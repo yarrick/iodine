@@ -140,11 +140,13 @@ close_dns(int fd)
 void
 dns_ping(int dns_fd)
 {
-	dns_query(dns_fd, "4.kryo.se", 1);
+	dns_write(dns_fd, dns_fd, 
+	 "AAAAAAAAAAAKRYOAAAAAAAAAAAKRYOAAAAAAAAAAAAAKRYOAAAAAAAAAAAAAKRYOAAAAAAAAAAAAAAAKRYOAAAAAAAAAAAAAKRYOAAAAAAAAAAAAAAAAAAB",
+	 119);
 }
 
 void 
-dns_query(int fd, char *host, int type)
+dns_query(int fd, int id, char *host, int type)
 {
 	char *p;
 	int len;
@@ -157,7 +159,7 @@ dns_query(int fd, char *host, int type)
 
 	header = (HEADER*)buf;	
 	
-	header->id = 0;
+	header->id = id;
 	header->qr = 0;
 	header->opcode = 0;
 	header->aa = 0;
@@ -177,6 +179,50 @@ dns_query(int fd, char *host, int type)
 
 	len = p - buf;
 	sendto(fd, buf, len+1, 0, (struct sockaddr*)&peer, peerlen);
+}
+
+int
+dns_write(int fd, int id, char *buf, int len)
+{
+	int avail;
+	int i;
+	int parts;
+	int p;
+	char data[256];
+	char *d;
+
+#define CHUNK 31
+// 31 bytes expands to 62 chars in domain
+// We just use hex as encoding right now
+
+	avail = 0xFF - strlen(topdomain) - 2;
+
+	avail /= 2; // use two chars per byte in encoding
+	avail -= (avail/CHUNK); // make space for parts
+
+	avail = MIN(avail, len); // do not use more bytes than is available;
+	d = data;
+
+	parts = avail / CHUNK;
+	for (p = 0; p < parts; p++) {
+		for (i = 0; i < CHUNK; i++) {
+			sprintf(d, "%02X", buf[p*CHUNK + i]);
+			d += 2;
+		}
+		*d++ = '.';
+		strcpy(d, topdomain);
+	}
+	parts = avail % CHUNK;
+	for (i = 0; i < parts; i++) {
+		sprintf(d, "%02X", buf[p*CHUNK + i]);
+		d += 2;
+	}
+	*d++ = '.';
+	strcpy(d, topdomain);
+	
+	printf("Resolving %s\n", data);
+	dns_query(fd, id, data, T_A);
+	return avail;
 }
 
 int
