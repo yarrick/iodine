@@ -19,9 +19,16 @@
 #ifndef _TUN_H_
 #define _TUN_H_
 
+struct tun_frame
+{
+	short flags;
+	short proto;
+	char data[];
+};
+
 int open_tun();
 void close_tun(int);
-int write_tun(int, uint8_t *, int);
-int read_tun(int, uint8_t *, int);
+int write_tun(int, struct tun_frame *, int);
+int read_tun(int, struct tun_frame *, int);
 
 #endif /* _TUN_H_ */

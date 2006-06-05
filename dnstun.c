@@ -21,12 +21,16 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <err.h>
 
 #include "tun.h"
 #include "dns.h"
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
+
+#define FRAMESIZE (64*1024)
 
 int running = 1;
 
@@ -41,9 +45,11 @@ tunnel(int tun_fd, int dns_fd)
 	int i;
 	int read;
 	fd_set fds;
-	char buf[4096];
 	struct timeval tv;
-	
+	struct tun_frame *frame;
+
+	frame = malloc(FRAMESIZE);
+
 	while (running) {
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
@@ -64,24 +70,31 @@ tunnel(int tun_fd, int dns_fd)
 		}
 		
 		if(i == 0) {
-			dns_ping(dns_fd);
+			//dns_ping(dns_fd);
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
-				read = read_tun(tun_fd, buf, sizeof(buf));
+				read = read_tun(tun_fd, frame, FRAMESIZE);
 				if (read > 0) {
+					int fd;
+
+					fd = open("moo", O_WRONLY | O_CREAT, S_IRGRP);
+					write(fd, frame->data, read - 4);
+					close(fd);
 					printf("Got data on tun! %d bytes\n", read);
-					dns_handle_tun(dns_fd, buf, read);
+					dns_handle_tun(dns_fd, frame->data, read - 4);
 				}
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dns_read(dns_fd, buf, sizeof(buf));
+				read = dns_read(dns_fd, frame->data, FRAMESIZE-4);
 				if (read > 0) {
 					printf("Got data on dns! %d bytes\n", read);
-					write_tun(tun_fd, buf, read);
+					write_tun(tun_fd, frame, read + 4);
 				}
 			} 
 		}
 	}
+
+	free(frame);
 
 	return 0;
 }

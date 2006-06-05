@@ -118,9 +118,9 @@ close_tun(int tun_fd)
 }
 
 int 
-write_tun(int tun_fd, uint8_t *buf, int len) 
+write_tun(int tun_fd, struct tun_frame *frame, int len) 
 {
-	if (write(tun_fd, buf, len) != len) {
+	if (write(tun_fd, frame, len) != len) {
 		warn("write_tun");
 		return 1;
 	}
@@ -129,8 +129,8 @@ write_tun(int tun_fd, uint8_t *buf, int len)
 }
 
 int 
-read_tun(int tun_fd, uint8_t *buf, int len) 
+read_tun(int tun_fd, struct tun_frame *frame, int len) 
 {
-	return read(tun_fd, buf, len);
+	return read(tun_fd, frame, len);
 }
 

@@ -45,8 +45,10 @@ tunnel(int tun_fd, int dns_fd)
 	int i;
 	int read;
 	fd_set fds;
-	char buf[64*1024];
 	struct timeval tv;
+	struct tun_frame *frame;
+
+	frame = malloc(64*1024);
 	
 	while (running) {
 		tv.tv_sec = 1;
@@ -68,17 +70,19 @@ tunnel(int tun_fd, int dns_fd)
 		
 		if(i != 0) {
 			if(FD_ISSET(tun_fd, &fds)) {
-				read = read_tun(tun_fd, buf, sizeof(buf));
+				read = read_tun(tun_fd, frame, 64*1024);
 				if(read > 0) 
-					dnsd_queuepacket(buf, read);
+					dnsd_queuepacket(frame->data, read - 4);
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dnsd_read(dns_fd, buf, sizeof(buf));
+				read = dnsd_read(dns_fd, frame->data, 64*1024-4);
 				if(read > 0)
-					write_tun(tun_fd, buf, read);
+					write_tun(tun_fd, frame, read + 4);
 			} 
 		}
 	}
+
+	free(frame);
 
 	return 0;
 }
