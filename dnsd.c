@@ -285,6 +285,10 @@ dnsd_read(int fd, char *buf, int buflen)
 					packetlen++;
 				}
 				dnsd_respond(fd, id, from);
+				if (lastblock && packetlen == 0) {
+					// Skipping ping packet
+					return 0;
+				}
 				if (lastblock) {
 					datalen = MIN(packetlen, buflen);
 					memcpy(buf, activepacket, datalen);
