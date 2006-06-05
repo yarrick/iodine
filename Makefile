@@ -13,17 +13,16 @@ stateos:
 	@echo OS is $(OS)
 
 $(OUT): $(OBJS)
+	@echo LD $@
 	@$(CC) $(OBJS) -o $(OUT) $(LDFLAGS)
 
 .c.o: 
-	@echo Compile $@
+	@echo CC $@
 	@$(CC) $(CFLAGS) $< -o $@
 
 clean:
-	rm -f $(OUT)
-	rm -f *~
-	rm -f *.o
-	rm -f *.core
+	@echo "Cleaning..."
+	@rm -f $(OUT) *~ *.o *.core
 
 run: $(OUT)
 	./$(OUT)
