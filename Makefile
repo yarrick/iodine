@@ -10,13 +10,14 @@ CFLAGS = -c -g -Wall -D$(OS)
 all: stateos $(OUT)
 
 stateos:
-	@echo Compiling for $(OS)
+	@echo OS is $(OS)
 
 $(OUT): $(OBJS)
-	$(CC) $(OBJS) -o $(OUT) $(LDFLAGS)
+	@$(CC) $(OBJS) -o $(OUT) $(LDFLAGS)
 
-%.o : %.c %.h
-	$(CC) $(CFLAGS) $< -o $@
+.c.o: 
+	@echo Compile $@
+	@$(CC) $(CFLAGS) $< -o $@
 
 clean:
 	rm -f $(OUT)
