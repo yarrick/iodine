@@ -261,6 +261,7 @@ dns_write(int fd, int id, char *buf, int len)
 {
 	int avail;
 	int i;
+	int final;
 	int parts;
 	int p;
 	char data[257];
@@ -276,7 +277,12 @@ dns_write(int fd, int id, char *buf, int len)
 	avail -= (avail/CHUNK); // make space for parts
 
 	avail = MIN(avail, len); // do not use more bytes than is available;
+	final = (avail == len);	// is this the last block?
 	d = data;
+
+	// First byte is 0 for middle packet and 1 for last packet
+	*d = '0' + final;
+	d++;
 
 	parts = avail / CHUNK;
 	for (p = 0; p < parts; p++) {
