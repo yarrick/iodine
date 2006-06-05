@@ -1,7 +1,5 @@
 /*
- * Copyright (c) 2006 
- * Bjorn Andersson <flex@kryo.se>,
- * Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,12 +41,13 @@ open_dns()
 
 	bzero(&addr, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = 0; 			// choose an available port
-	addr.sin_addr.s_addr = INADDR_ANY; 	// listen on 0.0.0.0
+	addr.sin_port = htons(0); 			// choose an available port
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);// listen on 0.0.0.0
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0) {
-		err(1, "Could not get UDP socket");
+		warn("Could not get UDP socket");
+		return 0;
 	}
 
 	flag = 1;
@@ -58,7 +57,8 @@ open_dns()
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
 
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-		err(1, "Could not bind UDP socket locally");
+		warn("Could not bind UDP socket locally");
+		return 0;
 	}
 
 	printf("Opened UDP socket\n");
