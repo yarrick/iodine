@@ -2,8 +2,15 @@ CC = gcc
 OUT = dnstun
 OBJS = dnstun.o tun.o
 
+OS = `uname | tr "a-z" "A-Z"`
+
 LDFLAGS = 
-CFLAGS = -c -g -Wall -D`uname | tr "a-z" "A-Z"`
+CFLAGS = -c -g -Wall -D$(OS)
+
+all: stateos $(OUT)
+
+stateos:
+	@echo Compiling for $(OS)
 
 $(OUT): $(OBJS)
 	$(CC) $(OBJS) -o $(OUT) $(LDFLAGS)
