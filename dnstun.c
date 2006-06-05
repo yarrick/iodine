@@ -17,12 +17,20 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <signal.h>
 #include <err.h>
 
 #include "tun.h"
 #include "dns.h"
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
+
+int running = 1;
+
+static void
+sigint(int sig) {
+	running = 0;
+}
 
 static int
 tunnel(int tun_fd, int dns_fd)
@@ -31,7 +39,7 @@ tunnel(int tun_fd, int dns_fd)
 	fd_set fds;
 	struct timeval tv;
 	
-	for (;;) {
+	while (running) {
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
 
@@ -69,10 +77,15 @@ main()
 
 	tun_fd = open_tun();
 	dns_fd = open_dns();
+
+	signal(SIGINT, sigint);
+	
 	dns_set_peer("192.168.11.101");
 	dns_query(dns_fd, "kryo.se", 1);
 
 	tunnel(tun_fd, dns_fd);
+
+	printf("Closing tunnel\n");
 
 	close_dns(dns_fd);
 	close_tun(tun_fd);	
