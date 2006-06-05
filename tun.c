@@ -59,7 +59,7 @@ open_tun()
 		snprintf(ifreq.ifr_name, IFNAMSIZ, "dns%d", i);
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
-			printf("opened %s\n", ifreq.ifr_name);
+			printf("Opened %s\n", ifreq.ifr_name);
 			return 0;
 		}
 
@@ -87,8 +87,10 @@ open_tun()
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
 
-			if ((tun_fd = open(tun_name, O_RDWR)) >= 0)
+			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
+				printf("Opened %s\n", tun_name);
 				return 0;
+			}
 
 			if (errno == ENOENT)
 				break;
