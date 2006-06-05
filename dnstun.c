@@ -56,7 +56,9 @@ tunnel(int tun_fd, int dns_fd)
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
 		
 		if(i < 0) {
-			warn("select");
+			if (running) {
+				warn("select");
+			}
 			return 1;
 		}
 		

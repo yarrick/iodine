@@ -133,10 +133,8 @@ int
 dns_read(int fd, char *buf, int len)
 {
 	int r;
-	int fromlen;
-	struct sockaddr_in from;
 
-	r = recvfrom(fd, buf, len, 0, (struct sockaddr*)&from, &fromlen);
+	r = recv(fd, buf, len, 0);
 	if (r < 0) {
 		perror("recvfrom");
 	}
