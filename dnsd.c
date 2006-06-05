@@ -198,22 +198,27 @@ dnsd_respond(int fd, short id, struct sockaddr_in from)
 	header->rd = 0;
 	header->ra = 0;
 
-	header->ancount = htons(1);
+	if(outbuflen > 0)
+		header->ancount = htons(1);
+	else
+		header->ancount = htons(0);
 
 	p = buf + sizeof(HEADER);
 	
 	p += host2dns("fluff", p, 5);	
-	PUTSHORT(T_PTR, p);
+	PUTSHORT(T_NULL, p);
 	PUTSHORT(C_IN, p);
 	PUTLONG(htons(3600), p);
 
-	size = host2dns("mupp", p+2, 4);
+	size = host2dns(outbuf, p+2, outbuflen);
 	PUTSHORT(size, p);
 	p += size;
 
 	len = p - buf;
 	printf("%d\n", len);
 	sendto(fd, buf, len, 0, (struct sockaddr*)&from, sizeof(from));
+
+	outbuflen = 0;
 }
 
 int

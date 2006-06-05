@@ -70,16 +70,11 @@ tunnel(int tun_fd, int dns_fd)
 		}
 		
 		if(i == 0) {
-			//dns_ping(dns_fd);
+			dns_ping(dns_fd);
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, frame, FRAMESIZE);
 				if (read > 0) {
-					int fd;
-
-					fd = open("moo", O_WRONLY | O_CREAT, S_IRGRP);
-					write(fd, frame->data, read - 4);
-					close(fd);
 					printf("Got data on tun! %d bytes\n", read);
 					dns_handle_tun(dns_fd, frame->data, read - 4);
 				}

@@ -185,7 +185,7 @@ dns_ping(int dns_fd)
 		printf("No reply on chunk, resending\n");
 		dns_send_chunk(dns_fd);
 	} else {
-		dns_write(dns_fd, dns_fd, "", 1);
+		dns_write(dns_fd, dns_fd, "", 0);
 	}
 }
 
