@@ -263,7 +263,7 @@ dns_write(int fd, int id, char *buf, int len)
 	int i;
 	int parts;
 	int p;
-	char data[256];
+	char data[257];
 	char *d;
 
 #define CHUNK 31
@@ -289,11 +289,11 @@ dns_write(int fd, int id, char *buf, int len)
 	}
 	parts = avail % CHUNK;
 	for (i = 0; i < parts; i++) {
-		sprintf(d, "%02X", buf[p*CHUNK + i]);
+		snprintf(d, 3, "%02X", buf[p*CHUNK + i]);
 		d += 2;
 	}
 	*d++ = '.';
-	strcpy(d, topdomain);
+	strncpy(d, topdomain, strlen(topdomain)+1);
 	
 	printf("Resolving %s\n", data);
 	dns_query(fd, id, data, T_A);
