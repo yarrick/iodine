@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
@@ -76,18 +77,21 @@ tunnel(int tun_fd, int dns_fd)
 }
 
 int
-main()
+main(int argc, char **argv)
 {
 	int tun_fd;
 	int dns_fd;
 
+	if (argc != 3) {
+		printf("Usage: %s nameserver topdomain\n", argv[0]);
+		exit(2);
+	}
+
 	tun_fd = open_tun();
-	dns_fd = open_dns();
+	dns_fd = open_dns(argv[1], argv[2]);
 
 	signal(SIGINT, sigint);
 	
-	dns_set_peer("192.168.11.101");
-
 	tunnel(tun_fd, dns_fd);
 
 	printf("Closing tunnel\n");

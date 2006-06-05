@@ -83,11 +83,12 @@ readname(char *packet, char *dst, char *src)
 	memcpy((dst), (src), (len)); (src)+=(len);
 
 int 
-open_dns() 
+open_dns(const char *host, const char *domain) 
 {
 	int fd;
 	int flag;
 	struct sockaddr_in addr;
+	struct hostent *h;
 
 	bzero(&addr, sizeof(addr));
 	addr.sin_family = AF_INET;
@@ -113,6 +114,20 @@ open_dns()
 
 	printf("Opened UDP socket\n");
 
+	// Init dns target struct
+	h = gethostbyname(host);
+	if (!h) {
+		perror("gethostbyname");
+	}
+	bzero(&peer, sizeof(peer));
+	peer.sin_family = AF_INET;
+	peer.sin_port = htons(53);
+	peer.sin_addr = *((struct in_addr *) h->h_addr);
+
+	// Save top domain used
+	strncpy(topdomain, domain, sizeof(topdomain) - 2);
+	topdomain[sizeof(topdomain) - 1] = 0;
+
 	return fd;
 }
 
@@ -123,21 +138,9 @@ close_dns(int fd)
 }
 
 void
-dns_set_peer(const char *host)
-{
-	struct hostent *h;
-
-	h = gethostbyname(host);
-	bzero(&peer, sizeof(peer));
-	peer.sin_family = AF_INET;
-	peer.sin_port = htons(53);
-	peer.sin_addr = *((struct in_addr *) h->h_addr);
-}
-
-void
 dns_ping(int dns_fd)
 {
-	dns_query(dns_fd, "kryo.se", 1);
+	dns_query(dns_fd, "4.kryo.se", 1);
 }
 
 void 

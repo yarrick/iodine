@@ -19,10 +19,9 @@
 
 extern struct sockaddr_in peer;
 
-int open_dns();
+int open_dns(const char *, const char *);
 void close_dns(int);
 
-void dns_set_peer(const char *);
 void dns_ping(int);
 void dns_query(int, char *, int);
 int dns_read(int, char *, int);
