@@ -25,6 +25,7 @@
 
 #include "tun.h"
 #include "dns.h"
+#include "dnsd.h"
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -61,14 +62,12 @@ tunnel(int tun_fd, int dns_fd)
 			return 1;
 		}
 		
-		if(i == 0) {
-			dns_ping(dns_fd);
-		} else {
+		if(i != 0) {
 			if(FD_ISSET(tun_fd, &fds)) {
 				
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dns_read(dns_fd, buf, sizeof(buf));
+				read = dnsd_read(dns_fd, buf, sizeof(buf));
 			} 
 		}
 	}
@@ -80,23 +79,23 @@ int
 main(int argc, char **argv)
 {
 	int tun_fd;
-	int dns_fd;
+	int dnsd_fd;
 
-	if (argc != 3) {
-		printf("Usage: %s nameserver topdomain\n", argv[0]);
+	if (argc != 2) {
+		printf("Usage: %s topdomain\n", argv[0]);
 		exit(2);
 	}
 
 	tun_fd = open_tun();
-	dns_fd = open_dns(argv[1], argv[2]);
+	dnsd_fd = open_dnsd(argv[1]);
 
 	signal(SIGINT, sigint);
 	
-	tunnel(tun_fd, dns_fd);
+	tunnel(tun_fd, dnsd_fd);
 
 	printf("Closing tunnel\n");
 
-	close_dns(dns_fd);
+	close_dnsd(dnsd_fd);
 	close_tun(tun_fd);	
 
 	return 0;

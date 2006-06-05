@@ -1,20 +1,26 @@
 CC = gcc
-OUT = dnstun
-OBJS = dnstun.o tun.o dns.o
+DNS = dnstun
+DNSOBJS = dnstun.o tun.o dns.o
+DNSD = dnstund
+DNSDOBJS = dnstund.o tun.o dnsd.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
 LDFLAGS = 
 CFLAGS = -c -g -Wall -D$(OS)
 
-all: stateos $(OUT)
+all: stateos $(DNS) $(DNSD)
 
 stateos:
 	@echo OS is $(OS)
 
-$(OUT): $(OBJS)
+$(DNS): $(DNSOBJS)
 	@echo LD $@
-	@$(CC) $(OBJS) -o $(OUT) $(LDFLAGS)
+	@$(CC) $(DNSOBJS) -o $(DNS) $(LDFLAGS)
+
+$(DNSD): $(DNSDOBJS)
+	@echo LD $@
+	@$(CC) $(DNSDOBJS) -o $(DNSD) $(LDFLAGS)
 
 .c.o: 
 	@echo CC $<
@@ -22,7 +28,5 @@ $(OUT): $(OBJS)
 
 clean:
 	@echo "Cleaning..."
-	@rm -f $(OUT) *~ *.o *.core
+	@rm -f $(DNS) $(DNSD) *~ *.o *.core
 
-run: $(OUT)
-	./$(OUT)
