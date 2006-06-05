@@ -30,6 +30,8 @@
 
 #include "dns.h"
 
+static int host2dns(const char *, char *, int);
+
 struct sockaddr_in peer;
 
 int 
@@ -82,4 +84,67 @@ dns_set_peer(const char *host)
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons(53);
 	peer.sin_addr = *((struct in_addr *) h->h_addr);
+}
+
+void 
+dns_query(int fd, char *host, int type)
+{
+	char *p;
+	int len;
+	int peerlen;
+	char buf[1024];
+	HEADER *header;
+	
+	len = 0;
+	memset(buf, 0, sizeof(buf));
+
+	header = (HEADER*)buf;	
+	
+	header->id = 0;
+	header->qr = 0;
+	header->opcode = 0;
+	header->aa = 0;
+	header->tc = 0;
+	header->rd = 1;
+	header->ra = 0;
+
+	header->qdcount = htons(1);
+
+	p = buf + sizeof(HEADER);
+	p += host2dns(host, p, strlen(host));	
+
+	PUTSHORT(type, p);
+	PUTSHORT(C_IN, p);
+
+	peerlen = sizeof(peer);
+
+	len = p - buf;
+	sendto(fd, buf, len+1, 0, (struct sockaddr*)&peer, peerlen);
+}
+
+static int
+host2dns(const char *host, char *buffer, int size)
+{
+	char *h;
+	char *p;
+	char *word;
+
+	h = strdup(host);
+	memset(buffer, 0, size);
+	p = buffer;
+	
+	word = strtok(h, ".");
+	while(word) {
+		*p++ = (char)strlen(word);
+		memcpy(p, word, strlen(word));
+		p += strlen(word);
+
+		word = strtok(NULL, ".");
+	}
+
+	*p++ = 0;
+
+	free(h);
+
+	return p - buffer;
 }

@@ -28,6 +28,7 @@ main()
 	open_tun();
 	dnssock = open_dns();
 	dns_set_peer("192.168.11.101");
+	dns_query(dnssock, "kryo.se", 1);
 
 	close_dns(dnssock);
 	close_tun();	
