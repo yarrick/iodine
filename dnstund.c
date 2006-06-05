@@ -21,6 +21,8 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <err.h>
 
 #include "tun.h"
@@ -30,6 +32,7 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 int running = 1;
+
 
 static void
 sigint(int sig) {
@@ -42,7 +45,7 @@ tunnel(int tun_fd, int dns_fd)
 	int i;
 	int read;
 	fd_set fds;
-	char buf[1024];
+	char buf[64*1024];
 	struct timeval tv;
 	
 	while (running) {
@@ -50,7 +53,8 @@ tunnel(int tun_fd, int dns_fd)
 		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
-		FD_SET(tun_fd, &fds);
+		if(!dnsd_haspacket())
+			FD_SET(tun_fd, &fds);
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
@@ -64,10 +68,23 @@ tunnel(int tun_fd, int dns_fd)
 		
 		if(i != 0) {
 			if(FD_ISSET(tun_fd, &fds)) {
-				
+				read = read_tun(tun_fd, buf, sizeof(buf));
+				if(read > 0) 
+					dnsd_queuepacket(buf, read);
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, buf, sizeof(buf));
+				int fd;
+
+				if(read > 0) {
+					fd = open("moo", O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+					write(fd, buf, read);
+					close(fd);
+				}
+				/*
+				if(read > 0)
+					write_tun(tun_fd, buf, read);
+					*/
 			} 
 		}
 	}

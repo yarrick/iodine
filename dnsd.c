@@ -36,8 +36,11 @@ struct sockaddr_in peer;
 char topdomain[256];
 
 // Current IP packet
-char activepacket[4096];
 int packetlen;
+char activepacket[4096];
+
+int outbuflen;
+char outbuf[64*1024];
 
 static int
 readname(char *packet, char *dst, char *src)
@@ -157,6 +160,20 @@ host2dns(const char *host, char *buffer, int size)
 	free(h);
 
 	return p - buffer;
+}
+
+int
+dnsd_haspacket()
+{
+	return (outbuflen > 0);
+}
+
+void
+dnsd_queuepacket(const char *buf, const int buflen)
+{
+	memcpy(outbuf, buf, buflen);	
+
+	outbuflen = buflen;
 }
 
 static void

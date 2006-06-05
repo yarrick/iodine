@@ -24,5 +24,8 @@ void close_dnsd(int);
 
 int dnsd_read(int, char *, int);
 
+int dnsd_haspacket();
+void dnsd_queuepacket(const char *, const int);
+
 
 #endif /* _DNSD_H_ */

@@ -121,7 +121,7 @@ int
 write_tun(int tun_fd, uint8_t *buf, int len) 
 {
 	if (write(tun_fd, buf, len) != len) {
-		warn("write_tun: %s", strerror(errno));
+		warn("write_tun");
 		return 1;
 	}
 
