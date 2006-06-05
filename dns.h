@@ -16,23 +16,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdio.h>
-#include <stdint.h>
+#ifndef _DNS_H_
+#define _DNS_H_
 
-#include "tun.h"
-#include "dns.h"
+int open_dns();
+void close_dns(int);
 
-int
-main()
-{
-	int dnssock;
-
-	open_tun();
-	dnssock = open_dns();
-	
-
-	close_dns(dnssock);
-	close_tun();	
-
-	return 0;
-}
+#endif /* _DNS_H_ */

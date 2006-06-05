@@ -1,6 +1,6 @@
 CC = gcc
 OUT = dnstun
-OBJS = dnstun.o tun.o
+OBJS = dnstun.o tun.o dns.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
