@@ -41,8 +41,8 @@ open_dns()
 
 	bzero(&addr, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(0); 			// choose an available port
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);// listen on 0.0.0.0
+	addr.sin_port = htons(0);
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0) {
