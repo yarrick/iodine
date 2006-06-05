@@ -185,7 +185,7 @@ dns_ping(int dns_fd)
 		printf("No reply on chunk, resending\n");
 		dns_send_chunk(dns_fd);
 	} else {
-		dns_write(dns_fd, dns_fd, "", 0);
+		dns_write(dns_fd, chunkid++, "", 0);
 	}
 }
 
@@ -258,19 +258,22 @@ dns_write(int fd, int id, char *buf, int len)
 
 	avail = MIN(avail, len); // do not use more bytes than is available;
 	final = (avail == len);	// is this the last block?
+	bzero(data, sizeof(data));
 	d = data;
 
 	// First byte is 0 for middle packet and 1 for last packet
 	*d = '0' + final;
 	d++;
 
-	for (i = 0; i < avail; i++) {
-		if (i > 0 && i % 31 == 0) {
-			*d = '.';
-			d++;
+	if (len > 0) {
+		for (i = 0; i < avail; i++) {
+			if (i > 0 && i % 31 == 0) {
+				*d = '.';
+				d++;
+			}
+			put_hex(d, buf[i]);
+			d += 2;
 		}
-		put_hex(d, buf[i]);
-		d += 2;
 	}
 	if (*d != '.') {
 		*d++ = '.';

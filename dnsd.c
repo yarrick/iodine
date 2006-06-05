@@ -290,8 +290,9 @@ dnsd_read(int fd, char *buf, int buflen)
 					packetlen++;
 				}
 				dnsd_respond(fd, id, from);
-				if (lastblock && packetlen == 0) {
+				if (lastblock && packetlen < 2) {
 					// Skipping ping packet
+					packetlen = 0;
 					return 0;
 				}
 				if (lastblock) {
