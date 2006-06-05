@@ -49,7 +49,7 @@ open_dns()
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0) {
-		warn("Could not get UDP socket");
+		warn("socket");
 		return 0;
 	}
 
@@ -60,7 +60,7 @@ open_dns()
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
 
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-		warn("Could not bind UDP socket locally");
+		warn("bind");
 		return 0;
 	}
 
