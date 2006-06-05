@@ -17,7 +17,7 @@ $(OUT): $(OBJS)
 	@$(CC) $(OBJS) -o $(OUT) $(LDFLAGS)
 
 .c.o: 
-	@echo CC $@
+	@echo CC $<
 	@$(CC) $(CFLAGS) $< -o $@
 
 clean:
