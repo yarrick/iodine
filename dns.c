@@ -86,6 +86,12 @@ dns_set_peer(const char *host)
 	peer.sin_addr = *((struct in_addr *) h->h_addr);
 }
 
+void
+dns_ping()
+{
+
+}
+
 void 
 dns_query(int fd, char *host, int type)
 {

@@ -28,7 +28,6 @@
 
 #define TUN_MAX_TRY 50
 
-int tun_fd = -1;
 char *tun_device = NULL;
 
 #ifdef LINUX
@@ -40,15 +39,16 @@ char *tun_device = NULL;
 int 
 open_tun() 
 {
-	struct ifreq ifreq;
 	int i;
+	int tun_fd;
+	struct ifreq ifreq;
 
 	if (tun_device == NULL)
 		tun_device = "/dev/net/tun";
 
 	if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
 		warn("open_tun: %s: %s", tun_device, strerror(errno));
-		return 1;
+		return 0;
 	}
 
 	bzero(&ifreq, sizeof(ifreq));
@@ -60,18 +60,18 @@ open_tun()
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			printf("Opened %s\n", ifreq.ifr_name);
-			return 0;
+			return tun_fd;
 		}
 
 		if (errno != EBUSY) {
 			warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
-			return 1;
+			return 0;
 		}
 	}
 
 	warn("open_tun: Couldn't set interface name.\n");
 
-	return 1;
+	return 0;
 }
 
 #else /* BSD */
@@ -79,21 +79,22 @@ open_tun()
 int 
 open_tun() 
 {
+	int i;
+	int tun_fd;
+	char tun_name[50];
+
 	if (tun_device != NULL) {
 		if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
 			warn("open_tun: %s: %s", tun_device, strerror(errno));
-			return 1;
+			return 0;
 		}
 	} else {
-		char tun_name[50];
-		int i;
-
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
 
 			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
 				printf("Opened %s\n", tun_name);
-				return 0;
+				return tun_fd;
 			}
 
 			if (errno == ENOENT)
@@ -101,7 +102,7 @@ open_tun()
 		}
 
 		warn("open_tun: Failed to open tunneling device.");
-		return 1;
+		return 0;
 	}
 
 	return 0;
@@ -110,14 +111,14 @@ open_tun()
 #endif /* LINUX */
 
 void 
-close_tun() 
+close_tun(int tun_fd) 
 {
 	if (tun_fd >= 0)
 		close(tun_fd);
 }
 
 int 
-write_tun(uint8_t *buf, int len) 
+write_tun(int tun_fd, uint8_t *buf, int len) 
 {
 	if (write(tun_fd, buf, len) != len) {
 		warn("write_tun: %s", strerror(errno));
@@ -128,7 +129,7 @@ write_tun(uint8_t *buf, int len)
 }
 
 int 
-read_tun(uint8_t *buf, int len) 
+read_tun(int tun_fd, uint8_t *buf, int len) 
 {
 	return read(tun_fd, buf, len);
 }

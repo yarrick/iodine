@@ -19,12 +19,9 @@
 #ifndef _TUN_H_
 #define _TUN_H_
 
-extern char *tun_device;
-extern int tun_fd;
-
 int open_tun();
-void close_tun();
-int write_tun(uint8_t *buf, int len);
-int read_tun(uint8_t *buf, int len);
+void close_tun(int);
+int write_tun(int, uint8_t *, int);
+int read_tun(int, uint8_t *, int);
 
 #endif /* _TUN_H_ */

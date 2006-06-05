@@ -16,22 +16,66 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
+#include <err.h>
 
 #include "tun.h"
 #include "dns.h"
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+
+static int
+tunnel(int tun_fd, int dns_fd)
+{
+	int i;
+	fd_set fds;
+	struct timeval tv;
+	
+	for (;;) {
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+
+		FD_ZERO(&fds);
+		FD_SET(tun_fd, &fds);
+		FD_SET(dns_fd, &fds);
+
+		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
+		
+		if(i < 0) {
+			warn("select");
+			return 1;
+		}
+		
+		if(i == 0) {
+			dns_ping();	
+		} else {
+			if(FD_ISSET(tun_fd, &fds)) {
+					
+			}
+			if(FD_ISSET(dns_fd, &fds)) {
+				
+			} 
+		}
+	}
+
+	return 0;
+}
+
 int
 main()
 {
-	int dnssock;
+	int tun_fd;
+	int dns_fd;
 
-	open_tun();
-	dnssock = open_dns();
+	tun_fd = open_tun();
+	dns_fd = open_dns();
 	dns_set_peer("192.168.11.101");
-	dns_query(dnssock, "kryo.se", 1);
+	dns_query(dns_fd, "kryo.se", 1);
 
-	close_dns(dnssock);
-	close_tun();	
+	tunnel(tun_fd, dns_fd);
+
+	close_dns(dns_fd);
+	close_tun(tun_fd);	
 
 	return 0;
 }

@@ -25,6 +25,8 @@ int open_dns();
 void close_dns(int);
 
 void dns_set_peer(const char *);
+void dns_ping();
 void dns_query(int, char *, int);
+
 
 #endif /* _DNS_H_ */
