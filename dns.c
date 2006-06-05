@@ -21,6 +21,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+#include <netdb.h>
 #include <time.h>
 #include <err.h>
 #include <stdio.h>
@@ -30,6 +31,8 @@
 #include <ctype.h>
 
 #include "dns.h"
+
+struct sockaddr_in peer;
 
 int 
 open_dns() 
@@ -67,4 +70,16 @@ void
 close_dns(int fd)
 {
 	close(fd);
+}
+
+void
+dns_set_peer(const char *host)
+{
+	struct hostent *h;
+
+	h = gethostbyname(host);
+	bzero(&peer, sizeof(peer));
+	peer.sin_family = AF_INET;
+	peer.sin_port = htons(53);
+	peer.sin_addr = *((struct in_addr *) h->h_addr);
 }

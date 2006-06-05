@@ -19,7 +19,11 @@
 #ifndef _DNS_H_
 #define _DNS_H_
 
+extern struct sockaddr_in peer;
+
 int open_dns();
 void close_dns(int);
+
+void dns_set_peer(const char *);
 
 #endif /* _DNS_H_ */
