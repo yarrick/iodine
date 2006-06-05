@@ -89,8 +89,8 @@ tunnel(int tun_fd, int dns_fd)
 				if (read > 0) {
 					printf("Got data on dns! %d bytes\n", read);
 
-					frame->flags = 0x0000;
-					frame->proto = 0x0800;
+					frame->flags = htons(0x0000);
+					frame->proto = htons(0x0800);
 					write_tun(tun_fd, frame, read + 4);
 				}
 			} 
