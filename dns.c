@@ -225,14 +225,25 @@ dns_query(int fd, int id, char *host, int type)
 	sendto(fd, buf, len, 0, (struct sockaddr*)&peer, peerlen);
 }
 
+static char to_hex[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
+static void
+put_hex(char *p, char h)
+{
+	int t;
+
+	t = (h & 0xF0) >> 4;
+	p[0] = to_hex[t];
+	t = h & 0x0F;
+	p[1] = to_hex[t];
+}
+
 int
 dns_write(int fd, int id, char *buf, int len)
 {
 	int avail;
 	int i;
 	int final;
-	int parts;
-	int p;
 	char data[257];
 	char *d;
 
@@ -253,20 +264,17 @@ dns_write(int fd, int id, char *buf, int len)
 	*d = '0' + final;
 	d++;
 
-	parts = avail / CHUNK;
-	for (p = 0; p < parts; p++) {
-		for (i = 0; i < CHUNK; i++) {
-			snprintf(d, 3, "%02X", buf[p*CHUNK + i]);
-			d += 2;
+	for (i = 0; i < avail; i++) {
+		if (i > 0 && i % 31 == 0) {
+			*d = '.';
+			d++;
 		}
-		*d++ = '.';
-	}
-	parts = avail % CHUNK;
-	for (i = 0; i < parts; i++) {
-		snprintf(d, 3, "%02X", buf[p*CHUNK + i]);
+		put_hex(d, buf[i]);
 		d += 2;
 	}
-	*d++ = '.';
+	if (*d != '.') {
+		*d++ = '.';
+	}
 	strncpy(d, topdomain, strlen(topdomain)+1);
 	
 	printf("Resolving %s\n", data);
