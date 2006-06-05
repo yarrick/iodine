@@ -48,8 +48,10 @@ open_tun()
 	if (tun_device == NULL)
 		tun_device = "/dev/net/tun";
 
-	if ((tun_fd = open(tun_device, O_RDWR)) < 0) 
-		err(1, "open_tun: %s: %s", tun_device, strerror(errno));
+	if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
+		warn("open_tun: %s: %s", tun_device, strerror(errno));
+		return 1;
+	}
 
 	bzero(&ifreq, sizeof(ifreq));
 
@@ -63,11 +65,13 @@ open_tun()
 			return 0;
 		}
 
-		if (errno != EBUSY) 
-			err(1, "open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+		if (errno != EBUSY) {
+			warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+			return 1;
+		}
 	}
 
-	err(1, "open_tun: Couldn't set interface name.\n");
+	warn("open_tun: Couldn't set interface name.\n");
 
 	return 1;
 }
@@ -78,8 +82,10 @@ int
 open_tun() 
 {
 	if (tun_device != NULL) {
-		if ((tun_fd = open(tun_device, O_RDWR)) < 0) 
-			err(1, "open_tun: %s: %s", tun_device, strerror(errno));
+		if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
+			warn("open_tun: %s: %s", tun_device, strerror(errno));
+			return 1;
+		}
 	} else {
 		char tun_name[50];
 		int i;
@@ -96,7 +102,8 @@ open_tun()
 				break;
 		}
 
-		err(1, "open_tun: Failed to open tunneling device.");
+		warn("open_tun: Failed to open tunneling device.");
+		return 1;
 	}
 
 	return 0;
@@ -114,8 +121,10 @@ close_tun()
 int 
 write_tun(uint8_t *buf, int len) 
 {
-	if (write(tun_fd, buf, len) != len) 
-		err(1, "write_tun: %s", strerror(errno));
+	if (write(tun_fd, buf, len) != len) {
+		warn("write_tun: %s", strerror(errno));
+		return 1;
+	}
 
 	return 0;
 }
