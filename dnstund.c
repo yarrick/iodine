@@ -76,8 +76,11 @@ tunnel(int tun_fd, int dns_fd)
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, frame->data, 64*1024-4);
-				if(read > 0)
+				if(read > 0) {
+					frame->flags = 0x0000;
+					frame->proto = 0x0800;
 					write_tun(tun_fd, frame, read + 4);
+				}
 			} 
 		}
 	}

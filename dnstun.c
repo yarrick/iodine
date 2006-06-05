@@ -88,6 +88,9 @@ tunnel(int tun_fd, int dns_fd)
 				read = dns_read(dns_fd, frame->data, FRAMESIZE-4);
 				if (read > 0) {
 					printf("Got data on dns! %d bytes\n", read);
+
+					frame->flags = 0x0000;
+					frame->proto = 0x0800;
 					write_tun(tun_fd, frame, read + 4);
 				}
 			} 
