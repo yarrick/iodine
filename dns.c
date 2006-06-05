@@ -35,6 +35,13 @@ static int host2dns(const char *, char *, int);
 struct sockaddr_in peer;
 char topdomain[256];
 
+// Current IP packet
+char activepacket[4096];
+int lastlen;
+int packetpos;
+int packetlen;
+uint16_t chunkid;
+
 static int
 readname(char *packet, char *dst, char *src)
 {
@@ -128,6 +135,9 @@ open_dns(const char *host, const char *domain)
 	strncpy(topdomain, domain, sizeof(topdomain) - 2);
 	topdomain[sizeof(topdomain) - 1] = 0;
 
+	// Init chunk id
+	chunkid = 0;
+
 	return fd;
 }
 
@@ -137,12 +147,77 @@ close_dns(int fd)
 	close(fd);
 }
 
+int
+dns_sending()
+{
+	return (packetlen != 0);
+}
+
+static void
+dns_send_chunk(int fd)
+{
+	int avail;
+	char *p;
+
+	p = activepacket;
+	p += packetpos;
+	avail = packetlen - packetpos;
+	lastlen = dns_write(fd, ++chunkid, p, avail);
+	printf("Sent %d bytes of %d remaining\n", lastlen, avail);
+}
+
+void
+dns_handle_tun(int fd, char *data, int len)
+{
+	memcpy(activepacket, data, MIN(len, sizeof(activepacket)));
+	lastlen = 0;
+	packetpos = 0;
+	packetlen = len;
+
+	dns_send_chunk(fd);
+}
+
+static int
+dns_handle_reply(int fd, char *data, int len)
+{
+	uint16_t id;
+	char *p;
+
+	p = data;
+	READSHORT(id, p);
+
+	// Handle ACKing
+	if (dns_sending() && id == chunkid) {
+		// Got ACK on sent packet
+		packetpos += lastlen;
+		if (packetpos == packetlen) {
+			// Packet completed
+			printf("IP packet size %d sent successfully!\n", packetlen);
+			packetpos = 0;
+			packetlen = 0;
+			lastlen = 0;
+		} else {
+			// More to send
+			dns_send_chunk(fd);
+		}
+	}
+
+	// Detect if any data is attached
+	// TODO
+	
+	return 0;
+}
+
 void
 dns_ping(int dns_fd)
 {
-	dns_write(dns_fd, dns_fd, 
-	 "AAAAAAAAAAAKRYOAAAAAAAAAAAKRYOAAAAAAAAAAAAAKRYOAAAAAAAAAAAAAKRYOAAAAAAAAAAAAAAAKRYOAAAAAAAAAAAAAKRYOAAAAAAAAAAAAAAAAAAB",
-	 119);
+	if (dns_sending()) {
+		// Resend latest chunk
+		printf("No reply on chunk, resending\n");
+		dns_send_chunk(dns_fd);
+	} else {
+		dns_write(dns_fd, dns_fd, "\0", 1);
+	}
 }
 
 void 
@@ -178,7 +253,7 @@ dns_query(int fd, int id, char *host, int type)
 	peerlen = sizeof(peer);
 
 	len = p - buf;
-	sendto(fd, buf, len+1, 0, (struct sockaddr*)&peer, peerlen);
+	sendto(fd, buf, len, 0, (struct sockaddr*)&peer, peerlen);
 }
 
 int
@@ -248,7 +323,7 @@ dns_read(int fd, char *buf, int buflen)
 	printf("Read %d bytes DNS reply\n", r);
 
 	if(r == -1) {
-		perror("recvfrom");
+		perror("recv");
 	} else {
 		header = (HEADER*)packet;
 		
@@ -277,8 +352,10 @@ dns_read(int fd, char *buf, int buflen)
 					READSHORT(port, r);
 					READNAME(packet, host, r);
 				}
-				printf("%s\n", name);
+			//	printf("%s\n", name);
 			}
+			// Is any data attached?
+			return dns_handle_reply(fd, packet, r);
 		}
 	}
 

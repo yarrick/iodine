@@ -150,7 +150,7 @@ host2dns(const char *host, char *buffer, int size)
 }
 
 static void
-dnsd_respond(int fd, struct sockaddr_in from)
+dnsd_respond(int fd, short id, struct sockaddr_in from)
 {
 	int len;
 	int size;
@@ -163,7 +163,7 @@ dnsd_respond(int fd, struct sockaddr_in from)
 	len = 0;
 	header = (HEADER*)buf;	
 
-	header->id = 0;
+	header->id = id;
 	header->qr = 1;
 	header->opcode = 0;
 	header->aa = 1;
@@ -194,6 +194,7 @@ dnsd_read(int fd, char *buf, int buflen)
 {
 	int i;
 	int r;
+	short id;
 	short type;
 	short class;
 	short qdcount;
@@ -214,6 +215,8 @@ dnsd_read(int fd, char *buf, int buflen)
 	} else {
 		header = (HEADER*)packet;
 		
+		id = ntohs(header->id);
+
 		data = packet + sizeof(HEADER);
 
 		if(!header->qr) {
@@ -227,7 +230,7 @@ dnsd_read(int fd, char *buf, int buflen)
 				
 				printf("%s %d %d\n", name, type, class);
 				
-				dnsd_respond(fd, from);
+				dnsd_respond(fd, id, from);
 			}
 		}
 	}

@@ -41,7 +41,7 @@ tunnel(int tun_fd, int dns_fd)
 	int i;
 	int read;
 	fd_set fds;
-	char buf[1024];
+	char buf[4096];
 	struct timeval tv;
 	
 	while (running) {
@@ -49,7 +49,9 @@ tunnel(int tun_fd, int dns_fd)
 		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
-		FD_SET(tun_fd, &fds);
+		if (!dns_sending()) {
+			FD_SET(tun_fd, &fds);
+		}
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
@@ -65,10 +67,18 @@ tunnel(int tun_fd, int dns_fd)
 			dns_ping(dns_fd);
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
-				
+				read = read_tun(tun_fd, buf, sizeof(buf));
+				if (read > 0) {
+					printf("Got data on tun! %d bytes\n", read);
+					dns_handle_tun(dns_fd, buf, read);
+				}
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dns_read(dns_fd, buf, sizeof(buf));
+				if (read > 0) {
+					printf("Got data on dns! %d bytes\n", read);
+					write_tun(tun_fd, buf, read);
+				}
 			} 
 		}
 	}
