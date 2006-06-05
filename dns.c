@@ -281,11 +281,10 @@ dns_write(int fd, int id, char *buf, int len)
 	parts = avail / CHUNK;
 	for (p = 0; p < parts; p++) {
 		for (i = 0; i < CHUNK; i++) {
-			sprintf(d, "%02X", buf[p*CHUNK + i]);
+			snprintf(d, 3, "%02X", buf[p*CHUNK + i]);
 			d += 2;
 		}
 		*d++ = '.';
-		strcpy(d, topdomain);
 	}
 	parts = avail % CHUNK;
 	for (i = 0; i < parts; i++) {
