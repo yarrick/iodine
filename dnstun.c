@@ -38,13 +38,11 @@ static int
 tunnel(int tun_fd, int dns_fd)
 {
 	int i;
-	fd_set fds;
-	struct timeval tv;
-	char buf[1024];
-	int buflen;
 	int read;
+	fd_set fds;
+	char buf[1024];
+	struct timeval tv;
 	
-	buflen = 1024;
 	while (running) {
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
@@ -69,7 +67,7 @@ tunnel(int tun_fd, int dns_fd)
 					
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dns_read(dns_fd, buf, buflen);
+				read = dns_read(dns_fd, buf, sizeof(buf));
 			} 
 		}
 	}
