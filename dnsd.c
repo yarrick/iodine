@@ -35,6 +35,10 @@ static int host2dns(const char *, char *, int);
 struct sockaddr_in peer;
 char topdomain[256];
 
+// Current IP packet
+char activepacket[4096];
+int packetlen;
+
 static int
 readname(char *packet, char *dst, char *src)
 {
@@ -112,6 +116,12 @@ open_dnsd(const char *domain)
 	}
 
 	printf("Opened UDP socket\n");
+	
+	// Save top domain used
+	strncpy(topdomain, domain, sizeof(topdomain) - 2);
+	topdomain[sizeof(topdomain) - 1] = 0;
+
+	packetlen = 0;
 
 	return fd;
 }
@@ -205,6 +215,13 @@ dnsd_read(int fd, char *buf, int buflen)
 	char packet[64*1024];
 	struct sockaddr_in from;
 
+	char lastblock;
+	char *np;
+	char *domainstart;
+	int namelen;
+	char *packetp;
+	int datalen;
+
 	addrlen = sizeof(struct sockaddr);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 
@@ -228,9 +245,38 @@ dnsd_read(int fd, char *buf, int buflen)
 				READSHORT(type, data);
 				READSHORT(class, data);
 				
-				printf("%s %d %d\n", name, type, class);
-				
+				lastblock = name[0] - '0';
+				np = name;
+				np++; // skip first byte, it has only fragmentation info
+				domainstart = strstr(np, topdomain);
+				if (!domainstart) {
+					fprintf(stderr, "Resolved domain does not end with %s! Ignoring packet\n", topdomain);
+					return 0;
+				}
+				namelen = (int) domainstart - (int) np;
+				*domainstart = '\0';
+				packetp = activepacket;
+				packetp += packetlen;
+				while (np < domainstart && packetlen < sizeof(activepacket)) {
+					if (*np == '.') {
+						np++;
+					} 
+					sscanf(np, "%02X", &r);
+					*packetp = r & 0xFF;
+					np += 2;
+					packetp++;
+					packetlen++;
+				}
 				dnsd_respond(fd, id, from);
+				if (lastblock) {
+					datalen = MIN(packetlen, buflen);
+					memcpy(buf, activepacket, datalen);
+					packetlen = 0;
+					printf("Got full packet, returning %d bytes!\n", datalen);
+					return datalen;
+				} else {
+					return 0;
+				}
 			}
 		}
 	}
