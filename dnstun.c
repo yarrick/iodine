@@ -18,6 +18,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <signal.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include <err.h>
 
 #include "tun.h"
@@ -38,7 +40,11 @@ tunnel(int tun_fd, int dns_fd)
 	int i;
 	fd_set fds;
 	struct timeval tv;
+	char buf[1024];
+	int buflen;
+	int read;
 	
+	buflen = 1024;
 	while (running) {
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
@@ -55,13 +61,13 @@ tunnel(int tun_fd, int dns_fd)
 		}
 		
 		if(i == 0) {
-			dns_ping();	
+			dns_ping(dns_fd);
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
 					
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				
+				read = dns_read(dns_fd, buf, buflen);
 			} 
 		}
 	}
@@ -81,7 +87,6 @@ main()
 	signal(SIGINT, sigint);
 	
 	dns_set_peer("192.168.11.101");
-	dns_query(dns_fd, "kryo.se", 1);
 
 	tunnel(tun_fd, dns_fd);
 

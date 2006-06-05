@@ -33,6 +33,7 @@
 static int host2dns(const char *, char *, int);
 
 struct sockaddr_in peer;
+char topdomain[256];
 
 int 
 open_dns() 
@@ -87,9 +88,9 @@ dns_set_peer(const char *host)
 }
 
 void
-dns_ping()
+dns_ping(int dns_fd)
 {
-
+	dns_query(dns_fd, "kryo.se", 1);
 }
 
 void 
@@ -126,6 +127,22 @@ dns_query(int fd, char *host, int type)
 
 	len = p - buf;
 	sendto(fd, buf, len+1, 0, (struct sockaddr*)&peer, peerlen);
+}
+
+int
+dns_read(int fd, char *buf, int len)
+{
+	int r;
+	int fromlen;
+	struct sockaddr_in from;
+
+	r = recvfrom(fd, buf, len, 0, (struct sockaddr*)&from, &fromlen);
+	if (r < 0) {
+		perror("recvfrom");
+	}
+	printf("Read %d bytes DNS reply\n", r);
+
+	return r;
 }
 
 static int
