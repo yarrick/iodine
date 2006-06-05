@@ -56,7 +56,7 @@ open_tun()
 	ifreq.ifr_flags = IFF_TUN; 
 
 	for (i = 0; i < TUN_MAX_TRY; i++) {
-		snprintf(ifreq.ifr_name, IFNAMSIZ, "tun%d", i);
+		snprintf(ifreq.ifr_name, IFNAMSIZ, "dns%d", i);
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			printf("opened %s\n", ifreq.ifr_name);
