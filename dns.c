@@ -209,7 +209,7 @@ dns_read(int fd, char *buf, int buflen)
 			ancount = ntohs(header->ancount);
 
 			for(i=0;i<ancount;i++) {
-				READNAME(buf, name, data);
+				READNAME(packet, name, data);
 				READSHORT(type, data);
 				READSHORT(class, data);
 				READLONG(ttl, data);
@@ -226,7 +226,7 @@ dns_read(int fd, char *buf, int buflen)
 					READSHORT(priority, r);
 					READSHORT(weight, r);
 					READSHORT(port, r);
-					READNAME(buf, host, r);
+					READNAME(packet, host, r);
 				}
 				printf("%s\n", name);
 			}
