@@ -74,17 +74,8 @@ tunnel(int tun_fd, int dns_fd)
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, buf, sizeof(buf));
-				int fd;
-
-				if(read > 0) {
-					fd = open("moo", O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
-					write(fd, buf, read);
-					close(fd);
-				}
-				/*
 				if(read > 0)
 					write_tun(tun_fd, buf, read);
-					*/
 			} 
 		}
 	}
