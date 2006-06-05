@@ -3,7 +3,7 @@ OUT = dnstun
 OBJS = dnstun.o tun.o
 
 LDFLAGS = 
-CFLAGS = -c -g -Wall 
+CFLAGS = -c -g -Wall -D`uname | tr "a-z" "A-Z"`
 
 $(OUT): $(OBJS)
 	$(CC) $(OBJS) -o $(OUT) $(LDFLAGS)
