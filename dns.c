@@ -177,37 +177,6 @@ dns_handle_tun(int fd, char *data, int len)
 	dns_send_chunk(fd);
 }
 
-static int
-dns_handle_reply(int fd, char *data, int len)
-{
-	uint16_t id;
-	char *p;
-
-	p = data;
-	READSHORT(id, p);
-
-	// Handle ACKing
-	if (dns_sending() && id == chunkid) {
-		// Got ACK on sent packet
-		packetpos += lastlen;
-		if (packetpos == packetlen) {
-			// Packet completed
-			printf("IP packet size %d sent successfully!\n", packetlen);
-			packetpos = 0;
-			packetlen = 0;
-			lastlen = 0;
-		} else {
-			// More to send
-			dns_send_chunk(fd);
-		}
-	}
-
-	// Detect if any data is attached
-	// TODO
-	
-	return 0;
-}
-
 void
 dns_ping(int dns_fd)
 {
@@ -357,15 +326,30 @@ dns_read(int fd, char *buf, int buflen)
 					READSHORT(port, r);
 					READNAME(packet, host, r);
 				}
-			//	printf("%s\n", name);
 			}
-			// Is any data attached?
-			return dns_handle_reply(fd, packet, r);
+			if (dns_sending() && chunkid == ntohs(header->id)) {
+				// Got ACK on sent packet
+				packetpos += lastlen;
+				if (packetpos == packetlen) {
+					// Packet completed
+					printf("IP packet size %d sent successfully!\n", packetlen);
+					packetpos = 0;
+					packetlen = 0;
+					lastlen = 0;
+				} else {
+					// More to send
+					dns_send_chunk(fd);
+				}
+			}
+
+			// TODO  is any data attached? find out and copy into buf and return length
+			return 0;
 		}
 	}
 
 	return 0;
 }
+
 
 static int
 host2dns(const char *host, char *buffer, int size)
