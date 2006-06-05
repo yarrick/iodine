@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>
+ * Copyright (c) 2006 
+ * Bjorn Andersson <flex@kryo.se>,
+ * Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,6 +17,7 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
 
 #include "tun.h"
 
@@ -22,8 +25,6 @@ int
 main()
 {
 	open_tun();
-
-	sleep(10);
 
 	close_tun();	
 

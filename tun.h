@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>
+ * Copyright (c) 2006 
+ * Bjorn Andersson <flex@kryo.se>,
+ * Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,9 +22,9 @@
 extern char *tun_device;
 extern int tun_fd;
 
-extern int open_tun();
-extern void close_tun();
-extern int write_tun(u_char *buf, int len);
-extern int read_tun(u_char *buf, int len);
+int open_tun();
+void close_tun();
+int write_tun(uint8_t *buf, int len);
+int read_tun(uint8_t *buf, int len);
 
 #endif /* _TUN_H_ */

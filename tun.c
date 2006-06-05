@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>
+ * Copyright (c) 2006 
+ * Bjorn Andersson <flex@kryo.se>,
+ * Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +20,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -107,7 +110,7 @@ close_tun()
 }
 
 int 
-write_tun(u_char *buf, int len) 
+write_tun(uint8_t *buf, int len) 
 {
 	if (write(tun_fd, buf, len) != len) 
 		err(1, "write_tun: %s", strerror(errno));
@@ -116,7 +119,7 @@ write_tun(u_char *buf, int len)
 }
 
 int 
-read_tun(u_char *buf, int len) 
+read_tun(uint8_t *buf, int len) 
 {
 	return read(tun_fd, buf, len);
 }
