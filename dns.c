@@ -35,6 +35,53 @@ static int host2dns(const char *, char *, int);
 struct sockaddr_in peer;
 char topdomain[256];
 
+static int
+readname(char *packet, char *dst, char *src)
+{
+	char l;
+	int len;
+	int offset;
+
+	len = 0;
+
+	while(*src) {
+		l = *src++;
+		len++;
+
+		if(l & 0x80 && l & 0x40) {
+			offset = ((src[-1] & 0x3f) << 8) | src[0];		
+			readname(packet, dst, packet + offset);
+			dst += strlen(dst);
+			break;
+		}
+
+		while(l) {
+			*dst++ = *src++;
+			l--;
+			len++;
+		}
+
+		*dst++ = '.';
+	}
+
+	*dst = '\0';
+	src++;
+	len++;
+
+	return len;
+}
+
+#define READNAME(packet, dst, src) (src) += readname((packet), (dst), (src));
+
+#define READSHORT(dst, src) \
+	(dst) = ntohs(*(short*)(src)); (src)+=2; 
+
+#define READLONG(dst, src) \
+	(dst) = ntohl(*(long*)(src)); (src)+=4; 
+
+#define READDATA(dst, src, len) \
+	memcpy((dst), (src), (len)); (src)+=(len);
+
 int 
 open_dns() 
 {
@@ -130,17 +177,63 @@ dns_query(int fd, char *host, int type)
 }
 
 int
-dns_read(int fd, char *buf, int len)
+dns_read(int fd, char *buf, int buflen)
 {
+	int i;
 	int r;
+	long ttl;
+	short rlen;
+	short type;
+	short class;
+	short port;
+	short ancount;
+	char *data;
+	char name[255];
+	char host[255];
+	char rdata[256];
+	HEADER *header;
+	char packet[64*1024];
 
-	r = recv(fd, buf, len, 0);
-	if (r < 0) {
-		perror("recvfrom");
-	}
+	r = recv(fd, packet, sizeof(packet), 0);
+
 	printf("Read %d bytes DNS reply\n", r);
 
-	return r;
+	if(r == -1) {
+		perror("recvfrom");
+	} else {
+		header = (HEADER*)packet;
+		
+		data = packet + sizeof(HEADER);
+
+		if(header->qr) { /* qr=1 => response */
+			ancount = ntohs(header->ancount);
+
+			for(i=0;i<ancount;i++) {
+				READNAME(buf, name, data);
+				READSHORT(type, data);
+				READSHORT(class, data);
+				READLONG(ttl, data);
+				READSHORT(rlen, data);
+				READDATA(rdata, data, rlen);
+
+				if(type == T_SRV && rlen > 6) {
+					char *r;
+					short priority;
+					short weight;
+
+					r = rdata;
+
+					READSHORT(priority, r);
+					READSHORT(weight, r);
+					READSHORT(port, r);
+					READNAME(buf, host, r);
+				}
+				printf("%s\n", name);
+			}
+		}
+	}
+
+	return 0;
 }
 
 static int
