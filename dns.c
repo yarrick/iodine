@@ -42,6 +42,8 @@ int packetpos;
 int packetlen;
 uint16_t chunkid;
 
+uint16_t pingid;
+
 static int
 readname(char *packet, char *dst, char *src)
 {
@@ -137,6 +139,7 @@ open_dns(const char *host, const char *domain)
 
 	// Init chunk id
 	chunkid = 0;
+	pingid = 0;
 
 	return fd;
 }
@@ -181,12 +184,12 @@ void
 dns_ping(int dns_fd)
 {
 	if (dns_sending()) {
-		// Resend latest chunk
-		printf("No reply on chunk, resending\n");
-		dns_send_chunk(dns_fd);
-	} else {
-		dns_write(dns_fd, 0, "", 0);
+		printf("No reply on chunk, discarding\n");
+		lastlen = 0;
+		packetpos = 0;
+		packetlen = 0;
 	}
+	dns_write(dns_fd, ++pingid, "", 0);
 }
 
 void 

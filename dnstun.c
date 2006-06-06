@@ -35,11 +35,6 @@
 
 #define FRAMESIZE (64*1024)
 
-#define POLL_MAX 4
-
-static int poll_sec[] = 	{1, 	0, 	0, 	0, 	0};
-static int poll_usec[] = 	{0,	400000,	200000,	100000,	50000};
-
 int running = 1;
 
 static void
@@ -52,21 +47,15 @@ tunnel(int tun_fd, int dns_fd)
 {
 	int i;
 	int read;
-	int fastpoll;
 	fd_set fds;
 	struct timeval tv;
 	struct tun_frame *frame;
 
 	frame = malloc(FRAMESIZE);
-	fastpoll = 0;
 
 	while (running) {
-		if (fastpoll > 0) {
-			fastpoll--;
-			printf("Fast poll %d\n", fastpoll);
-		}
-		tv.tv_sec = poll_sec[fastpoll];
-		tv.tv_usec = poll_usec[fastpoll];
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
 		if (!dns_sending()) 
@@ -105,7 +94,6 @@ tunnel(int tun_fd, int dns_fd)
 #endif
 					
 					write_tun(tun_fd, frame, read + 4);
-					fastpoll = POLL_MAX;
 				}
 			} 
 		}
