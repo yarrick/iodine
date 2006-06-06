@@ -6,7 +6,7 @@ DNSDOBJS = dnstund.o tun.o dnsd.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
-LDFLAGS = 
+LDFLAGS =  -lz
 CFLAGS = -c -g -Wall -D$(OS)
 
 all: stateos $(DNS) $(DNSD)

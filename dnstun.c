@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <err.h>
 #include <arpa/inet.h>
+#include <zlib.h>
 
 #include "tun.h"
 #include "dns.h"
@@ -50,6 +51,8 @@ tunnel(int tun_fd, int dns_fd)
 	fd_set fds;
 	struct timeval tv;
 	struct tun_frame *frame;
+	long buflen;
+	char buf[64*1024];
 
 	frame = malloc(FRAMESIZE);
 
@@ -77,13 +80,17 @@ tunnel(int tun_fd, int dns_fd)
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, frame, FRAMESIZE);
 				if (read > 0) {
-					printf("Got data on tun! %d bytes\n", read);
-					dns_handle_tun(dns_fd, frame->data, read - 4);
+					buflen = sizeof(buf);
+					compress2(buf, &buflen, frame->data, read - 4, 9);
+					dns_handle_tun(dns_fd, buf, buflen);
 				}
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dns_read(dns_fd, frame->data, FRAMESIZE-4);
 				if (read > 0) {
+					buflen = 64*1024-4;
+					uncompress(frame->data, &buflen, buf, read);
+
 					printf("Got data on dns! %d bytes\n", read);
 
 					frame->flags = htons(0x0000);
@@ -93,7 +100,7 @@ tunnel(int tun_fd, int dns_fd)
 					frame->proto = htons(0x0002);	// BSD wants AF_INET as long word
 #endif
 					
-					write_tun(tun_fd, frame, read + 4);
+					write_tun(tun_fd, frame, buflen + 4);
 					if (!dns_sending()) {
 						dns_ping(dns_fd);
 					}

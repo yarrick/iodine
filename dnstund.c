@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <err.h>
 #include <arpa/inet.h>
+#include <zlib.h>
 
 #include "tun.h"
 #include "dns.h"
@@ -49,6 +50,8 @@ tunnel(int tun_fd, int dns_fd)
 	fd_set fds;
 	struct timeval tv;
 	struct tun_frame *frame;
+	long buflen;
+	char buf[64*1024];
 
 	frame = malloc(64*1024);
 	
@@ -80,19 +83,25 @@ tunnel(int tun_fd, int dns_fd)
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, frame, 64*1024);
-				if(read > 0) 
-					dnsd_queuepacket(frame->data, read - 4);
+				if(read > 0) {
+					buflen = sizeof(buf);
+					compress2(buf, &buflen, frame->data, read - 4, 9);
+					dnsd_queuepacket(buf, buflen);
+				}
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dnsd_read(dns_fd, frame->data, 64*1024-4);
+				read = dnsd_read(dns_fd, buf, 64*1024-4);
 				if(read > 0) {
+					buflen = 64*1024-4;
+					uncompress(frame->data, &buflen, buf, read);
+					
 					frame->flags = htons(0x0000);
 #ifdef LINUX
 					frame->proto = htons(0x0800);
 #else
 					frame->proto = htons(0x0002);
 #endif
-					write_tun(tun_fd, frame, read + 4);
+					write_tun(tun_fd, frame, buflen + 4);
 				}
 			} 
 		}
