@@ -317,6 +317,8 @@ dns_read(int fd, char *buf, int buflen)
 		if(header->qr) { /* qr=1 => response */
 			ancount = ntohs(header->ancount);
 
+			rlen = 0;
+
 			for(i=0;i<ancount;i++) {
 				READNAME(packet, name, data);
 				READSHORT(type, data);
@@ -325,17 +327,8 @@ dns_read(int fd, char *buf, int buflen)
 				READSHORT(rlen, data);
 				READDATA(rdata, data, rlen);
 
-				if(type == T_SRV && rlen > 6) {
-					char *r;
-					short priority;
-					short weight;
-
-					r = rdata;
-
-					READSHORT(priority, r);
-					READSHORT(weight, r);
-					READSHORT(port, r);
-					READNAME(packet, host, r);
+				if(type == T_NULL) {
+					memcpy(buf, rdata, rlen);	
 				}
 			}
 			if (dns_sending() && chunkid == ntohs(header->id)) {
@@ -354,7 +347,7 @@ dns_read(int fd, char *buf, int buflen)
 			}
 
 			// TODO  is any data attached? find out and copy into buf and return length
-			return 0;
+			return rlen;
 		}
 	}
 

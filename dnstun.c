@@ -24,11 +24,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <err.h>
+#include <arpa/inet.h>
 
 #include "tun.h"
 #include "dns.h"
-
-#define MAX(a,b) ((a)>(b)?(a):(b))
 
 #define FRAMESIZE (64*1024)
 
@@ -75,6 +74,7 @@ tunnel(int tun_fd, int dns_fd)
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, frame, FRAMESIZE);
 				if (read > 0) {
+					printf("%04x\n", frame->proto);
 					printf("Got data on tun! %d bytes\n", read);
 					dns_handle_tun(dns_fd, frame->data, read - 4);
 				}
@@ -84,8 +84,9 @@ tunnel(int tun_fd, int dns_fd)
 				if (read > 0) {
 					printf("Got data on dns! %d bytes\n", read);
 
-					frame->flags = htons(0x0000);
-					frame->proto = htons(0x0800);
+					//frame->flags = htons(0x0000);
+					//frame->proto = htons(0x0200);
+					
 					write_tun(tun_fd, frame, read + 4);
 				}
 			} 

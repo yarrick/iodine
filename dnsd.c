@@ -180,10 +180,9 @@ static void
 dnsd_respond(int fd, short id, struct sockaddr_in from)
 {
 	int len;
-	int size;
-	HEADER *header;
 	char *p;
 	char buf[1024];
+	HEADER *header;
 
 	memset(buf, 0, sizeof(buf));
 

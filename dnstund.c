@@ -24,15 +24,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <err.h>
+#include <arpa/inet.h>
 
 #include "tun.h"
 #include "dns.h"
 #include "dnsd.h"
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
 int running = 1;
-
 
 static void
 sigint(int sig) {
