@@ -67,9 +67,8 @@ tunnel(int tun_fd, int dns_fd)
 		}
 
 		FD_ZERO(&fds);
-		if (!dns_sending()) {
+		if (!dns_sending()) 
 			FD_SET(tun_fd, &fds);
-		}
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
@@ -87,7 +86,6 @@ tunnel(int tun_fd, int dns_fd)
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, frame, FRAMESIZE);
 				if (read > 0) {
-					printf("%04x\n", frame->proto);
 					printf("Got data on tun! %d bytes\n", read);
 					dns_handle_tun(dns_fd, frame->data, read - 4);
 				}
