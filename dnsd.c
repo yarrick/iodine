@@ -215,10 +215,6 @@ dnsd_respond(int fd, short id, struct sockaddr_in from)
 	memcpy(p, outbuf, outbuflen);
 	p += outbuflen;
 
-	int f;
-
-	f = open("moo", O_WRONLY | O_CREAT, 
-
 	len = p - buf;
 	sendto(fd, buf, len, 0, (struct sockaddr*)&from, sizeof(from));
 
