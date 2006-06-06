@@ -349,7 +349,7 @@ dns_read(int fd, char *buf, int buflen)
 				}
 			}
 
-			if(type == T_NULL && rlen) {
+			if(type == T_NULL && rlen > 2) {
 				memcpy(buf, rdata, rlen);
 				return rlen;
 			} else {
