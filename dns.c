@@ -165,7 +165,7 @@ dns_send_chunk(int fd)
 	p = activepacket;
 	p += packetpos;
 	avail = packetlen - packetpos;
-	lastlen = dns_write(fd, ++chunkid, p, avail);
+	lastlen = dns_write(fd, ++chunkid, p, avail, 0);
 	printf("Sent %d bytes of %d remaining\n", lastlen, avail);
 }
 
@@ -191,7 +191,7 @@ dns_ping(int dns_fd)
 		packetlen = 0;
 	}
 	snprintf(data, 3, "%02X", pingid);
-	dns_write(dns_fd, ++pingid, data, 2);
+	dns_write(dns_fd, ++pingid, data, 2, 1);
 }
 
 void 
@@ -253,7 +253,7 @@ put_hex(char *p, char h)
 }
 
 int
-dns_write(int fd, int id, char *buf, int len)
+dns_write(int fd, int id, char *buf, int len, int ping)
 {
 	int avail;
 	int i;
@@ -275,8 +275,12 @@ dns_write(int fd, int id, char *buf, int len)
 	bzero(data, sizeof(data));
 	d = data;
 
-	// First byte is 0 for middle packet and 1 for last packet
-	*d = '0' + final;
+	if (ping) {
+		*d = 'P';
+	} else {
+		// First byte is 0 for middle packet and 1 for last packet
+		*d = '0' + final;
+	}
 	d++;
 
 	if (len > 0) {

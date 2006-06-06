@@ -24,7 +24,7 @@ int dns_sending();
 void dns_handle_tun(int, char *, int);
 void dns_ping(int);
 void dns_query(int, int, char *, int);
-int dns_write(int, int, char *, int);
+int dns_write(int, int, char *, int, int);
 int dns_read(int, char *, int);
 
 
