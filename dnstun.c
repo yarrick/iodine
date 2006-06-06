@@ -29,6 +29,10 @@
 #include "tun.h"
 #include "dns.h"
 
+#ifndef MAX
+#define MAX(a,b) ((a)>(b)?(a):(b))
+#endif
+
 #define FRAMESIZE (64*1024)
 
 int running = 1;

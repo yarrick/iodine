@@ -30,6 +30,10 @@
 #include "dns.h"
 #include "dnsd.h"
 
+#ifndef MAX
+#define MAX(a,b) ((a)>(b)?(a):(b))
+#endif
+
 int running = 1;
 
 static void
