@@ -80,6 +80,7 @@ tunnel(int tun_fd, int dns_fd)
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, frame, FRAMESIZE);
 				if (read > 0) {
+					printf("Got data on tun! %d bytes\n", read);
 					buflen = sizeof(buf);
 					compress2(buf, &buflen, frame->data, read - 4, 9);
 					dns_handle_tun(dns_fd, buf, buflen);
