@@ -342,7 +342,6 @@ dns_read(int fd, char *buf, int buflen)
 			if(ttl == T_NULL && rlen)
 				memcpy(buf, rdata, rlen);	
 
-			// TODO  is any data attached? find out and copy into buf and return length
 			return rlen;
 		}
 	}
