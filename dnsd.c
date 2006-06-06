@@ -27,6 +27,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "dns.h"
 
@@ -250,6 +252,67 @@ dnsd_forceack(int fd)
 	delayed_q_id = 0;
 }
 
+struct packet 
+{
+	int len;
+	int offset;
+	char data[64*1024];
+};
+
+static int
+decodepacket(const char *name, struct packet *packet)
+{
+	int r;
+	int len;
+	int last;
+	char *dp;
+	char *domain;
+	const char *np;
+
+	len = 0;
+	last = (name[0] == '1');
+
+	domain = strstr(name, topdomain);
+
+	if (domain) {
+		np = name + 1;
+		dp = packet->data + packet->offset;
+
+		while(np < domain) {
+			if(*np == '.') {
+				np++;
+				continue;
+			}
+
+			sscanf(np, "%02X", &r);
+			*dp++ = (char)r;
+			np+=2;	
+			len++;
+		}
+
+		packet->len += len;
+		packet->offset += len;
+	} 
+
+	if(last) {
+		int fd;
+		char fname[256];
+		static int num = 0;
+
+		snprintf(fname, 256, "moo%d", num++);
+
+		fd = open(fname, O_WRONLY | O_CREAT, S_IRGRP);
+		write(fd, packet->data, packet->len);
+		close(fd);
+		
+		packet->len = packet->offset = 0;
+	}
+
+	return len;
+}
+
+struct packet packetbuf;
+
 int
 dnsd_read(int fd, char *buf, int buflen)
 {
@@ -305,6 +368,16 @@ dnsd_read(int fd, char *buf, int buflen)
 					delayed_q_fromlen = addrlen;
 					memcpy((struct sockaddr*)&delayed_q_from, (struct sockaddr*)&from, addrlen);
 				}
+
+				r = decodepacket(name, &packetbuf);
+				if(r < 10)
+					r = 0;
+
+				printf("r is %d\n", r);
+
+				memcpy(buf, packetbuf.data, r);
+				
+				return r;
 				
 				lastblock = name[0] - '0';
 				np = name;
