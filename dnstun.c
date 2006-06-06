@@ -86,7 +86,7 @@ tunnel(int tun_fd, int dns_fd)
 				}
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dns_read(dns_fd, frame->data, FRAMESIZE-4);
+				read = dns_read(dns_fd, buf, FRAMESIZE-4);
 				if (read > 0) {
 					buflen = 64*1024-4;
 					uncompress(frame->data, &buflen, buf, read);
