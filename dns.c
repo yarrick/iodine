@@ -166,7 +166,7 @@ dns_send_chunk(int fd)
 	p += packetpos;
 	avail = packetlen - packetpos;
 	lastlen = dns_write(fd, ++chunkid, p, avail, 0);
-	printf("Sent %d bytes of %d remaining\n", lastlen, avail);
+	//printf("Sent %d bytes of %d remaining\n", lastlen, avail);
 }
 
 void
@@ -185,7 +185,7 @@ dns_ping(int dns_fd)
 {
 	char data[3];
 	if (dns_sending()) {
-		printf("No reply on chunk, discarding\n");
+	//	printf("No reply on chunk, discarding\n");
 		lastlen = 0;
 		packetpos = 0;
 		packetlen = 0;
@@ -298,7 +298,7 @@ dns_write(int fd, int id, char *buf, int len, int ping)
 	}
 	strncpy(d, topdomain, strlen(topdomain)+1);
 	
-	printf("Resolving %s\n", data);
+	//printf("Resolving %s\n", data);
 	dns_query(fd, id, data, T_NULL);
 	return avail;
 }
@@ -321,7 +321,7 @@ dns_read(int fd, char *buf, int buflen)
 
 	r = recv(fd, packet, sizeof(packet), 0);
 
-	printf("Read %d bytes DNS reply\n", r);
+	//printf("Read %d bytes DNS reply\n", r);
 
 	if(r == -1) {
 		perror("recv");
@@ -354,7 +354,7 @@ dns_read(int fd, char *buf, int buflen)
 				packetpos += lastlen;
 				if (packetpos == packetlen) {
 					// Packet completed
-					printf("IP packet size %d sent successfully!\n", packetlen);
+					// printf("IP packet size %d sent successfully!\n", packetlen);
 					packetpos = 0;
 					packetlen = 0;
 					lastlen = 0;
