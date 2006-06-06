@@ -183,14 +183,15 @@ dns_handle_tun(int fd, char *data, int len)
 void
 dns_ping(int dns_fd)
 {
-	char data[3];
+	char data[2];
 	if (dns_sending()) {
 	//	printf("No reply on chunk, discarding\n");
 		lastlen = 0;
 		packetpos = 0;
 		packetlen = 0;
 	}
-	snprintf(data, 3, "%02X", pingid);
+	data[0] = (pingid & 0xFF00) >> 8;
+	data[1] = (pingid & 0xFF);
 	dns_write(dns_fd, ++pingid, data, 2, 1);
 }
 
