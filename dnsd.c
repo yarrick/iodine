@@ -39,6 +39,7 @@ char topdomain[256];
 int packetlen;
 char activepacket[4096];
 
+int outid;
 int outbuflen;
 char outbuf[64*1024];
 
@@ -174,10 +175,11 @@ dnsd_queuepacket(const char *buf, const int buflen)
 	memcpy(outbuf, buf, buflen);	
 
 	outbuflen = buflen;
+	outid++;
 }
 
 static void
-dnsd_respond(int fd, short id, struct sockaddr_in from)
+dnsd_respond(int fd, char *name, short type, short id, struct sockaddr_in from)
 {
 	int len;
 	char *p;
@@ -189,7 +191,7 @@ dnsd_respond(int fd, short id, struct sockaddr_in from)
 	len = 0;
 	header = (HEADER*)buf;	
 
-	header->id = id;
+	header->id = htons(id);
 	header->qr = 1;
 	header->opcode = 0;
 	header->aa = 1;
@@ -197,22 +199,28 @@ dnsd_respond(int fd, short id, struct sockaddr_in from)
 	header->rd = 0;
 	header->ra = 0;
 
-	if(outbuflen > 0)
-		header->ancount = htons(1);
-	else
-		header->ancount = htons(0);
+	header->qdcount = htons(1);
+	header->ancount = htons(1);
 
 	p = buf + sizeof(HEADER);
 	
-	p += host2dns("fluff", p, 5);	
-	PUTSHORT(T_NULL, p);
+	p += host2dns(name, p, strlen(name));
+	PUTSHORT(type, p);
 	PUTSHORT(C_IN, p);
-	PUTLONG(htons(0), p);
+	
+	p += host2dns(name, p, strlen(name));	
+	PUTSHORT(type, p);
+	PUTSHORT(C_IN, p);
+	PUTLONG(0, p);
 
-	//size = host2dns(outbuf, p+2, outbuflen);
-	PUTSHORT(outbuflen, p);
-	memcpy(p, outbuf, outbuflen);
-	p += outbuflen;
+	if(outbuflen > 0) {
+		printf("%d\n", outid);
+		PUTSHORT(outbuflen, p);
+		memcpy(p, outbuf, outbuflen);
+		p += outbuflen;
+	} else {
+		PUTSHORT(0, p);
+	}
 
 	len = p - buf;
 	printf("Responding with %d\n", len);
@@ -224,7 +232,6 @@ dnsd_respond(int fd, short id, struct sockaddr_in from)
 int
 dnsd_read(int fd, char *buf, int buflen)
 {
-	int i;
 	int r;
 	short id;
 	short type;
@@ -261,11 +268,13 @@ dnsd_read(int fd, char *buf, int buflen)
 		if(!header->qr) {
 			qdcount = ntohs(header->qdcount);		
 
-			for(i=0;i<qdcount;i++) {
+			if(qdcount == 1) {
 				bzero(name, sizeof(name));
 				READNAME(packet, name, data);
 				READSHORT(type, data);
 				READSHORT(class, data);
+				
+				dnsd_respond(fd, name, type, id, from);
 				
 				lastblock = name[0] - '0';
 				np = name;
@@ -289,7 +298,6 @@ dnsd_read(int fd, char *buf, int buflen)
 					packetp++;
 					packetlen++;
 				}
-				dnsd_respond(fd, id, from);
 				if (lastblock && packetlen < 2) {
 					// Skipping ping packet
 					packetlen = 0;
