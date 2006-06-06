@@ -53,8 +53,13 @@ tunnel(int tun_fd, int dns_fd)
 	frame = malloc(64*1024);
 	
 	while (running) {
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
+		if (dnsd_hasack()) {
+			tv.tv_sec = 0;
+			tv.tv_usec = 150000;
+		} else {
+			tv.tv_sec = 1;
+			tv.tv_usec = 0;
+		}
 
 		FD_ZERO(&fds);
 		if(!dnsd_haspacket()) 
@@ -88,6 +93,12 @@ tunnel(int tun_fd, int dns_fd)
 					write_tun(tun_fd, frame, read + 4);
 				}
 			} 
+		} else {
+			// Timeout on select()
+			if (dnsd_hasack()) {
+				printf("Got no data, sending delayed ACK\n");
+				dnsd_forceack(dns_fd);
+			}
 		}
 	}
 

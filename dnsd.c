@@ -42,6 +42,11 @@ char activepacket[4096];
 int outid;
 int outbuflen;
 char outbuf[64*1024];
+char delayed_q_name[256];
+short delayed_q_type;
+short delayed_q_id;
+struct sockaddr_in delayed_q_from;
+int delayed_q_fromlen;
 
 static int
 readname(char *packet, char *dst, char *src)
@@ -126,6 +131,9 @@ open_dnsd(const char *domain)
 	topdomain[sizeof(topdomain) - 1] = 0;
 
 	packetlen = 0;
+	delayed_q_type = 0;
+	delayed_q_id = 0;
+	delayed_q_fromlen = 0;
 
 	return fd;
 }
@@ -169,6 +177,12 @@ dnsd_haspacket()
 	return (outbuflen > 0);
 }
 
+int
+dnsd_hasack()
+{
+	return (delayed_q_id != 0);
+}
+
 void
 dnsd_queuepacket(const char *buf, const int buflen)
 {
@@ -179,7 +193,7 @@ dnsd_queuepacket(const char *buf, const int buflen)
 }
 
 static void
-dnsd_respond(int fd, char *name, short type, short id, struct sockaddr_in from)
+dnsd_send(int fd, char *name, short type, short id, struct sockaddr_in from)
 {
 	int len;
 	char *p;
@@ -229,6 +243,13 @@ dnsd_respond(int fd, char *name, short type, short id, struct sockaddr_in from)
 	outbuflen = 0;
 }
 
+void
+dnsd_forceack(int fd)
+{
+	dnsd_send(fd, delayed_q_name, delayed_q_type, delayed_q_id, delayed_q_from);
+	delayed_q_id = 0;
+}
+
 int
 dnsd_read(int fd, char *buf, int buflen)
 {
@@ -274,7 +295,16 @@ dnsd_read(int fd, char *buf, int buflen)
 				READSHORT(type, data);
 				READSHORT(class, data);
 				
-				dnsd_respond(fd, name, type, id, from);
+				if (dnsd_haspacket()) {
+					dnsd_send(fd, name, type, id, from);
+				} else {
+					// Store needed info about delayed response
+					strncpy(delayed_q_name, name, 256);
+					delayed_q_type = type;
+					delayed_q_id = id;
+					delayed_q_fromlen = addrlen;
+					memcpy((struct sockaddr*)&delayed_q_from, (struct sockaddr*)&from, addrlen);
+				}
 				
 				lastblock = name[0] - '0';
 				np = name;
