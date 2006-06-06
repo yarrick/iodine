@@ -281,7 +281,7 @@ dns_write(int fd, int id, char *buf, int len)
 	strncpy(d, topdomain, strlen(topdomain)+1);
 	
 	printf("Resolving %s\n", data);
-	dns_query(fd, id, data, T_A);
+	dns_query(fd, id, data, T_NULL);
 	return avail;
 }
 
