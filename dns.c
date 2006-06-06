@@ -293,6 +293,7 @@ dns_read(int fd, char *buf, int buflen)
 	short rlen;
 	short type;
 	short class;
+	short qdcount;
 	short ancount;
 	char *data;
 	char name[255];
@@ -312,10 +313,16 @@ dns_read(int fd, char *buf, int buflen)
 		data = packet + sizeof(HEADER);
 
 		if(header->qr) { /* qr=1 => response */
+			qdcount = ntohs(header->qdcount);
 			ancount = ntohs(header->ancount);
 
 			rlen = 0;
 
+			if(qdcount == 1) {
+				READNAME(packet, name, data);
+				READSHORT(type, data);
+				READSHORT(class, data);
+			}
 			if(ancount == 1) {
 				READNAME(packet, name, data);
 				READSHORT(type, data);
@@ -339,10 +346,12 @@ dns_read(int fd, char *buf, int buflen)
 				}
 			}
 
-			if(ttl == T_NULL && rlen)
-				memcpy(buf, rdata, rlen);	
-
-			return rlen;
+			if(type == T_NULL && rlen) {
+				memcpy(buf, rdata, rlen);
+				return rlen;
+			} else {
+				return 0;
+			}
 		}
 	}
 

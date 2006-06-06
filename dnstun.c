@@ -47,15 +47,24 @@ tunnel(int tun_fd, int dns_fd)
 {
 	int i;
 	int read;
+	int fastpoll;
 	fd_set fds;
 	struct timeval tv;
 	struct tun_frame *frame;
 
 	frame = malloc(FRAMESIZE);
+	fastpoll = 0;
 
 	while (running) {
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
+		if (fastpoll) {
+			tv.tv_sec = 0;
+			tv.tv_usec = 5000;
+			fastpoll = 0;
+			printf("Fast poll\n");
+		} else {
+			tv.tv_sec = 1;
+			tv.tv_usec = 0;
+		}
 
 		FD_ZERO(&fds);
 		if (!dns_sending()) {
@@ -95,6 +104,7 @@ tunnel(int tun_fd, int dns_fd)
 #endif
 					
 					write_tun(tun_fd, frame, read + 4);
+					fastpoll = 1; // make sure we send packet real soon
 				}
 			} 
 		}
