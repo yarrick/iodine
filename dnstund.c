@@ -72,11 +72,9 @@ tunnel(int tun_fd, int dns_fd)
 		
 		if(i != 0) {
 			if(FD_ISSET(tun_fd, &fds)) {
-				printf("data on tun\n");
 				read = read_tun(tun_fd, frame, 64*1024);
-				if(read > 0) {
+				if(read > 0) 
 					dnsd_queuepacket(frame->data, read - 4);
-				}
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, frame->data, 64*1024-4);
