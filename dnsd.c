@@ -199,7 +199,7 @@ dnsd_send(int fd, char *name, short type, short id, struct sockaddr_in from)
 {
 	int len;
 	char *p;
-	char buf[1024];
+	char buf[64*1024];
 	HEADER *header;
 
 	memset(buf, 0, sizeof(buf));
@@ -265,16 +265,18 @@ decodepacket(const char *name, struct packet *packet)
 	int r;
 	int len;
 	int last;
+	int ping;
 	char *dp;
 	char *domain;
 	const char *np;
 
 	len = 0;
 	last = (name[0] == '1');
+	ping = (name[0] == 'p' || name[0] == 'P');
 
 	domain = strstr(name, topdomain);
 
-	if (domain) {
+	if (!ping && domain) {
 		np = name + 1;
 		dp = packet->data + packet->offset;
 
@@ -295,17 +297,10 @@ decodepacket(const char *name, struct packet *packet)
 	} 
 
 	if(last) {
-		int fd;
-		char fname[256];
-		static int num = 0;
-
-		snprintf(fname, 256, "moo%d", num++);
-
-		fd = open(fname, O_WRONLY | O_CREAT, S_IRGRP);
-		write(fd, packet->data, packet->len);
-		close(fd);
-		
+		len = packet->len;
 		packet->len = packet->offset = 0;
+	} else {
+		len = 0;
 	}
 
 	return len;
@@ -370,8 +365,6 @@ dnsd_read(int fd, char *buf, int buflen)
 				}
 
 				r = decodepacket(name, &packetbuf);
-				if(r < 10)
-					r = 0;
 
 				printf("r is %d\n", r);
 
