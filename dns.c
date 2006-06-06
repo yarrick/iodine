@@ -288,17 +288,14 @@ dns_write(int fd, int id, char *buf, int len)
 int
 dns_read(int fd, char *buf, int buflen)
 {
-	int i;
 	int r;
 	long ttl;
 	short rlen;
 	short type;
 	short class;
-	short port;
 	short ancount;
 	char *data;
 	char name[255];
-	char host[255];
 	char rdata[256];
 	HEADER *header;
 	char packet[64*1024];
@@ -319,17 +316,13 @@ dns_read(int fd, char *buf, int buflen)
 
 			rlen = 0;
 
-			for(i=0;i<ancount;i++) {
+			if(ancount == 1) {
 				READNAME(packet, name, data);
 				READSHORT(type, data);
 				READSHORT(class, data);
 				READLONG(ttl, data);
 				READSHORT(rlen, data);
 				READDATA(rdata, data, rlen);
-
-				if(type == T_NULL) {
-					memcpy(buf, rdata, rlen);	
-				}
 			}
 			if (dns_sending() && chunkid == ntohs(header->id)) {
 				// Got ACK on sent packet
@@ -345,6 +338,9 @@ dns_read(int fd, char *buf, int buflen)
 					dns_send_chunk(fd);
 				}
 			}
+
+			if(ttl == T_NULL && rlen)
+				memcpy(buf, rdata, rlen);	
 
 			// TODO  is any data attached? find out and copy into buf and return length
 			return rlen;

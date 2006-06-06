@@ -57,8 +57,10 @@ tunnel(int tun_fd, int dns_fd)
 		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
-		if(!dnsd_haspacket())
+		if(!dnsd_haspacket()) {
+			printf("There is room for more\n");
 			FD_SET(tun_fd, &fds);
+		}
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
@@ -72,15 +74,22 @@ tunnel(int tun_fd, int dns_fd)
 		
 		if(i != 0) {
 			if(FD_ISSET(tun_fd, &fds)) {
+				printf("data on tun\n");
 				read = read_tun(tun_fd, frame, 64*1024);
-				if(read > 0) 
+				if(read > 0) {
+					printf("Sending response\n");
 					dnsd_queuepacket(frame->data, read - 4);
+				}
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, frame->data, 64*1024-4);
 				if(read > 0) {
 					frame->flags = htons(0x0000);
+#ifdef LINUX
 					frame->proto = htons(0x0800);
+#else
+					frame->proto = htons(0x0002);
+#endif
 					write_tun(tun_fd, frame, read + 4);
 				}
 			} 

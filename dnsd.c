@@ -215,6 +215,7 @@ dnsd_respond(int fd, short id, struct sockaddr_in from)
 	p += outbuflen;
 
 	len = p - buf;
+	printf("Responding with %d\n", len);
 	sendto(fd, buf, len, 0, (struct sockaddr*)&from, sizeof(from));
 
 	outbuflen = 0;
