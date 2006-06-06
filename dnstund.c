@@ -73,8 +73,11 @@ tunnel(int tun_fd, int dns_fd)
 				warn("select");
 			return 1;
 		}
-		
-		if(i != 0) {
+	
+		if (i==0) {	
+			if (dnsd_hasack()) 
+				dnsd_forceack(dns_fd);
+		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, frame, 64*1024);
 				if(read > 0) 
@@ -92,12 +95,6 @@ tunnel(int tun_fd, int dns_fd)
 					write_tun(tun_fd, frame, read + 4);
 				}
 			} 
-		} else {
-			// Timeout on select()
-			if (dnsd_hasack()) {
-				printf("Got no data, sending delayed ACK\n");
-				dnsd_forceack(dns_fd);
-			}
 		}
 	}
 

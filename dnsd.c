@@ -230,7 +230,6 @@ dnsd_send(int fd, char *name, short type, short id, struct sockaddr_in from)
 	PUTLONG(0, p);
 
 	if(outbuflen > 0) {
-		printf("%d\n", outid);
 		PUTSHORT(outbuflen, p);
 		memcpy(p, outbuf, outbuflen);
 		p += outbuflen;
@@ -239,7 +238,7 @@ dnsd_send(int fd, char *name, short type, short id, struct sockaddr_in from)
 	}
 
 	len = p - buf;
-	printf("Responding with %d\n", len);
+//	printf("Responding with %d\n", len);
 	sendto(fd, buf, len, 0, (struct sockaddr*)&from, sizeof(from));
 
 	outbuflen = 0;
@@ -323,17 +322,10 @@ dnsd_read(int fd, char *buf, int buflen)
 	char packet[64*1024];
 	struct sockaddr_in from;
 
-	char lastblock;
-	char *np;
-	char *domainstart;
-	int namelen;
-	char *packetp;
-	int datalen;
-
 	addrlen = sizeof(struct sockaddr);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 
-	printf("Read %d bytes DNS query from %s\n", r, inet_ntoa(from.sin_addr));
+	//printf("Read %d bytes DNS query from %s\n", r, inet_ntoa(from.sin_addr));
 
 	if(r == -1) {
 		perror("recvfrom");
@@ -366,48 +358,9 @@ dnsd_read(int fd, char *buf, int buflen)
 
 				r = decodepacket(name, &packetbuf);
 
-				printf("r is %d\n", r);
-
 				memcpy(buf, packetbuf.data, r);
 				
 				return r;
-				
-				lastblock = name[0] - '0';
-				np = name;
-				np++; // skip first byte, it has only fragmentation info
-				domainstart = strstr(np, topdomain);
-				if (!domainstart) {
-					fprintf(stderr, "Resolved domain does not end with %s! Ignoring packet\n", topdomain);
-					return 0;
-				}
-				namelen = (int) domainstart - (int) np;
-				*domainstart = '\0';
-				packetp = activepacket;
-				packetp += packetlen;
-				while (np < domainstart && packetlen < sizeof(activepacket)) {
-					if (*np == '.') {
-						np++;
-					} 
-					sscanf(np, "%02X", &r);
-					*packetp = r & 0xFF;
-					np += 2;
-					packetp++;
-					packetlen++;
-				}
-				if (lastblock && packetlen < 2) {
-					// Skipping ping packet
-					packetlen = 0;
-					return 0;
-				}
-				if (lastblock) {
-					datalen = MIN(packetlen, buflen);
-					memcpy(buf, activepacket, datalen);
-					packetlen = 0;
-					printf("Got full packet, returning %d bytes!\n", datalen);
-					return datalen;
-				} else {
-					return 0;
-				}
 			}
 		}
 	}
