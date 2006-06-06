@@ -215,12 +215,21 @@ dns_query(int fd, int id, char *host, int type)
 	header->ra = 0;
 
 	header->qdcount = htons(1);
+	header->arcount = htons(1);
 
 	p = buf + sizeof(HEADER);
 	p += host2dns(host, p, strlen(host));	
 
 	PUTSHORT(type, p);
 	PUTSHORT(C_IN, p);
+
+	// EDNS0
+	*p++ = 0x00; //Root
+	PUTSHORT(0x0029, p); // OPT
+	PUTSHORT(0x1000, p); // Payload size: 4096
+	PUTSHORT(0x0000, p); // Higher bits/ edns version
+	PUTSHORT(0x8000, p); // Z
+	PUTSHORT(0x0000, p); // Data length
 
 	peerlen = sizeof(peer);
 
