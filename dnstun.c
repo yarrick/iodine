@@ -58,7 +58,7 @@ tunnel(int tun_fd, int dns_fd)
 	while (running) {
 		if (fastpoll) {
 			tv.tv_sec = 0;
-			tv.tv_usec = 5000;
+			tv.tv_usec = 55000;
 			fastpoll = 0;
 			printf("Fast poll\n");
 		} else {

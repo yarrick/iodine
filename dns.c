@@ -185,7 +185,7 @@ dns_ping(int dns_fd)
 		printf("No reply on chunk, resending\n");
 		dns_send_chunk(dns_fd);
 	} else {
-		dns_write(dns_fd, chunkid++, "", 0);
+		dns_write(dns_fd, 0, "", 0);
 	}
 }
 
@@ -203,7 +203,7 @@ dns_query(int fd, int id, char *host, int type)
 
 	header = (HEADER*)buf;	
 	
-	header->id = id;
+	header->id = htons(id);
 	header->qr = 0;
 	header->opcode = 0;
 	header->aa = 0;
@@ -297,7 +297,7 @@ dns_read(int fd, char *buf, int buflen)
 	short ancount;
 	char *data;
 	char name[255];
-	char rdata[256];
+	char rdata[4*1024];
 	HEADER *header;
 	char packet[64*1024];
 
