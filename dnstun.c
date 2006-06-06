@@ -94,6 +94,9 @@ tunnel(int tun_fd, int dns_fd)
 #endif
 					
 					write_tun(tun_fd, frame, read + 4);
+					if (!dns_sending()) {
+						dns_ping(dns_fd);
+					}
 				}
 			} 
 		}
