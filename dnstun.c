@@ -35,6 +35,11 @@
 
 #define FRAMESIZE (64*1024)
 
+#define POLL_MAX 4
+
+static int poll_sec[] = 	{1, 	0, 	0, 	0, 	0};
+static int poll_usec[] = 	{0,	400000,	200000,	100000,	50000};
+
 int running = 1;
 
 static void
@@ -56,15 +61,12 @@ tunnel(int tun_fd, int dns_fd)
 	fastpoll = 0;
 
 	while (running) {
-		if (fastpoll) {
-			tv.tv_sec = 0;
-			tv.tv_usec = 55000;
-			fastpoll = 0;
-			printf("Fast poll\n");
-		} else {
-			tv.tv_sec = 1;
-			tv.tv_usec = 0;
+		if (fastpoll > 0) {
+			fastpoll--;
+			printf("Fast poll %d\n", fastpoll);
 		}
+		tv.tv_sec = poll_sec[fastpoll];
+		tv.tv_usec = poll_usec[fastpoll];
 
 		FD_ZERO(&fds);
 		if (!dns_sending()) 
@@ -95,14 +97,15 @@ tunnel(int tun_fd, int dns_fd)
 				if (read > 0) {
 					printf("Got data on dns! %d bytes\n", read);
 
+					frame->flags = htons(0x0000);
 #ifdef LINUX
-					frame->proto = htons(0x0800);
+					frame->proto = htons(0x0800);	// Linux wants ETH_P_IP
 #else
-					frame->proto = htons(0x0002);
+					frame->proto = htons(0x0002);	// BSD wants AF_INET as long word
 #endif
 					
 					write_tun(tun_fd, frame, read + 4);
-					fastpoll = 1; // make sure we send packet real soon
+					fastpoll = POLL_MAX;
 				}
 			} 
 		}
@@ -134,7 +137,7 @@ main(int argc, char **argv)
 	printf("Closing tunnel\n");
 
 	close_dns(dns_fd);
-	close_tun(tun_fd);	
+	close_tun(tun_fd);
 
 	return 0;
 }
