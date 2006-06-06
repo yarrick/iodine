@@ -55,7 +55,7 @@ tunnel(int tun_fd, int dns_fd)
 	while (running) {
 		if (dnsd_hasack()) {
 			tv.tv_sec = 0;
-			tv.tv_usec = 150000;
+			tv.tv_usec = 50000;
 		} else {
 			tv.tv_sec = 1;
 			tv.tv_usec = 0;
@@ -69,9 +69,8 @@ tunnel(int tun_fd, int dns_fd)
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
 		
 		if(i < 0) {
-			if (running) {
+			if (running) 
 				warn("select");
-			}
 			return 1;
 		}
 		
