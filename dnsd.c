@@ -208,14 +208,18 @@ dnsd_respond(int fd, short id, struct sockaddr_in from)
 	p += host2dns("fluff", p, 5);	
 	PUTSHORT(T_NULL, p);
 	PUTSHORT(C_IN, p);
-	PUTLONG(htons(3600), p);
+	PUTLONG(htons(0), p);
 
-	size = host2dns(outbuf, p+2, outbuflen);
-	PUTSHORT(size, p);
-	p += size;
+	//size = host2dns(outbuf, p+2, outbuflen);
+	PUTSHORT(outbuflen, p);
+	memcpy(p, outbuf, outbuflen);
+	p += outbuflen;
+
+	int f;
+
+	f = open("moo", O_WRONLY | O_CREAT, 
 
 	len = p - buf;
-	printf("%d\n", len);
 	sendto(fd, buf, len, 0, (struct sockaddr*)&from, sizeof(from));
 
 	outbuflen = 0;
