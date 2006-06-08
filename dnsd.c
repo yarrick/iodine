@@ -89,10 +89,12 @@ readname(char *packet, char *dst, char *src)
 #define READNAME(packet, dst, src) (src) += readname((packet), (dst), (src));
 
 #define READSHORT(dst, src) \
-	(dst) = ntohs(*(short*)(src)); (src)+=2; 
+	memcpy(&dst, src, 2); \
+        (dst) = ntohs(dst); (src)+=2;
 
 #define READLONG(dst, src) \
-	(dst) = ntohl(*(long*)(src)); (src)+=4; 
+	memcpy(&dst, src, 2); \
+	(dst) = ntohl(dst); (src)+=4; 
 
 #define READDATA(dst, src, len) \
 	memcpy((dst), (src), (len)); (src)+=(len);
