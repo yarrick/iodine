@@ -29,6 +29,7 @@
 #include <ctype.h>
 
 #include "dns.h"
+#include "read.h"
 
 static int host2dns(const char *, char *, int);
 
@@ -43,55 +44,6 @@ int packetlen;
 uint16_t chunkid;
 
 uint16_t pingid;
-
-static int
-readname(char *packet, char *dst, char *src)
-{
-	char l;
-	int len;
-	int offset;
-
-	len = 0;
-
-	while(*src) {
-		l = *src++;
-		len++;
-
-		if(l & 0x80 && l & 0x40) {
-			offset = ((src[-1] & 0x3f) << 8) | src[0];		
-			readname(packet, dst, packet + offset);
-			dst += strlen(dst);
-			break;
-		}
-
-		while(l) {
-			*dst++ = *src++;
-			l--;
-			len++;
-		}
-
-		*dst++ = '.';
-	}
-
-	*dst = '\0';
-	src++;
-	len++;
-
-	return len;
-}
-
-#define READNAME(packet, dst, src) (src) += readname((packet), (dst), (src));
-
-#define READSHORT(dst, src) \
-	memcpy(&dst, src, 2); \
-        (dst) = ntohs(dst); (src)+=2;
-
-#define READLONG(dst, src) \
-	memcpy(&dst, src, 2); \
-	(dst) = ntohl(dst); (src)+=4; 
-
-#define READDATA(dst, src, len) \
-	memcpy((dst), (src), (len)); (src)+=(len);
 
 int 
 open_dns(const char *host, const char *domain) 

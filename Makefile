@@ -1,8 +1,8 @@
 CC = gcc
 DNS = dnstun
-DNSOBJS = dnstun.o tun.o dns.o
+DNSOBJS = dnstun.o tun.o dns.o read.o
 DNSD = dnstund
-DNSDOBJS = dnstund.o tun.o dnsd.o
+DNSDOBJS = dnstund.o tun.o dnsd.o read.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
