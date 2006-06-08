@@ -97,9 +97,9 @@ tunnel(int tun_fd, int dns_fd)
 					
 					frame->flags = htons(0x0000);
 #ifdef LINUX
-					frame->proto = htons(0x0800);
+					frame->proto = htons(0x0800);	// Linux wants ETH_P_IP
 #else
-					frame->proto = htons(0x0002);
+					frame->proto = htons(0x0002);	// BSD wants AF_INET as long word
 #endif
 					write_tun(tun_fd, frame, buflen + 4);
 				}
