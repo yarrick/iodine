@@ -15,6 +15,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -48,7 +49,7 @@ open_tun()
 
 	if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
 		warn("open_tun: %s: %s", tun_device, strerror(errno));
-		return 0;
+		exit(1);
 	}
 
 	bzero(&ifreq, sizeof(ifreq));
@@ -70,7 +71,8 @@ open_tun()
 	}
 
 	warn("open_tun: Couldn't set interface name.\n");
-
+	exit(1);
+	
 	return 0;
 }
 
@@ -86,7 +88,7 @@ open_tun()
 	if (tun_device != NULL) {
 		if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
 			warn("open_tun: %s: %s", tun_device, strerror(errno));
-			return 0;
+			exit(1);
 		}
 	} else {
 		for (i = 0; i < TUN_MAX_TRY; i++) {
@@ -102,7 +104,7 @@ open_tun()
 		}
 
 		warn("open_tun: Failed to open tunneling device.");
-		return 0;
+		exit(1);
 	}
 
 	return 0;
