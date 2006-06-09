@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <err.h>
+#include <pwd.h>
 #include <arpa/inet.h>
 #include <zlib.h>
 
@@ -115,22 +116,59 @@ tunnel(int tun_fd, int dns_fd)
 	return 0;
 }
 
+static void
+usage() {
+	printf("Usage: dnstun [-u user] nameserver topdomain\n");
+	exit(2);
+}
+
 int
 main(int argc, char **argv)
 {
 	int tun_fd;
 	int dns_fd;
+	int choice;
+	char *username;
+	struct passwd *pw;
 
-	if (argc != 3) {
-		printf("Usage: %s nameserver topdomain\n", argv[0]);
-		exit(2);
+	username = NULL;
+	while ((choice = getopt(argc, argv, "u:")) != -1) {
+		switch(choice) {
+		case 'u':
+			username = optarg;
+			pw = getpwnam(username);
+			if (!pw) {
+				printf("User %s does not exist!\n", username);
+				usage();
+			}
+			break;
+		default:
+			usage();
+			break;
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 2) {
+		usage();
 	}
 
 	tun_fd = open_tun();
-	dns_fd = open_dns(argv[1], argv[2]);
+	dns_fd = open_dns(argv[0], argv[1]);
+	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
 
 	signal(SIGINT, sigint);
 	
+	if (username) {
+		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
+			printf("Could not switch to user %s!\n", username);
+			usage();
+		}
+		printf("Now running as user %s\n", username);
+	}
+
 	tunnel(tun_fd, dns_fd);
 
 	printf("Closing tunnel\n");
