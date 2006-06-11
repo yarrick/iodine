@@ -108,18 +108,21 @@ extern char *__progname;
 
 static void
 usage() {
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] topdomain\n", __progname);
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-m mtu] "
+			"tunnel_ip topdomain\n", __progname);
 	exit(2);
 }
 
 static void
 help() {
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] "
-		   "topdomain\n", __progname);
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-m mtu] "
+		   "tunnel_ip topdomain\n", __progname);
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
+	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
+	printf("topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
 }
 
@@ -140,12 +143,15 @@ main(int argc, char **argv)
 	char *newroot;
 	char *username;
 	int foreground;
+	int mtu;
 	struct passwd *pw;
 
 	username = NULL;
+	newroot = NULL;
 	foreground = 0;
+	mtu = 1024;
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:m:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -162,6 +168,9 @@ main(int argc, char **argv)
 		case 't':
 			newroot = optarg;
 			break;
+		case 'm':
+			mtu = atoi(optarg);
+			break;
 		default:
 			usage();
 			break;
@@ -176,7 +185,7 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (argc != 1) 
+	if (argc != 2) 
 		usage();
 
 	if (username) {
@@ -187,9 +196,16 @@ main(int argc, char **argv)
 		}
 	}
 
-	if ((tun_fd = open_tun()) == -1) 
+	if (mtu == 0) {
+		printf("Bad MTU given.\n");
+		usage();
+	}
+
+	if ((tun_fd = open_tun()) == -1)
+		goto cleanup0;
+	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
 		goto cleanup1;
-	if ((dnsd_fd = open_dnsd(argv[0])) == -1) 
+	if ((dnsd_fd = open_dnsd(argv[1])) == -1) 
 		goto cleanup2;
 
 
@@ -220,6 +236,7 @@ cleanup2:
 	close_dnsd(dnsd_fd);
 cleanup1:
 	close_tun(tun_fd);	
+cleanup0:
 
 	return 0;
 }

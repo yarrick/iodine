@@ -31,7 +31,7 @@
 #define TUN_MAX_TRY 50
 
 char *tun_device = NULL;
-char *if_device = NULL;
+char *if_name = NULL;
 
 #ifdef LINUX
 
@@ -63,7 +63,7 @@ open_tun()
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			printf("Opened %s\n", ifreq.ifr_name);
-			if_device = strdup(ifreq.ifr_name);
+			if_name = strdup(ifreq.ifr_name);
 			return tun_fd;
 		}
 
@@ -98,7 +98,7 @@ open_tun()
 
 			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
 				printf("Opened %s\n", tun_name);
-				if_device = strdup(tun_name);
+				if_name = strdup(tun_name);
 				return tun_fd;
 			}
 
@@ -158,7 +158,7 @@ tun_setip(const char *ip)
 	if (inet_addr(ip) != 0) {
 		snprintf(cmdline, sizeof(cmdline), 
 				"/sbin/ifconfig %s %s netmask 255.255.255.0",
-				tun_device,
+				if_name,
 				ip);
 #ifndef LINUX
 		int r;
@@ -173,6 +173,7 @@ tun_setip(const char *ip)
 		}
 #endif
 
+		printf("Setting IP of %s to %s\n", if_name, ip);
 		return system(cmdline);
 	}
 
@@ -187,9 +188,10 @@ tun_setmtu(const int mtu)
 	if (mtu > 200 && mtu < 1500) {
 		snprintf(cmdline, sizeof(cmdline), 
 				"/sbin/ifconfig %s mtu %d",
-				tun_device,
+				if_name,
 				mtu);
 		
+		printf("Setting MTU of %s to %d\n", if_name, mtu);
 		return system(cmdline);
 	}
 
