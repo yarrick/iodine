@@ -119,6 +119,7 @@ help() {
 		   "topdomain\n", __progname);
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
+	printf("  -t dir to chroot to directory dir");
 	exit(0);
 }
 
@@ -163,7 +164,7 @@ main(int argc, char **argv)
 			break;
 		default:
 			usage();
-			/* NOTREACHED */
+			break;
 		}
 	}
 
