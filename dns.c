@@ -618,7 +618,9 @@ dnsd_read(int fd, char *buf, int buflen)
 
 				r = decodepacket(name, &packetbuf);
 
-				memcpy(buf, packetbuf.data, r);
+				if (r > 0) {
+					memcpy(buf, packetbuf.data, r);
+				}
 
 				return r;
 			}
