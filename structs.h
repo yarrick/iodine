@@ -28,7 +28,7 @@ struct query {
 	char name[256];
 	short type;
 	short id;
-	struct sockaddr_in from;
+	struct sockaddr from;
 	int fromlen;
 };
 

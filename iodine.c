@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <err.h>
@@ -120,7 +121,7 @@ handshake(int dns_fd)
 
 	timeout = 1;
 	
-	for (i=0;i<5;i++) {
+	for (i=0; running && i<5 ;i++) {
 		tv.tv_sec = timeout++;
 		tv.tv_usec = 0;
 
@@ -139,18 +140,17 @@ handshake(int dns_fd)
 				continue;
 			}
 
-			if (read == 0) 
-				continue;
+			if (read > 0) {
+				p = strchr(in, '-');
+				if (p) {
+					*p++ = '\0';
+					mtu = atoi(p);
 
-			p = strchr(in, '-');
-			if (p) {
-				*p++ = '\0';
-				mtu = atoi(p);
-
-				printf("%s %d\n", in, mtu);
-
-				if (tun_setip(in) == 0 && tun_setmtu(atoi(p)) == 0)
-					return 0;
+					if (tun_setip(in) == 0 && tun_setmtu(atoi(p)) == 0)
+						return 0;
+					else 
+						warn("Received handshake but b0rk");
+				}
 			}
 		}
 
