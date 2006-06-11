@@ -23,5 +23,7 @@ int open_tun();
 void close_tun(int);
 int write_tun(int, char *, int);
 int read_tun(int, char *, int);
+int tun_setip(const char *);
+int tun_setmtu(const int);
 
 #endif /* _TUN_H_ */
