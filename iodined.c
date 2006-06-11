@@ -158,6 +158,8 @@ help() {
 	printf("iodine IP over DNS tunneling server\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-m mtu] "
 		   "tunnel_ip topdomain\n", __progname);
+	printf("  -v to print version info and exit\n");
+	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
