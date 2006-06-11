@@ -49,7 +49,7 @@ open_tun()
 
 	if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
 		warn("open_tun: %s: %s", tun_device, strerror(errno));
-		exit(1);
+		return -1;
 	}
 
 	bzero(&ifreq, sizeof(ifreq));
@@ -66,14 +66,13 @@ open_tun()
 
 		if (errno != EBUSY) {
 			warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
-			return 0;
+			return -1;
 		}
 	}
 
 	warn("open_tun: Couldn't set interface name.\n");
-	exit(1);
 	
-	return 0;
+	return -1;
 }
 
 #else /* BSD */
@@ -88,7 +87,7 @@ open_tun()
 	if (tun_device != NULL) {
 		if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
 			warn("open_tun: %s: %s", tun_device, strerror(errno));
-			exit(1);
+			return -1;
 		}
 	} else {
 		for (i = 0; i < TUN_MAX_TRY; i++) {
@@ -104,10 +103,9 @@ open_tun()
 		}
 
 		warn("open_tun: Failed to open tunneling device.");
-		exit(1);
 	}
 
-	return 0;
+	return -1;
 }
 
 #endif /* LINUX */

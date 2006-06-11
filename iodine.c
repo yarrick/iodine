@@ -185,8 +185,10 @@ main(int argc, char **argv)
 		}
 	}
 
-	tun_fd = open_tun();
-	dns_fd = open_dns(argv[0], argv[1]);
+	if ((tun_fd = open_tun()) == -1)
+		goto cleanup1;
+	if ((dns_fd = open_dns(argv[0], argv[1])) == -1)
+		goto cleanup2;
 
 	signal(SIGINT, sigint);
 
@@ -215,7 +217,9 @@ main(int argc, char **argv)
 
 	printf("Closing tunnel\n");
 
+cleanup2:
 	close_dns(dns_fd);
+cleanup1:
 	close_tun(tun_fd);
 
 	return 0;

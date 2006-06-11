@@ -187,8 +187,11 @@ main(int argc, char **argv)
 		}
 	}
 
-	tun_fd = open_tun();
-	dnsd_fd = open_dnsd(argv[0]);
+	if ((tun_fd = open_tun()) == -1) 
+		goto cleanup1;
+	if ((dnsd_fd = open_dnsd(argv[0])) == -1) 
+		goto cleanup2;
+
 
 	if (newroot) {
 		if (chroot(newroot) != 0 || chdir("/") != 0)
@@ -214,7 +217,9 @@ main(int argc, char **argv)
 	
 	tunnel(tun_fd, dnsd_fd);
 
+cleanup2:
 	close_dnsd(dnsd_fd);
+cleanup1:
 	close_tun(tun_fd);	
 
 	return 0;

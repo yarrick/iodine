@@ -70,7 +70,7 @@ open_dns(const char *host, const char *domain)
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0) {
 		warn("socket");
-		return 0;
+		return -1;
 	}
 
 	flag = 1;
@@ -81,7 +81,7 @@ open_dns(const char *host, const char *domain)
 
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
 		warn("bind");
-		return 0;
+		return -1;
 	}
 
 	printf("Opened UDP socket\n");
@@ -91,7 +91,7 @@ open_dns(const char *host, const char *domain)
 	h = gethostbyname(host);
 	if (!h) {
 		printf("Could not resolve name %s, exiting\n", host);
-		exit(9);
+		return -1;
 	}
 	bzero(&peer, sizeof(peer));
 	peer.sin_family = AF_INET;
@@ -124,7 +124,7 @@ open_dnsd(const char *domain)
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(fd < 0) {
 		warn("socket");
-		return 0;
+		return -1;
 	}
 
 	flag = 1;
@@ -135,7 +135,7 @@ open_dnsd(const char *domain)
 
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
 		warn("bind");
-		return 0;
+		return -1;
 	}
 
 	printf("Opened UDP socket\n");
