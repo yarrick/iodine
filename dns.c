@@ -319,7 +319,6 @@ dns_write(int fd, int id, char *buf, int len, char flag)
 	}
 	strncpy(d, topdomain, strlen(topdomain)+1);
 	
-	//printf("Resolving %s\n", data);
 	dns_query(fd, id, data, T_NULL);
 	return avail;
 }
@@ -518,7 +517,7 @@ decodepacket(const char *name, char *buf, int buflen)
 
 	buf[0] = name[0];
 
-	dp = buf;
+	dp = buf + 1;
 	np = name + 1;
 
 	while(len < buflen && np < domain) {

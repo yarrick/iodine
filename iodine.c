@@ -278,8 +278,6 @@ main(int argc, char **argv)
 
 	tunnel(tun_fd, dns_fd);
 
-	printf("Closing tunnel\n");
-
 cleanup2:
 	close_dns(dns_fd);
 	close_tun(tun_fd);
