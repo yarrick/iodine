@@ -55,6 +55,15 @@ short delayed_q_id;
 struct sockaddr_in delayed_q_from;
 int delayed_q_fromlen;
 
+struct packet 
+{
+	int len;
+	int offset;
+	char data[64*1024];
+};
+
+struct packet packetbuf;
+
 int 
 open_dns(const char *host, const char *domain) 
 {
@@ -503,13 +512,6 @@ dnsd_forceack(int fd)
 	delayed_q_id = 0;
 }
 
-struct packet 
-{
-	int len;
-	int offset;
-	char data[64*1024];
-};
-
 static int
 decodepacket(const char *name, struct packet *packet)
 {
@@ -517,6 +519,7 @@ decodepacket(const char *name, struct packet *packet)
 	int len;
 	int last;
 	int ping;
+	int hello;
 	char *dp;
 	char *domain;
 	const char *np;
@@ -524,10 +527,11 @@ decodepacket(const char *name, struct packet *packet)
 	len = 0;
 	last = (name[0] == '1');
 	ping = (name[0] == 'p' || name[0] == 'P');
+	hello = (name[0] == 'h' || name[0] == 'H');
 
 	domain = strstr(name, topdomain);
 
-	if (!ping && domain) {
+	if (!ping && !hello && domain) {
 		np = name + 1;
 		dp = packet->data + packet->offset;
 
@@ -550,6 +554,8 @@ decodepacket(const char *name, struct packet *packet)
 	if(last) {
 		len = packet->len;
 		packet->len = packet->offset = 0;
+	} else if (hello) {
+		len = GOTHELLO;
 	} else {
 		len = 0;
 	}
@@ -562,8 +568,6 @@ close_dnsd(int fd)
 {
 	close(fd);
 }
-
-struct packet packetbuf;
 
 int
 dnsd_read(int fd, char *buf, int buflen)
@@ -587,20 +591,20 @@ dnsd_read(int fd, char *buf, int buflen)
 		perror("recvfrom");
 	} else {
 		header = (HEADER*)packet;
-		
+
 		id = ntohs(header->id);
 
 		data = packet + sizeof(HEADER);
 
 		if(!header->qr) {
-			qdcount = ntohs(header->qdcount);		
+			qdcount = ntohs(header->qdcount);
 
 			if(qdcount == 1) {
 				bzero(name, sizeof(name));
 				READNAME(packet, name, data);
 				READSHORT(type, data);
 				READSHORT(class, data);
-				
+
 				if (dnsd_haspacket()) {
 					dnsd_send(fd, name, type, id, from);
 				} else {
@@ -615,7 +619,7 @@ dnsd_read(int fd, char *buf, int buflen)
 				r = decodepacket(name, &packetbuf);
 
 				memcpy(buf, packetbuf.data, r);
-				
+
 				return r;
 			}
 		}

@@ -17,6 +17,8 @@
 #ifndef _DNS_H_
 #define _DNS_H_
 
+#define GOTHELLO -5
+
 int open_dns(const char *, const char *);
 void close_dns(int);
 

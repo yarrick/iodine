@@ -81,7 +81,7 @@ tunnel(int tun_fd, int dns_fd)
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, in, sizeof(in));
-				if (read <= 0) 
+				if (read <= 0)
 					continue;
 				
 				outlen = sizeof(out);
@@ -90,8 +90,13 @@ tunnel(int tun_fd, int dns_fd)
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, in, sizeof(in));
-				if (read <= 0)
+				if (read <= 0) {
+					if (read == GOTHELLO) {
+						read = snprintf(in, sizeof(in), "%s-%d", "172.30.5.2", 1023);
+						dnsd_queuepacket(in, read);
+					}
 					continue;
+				}
 
 				outlen = sizeof(out);
 				uncompress(out, &outlen, in, read);
@@ -207,7 +212,6 @@ main(int argc, char **argv)
 		goto cleanup1;
 	if ((dnsd_fd = open_dnsd(argv[1])) == -1) 
 		goto cleanup2;
-
 
 	if (newroot) {
 		if (chroot(newroot) != 0 || chdir("/") != 0)
