@@ -120,9 +120,21 @@ close_tun(int tun_fd)
 }
 
 int 
-write_tun(int tun_fd, struct tun_frame *frame, int len) 
+write_tun(int tun_fd, char *data, int len) 
 {
-	if (write(tun_fd, frame, len) != len) {
+#ifdef LINUX
+	data[0] = 0x00;
+	data[1] = 0x00;
+	data[2] = 0x08;
+	data[3] = 0x00;
+#else /* LINUX */
+	data[0] = 0x00;
+	data[1] = 0x00;
+	data[2] = 0x00;
+	data[3] = 0x02;
+#endif /* !LINUX */
+
+	if (write(tun_fd, data, len) != len) {
 		warn("write_tun");
 		return 1;
 	}
@@ -131,8 +143,8 @@ write_tun(int tun_fd, struct tun_frame *frame, int len)
 }
 
 int 
-read_tun(int tun_fd, struct tun_frame *frame, int len) 
+read_tun(int tun_fd, char *buf, int len) 
 {
-	return read(tun_fd, frame, len);
+	return read(tun_fd, buf, len);
 }
 

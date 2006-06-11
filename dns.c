@@ -326,14 +326,15 @@ dns_read(int fd, char *buf, int buflen)
 	char name[255];
 	char rdata[4*1024];
 	HEADER *header;
+	socklen_t addrlen;
 	char packet[64*1024];
+	struct sockaddr_in from;
 
-	r = recv(fd, packet, sizeof(packet), 0);
-
-	//printf("Read %d bytes DNS reply\n", r);
+	addrlen = sizeof(struct sockaddr);
+	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 
 	if(r == -1) {
-		perror("recv");
+		perror("recvfrom");
 	} else {
 		header = (HEADER*)packet;
 		
@@ -570,8 +571,6 @@ dnsd_read(int fd, char *buf, int buflen)
 
 	addrlen = sizeof(struct sockaddr);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
-
-	//printf("Read %d bytes DNS query from %s\n", r, inet_ntoa(from.sin_addr));
 
 	if(r == -1) {
 		perror("recvfrom");

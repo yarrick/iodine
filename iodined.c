@@ -49,11 +49,9 @@ tunnel(int tun_fd, int dns_fd)
 	int read;
 	fd_set fds;
 	struct timeval tv;
-	struct tun_frame *frame;
-	long buflen;
-	char buf[64*1024];
-
-	frame = malloc(64*1024);
+	char in[64*1024];
+	long outlen;
+	char out[64*1024];
 	
 	while (running) {
 		if (dnsd_hasack()) {
@@ -82,32 +80,26 @@ tunnel(int tun_fd, int dns_fd)
 				dnsd_forceack(dns_fd);
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
-				read = read_tun(tun_fd, frame, 64*1024);
-				if(read > 0) {
-					buflen = sizeof(buf);
-					compress2(buf, &buflen, frame->data, read - 4, 9);
-					dnsd_queuepacket(buf, buflen);
-				}
+				read = read_tun(tun_fd, in, sizeof(in));
+				if (read <= 0) 
+					continue;
+				
+				outlen = sizeof(out);
+				compress2(out, &outlen, in, read, 9);
+				dnsd_queuepacket(out, outlen);
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dnsd_read(dns_fd, buf, 64*1024-4);
-				if(read > 0) {
-					buflen = 64*1024-4;
-					uncompress(frame->data, &buflen, buf, read);
-					
-					frame->flags = htons(0x0000);
-#ifdef LINUX
-					frame->proto = htons(0x0800);	// Linux wants ETH_P_IP
-#else
-					frame->proto = htons(0x0002);	// BSD wants AF_INET as long word
-#endif
-					write_tun(tun_fd, frame, buflen + 4);
-				}
+				read = dnsd_read(dns_fd, in, sizeof(in));
+				if (read <= 0)
+					continue;
+
+				outlen = sizeof(out);
+				uncompress(out, &outlen, in, read);
+
+				write_tun(tun_fd, out, outlen);
 			} 
 		}
 	}
-
-	free(frame);
 
 	return 0;
 }

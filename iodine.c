@@ -35,8 +35,6 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
 
-#define FRAMESIZE (64*1024)
-
 int running = 1;
 
 static void
@@ -51,11 +49,9 @@ tunnel(int tun_fd, int dns_fd)
 	int read;
 	fd_set fds;
 	struct timeval tv;
-	struct tun_frame *frame;
-	long buflen;
-	char buf[64*1024];
-
-	frame = malloc(FRAMESIZE);
+	char in[64*1024];
+	long outlen;
+	char out[64*1024];
 
 	while (running) {
 		tv.tv_sec = 1;
@@ -79,36 +75,28 @@ tunnel(int tun_fd, int dns_fd)
 			dns_ping(dns_fd);
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
-				read = read_tun(tun_fd, frame, FRAMESIZE);
-				if (read > 0) {
-					buflen = sizeof(buf);
-					compress2(buf, &buflen, frame->data, read - 4, 9);
-					dns_handle_tun(dns_fd, buf, buflen);
-				}
+				read = read_tun(tun_fd, in, sizeof(in));
+				if(read <= 0)
+					continue;
+
+				outlen = sizeof(out);
+				compress2(out, &outlen, in, read, 9);
+				dns_handle_tun(dns_fd, out, outlen);
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dns_read(dns_fd, buf, FRAMESIZE-4);
-				if (read > 0) {
-					buflen = 64*1024-4;
-					uncompress(frame->data, &buflen, buf, read);
+				read = dns_read(dns_fd, in, sizeof(in));
+				if (read <= 0) 
+					continue;
 
-					frame->flags = htons(0x0000);
-#ifdef LINUX
-					frame->proto = htons(0x0800);	// Linux wants ETH_P_IP
-#else
-					frame->proto = htons(0x0002);	// BSD wants AF_INET as long word
-#endif
-					
-					write_tun(tun_fd, frame, buflen + 4);
-					if (!dns_sending()) {
-						dns_ping(dns_fd);
-					}
-				}
+				outlen = sizeof(out);
+				uncompress(out, &outlen, in, read);
+
+				write_tun(tun_fd, out, outlen);
+				if (!dns_sending()) 
+					dns_ping(dns_fd);
 			} 
 		}
 	}
-
-	free(frame);
 
 	return 0;
 }
@@ -151,11 +139,6 @@ main(int argc, char **argv)
 	username = NULL;
 	foreground = 0;
 	
-	if (geteuid() != 0) {
-		printf("Run as root and you'll be happy.\n");
-		usage();
-	}
-
 	while ((choice = getopt(argc, argv, "vfhu:")) != -1) {
 		switch(choice) {
 		case 'v':
@@ -174,6 +157,11 @@ main(int argc, char **argv)
 			usage();
 			break;
 		}
+	}
+	
+	if (geteuid() != 0) {
+		printf("Run as root and you'll be happy.\n");
+		usage();
 	}
 
 	argc -= optind;
