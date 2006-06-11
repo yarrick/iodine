@@ -142,11 +142,6 @@ main(int argc, char **argv)
 	username = NULL;
 	foreground = 0;
 	
-	if (geteuid() != 0) {
-		printf("Run as root and you'll be happy.\n");
-		usage();
-	}
-
 	while ((choice = getopt(argc, argv, "vfhu:")) != -1) {
 		switch(choice) {
 		case 'v':
@@ -169,6 +164,11 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
+	
+	if (geteuid() != 0) {
+		printf("Run as root and you'll be happy.\n");
+		usage();
+	}
 
 	if (argc != 1) {
 		usage();
