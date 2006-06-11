@@ -131,7 +131,7 @@ help() {
 
 static void
 version() {
-	char *svnver = "$Id$";
+	char *svnver = "$Rev$ from $Date$";
 	printf("iodine IP over DNS tunneling server\n");
 	printf("SVN version: %s\n", svnver);
 	exit(0);
