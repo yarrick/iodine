@@ -116,7 +116,9 @@ extern char *__progname;
 
 static void
 usage() {
-	printf("Usage: %s [-u user] topdomain\n", __progname);
+	printf("Usage: %s [-f] [-u user] topdomain\n", __progname);
+	printf("-f is to keep running in foreground\n");
+	printf("-u name to drop privileges and run as user 'name'\n");
 	exit(2);
 }
 
@@ -128,16 +130,21 @@ main(int argc, char **argv)
 	int choice;
 	char *username;
 	struct passwd *pw;
+	int foreground;
 
 	username = NULL;
+	foreground = 0;
 	
 	if (geteuid() != 0) {
 		printf("Run as root and you'll be happy.\n");
 		usage();
 	}
 
-	while ((choice = getopt(argc, argv, "u:")) != -1) {
+	while ((choice = getopt(argc, argv, "fu:")) != -1) {
 		switch(choice) {
+		case 'f':
+			foreground = 1;
+			break;
 		case 'u':
 			username = optarg;
 			break;
@@ -166,6 +173,12 @@ main(int argc, char **argv)
 	dnsd_fd = open_dnsd(argv[0]);
 	printf("Listening to dns for domain %s\n", argv[0]);
 
+	if (!foreground) {
+		daemon(0, 0);
+		umask(0);
+		alarm(0);
+	}
+
 	signal(SIGINT, sigint);
 	if (username) {
 		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
@@ -176,8 +189,6 @@ main(int argc, char **argv)
 	}
 	
 	tunnel(tun_fd, dnsd_fd);
-
-	printf("Closing tunnel\n");
 
 	close_dnsd(dnsd_fd);
 	close_tun(tun_fd);	

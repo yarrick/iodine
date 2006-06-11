@@ -85,11 +85,13 @@ open_dns(const char *host, const char *domain)
 	}
 
 	printf("Opened UDP socket\n");
+	printf("Sending queries for %s to %s\n", domain, host);
 
 	// Init dns target struct
 	h = gethostbyname(host);
 	if (!h) {
-		perror("gethostbyname");
+		printf("Could not resolve name %s, exiting\n", host);
+		exit(9);
 	}
 	bzero(&peer, sizeof(peer));
 	peer.sin_family = AF_INET;

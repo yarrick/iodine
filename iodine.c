@@ -81,7 +81,6 @@ tunnel(int tun_fd, int dns_fd)
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, frame, FRAMESIZE);
 				if (read > 0) {
-					printf("Got data on tun! %d bytes\n", read);
 					buflen = sizeof(buf);
 					compress2(buf, &buflen, frame->data, read - 4, 9);
 					dns_handle_tun(dns_fd, buf, buflen);
@@ -92,8 +91,6 @@ tunnel(int tun_fd, int dns_fd)
 				if (read > 0) {
 					buflen = 64*1024-4;
 					uncompress(frame->data, &buflen, buf, read);
-
-					printf("Got data on dns! %d bytes\n", read);
 
 					frame->flags = htons(0x0000);
 #ifdef LINUX
@@ -121,6 +118,8 @@ extern char *__progname;
 static void
 usage() {
 	printf("Usage: %s [-u user] nameserver topdomain\n", __progname);
+	printf("-f is to keep running in foreground\n");
+	printf("-u name to drop privileges and run as user 'name'\n");
 	exit(2);
 }
 
@@ -132,16 +131,21 @@ main(int argc, char **argv)
 	int choice;
 	char *username;
 	struct passwd *pw;
+	int foreground;
 
 	username = NULL;
+	foreground = 0;
 	
 	if (geteuid() != 0) {
 		printf("Run as root and you'll be happy.\n");
 		usage();
 	}
 
-	while ((choice = getopt(argc, argv, "u:")) != -1) {
+	while ((choice = getopt(argc, argv, "fu:")) != -1) {
 		switch(choice) {
+		case 'f':
+			foreground = 1;
+			break;
 		case 'u':
 			username = optarg;
 			break;
@@ -166,12 +170,16 @@ main(int argc, char **argv)
 		}
 	}
 
-
 	tun_fd = open_tun();
 	dns_fd = open_dns(argv[0], argv[1]);
-	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
 
 	signal(SIGINT, sigint);
+	
+	if (!foreground) {
+		daemon(0, 0);
+		umask(0);
+		alarm(0);
+	}
 	
 	if (username) {
 		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
