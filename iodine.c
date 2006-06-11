@@ -232,7 +232,7 @@ main(int argc, char **argv)
 	}
 
 	if ((tun_fd = open_tun()) == -1)
-		goto cleanup1;
+		goto cleanup0;
 	if ((dns_fd = open_dns(argv[0], argv[1])) == -1)
 		goto cleanup2;
 
@@ -249,6 +249,7 @@ main(int argc, char **argv)
 	}
 	
 	if (!foreground) {
+		printf("Detaching from terminal...\n");
 		daemon(0, 0);
 		umask(0);
 		alarm(0);
@@ -269,6 +270,7 @@ cleanup2:
 	close_dns(dns_fd);
 cleanup1:
 	close_tun(tun_fd);
+cleanup0:
 
 	return 0;
 }

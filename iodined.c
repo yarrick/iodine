@@ -221,6 +221,7 @@ main(int argc, char **argv)
 	}
 	
 	if (!foreground) {
+		printf("Detaching from terminal...\n");
 		daemon(0, 0);
 		umask(0);
 		alarm(0);
