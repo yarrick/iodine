@@ -1,26 +1,26 @@
 CC = gcc
-DNS = iodine
-DNSOBJS = dnstun.o tun.o dns.o read.o
-DNSD = iodined
-DNSDOBJS = dnstund.o tun.o dnsd.o read.o
+CLIENT = iodine
+CLIENTOBJS = iodine.o tun.o dns.o read.o
+SERVER = iodined
+SERVEROBJS = iodined.o tun.o dnsd.o read.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
 LDFLAGS =  -lz
 CFLAGS = -c -g -Wall -D$(OS)
 
-all: stateos $(DNS) $(DNSD)
+all: stateos $(CLIENT) $(SERVER)
 
 stateos:
 	@echo OS is $(OS)
 
-$(DNS): $(DNSOBJS)
+$(CLIENT): $(CLIENTOBJS)
 	@echo LD $@
-	@$(CC) $(DNSOBJS) -o $(DNS) $(LDFLAGS)
+	@$(CC) $(CLIENTOBJS) -o $(CLIENT) $(LDFLAGS)
 
-$(DNSD): $(DNSDOBJS)
+$(SERVER): $(SERVEROBJS)
 	@echo LD $@
-	@$(CC) $(DNSDOBJS) -o $(DNSD) $(LDFLAGS)
+	@$(CC) $(SERVEROBJS) -o $(SERVER) $(LDFLAGS)
 
 .c.o: 
 	@echo CC $<
@@ -28,5 +28,5 @@ $(DNSD): $(DNSDOBJS)
 
 clean:
 	@echo "Cleaning..."
-	@rm -f $(DNS) $(DNSD) *~ *.o *.core
+	@rm -f $(CLIENT) $(SERVER) *~ *.o *.core
 
