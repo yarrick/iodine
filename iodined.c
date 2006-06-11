@@ -184,7 +184,6 @@ main(int argc, char **argv)
 
 	tun_fd = open_tun();
 	dnsd_fd = open_dnsd(argv[0]);
-	printf("Listening to dns for domain %s\n", argv[0]);
 
 	if (!foreground) {
 		daemon(0, 0);

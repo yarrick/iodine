@@ -139,6 +139,7 @@ open_dnsd(const char *domain)
 	}
 
 	printf("Opened UDP socket\n");
+	printf("Listening to dns for domain %s\n", domain);
 	
 	// Save top domain used
 	strncpy(topdomain, domain, sizeof(topdomain) - 2);
