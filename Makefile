@@ -1,7 +1,7 @@
 CC = gcc
-DNS = dnstun
+DNS = iodine
 DNSOBJS = dnstun.o tun.o dns.o read.o
-DNSD = dnstund
+DNSD = iodined
 DNSDOBJS = dnstund.o tun.o dnsd.o read.o
 
 OS = `uname | tr "a-z" "A-Z"`
