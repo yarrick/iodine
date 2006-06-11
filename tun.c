@@ -31,7 +31,7 @@
 #define TUN_MAX_TRY 50
 
 char *tun_device = NULL;
-char *if_name = NULL;
+char if_name[50];
 
 #ifdef LINUX
 
@@ -63,7 +63,7 @@ open_tun()
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			printf("Opened %s\n", ifreq.ifr_name);
-			if_name = strdup(ifreq.ifr_name);
+			snprintf(if_name, sizeof(if_name), "dns%d", i);
 			return tun_fd;
 		}
 
@@ -98,7 +98,7 @@ open_tun()
 
 			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
 				printf("Opened %s\n", tun_name);
-				if_name = strdup(tun_name);
+				snprintf(if_name, sizeof(if_name), "tun%d", i);
 				return tun_fd;
 			}
 
@@ -160,6 +160,8 @@ tun_setip(const char *ip)
 				"/sbin/ifconfig %s %s netmask 255.255.255.0",
 				if_name,
 				ip);
+		
+		printf("Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
 		int r;
 
@@ -171,9 +173,8 @@ tun_setip(const char *ip)
 					"/sbin/route add %s/24 %s",
 					ip, ip);
 		}
+		printf("Adding route %s/24 to %s\n", ip, ip);
 #endif
-
-		printf("Setting IP of %s to %s\n", if_name, ip);
 		return system(cmdline);
 	}
 
