@@ -56,6 +56,7 @@ tunnel(int tun_fd, int dns_fd)
 {
 	int i;
 	int read;
+	int code;
 	fd_set fds;
 	struct timeval tv;
 	char in[64*1024];
@@ -105,21 +106,28 @@ tunnel(int tun_fd, int dns_fd)
 				if(in[0] == 'H' || in[0] == 'h') {
 					read = snprintf(out, sizeof(out), "%s-%d", "172.30.5.2", 1023);
 					dnsd_queuepacket(out, read);
-				} else if(in[0] == '0') {
-					memcpy(packetbuf.data + packetbuf.offset, in, read);
-					packetbuf.len += read;
-					packetbuf.offset += read;
-				} else if(in[0] == '1') {
-					memcpy(packetbuf.data + packetbuf.offset, in, read);
-					packetbuf.len += read;
-					packetbuf.offset += read;
+				} else if((in[0] >= '0' && in[0] <= '9')
+						|| (in[0] >= 'a' && in[0] <= 'f')
+						|| (in[0] >= 'A' && in[0] <= 'F')) {
+					if ((in[0] >= '0' && in[0] <= '9'))
+						code = in[0] - '0';
+					if ((in[0] >= 'a' && in[0] <= 'f'))
+						code = in[0] - 'a' + 10;
+					if ((in[0] >= 'A' && in[0] <= 'F'))
+						code = in[0] - 'A' + 10;
 
-					outlen = sizeof(out);
-					uncompress(out, &outlen, packetbuf.data, packetbuf.len);
+					memcpy(packetbuf.data + packetbuf.offset, in + 1, read - 1);
+					packetbuf.len += read - 1;
+					packetbuf.offset += read - 1;
 
-					write_tun(tun_fd, out, outlen);
+					if (code & 1) {
+						outlen = sizeof(out);
+						uncompress(out, &outlen, packetbuf.data, packetbuf.len);
 
-					packetbuf.len = packetbuf.offset = 0;
+						write_tun(tun_fd, out, outlen);
+
+						packetbuf.len = packetbuf.offset = 0;
+					}
 				}
 			} 
 		}
@@ -174,6 +182,9 @@ main(int argc, char **argv)
 	newroot = NULL;
 	foreground = 0;
 	mtu = 1024;
+
+	packetbuf.len = 0;
+	packetbuf.offset = 0;
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:m:")) != -1) {
 		switch(choice) {
