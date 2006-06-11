@@ -35,6 +35,7 @@ int open_dnsd(const char *);
 void close_dnsd(int);
 
 int dnsd_read(int, char *, int);
+void dnsd_send(int, char *, int);
 
 int dnsd_haspacket();
 int dnsd_hasack();

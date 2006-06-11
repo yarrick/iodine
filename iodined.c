@@ -45,6 +45,8 @@ struct packet
 };
 
 struct packet packetbuf;
+struct packet outpacket;
+int outid;
 
 static void
 sigint(int sig) {
@@ -66,14 +68,14 @@ tunnel(int tun_fd, int dns_fd)
 	while (running) {
 		if (dnsd_hasack()) {
 			tv.tv_sec = 0;
-			tv.tv_usec = 50000;
+			tv.tv_usec = 5000;
 		} else {
 			tv.tv_sec = 1;
 			tv.tv_usec = 0;
 		}
 
 		FD_ZERO(&fds);
-		if(!dnsd_haspacket()) 
+		if(outpacket.len == 0)
 			FD_SET(tun_fd, &fds);
 		FD_SET(dns_fd, &fds);
 
@@ -87,7 +89,8 @@ tunnel(int tun_fd, int dns_fd)
 	
 		if (i==0) {	
 			if (dnsd_hasack()) 
-				dnsd_forceack(dns_fd);
+				dnsd_send(dns_fd, outpacket.data, outpacket.len);
+				outpacket.len = 0;
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, in, sizeof(in));
@@ -96,7 +99,8 @@ tunnel(int tun_fd, int dns_fd)
 				
 				outlen = sizeof(out);
 				compress2(out, &outlen, in, read, 9);
-				dnsd_queuepacket(out, outlen);
+				memcpy(outpacket.data, out, outlen);
+				outpacket.len = outlen;
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, in, sizeof(in));
@@ -105,7 +109,7 @@ tunnel(int tun_fd, int dns_fd)
 
 				if(in[0] == 'H' || in[0] == 'h') {
 					read = snprintf(out, sizeof(out), "%s-%d", "172.30.5.2", 1023);
-					dnsd_queuepacket(out, read);
+					dnsd_send(dns_fd, out, read);
 				} else if((in[0] >= '0' && in[0] <= '9')
 						|| (in[0] >= 'a' && in[0] <= 'f')
 						|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -127,6 +131,10 @@ tunnel(int tun_fd, int dns_fd)
 						write_tun(tun_fd, out, outlen);
 
 						packetbuf.len = packetbuf.offset = 0;
+					}
+					if (outpacket.len > 0) {
+						dnsd_send(dns_fd, outpacket.data, outpacket.len);
+						outpacket.len = 0;
 					}
 				}
 			} 
@@ -185,6 +193,7 @@ main(int argc, char **argv)
 
 	packetbuf.len = 0;
 	packetbuf.offset = 0;
+	outpacket.len = 0;
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:m:")) != -1) {
 		switch(choice) {
