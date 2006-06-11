@@ -249,8 +249,10 @@ main(int argc, char **argv)
 		goto cleanup0;
 	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
 		goto cleanup1;
-	if ((dnsd_fd = open_dnsd(argv[1])) == -1) 
+	if ((dnsd_fd = open_dns(argv[1], 53)) == -1) 
 		goto cleanup2;
+	
+	printf("Listening to dns for domain %s\n", argv[1]);
 
 	if (newroot) {
 		if (chroot(newroot) != 0 || chdir("/") != 0)
@@ -277,7 +279,7 @@ main(int argc, char **argv)
 	tunnel(tun_fd, dnsd_fd);
 
 cleanup2:
-	close_dnsd(dnsd_fd);
+	close_dns(dnsd_fd);
 cleanup1:
 	close_tun(tun_fd);	
 cleanup0:

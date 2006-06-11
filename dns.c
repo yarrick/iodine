@@ -49,16 +49,15 @@ uint16_t pingid;
 
 
 int 
-open_dns(const char *host, const char *domain) 
+open_dns(const char *domain, int localport) 
 {
 	int fd;
 	int flag;
 	struct sockaddr_in addr;
-	struct hostent *h;
 
 	bzero(&addr, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(0);
+	addr.sin_port = htons(localport);
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -78,8 +77,18 @@ open_dns(const char *host, const char *domain)
 		return -1;
 	}
 
+	// Save top domain used
+	strncpy(topdomain, domain, sizeof(topdomain) - 2);
+	topdomain[sizeof(topdomain) - 1] = 0;
+
 	printf("Opened UDP socket\n");
-	printf("Sending queries for %s to %s\n", domain, host);
+	return fd;
+}
+
+int 
+dns_settarget(const char *host) 
+{
+	struct hostent *h;
 
 	// Init dns target struct
 	h = gethostbyname(host);
@@ -87,63 +96,18 @@ open_dns(const char *host, const char *domain)
 		printf("Could not resolve name %s, exiting\n", host);
 		return -1;
 	}
+
 	bzero(&peer, sizeof(peer));
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons(53);
 	peer.sin_addr = *((struct in_addr *) h->h_addr);
 
-	// Save top domain used
-	strncpy(topdomain, domain, sizeof(topdomain) - 2);
-	topdomain[sizeof(topdomain) - 1] = 0;
-
 	// Init chunk id
 	chunkid = 0;
 	pingid = 0;
 
-	return fd;
+	return 0;
 }
-
-int 
-open_dnsd(const char *domain) 
-{
-	int fd;
-	int flag;
-	struct sockaddr_in addr;
-
-	bzero(&addr, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(53);
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if(fd < 0) {
-		warn("socket");
-		return -1;
-	}
-
-	flag = 1;
-#ifdef SO_REUSEPORT
-	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
-#endif
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
-
-	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-		warn("bind");
-		return -1;
-	}
-
-	printf("Opened UDP socket\n");
-	printf("Listening to dns for domain %s\n", domain);
-	
-	// Save top domain used
-	strncpy(topdomain, domain, sizeof(topdomain) - 2);
-	topdomain[sizeof(topdomain) - 1] = 0;
-
-	packetlen = 0;
-	
-	return fd;
-}
-
 
 void
 close_dns(int fd)
@@ -495,12 +459,6 @@ decodepacket(const char *name, char *buf, int buflen)
 	if (len == buflen)
 		return -1; 
 	return len;
-}
-
-void
-close_dnsd(int fd)
-{
-	close(fd);
 }
 
 int
