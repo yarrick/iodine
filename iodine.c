@@ -186,6 +186,7 @@ main(int argc, char **argv)
 	int foreground;
 	struct passwd *pw;
 
+	newroot = NULL;
 	username = NULL;
 	foreground = 0;
 	
@@ -232,7 +233,7 @@ main(int argc, char **argv)
 	}
 
 	if ((tun_fd = open_tun()) == -1)
-		goto cleanup0;
+		goto cleanup1;
 	if ((dns_fd = open_dns(argv[0], argv[1])) == -1)
 		goto cleanup2;
 
@@ -268,9 +269,8 @@ main(int argc, char **argv)
 
 cleanup2:
 	close_dns(dns_fd);
-cleanup1:
 	close_tun(tun_fd);
-cleanup0:
+cleanup1:
 
 	return 0;
 }
