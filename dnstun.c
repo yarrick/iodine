@@ -116,9 +116,11 @@ tunnel(int tun_fd, int dns_fd)
 	return 0;
 }
 
+extern char *__progname;
+
 static void
 usage() {
-	printf("Usage: dnstun [-u user] nameserver topdomain\n");
+	printf("Usage: %s [-u user] nameserver topdomain\n", __progname);
 	exit(2);
 }
 
@@ -132,15 +134,11 @@ main(int argc, char **argv)
 	struct passwd *pw;
 
 	username = NULL;
+
 	while ((choice = getopt(argc, argv, "u:")) != -1) {
 		switch(choice) {
 		case 'u':
 			username = optarg;
-			pw = getpwnam(username);
-			if (!pw) {
-				printf("User %s does not exist!\n", username);
-				usage();
-			}
 			break;
 		default:
 			usage();
@@ -150,10 +148,19 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-
+	
 	if (argc != 2) {
 		usage();
 	}
+	
+	if(username) {
+		pw = getpwnam(username);
+		if (!pw) {
+			printf("User %s does not exist!\n", username);
+			usage();
+		}
+	}
+
 
 	tun_fd = open_tun();
 	dns_fd = open_dns(argv[0], argv[1]);
