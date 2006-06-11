@@ -34,11 +34,14 @@
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
-
+	
 int running = 1;
 
+int tun_fd;
+int dns_fd;
+
 static void
-sigint(int sig) {
+sighandler(int sig) {
 	running = 0;
 }
 
@@ -107,6 +110,7 @@ handshake(int dns_fd)
 	int i;
 	int r;
 	char *p;
+	int mtu;
 	int read;
 	fd_set fds;
 	int timeout;
@@ -129,16 +133,24 @@ handshake(int dns_fd)
 		if(r > 0) {
 			read = dns_read(dns_fd, in, sizeof(in));
 			
-			if(read <= 0) {
+			if(read < 0) {
 				perror("read");
 				continue;
 			}
 
-			p = strchr(in, '-');
-			*p++ = '\0';
+			if (read == 0) 
+				continue;
 
-			if (tun_setip(in) == 0 && tun_setmtu(atoi(p)) == 0)
-				return 0;
+			p = strchr(in, '-');
+			if (p) {
+				*p++ = '\0';
+				mtu = atoi(p);
+
+				printf("%s %d\n", in, mtu);
+
+				if (tun_setip(in) == 0 && tun_setmtu(atoi(p)) == 0)
+					return 0;
+			}
 		}
 
 		printf("Retrying...\n");
@@ -181,8 +193,6 @@ int
 main(int argc, char **argv)
 {
 	int choice;
-	int tun_fd;
-	int dns_fd;
 	char *newroot;
 	char *username;
 	int foreground;
@@ -239,7 +249,8 @@ main(int argc, char **argv)
 	if ((dns_fd = open_dns(argv[0], argv[1])) == -1)
 		goto cleanup2;
 
-	signal(SIGINT, sigint);
+	signal(SIGINT, sighandler);
+	signal(SIGTERM, sighandler);
 
 	if(handshake(dns_fd))
 		goto cleanup2;

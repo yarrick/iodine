@@ -112,7 +112,7 @@ open_tun()
 	return -1;
 }
 
-#endif /* LINUX */
+#endif /* !LINUX */
 
 void 
 close_tun(int tun_fd) 
@@ -194,6 +194,8 @@ tun_setmtu(const int mtu)
 		
 		printf("Setting MTU of %s to %d\n", if_name, mtu);
 		return system(cmdline);
+	} else {
+		warn("MTU out of range: %d\n", mtu);
 	}
 
 	return 1;

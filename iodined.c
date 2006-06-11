@@ -37,6 +37,15 @@
 
 int running = 1;
 
+struct packet 
+{
+	int len;
+	int offset;
+	char data[64*1024];
+};
+
+struct packet packetbuf;
+
 static void
 sigint(int sig) {
 	running = 0;
@@ -90,18 +99,28 @@ tunnel(int tun_fd, int dns_fd)
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, in, sizeof(in));
-				if (read <= 0) {
-					if (read == GOTHELLO) {
-						read = snprintf(in, sizeof(in), "%s-%d", "172.30.5.2", 1023);
-						dnsd_queuepacket(in, read);
-					}
-					continue;
+				if (read < 0)
+			   		continue;
+
+				if(in[0] == 'H' || in[0] == 'h') {
+					read = snprintf(out, sizeof(out), "%s-%d", "172.30.5.2", 1023);
+					dnsd_queuepacket(out, read);
+				} else if(in[0] == '0') {
+					memcpy(packetbuf.data + packetbuf.offset, in, read);
+					packetbuf.len += read;
+					packetbuf.offset += read;
+				} else if(in[0] == '1') {
+					memcpy(packetbuf.data + packetbuf.offset, in, read);
+					packetbuf.len += read;
+					packetbuf.offset += read;
+
+					outlen = sizeof(out);
+					uncompress(out, &outlen, packetbuf.data, packetbuf.len);
+
+					write_tun(tun_fd, out, outlen);
+
+					packetbuf.len = packetbuf.offset = 0;
 				}
-
-				outlen = sizeof(out);
-				uncompress(out, &outlen, in, read);
-
-				write_tun(tun_fd, out, outlen);
 			} 
 		}
 	}

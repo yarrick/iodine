@@ -55,14 +55,6 @@ short delayed_q_id;
 struct sockaddr_in delayed_q_from;
 int delayed_q_fromlen;
 
-struct packet 
-{
-	int len;
-	int offset;
-	char data[64*1024];
-};
-
-struct packet packetbuf;
 
 int 
 open_dns(const char *host, const char *domain) 
@@ -513,53 +505,36 @@ dnsd_forceack(int fd)
 }
 
 static int
-decodepacket(const char *name, struct packet *packet)
+decodepacket(const char *name, char *buf, int buflen)
 {
 	int r;
 	int len;
-	int last;
-	int ping;
-	int hello;
 	char *dp;
 	char *domain;
 	const char *np;
 
-	len = 0;
-	last = (name[0] == '1');
-	ping = (name[0] == 'p' || name[0] == 'P');
-	hello = (name[0] == 'h' || name[0] == 'H');
-
+	len = 1;
 	domain = strstr(name, topdomain);
 
-	if (!ping && !hello && domain) {
-		np = name + 1;
-		dp = packet->data + packet->offset;
+	buf[0] = name[0];
 
-		while(np < domain) {
-			if(*np == '.') {
-				np++;
-				continue;
-			}
+	dp = buf;
+	np = name + 1;
 
-			sscanf(np, "%02X", &r);
-			*dp++ = (char)r;
-			np+=2;	
-			len++;
+	while(len < buflen && np < domain) {
+		if(*np == '.') {
+			np++;
+			continue;
 		}
 
-		packet->len += len;
-		packet->offset += len;
+		sscanf(np, "%02X", &r);
+		*dp++ = (char)r;
+		np+=2;	
+		len++;
 	} 
 
-	if(last) {
-		len = packet->len;
-		packet->len = packet->offset = 0;
-	} else if (hello) {
-		len = GOTHELLO;
-	} else {
-		len = 0;
-	}
-
+	if (len == buflen)
+		return -1; 
 	return len;
 }
 
@@ -616,13 +591,7 @@ dnsd_read(int fd, char *buf, int buflen)
 					memcpy((struct sockaddr*)&delayed_q_from, (struct sockaddr*)&from, addrlen);
 				}
 
-				r = decodepacket(name, &packetbuf);
-
-				if (r > 0) {
-					memcpy(buf, packetbuf.data, r);
-				}
-
-				return r;
+				return decodepacket(name, buf, buflen);
 			}
 		}
 	}
