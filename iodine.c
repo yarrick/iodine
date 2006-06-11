@@ -134,6 +134,11 @@ main(int argc, char **argv)
 	struct passwd *pw;
 
 	username = NULL;
+	
+	if (geteuid() != 0) {
+		printf("Run as root and you'll be happy.\n");
+		usage();
+	}
 
 	while ((choice = getopt(argc, argv, "u:")) != -1) {
 		switch(choice) {
