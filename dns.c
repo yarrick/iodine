@@ -131,7 +131,6 @@ dns_send_chunk(int fd)
 	p += packetpos;
 	avail = packetlen - packetpos;
 	lastlen = dns_write(fd, ++chunkid, p, avail, 0);
-	//printf("Sent %d bytes of %d remaining\n", lastlen, avail);
 }
 
 void
@@ -150,7 +149,6 @@ dns_ping(int dns_fd)
 {
 	char data[2];
 	if (dns_sending()) {
-	//	printf("No reply on chunk, discarding\n");
 		lastlen = 0;
 		packetpos = 0;
 		packetlen = 0;
@@ -328,7 +326,6 @@ dns_read(int fd, char *buf, int buflen)
 				packetpos += lastlen;
 				if (packetpos == packetlen) {
 					// Packet completed
-					// printf("IP packet size %d sent successfully!\n", packetlen);
 					packetpos = 0;
 					packetlen = 0;
 					lastlen = 0;
@@ -497,7 +494,6 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 				READSHORT(type, data);
 				READSHORT(class, data);
 
-				// Store needed info about delayed response
 				strncpy(q->name, name, 256);
 				q->type = type;
 				q->id = id;
