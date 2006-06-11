@@ -116,15 +116,24 @@ extern char *__progname;
 
 static void
 usage() {
-	printf("Usage: %s [-f] [-u user] topdomain\n", __progname);
+	printf("Usage: %s [-v] [-h] [-f] [-u user] topdomain\n", __progname);
 	exit(2);
 }
 
 static void
 help() {
-	printf("Usage: %s [-f] [-u user] topdomain\n", __progname);
+	printf("iodine IP over DNS tunneling client\n");
+	printf("Usage: %s [-v] [-h] [-f] [-u user] topdomain\n", __progname);
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
+	exit(0);
+}
+
+static void
+version() {
+	char *svnver = "$Id$";
+	printf("iodine IP over DNS tunneling server\n");
+	printf("SVN version: %s\n", svnver);
 	exit(0);
 }
 
@@ -146,8 +155,11 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	while ((choice = getopt(argc, argv, "fhu:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:")) != -1) {
 		switch(choice) {
+		case 'v':
+			version();
+			break;
 		case 'f':
 			foreground = 1;
 			break;
