@@ -108,14 +108,15 @@ extern char *__progname;
 
 static void
 usage() {
-	printf("Usage: %s [-v] [-h] [-f] [-u user] topdomain\n", __progname);
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] topdomain\n", __progname);
 	exit(2);
 }
 
 static void
 help() {
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] topdomain\n", __progname);
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] "
+		   "topdomain\n", __progname);
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	exit(0);
@@ -132,17 +133,18 @@ version() {
 int
 main(int argc, char **argv)
 {
+	int choice;
 	int tun_fd;
 	int dnsd_fd;
-	int choice;
+	char *newroot;
 	char *username;
-	struct passwd *pw;
 	int foreground;
+	struct passwd *pw;
 
 	username = NULL;
 	foreground = 0;
 	
-	while ((choice = getopt(argc, argv, "vfhu:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -156,9 +158,12 @@ main(int argc, char **argv)
 		case 'u':
 			username = optarg;
 			break;
+		case 't':
+			newroot = optarg;
+			break;
 		default:
 			usage();
-			break;
+			/* NOTREACHED */
 		}
 	}
 
@@ -170,9 +175,8 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (argc != 1) {
+	if (argc != 1) 
 		usage();
-	}
 
 	if (username) {
 		pw = getpwnam(username);
@@ -185,6 +189,13 @@ main(int argc, char **argv)
 	tun_fd = open_tun();
 	dnsd_fd = open_dnsd(argv[0]);
 
+	if (newroot) {
+		if (chroot(newroot) != 0 || chdir("/") != 0)
+			err(1, "%s", newroot);
+		seteuid(geteuid());
+		setuid(getuid());
+	}
+	
 	if (!foreground) {
 		daemon(0, 0);
 		umask(0);
