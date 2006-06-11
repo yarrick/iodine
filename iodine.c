@@ -164,6 +164,8 @@ help() {
 	printf("  -f is to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
+	printf("nameserver is the IP number of the relaying nameserver\n");
+	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 	exit(0);
 }
 
