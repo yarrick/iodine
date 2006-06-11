@@ -247,9 +247,9 @@ main(int argc, char **argv)
 
 	if ((tun_fd = open_tun()) == -1)
 		goto cleanup1;
-	if ((dns_fd = open_dns(argv[0], 0)) == -1)
+	if ((dns_fd = open_dns(argv[1], 0)) == -1)
 		goto cleanup2;
-	if (dns_settarget(argv[1]) == -1)
+	if (dns_settarget(argv[0]) == -1)
 		goto cleanup2;
 
 	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
