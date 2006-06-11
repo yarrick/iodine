@@ -117,10 +117,16 @@ extern char *__progname;
 
 static void
 usage() {
-	printf("Usage: %s [-u user] nameserver topdomain\n", __progname);
-	printf("-f is to keep running in foreground\n");
-	printf("-u name to drop privileges and run as user 'name'\n");
+	printf("Usage: %s [-f] [-u user] nameserver topdomain\n", __progname);
 	exit(2);
+}
+
+static void
+help() {
+	printf("Usage: %s [-f] [-u user] nameserver topdomain\n", __progname);
+	printf("  -f is to keep running in foreground\n");
+	printf("  -u name to drop privileges and run as user 'name'\n");
+	exit(0);
 }
 
 int
@@ -141,10 +147,13 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	while ((choice = getopt(argc, argv, "fu:")) != -1) {
+	while ((choice = getopt(argc, argv, "fhu:")) != -1) {
 		switch(choice) {
 		case 'f':
 			foreground = 1;
+			break;
+		case 'h':
+			help();
 			break;
 		case 'u':
 			username = optarg;
