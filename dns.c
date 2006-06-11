@@ -28,8 +28,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "dns.h"
 #include "read.h"
+#include "structs.h"
+#include "dns.h"
 
 static int host2dns(const char *, char *, int);
 static int dns_write(int, int, char *, int, char);
@@ -45,12 +46,6 @@ int packetlen;
 uint16_t chunkid;
 
 uint16_t pingid;
-
-char delayed_q_name[256];
-short delayed_q_type;
-short delayed_q_id;
-struct sockaddr_in delayed_q_from;
-int delayed_q_fromlen;
 
 
 int 
@@ -145,10 +140,7 @@ open_dnsd(const char *domain)
 	topdomain[sizeof(topdomain) - 1] = 0;
 
 	packetlen = 0;
-	delayed_q_type = 0;
-	delayed_q_id = 0;
-	delayed_q_fromlen = 0;
-
+	
 	return fd;
 }
 
@@ -422,14 +414,8 @@ host2dns(const char *host, char *buffer, int size)
 	return p - buffer;
 }
 
-int
-dnsd_hasack()
-{
-	return (delayed_q_id != 0);
-}
-
 void
-dnsd_send(int fd, char *data, int datalen)
+dnsd_send(int fd, struct query *q, char *data, int datalen)
 {
 	int len;
 	char *p;
@@ -441,7 +427,7 @@ dnsd_send(int fd, char *data, int datalen)
 	len = 0;
 	header = (HEADER*)buf;	
 
-	header->id = htons(delayed_q_id);
+	header->id = htons(q->id);
 	header->qr = 1;
 	header->opcode = 0;
 	header->aa = 1;
@@ -454,16 +440,16 @@ dnsd_send(int fd, char *data, int datalen)
 
 	p = buf + sizeof(HEADER);
 	
-	p += host2dns(delayed_q_name, p, strlen(delayed_q_name));
-	PUTSHORT(delayed_q_type, p);
+	p += host2dns(q->name, p, strlen(q->name));
+	PUTSHORT(q->type, p);
 	PUTSHORT(C_IN, p);
 	
-	p += host2dns(delayed_q_name, p, strlen(delayed_q_name));	
-	PUTSHORT(delayed_q_type, p);
+	p += host2dns(q->name, p, strlen(q->name));	
+	PUTSHORT(q->type, p);
 	PUTSHORT(C_IN, p);
 	PUTLONG(0, p);
 
-	delayed_q_id = 0;
+	q->id = 0;
 
 	if(datalen > 0) {
 		PUTSHORT(datalen, p);
@@ -474,7 +460,7 @@ dnsd_send(int fd, char *data, int datalen)
 	}
 
 	len = p - buf;
-	sendto(fd, buf, len, 0, (struct sockaddr*)&delayed_q_from, delayed_q_fromlen);
+	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
 
 static int
@@ -518,7 +504,7 @@ close_dnsd(int fd)
 }
 
 int
-dnsd_read(int fd, char *buf, int buflen)
+dnsd_read(int fd, struct query *q, char *buf, int buflen)
 {
 	int r;
 	short id;
@@ -554,11 +540,11 @@ dnsd_read(int fd, char *buf, int buflen)
 				READSHORT(class, data);
 
 				// Store needed info about delayed response
-				strncpy(delayed_q_name, name, 256);
-				delayed_q_type = type;
-				delayed_q_id = id;
-				delayed_q_fromlen = addrlen;
-				memcpy((struct sockaddr*)&delayed_q_from, (struct sockaddr*)&from, addrlen);
+				strncpy(q->name, name, 256);
+				q->type = type;
+				q->id = id;
+				q->fromlen = addrlen;
+				memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 
 				return decodepacket(name, buf, buflen);
 			}

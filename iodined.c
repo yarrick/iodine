@@ -29,6 +29,7 @@
 #include <zlib.h>
 
 #include "tun.h"
+#include "structs.h"
 #include "dns.h"
 
 #ifndef MAX
@@ -37,16 +38,11 @@
 
 int running = 1;
 
-struct packet 
-{
-	int len;
-	int offset;
-	char data[64*1024];
-};
-
 struct packet packetbuf;
 struct packet outpacket;
 int outid;
+
+struct query q;
 
 static void
 sigint(int sig) {
@@ -66,7 +62,7 @@ tunnel(int tun_fd, int dns_fd)
 	char out[64*1024];
 	
 	while (running) {
-		if (dnsd_hasack()) {
+		if (q.id != 0) {
 			tv.tv_sec = 0;
 			tv.tv_usec = 5000;
 		} else {
@@ -88,9 +84,10 @@ tunnel(int tun_fd, int dns_fd)
 		}
 	
 		if (i==0) {	
-			if (dnsd_hasack()) 
-				dnsd_send(dns_fd, outpacket.data, outpacket.len);
+			if (q.type != 0) 
+				dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
 				outpacket.len = 0;
+				q.id = 0;
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, in, sizeof(in));
@@ -103,13 +100,13 @@ tunnel(int tun_fd, int dns_fd)
 				outpacket.len = outlen;
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dnsd_read(dns_fd, in, sizeof(in));
+				read = dnsd_read(dns_fd, &q, in, sizeof(in));
 				if (read < 0)
 			   		continue;
 
 				if(in[0] == 'H' || in[0] == 'h') {
 					read = snprintf(out, sizeof(out), "%s-%d", "172.30.5.2", 1023);
-					dnsd_send(dns_fd, out, read);
+					dnsd_send(dns_fd, &q, out, read);
 				} else if((in[0] >= '0' && in[0] <= '9')
 						|| (in[0] >= 'a' && in[0] <= 'f')
 						|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -133,8 +130,9 @@ tunnel(int tun_fd, int dns_fd)
 						packetbuf.len = packetbuf.offset = 0;
 					}
 					if (outpacket.len > 0) {
-						dnsd_send(dns_fd, outpacket.data, outpacket.len);
+						dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
 						outpacket.len = 0;
+						q.id = 0;
 					}
 				}
 			} 
@@ -194,6 +192,7 @@ main(int argc, char **argv)
 	packetbuf.len = 0;
 	packetbuf.offset = 0;
 	outpacket.len = 0;
+	q.id = 0;
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:m:")) != -1) {
 		switch(choice) {

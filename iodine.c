@@ -29,6 +29,7 @@
 #include <zlib.h>
 
 #include "tun.h"
+#include "structs.h"
 #include "dns.h"
 
 #ifndef MAX

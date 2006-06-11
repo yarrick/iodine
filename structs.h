@@ -14,31 +14,22 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _DNS_H_
-#define _DNS_H_
+#ifndef _STRUCTS_H_
+#define _STRUCTS_H_
 
-int open_dns(const char *, const char *);
-void close_dns(int);
+struct packet 
+{
+	int len;
+	int offset;
+	char data[64*1024];
+};
 
-int dns_sending();
-void dns_handle_tun(int, char *, int);
-void dns_ping(int);
-void dns_handshake(int);
-void dns_query(int, int, char *, int);
-int dns_read(int, char *, int);
+struct query {
+	char name[256];
+	short type;
+	short id;
+	struct sockaddr_in from;
+	int fromlen;
+};
 
-extern struct sockaddr_in peer;
-
-int open_dnsd(const char *);
-void close_dnsd(int);
-
-int dnsd_read(int, struct query*, char *, int);
-void dnsd_send(int, struct query*, char *, int);
-
-int dnsd_haspacket();
-int dnsd_hasack();
-void dnsd_forceack(int);
-void dnsd_queuepacket(const char *, const int);
-
-
-#endif /* _DNS_H_ */
+#endif /* _STRUCTS_H_ */
