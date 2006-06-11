@@ -122,7 +122,7 @@ usage() {
 
 static void
 help() {
-	printf("iodine IP over DNS tunneling client\n");
+	printf("iodine IP over DNS tunneling server\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] topdomain\n", __progname);
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
