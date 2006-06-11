@@ -24,12 +24,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <err.h>
+#include <arpa/inet.h>
 
 #include "tun.h"
 
 #define TUN_MAX_TRY 50
 
 char *tun_device = NULL;
+char *if_device = NULL;
 
 #ifdef LINUX
 
@@ -61,6 +63,7 @@ open_tun()
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			printf("Opened %s\n", ifreq.ifr_name);
+			if_device = strdup(ifreq.ifr_name);
 			return tun_fd;
 		}
 
@@ -95,6 +98,7 @@ open_tun()
 
 			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
 				printf("Opened %s\n", tun_name);
+				if_device = strdup(tun_name);
 				return tun_fd;
 			}
 
@@ -144,5 +148,51 @@ int
 read_tun(int tun_fd, char *buf, int len) 
 {
 	return read(tun_fd, buf, len);
+}
+
+int
+tun_setip(const char *ip)
+{
+	char cmdline[512];
+
+	if (inet_addr(ip) != 0) {
+		snprintf(cmdline, sizeof(cmdline), 
+				"/sbin/ifconfig %s %s netmask 255.255.255.0",
+				tun_device,
+				ip);
+#ifndef LINUX
+		int r;
+
+		r = system(cmdline);
+		if(r != 0) {
+			return r;
+		} else {
+			snprintf(cmdline, sizeof(cmdline),
+					"/sbin/route add %s/24 %s",
+					ip, ip);
+		}
+#endif
+
+		return system(cmdline);
+	}
+
+	return 1;
+}
+
+int 
+tun_setmtu(const int mtu)
+{
+	char cmdline[512];
+
+	if (mtu > 200 && mtu < 1500) {
+		snprintf(cmdline, sizeof(cmdline), 
+				"/sbin/ifconfig %s mtu %d",
+				tun_device,
+				mtu);
+		
+		return system(cmdline);
+	}
+
+	return 1;
 }
 
