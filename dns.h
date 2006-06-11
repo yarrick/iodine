@@ -27,5 +27,17 @@ void dns_query(int, int, char *, int);
 int dns_write(int, int, char *, int, int);
 int dns_read(int, char *, int);
 
+extern struct sockaddr_in peer;
+
+int open_dnsd(const char *);
+void close_dnsd(int);
+
+int dnsd_read(int, char *, int);
+
+int dnsd_haspacket();
+int dnsd_hasack();
+void dnsd_forceack(int);
+void dnsd_queuepacket(const char *, const int);
+
 
 #endif /* _DNS_H_ */

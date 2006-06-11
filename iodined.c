@@ -30,7 +30,6 @@
 
 #include "tun.h"
 #include "dns.h"
-#include "dnsd.h"
 
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))

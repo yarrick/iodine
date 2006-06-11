@@ -2,7 +2,7 @@ CC = gcc
 CLIENT = iodine
 CLIENTOBJS = iodine.o tun.o dns.o read.o
 SERVER = iodined
-SERVEROBJS = iodined.o tun.o dnsd.o read.o
+SERVEROBJS = iodined.o tun.o dns.o read.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
