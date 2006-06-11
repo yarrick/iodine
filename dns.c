@@ -109,6 +109,50 @@ open_dns(const char *host, const char *domain)
 	return fd;
 }
 
+int 
+open_dnsd(const char *domain) 
+{
+	int fd;
+	int flag;
+	struct sockaddr_in addr;
+
+	bzero(&addr, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(53);
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if(fd < 0) {
+		warn("socket");
+		return 0;
+	}
+
+	flag = 1;
+#ifdef SO_REUSEPORT
+	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
+#endif
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
+
+	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+		warn("bind");
+		return 0;
+	}
+
+	printf("Opened UDP socket\n");
+	
+	// Save top domain used
+	strncpy(topdomain, domain, sizeof(topdomain) - 2);
+	topdomain[sizeof(topdomain) - 1] = 0;
+
+	packetlen = 0;
+	delayed_q_type = 0;
+	delayed_q_id = 0;
+	delayed_q_fromlen = 0;
+
+	return fd;
+}
+
+
 void
 close_dns(int fd)
 {
@@ -205,12 +249,11 @@ dns_query(int fd, int id, char *host, int type)
 	sendto(fd, buf, len, 0, (struct sockaddr*)&peer, peerlen);
 }
 
-static char to_hex[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
-
 static void
 put_hex(char *p, char h)
 {
 	int t;
+	static const char to_hex[] = "0123456789ABCDEF";
 
 	t = (h & 0xF0) >> 4;
 	p[0] = to_hex[t];
@@ -500,49 +543,6 @@ decodepacket(const char *name, struct packet *packet)
 	}
 
 	return len;
-}
-
-int 
-open_dnsd(const char *domain) 
-{
-	int fd;
-	int flag;
-	struct sockaddr_in addr;
-
-	bzero(&addr, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(53);
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if(fd < 0) {
-		warn("socket");
-		return 0;
-	}
-
-	flag = 1;
-#ifdef SO_REUSEPORT
-	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
-#endif
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
-
-	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-		warn("bind");
-		return 0;
-	}
-
-	printf("Opened UDP socket\n");
-	
-	// Save top domain used
-	strncpy(topdomain, domain, sizeof(topdomain) - 2);
-	topdomain[sizeof(topdomain) - 1] = 0;
-
-	packetlen = 0;
-	delayed_q_type = 0;
-	delayed_q_id = 0;
-	delayed_q_fromlen = 0;
-
-	return fd;
 }
 
 void
