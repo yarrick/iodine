@@ -84,7 +84,7 @@ tunnel(int tun_fd, int dns_fd)
 		}
 	
 		if (i==0) {	
-			if (q.type != 0) 
+			if (q.id != 0) 
 				dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
 				outpacket.len = 0;
 				q.id = 0;
@@ -107,6 +107,7 @@ tunnel(int tun_fd, int dns_fd)
 				if(in[0] == 'H' || in[0] == 'h') {
 					read = snprintf(out, sizeof(out), "%s-%d", "172.30.5.2", 1023);
 					dnsd_send(dns_fd, &q, out, read);
+					q.id = 0;
 				} else if((in[0] >= '0' && in[0] <= '9')
 						|| (in[0] >= 'a' && in[0] <= 'f')
 						|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -129,11 +130,11 @@ tunnel(int tun_fd, int dns_fd)
 
 						packetbuf.len = packetbuf.offset = 0;
 					}
-					if (outpacket.len > 0) {
-						dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
-						outpacket.len = 0;
-						q.id = 0;
-					}
+				}
+				if (outpacket.len > 0) {
+					dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
+					outpacket.len = 0;
+					q.id = 0;
 				}
 			} 
 		}
