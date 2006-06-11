@@ -101,6 +101,52 @@ tunnel(int tun_fd, int dns_fd)
 	return 0;
 }
 
+static int
+handshake(int dns_fd)
+{
+	int i;
+	int r;
+	char *p;
+	int read;
+	fd_set fds;
+	int timeout;
+	char in[4096];
+	struct timeval tv;
+
+	timeout = 1;
+	
+	for (i=0;i<5;i++) {
+		tv.tv_sec = timeout++;
+		tv.tv_usec = 0;
+
+		dns_handshake(dns_fd);
+		
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = dns_read(dns_fd, in, sizeof(in));
+			
+			if(read <= 0) {
+				perror("read");
+				continue;
+			}
+
+			p = strchr(in, '-');
+			*p++ = '\0';
+
+			if (tun_setip(in) == 0 && tun_setmtu(atoi(p)) == 0)
+				return 0;
+		}
+
+		printf("Retrying...\n");
+	}
+
+	return 1;
+}
+
 extern char *__progname;
 
 static void
@@ -191,6 +237,9 @@ main(int argc, char **argv)
 		goto cleanup2;
 
 	signal(SIGINT, sigint);
+
+	if(handshake(dns_fd))
+		goto cleanup2;
 
 	if (newroot) {
 		if (chroot(newroot) != 0 || chdir("/") != 0)

@@ -32,6 +32,7 @@
 #include "read.h"
 
 static int host2dns(const char *, char *, int);
+static int dns_write(int, int, char *, int, char);
 
 struct sockaddr_in peer;
 char topdomain[256];
@@ -202,7 +203,16 @@ dns_ping(int dns_fd)
 	}
 	data[0] = (pingid & 0xFF00) >> 8;
 	data[1] = (pingid & 0xFF);
-	dns_write(dns_fd, ++pingid, data, 2, 1);
+	dns_write(dns_fd, ++pingid, data, 2, 'P');
+}
+
+void 
+dns_handshake(int dns_fd)
+{
+	char data[2];
+	data[0] = (pingid & 0xFF00) >> 8;
+	data[1] = (pingid & 0xFF);
+	dns_write(dns_fd, ++pingid, data, 2, 'H');
 }
 
 void 
@@ -262,8 +272,8 @@ put_hex(char *p, char h)
 	p[1] = to_hex[t];
 }
 
-int
-dns_write(int fd, int id, char *buf, int len, int ping)
+static int
+dns_write(int fd, int id, char *buf, int len, char flag)
 {
 	int avail;
 	int i;
@@ -285,8 +295,8 @@ dns_write(int fd, int id, char *buf, int len, int ping)
 	bzero(data, sizeof(data));
 	d = data;
 
-	if (ping) {
-		*d = 'P';
+	if (flag != 0) {
+		*d = flag;
 	} else {
 		// First byte is 0 for middle packet and 1 for last packet
 		*d = '0' + final;
