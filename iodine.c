@@ -210,7 +210,6 @@ main(int argc, char **argv)
 			printf("Could not switch to user %s!\n", username);
 			usage();
 		}
-		printf("Now running as user %s\n", username);
 	}
 
 	tunnel(tun_fd, dns_fd);
