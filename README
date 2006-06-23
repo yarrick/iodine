@@ -1,0 +1,69 @@
+
+iodine - IP over DNS is now easy
+
+   http://code.kryo.se/iodine
+
+********************************
+
+This is a piece of software that lets you tunnel IPv4 data through a DNS
+server. This can be usable in different situations where internet access is
+firewalled, but DNS queries are allowed.
+
+
+HOW TO USE:
+
+Server side:
+To use this tunnel, you need control over a real domain (like mytunnel.com),
+and another computer with a static public IP number that does not yet run a DNS
+server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the computer.
+If you use BIND for the domain, add these lines to the zone file:
+
+tunnel1host	IN	A	10.15.213.99
+
+$ORIGIN tunnel1.mytunnnel.com.
+@		IN	NS	tunnel1host.mytunnel.com.
+
+Now any DNS querys for domains ending with tunnel1.mytunnnel.com will be sent
+to your server. Start iodined on the server. The first argument is the tunnel
+IP address (like 192.168.99.1) and the second is the assigned domain (in this
+case tunnel1.mytunnel.com). The -f argument will keep iodined running in the
+foreground, which helps when testing. iodined will start a virtual interface,
+and also start listening for DNS queries on UDP port 53. Now everything is
+ready for the client.
+
+Client side:
+All the setup is done, just start iodine. It also takes two arguments, the
+first is the server (10.15.213.99 or tunnel1host.mytunnel.com) and the second
+is the domain used (tunnel1.mytunnnel.com). The tunnel interface will get an IP
+close to the servers (in this case 192.168.99.2) and a suitable MTU. Now you
+should be able to ping the other end of the tunnel from each side.
+
+
+INFO:
+
+iodine has been tested on Linux (x86 and SPARC64) and OpenBSD (x86). It should
+work on other unix-like systems as well that has TUN/TAP tunneling support. Let
+us know if you get it to run on other platforms. 
+
+
+THE NAME:
+
+The name iodine was chosen since it starts with IOD (IP Over DNS) and since
+iodine has atomic number 53, just like the DNS port.
+
+
+AUTHORS & LICENSE:
+
+Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+
+Permission to use, copy, modify, and distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
