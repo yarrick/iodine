@@ -155,7 +155,7 @@ tun_setip(const char *ip)
 {
 	char cmdline[512];
 
-	if (inet_addr(ip) != 0) {
+	if (inet_addr(ip) != INADDR_NONE) {
 		snprintf(cmdline, sizeof(cmdline), 
 				"/sbin/ifconfig %s %s netmask 255.255.255.0",
 				if_name,
@@ -176,6 +176,8 @@ tun_setip(const char *ip)
 		printf("Adding route %s/24 to %s\n", ip, ip);
 #endif
 		return system(cmdline);
+	} else {
+		printf("Invalid IP: %s!\n", ip);
 	}
 
 	return 1;

@@ -45,6 +45,9 @@ int outid;
 
 struct query q;
 
+int my_mtu;
+in_addr_t my_ip;
+
 static void
 sigint(int sig) {
 	running = 0;
@@ -56,6 +59,8 @@ tunnel(int tun_fd, int dns_fd)
 	int i;
 	int read;
 	int code;
+	int ipadder;
+	struct in_addr nextip;
 	fd_set fds;
 	struct timeval tv;
 	char in[64*1024];
@@ -106,7 +111,15 @@ tunnel(int tun_fd, int dns_fd)
 			   		continue;
 
 				if(in[0] == 'H' || in[0] == 'h') {
-					read = snprintf(out, sizeof(out), "%s-%d", "172.30.5.2", 1023);
+					ipadder = htonl(my_ip); // To get the last byte last
+					if ((ipadder & 0xFF) == 0xFF) {
+						// IP ends with 255.
+						ipadder--;
+					} else {
+						ipadder++;
+					}
+					nextip.s_addr = ntohl(ipadder);
+					read = snprintf(out, sizeof(out), "%s-%d", inet_ntoa(nextip), my_mtu);
 					dnsd_send(dns_fd, &q, out, read);
 					q.id = 0;
 				} else if((in[0] >= '0' && in[0] <= '9')
@@ -254,7 +267,10 @@ main(int argc, char **argv)
 		goto cleanup1;
 	if ((dnsd_fd = open_dns(argv[1], 53)) == -1) 
 		goto cleanup2;
-	
+
+	my_ip = inet_addr(argv[0]);
+	my_mtu = mtu;
+
 	printf("Listening to dns for domain %s\n", argv[1]);
 
 	if (newroot) {
