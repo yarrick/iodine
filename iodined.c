@@ -90,10 +90,11 @@ tunnel(int tun_fd, int dns_fd)
 		}
 	
 		if (i==0) {	
-			if (q.id != 0) 
+			if (q.id != 0) {
 				dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
 				outpacket.len = 0;
 				q.id = 0;
+			}
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, in, sizeof(in));
