@@ -14,8 +14,8 @@ HOW TO USE:
 
 Server side:
 To use this tunnel, you need control over a real domain (like mytunnel.com),
-and another computer with a static public IP number that does not yet run a DNS
-server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the computer.
+and a server with a static public IP number that does not yet run a DNS
+server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the server.
 If you use BIND for the domain, add these lines to the zone file:
 
 tunnel1host	IN	A	10.15.213.99
@@ -31,15 +31,37 @@ foreground, which helps when testing. iodined will start a virtual interface,
 and also start listening for DNS queries on UDP port 53. Now everything is
 ready for the client.
 
-Client side:
-All the setup is done, just start iodine. It also takes two arguments, the
-first is the server (10.15.213.99 or tunnel1host.mytunnel.com) and the second
-is the domain used (tunnel1.mytunnnel.com). The tunnel interface will get an IP
-close to the servers (in this case 192.168.99.2) and a suitable MTU. Now you
-should be able to ping the other end of the tunnel from each side.
+Client side: 
+All the setup is done, just start iodine. It also takes two
+arguments, the first is the local relaying DNS server and the second is the
+domain used (tunnel1.mytunnnel.com). If DNS queries are allowed to any
+computer, you can use the tunnel endpoint (example: 10.15.213.99 or
+tunnel1host.mytunnel.com) as the first argument. The tunnel interface will get
+an IP close to the servers (in this case 192.168.99.2) and a suitable MTU. Now
+you should be able to ping the other end of the tunnel from either side.  
 
 
-INFO:
+MISC. INFO:
+
+Note that you can have only one client per server at the same time. This is
+because of the fragmentation of big packets going upstream, and will be fixed
+in future versions. 
+
+Try experimenting with the MTU size (-m option) to get maximum bandwidth. It is
+set to 1024 by default, which seems to work with most DNS servers. If you have
+problems, try setting it to below 512.
+
+If you have problems, try inspecting the traffic with network monitoring tools
+and make sure that the relaying DNS server has not cached the response. A
+cached error message could mean that you started the client before the server.
+
+The upstream data is sent gzipped encoded in hexadecimal. DNS protocol allows
+one query per packet, and one query can be max 256 chars. Each domain name part
+can be max 63 chars. So your domain name and subdomain should be as short as
+possible to allow maximum throughput.
+
+
+PORTABILITY:
 
 iodine has been tested on Linux (x86 and SPARC64) and OpenBSD (x86). It should
 work on other unix-like systems as well that has TUN/TAP tunneling support. Let
@@ -49,21 +71,21 @@ us know if you get it to run on other platforms.
 THE NAME:
 
 The name iodine was chosen since it starts with IOD (IP Over DNS) and since
-iodine has atomic number 53, just like the DNS port.
+iodine has atomic number 53, which happens to be the DNS port number.
 
 
 AUTHORS & LICENSE:
 
 Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
 
-Permission to use, copy, modify, and distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
+Permission to use, copy, modify, and distribute this software for any purpose
+with or without fee is hereby granted, provided that the above copyright notice
+and this permission notice appear in all copies.
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
