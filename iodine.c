@@ -247,7 +247,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if ((tun_fd = open_tun()) == -1)
+	if ((tun_fd = open_tun(NULL)) == -1)
 		goto cleanup1;
 	if ((dns_fd = open_dns(argv[1], 0)) == -1)
 		goto cleanup2;

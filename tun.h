@@ -19,7 +19,7 @@
 #ifndef _TUN_H_
 #define _TUN_H_
 
-int open_tun();
+int open_tun(const char *);
 void close_tun(int);
 int write_tun(int, char *, int);
 int read_tun(int, char *, int);

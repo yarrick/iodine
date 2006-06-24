@@ -31,7 +31,6 @@
 
 #define TUN_MAX_TRY 50
 
-char *tun_device = NULL;
 char if_name[50];
 
 #ifdef LINUX
@@ -41,17 +40,15 @@ char if_name[50];
 #include <linux/if_tun.h>
 
 int 
-open_tun() 
+open_tun(const char *tun_device) 
 {
 	int i;
 	int tun_fd;
 	struct ifreq ifreq;
+	char *tunnel = "/dev/net/tun";
 
-	if (tun_device == NULL)
-		tun_device = "/dev/net/tun";
-
-	if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
-		warn("open_tun: %s: %s", tun_device, strerror(errno));
+	if ((tun_fd = open(tunnel, O_RDWR)) < 0) {
+		warn("open_tun: %s: %s", tunnel, strerror(errno));
 		return -1;
 	}
 
@@ -59,30 +56,44 @@ open_tun()
 
 	ifreq.ifr_flags = IFF_TUN; 
 
-	for (i = 0; i < TUN_MAX_TRY; i++) {
-		snprintf(ifreq.ifr_name, IFNAMSIZ, "dns%d", i);
+	if (tun_device != NULL) {
+			strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
 
-		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
-			printf("Opened %s\n", ifreq.ifr_name);
-			snprintf(if_name, sizeof(if_name), "dns%d", i);
-			return tun_fd;
+			if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
+				printf("Opened %s\n", ifreq.ifr_name);
+				snprintf(if_name, sizeof(if_name), "dns%d", i);
+				return tun_fd;
+			}
+
+			if (errno != EBUSY) {
+				warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+				return -1;
+			}
+	} else {
+		for (i = 0; i < TUN_MAX_TRY; i++) {
+			snprintf(ifreq.ifr_name, IFNAMSIZ, "dns%d", i);
+
+			if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
+				printf("Opened %s\n", ifreq.ifr_name);
+				snprintf(if_name, sizeof(if_name), "dns%d", i);
+				return tun_fd;
+			}
+
+			if (errno != EBUSY) {
+				warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+				return -1;
+			}
 		}
 
-		if (errno != EBUSY) {
-			warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
-			return -1;
-		}
+		warn("open_tun: Couldn't set interface name.\n");
 	}
-
-	warn("open_tun: Couldn't set interface name.\n");
-	
 	return -1;
 }
 
 #else /* BSD */
 
 int 
-open_tun() 
+open_tun(const char *tun_device) 
 {
 	int i;
 	int tun_fd;

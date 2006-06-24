@@ -263,7 +263,7 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if ((tun_fd = open_tun()) == -1)
+	if ((tun_fd = open_tun(NULL)) == -1)
 		goto cleanup0;
 	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
 		goto cleanup1;
