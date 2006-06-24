@@ -136,30 +136,39 @@ close_tun(int tun_fd)
 int 
 write_tun(int tun_fd, char *data, int len) 
 {
+#ifdef FREEBSD
+	data += 4;
+	len -= 4;
+#else /* !FREEBSD */
 #ifdef LINUX
 	data[0] = 0x00;
 	data[1] = 0x00;
 	data[2] = 0x08;
 	data[3] = 0x00;
-#else /* LINUX */
+#else /* OPENBSD */
 	data[0] = 0x00;
 	data[1] = 0x00;
 	data[2] = 0x00;
 	data[3] = 0x02;
 #endif /* !LINUX */
+#endif /* FREEBSD */
 
 	if (write(tun_fd, data, len) != len) {
 		warn("write_tun");
 		return 1;
 	}
-
 	return 0;
 }
 
 int 
 read_tun(int tun_fd, char *buf, int len) 
 {
+#ifdef FREEBSD
+	// FreeBSD has no header
+	return read(tun_fd, buf + 4, len - 4) + 4;
+#else /* !FREEBSD */
 	return read(tun_fd, buf, len);
+#endif /* !FREEBSD */
 }
 
 int
@@ -169,8 +178,9 @@ tun_setip(const char *ip)
 
 	if (inet_addr(ip) != INADDR_NONE) {
 		snprintf(cmdline, sizeof(cmdline), 
-				"/sbin/ifconfig %s %s netmask 255.255.255.0",
+				"/sbin/ifconfig %s %s %s netmask 255.255.255.0",
 				if_name,
+				ip,
 				ip);
 		
 		printf("Setting IP of %s to %s\n", if_name, ip);

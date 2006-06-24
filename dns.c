@@ -32,6 +32,11 @@
 #include "structs.h"
 #include "dns.h"
 
+// For FreeBSD
+#ifndef MIN
+#define MIN(a,b) ((a)<(b)?(a):(b))
+#endif
+
 static int host2dns(const char *, char *, int);
 static int dns_write(int, int, char *, int, char);
 
