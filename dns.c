@@ -19,6 +19,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser8_compat.h>
+#endif
 #include <netdb.h>
 #include <time.h>
 #include <err.h>
