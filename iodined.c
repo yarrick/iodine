@@ -163,7 +163,7 @@ extern char *__progname;
 
 static void
 usage() {
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
 			"tunnel_ip topdomain\n", __progname);
 	exit(2);
 }
@@ -171,13 +171,15 @@ usage() {
 static void
 help() {
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
 		   "tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
+	printf("  -d device to set tunnel device name\n");
+	printf("  -m mtu to set tunnel device mtu\n");
 	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
 	printf("topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
@@ -199,12 +201,14 @@ main(int argc, char **argv)
 	int dnsd_fd;
 	char *newroot;
 	char *username;
+	char *device;
 	int foreground;
 	int mtu;
 	struct passwd *pw;
 
 	username = NULL;
 	newroot = NULL;
+	device = NULL;
 	foreground = 0;
 	mtu = 1024;
 
@@ -213,7 +217,7 @@ main(int argc, char **argv)
 	outpacket.len = 0;
 	q.id = 0;
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:m:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:d:m:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -229,6 +233,9 @@ main(int argc, char **argv)
 			break;
 		case 't':
 			newroot = optarg;
+			break;
+		case 'd':
+			device = optarg;
 			break;
 		case 'm':
 			mtu = atoi(optarg);
@@ -263,7 +270,7 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if ((tun_fd = open_tun(NULL)) == -1)
+	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup0;
 	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
 		goto cleanup1;

@@ -58,10 +58,10 @@ open_tun(const char *tun_device)
 
 	if (tun_device != NULL) {
 			strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
+			strncpy(if_name, tun_device, sizeof(if_name));
 
 			if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 				printf("Opened %s\n", ifreq.ifr_name);
-				snprintf(if_name, sizeof(if_name), "dns%d", i);
 				return tun_fd;
 			}
 

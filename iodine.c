@@ -164,7 +164,7 @@ extern char *__progname;
 
 static void
 usage() {
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] "
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device]"
 			"nameserver topdomain\n", __progname);
 	exit(2);
 }
@@ -172,13 +172,14 @@ usage() {
 static void
 help() {
 	printf("iodine IP over DNS tunneling client\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] "
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device]"
 			"nameserver topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
+	printf("  -d device to set tunnel device name\n");
 	printf("nameserver is the IP number of the relaying nameserver\n");
 	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 	exit(0);
@@ -198,14 +199,16 @@ main(int argc, char **argv)
 	int choice;
 	char *newroot;
 	char *username;
+	char *device;
 	int foreground;
 	struct passwd *pw;
 
 	newroot = NULL;
 	username = NULL;
+	device = NULL;
 	foreground = 0;
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:d:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -221,6 +224,9 @@ main(int argc, char **argv)
 			break;
 		case 't':
 			newroot = optarg;
+			break;
+		case 'd':
+			device = optarg;
 			break;
 		default:
 			usage();
@@ -247,7 +253,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if ((tun_fd = open_tun(NULL)) == -1)
+	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup1;
 	if ((dns_fd = open_dns(argv[1], 0)) == -1)
 		goto cleanup2;
