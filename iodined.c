@@ -27,6 +27,7 @@
 #include <err.h>
 #include <pwd.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <zlib.h>
 
 #include "tun.h"

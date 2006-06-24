@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <err.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include "tun.h"
 
