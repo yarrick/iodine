@@ -172,7 +172,7 @@ usage() {
 static void
 help() {
 	printf("iodine IP over DNS tunneling client\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device]"
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"nameserver topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
