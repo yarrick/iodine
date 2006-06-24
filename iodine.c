@@ -187,9 +187,8 @@ help() {
 
 static void
 version() {
-	char *svnver = "$Rev$ from $Date$";
 	printf("iodine IP over DNS tunneling client\n");
-	printf("SVN version: %s\n", svnver);
+	printf("version: 0.3\n");
 	exit(0);
 }
 
