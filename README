@@ -19,9 +19,7 @@ server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the server.
 If you use BIND for the domain, add these lines to the zone file:
 
 tunnel1host	IN	A	10.15.213.99
-
-$ORIGIN tunnel1.mytunnnel.com.
-@		IN	NS	tunnel1host.mytunnel.com.
+tunnel1		IN	NS	tunnel1host.mytunnel.com.
 
 Now any DNS querys for domains ending with tunnel1.mytunnnel.com will be sent
 to your server. Start iodined on the server. The first argument is the tunnel
