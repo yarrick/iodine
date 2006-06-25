@@ -1,0 +1,12 @@
+
+iodine - IP over DNS is now easy
+
+   http://code.kryo.se/iodine
+
+********************************
+
+STUFF TO DO:
+
+- Handle multiple concurrent users on one server
+
+- Better encoding (use all five bits in upstream data, a-z0-9)
