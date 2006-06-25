@@ -57,18 +57,18 @@ open_tun(const char *tun_device)
 	ifreq.ifr_flags = IFF_TUN; 
 
 	if (tun_device != NULL) {
-			strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
-			strncpy(if_name, tun_device, sizeof(if_name));
+		strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
+		strncpy(if_name, tun_device, sizeof(if_name));
 
-			if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
-				printf("Opened %s\n", ifreq.ifr_name);
-				return tun_fd;
-			}
+		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
+			printf("Opened %s\n", ifreq.ifr_name);
+			return tun_fd;
+		}
 
-			if (errno != EBUSY) {
-				warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
-				return -1;
-			}
+		if (errno != EBUSY) {
+			warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+			return -1;
+		}
 	} else {
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(ifreq.ifr_name, IFNAMSIZ, "dns%d", i);
@@ -100,8 +100,11 @@ open_tun(const char *tun_device)
 	char tun_name[50];
 
 	if (tun_device != NULL) {
-		if ((tun_fd = open(tun_device, O_RDWR)) < 0) {
-			warn("open_tun: %s: %s", tun_device, strerror(errno));
+		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
+		strncpy(if_name, tun_device, sizeof(if_name));
+
+		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
+			warn("open_tun: %s: %s", tun_name, strerror(errno));
 			return -1;
 		}
 	} else {
