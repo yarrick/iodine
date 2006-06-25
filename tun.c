@@ -85,7 +85,7 @@ open_tun(const char *tun_device)
 			}
 		}
 
-		warn("open_tun: Couldn't set interface name.\n");
+		warn("open_tun: Couldn't set interface name");
 	}
 	return -1;
 }
@@ -124,7 +124,7 @@ open_tun(const char *tun_device)
 				break;
 		}
 
-		warn("open_tun: Failed to open tunneling device.");
+		warn("open_tun: Failed to open tunneling device");
 	}
 
 	return -1;
