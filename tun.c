@@ -107,6 +107,9 @@ open_tun(const char *tun_device)
 			warn("open_tun: %s: %s", tun_name, strerror(errno));
 			return -1;
 		}
+
+		printf("Opened %s\n", tun_name);
+		return tun_fd;
 	} else {
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
@@ -139,10 +142,10 @@ close_tun(int tun_fd)
 int 
 write_tun(int tun_fd, char *data, int len) 
 {
-#ifdef FREEBSD
+#if defined (FREEBSD) || defined (DARWIN)
 	data += 4;
 	len -= 4;
-#else /* !FREEBSD */
+#else /* !FREEBSD/DARWIN */
 #ifdef LINUX
 	data[0] = 0x00;
 	data[1] = 0x00;
@@ -166,7 +169,7 @@ write_tun(int tun_fd, char *data, int len)
 int 
 read_tun(int tun_fd, char *buf, int len) 
 {
-#ifdef FREEBSD
+#if defined (FREEBSD) || defined (DARWIN)
 	// FreeBSD has no header
 	return read(tun_fd, buf + 4, len - 4) + 4;
 #else /* !FREEBSD */
