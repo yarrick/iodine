@@ -19,11 +19,15 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser8_compat.h>
+#endif
 #include <netdb.h>
 #include <time.h>
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
@@ -352,7 +356,6 @@ dns_read(int fd, char *buf, int buflen)
 	return 0;
 }
 
-
 static int
 host2dns(const char *host, char *buffer, int size)
 {
@@ -386,6 +389,7 @@ dnsd_send(int fd, struct query *q, char *data, int datalen)
 	int len;
 	char *p;
 	char buf[64*1024];
+	short name;
 	HEADER *header;
 
 	memset(buf, 0, sizeof(buf));
@@ -406,24 +410,21 @@ dnsd_send(int fd, struct query *q, char *data, int datalen)
 
 	p = buf + sizeof(HEADER);
 	
+	name = 0xc000 | ((p - buf) & 0x3fff);
 	p += host2dns(q->name, p, strlen(q->name));
 	PUTSHORT(q->type, p);
 	PUTSHORT(C_IN, p);
 	
-	p += host2dns(q->name, p, strlen(q->name));	
+	PUTSHORT(name, p);
 	PUTSHORT(q->type, p);
 	PUTSHORT(C_IN, p);
 	PUTLONG(0, p);
 
 	q->id = 0;
 
-	if(datalen > 0) {
-		PUTSHORT(datalen, p);
-		memcpy(p, data, datalen);
-		p += datalen;
-	} else {
-		PUTSHORT(0, p);
-	}
+	PUTSHORT(datalen, p);
+	memcpy(p, data, datalen);
+	p += datalen;
 
 	len = p - buf;
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
@@ -481,9 +482,7 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 	addrlen = sizeof(struct sockaddr);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 
-	if(r == -1) {
-		perror("recvfrom");
-	} else {
+	if (r >= sizeof(HEADER)) {
 		header = (HEADER*)packet;
 
 		id = ntohs(header->id);
@@ -508,6 +507,8 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 				return decodepacket(name, buf, buflen);
 			}
 		}
+	} else {
+		perror("recvfrom");
 	}
 
 	return 0;

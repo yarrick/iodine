@@ -1,0 +1,18 @@
+
+iodine - IP over DNS is now easy
+
+   http://code.kryo.se/iodine
+
+********************************
+
+CHANGES:
+
+2006-07-11: 0.3.1 
+	- Add Mac OSX support
+	- Add setting device name
+	- Use compression of domain name in reply (should allow setting MTU 
+		approx 200 bytes higher)
+
+2006-06-24: 0.3.0
+	- First public release
+	- Support for Linux, FreeBSD, OpenBSD

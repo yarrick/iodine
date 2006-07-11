@@ -61,9 +61,10 @@ possible to allow maximum throughput.
 
 PORTABILITY:
 
-iodine has been tested on Linux (x86 and SPARC64), FreeBSD (x86) and 
-OpenBSD (x86). It should work on other unix-like systems as well that has 
-TUN/TAP tunneling support. Let us know if you get it to run on other platforms. 
+iodine has been tested on Linux (x86 and SPARC64), FreeBSD (x86), OpenBSD (x86)
+and MacOS X (10.3, ppc, with http://www-user.rhrk.uni-kl.de/~nissler/tuntap/).
+It should work on other unix-like systems as well that has TUN/TAP tunneling
+support. Let us know if you get it to run on other platforms. 
 
 
 THE NAME:
