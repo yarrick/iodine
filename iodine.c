@@ -255,7 +255,7 @@ main(int argc, char **argv)
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup1;
-	if ((dns_fd = open_dns(argv[1], 0)) == -1)
+	if ((dns_fd = open_dns(argv[1], 0, INADDR_ANY)) == -1)
 		goto cleanup2;
 	if (dns_settarget(argv[0]) == -1)
 		goto cleanup2;

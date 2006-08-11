@@ -58,7 +58,7 @@ uint16_t pingid;
 
 
 int 
-open_dns(const char *domain, int localport) 
+open_dns(const char *domain, int localport, in_addr_t listen_ip) 
 {
 	int fd;
 	int flag;
@@ -67,9 +67,9 @@ open_dns(const char *domain, int localport)
 	bzero(&addr, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(localport);
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	addr.sin_addr.s_addr = listen_ip; // This is already network byte order, inet_addr() or constant INADDR_ANY (==0)
 
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if(fd < 0) {
 		warn("socket");
 		return -1;
