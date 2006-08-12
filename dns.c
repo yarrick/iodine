@@ -35,11 +35,8 @@
 #include "read.h"
 #include "structs.h"
 #include "dns.h"
+#include "encoding.h"
 
-// For FreeBSD
-#ifndef MIN
-#define MIN(a,b) ((a)<(b)?(a):(b))
-#endif
 
 static int host2dns(const char *, char *, int);
 static int dns_write(int, int, char *, int, char);
@@ -221,66 +218,28 @@ dns_query(int fd, int id, char *host, int type)
 	sendto(fd, buf, len, 0, (struct sockaddr*)&peer, peerlen);
 }
 
-static void
-put_hex(char *p, char h)
-{
-	int t;
-	static const char to_hex[] = "0123456789ABCDEF";
-
-	t = (h & 0xF0) >> 4;
-	p[0] = to_hex[t];
-	t = h & 0x0F;
-	p[1] = to_hex[t];
-}
-
 static int
 dns_write(int fd, int id, char *buf, int len, char flag)
 {
 	int avail;
-	int i;
-	int final;
+	int written;
+	int encoded;
 	char data[257];
 	char *d;
 
-#define CHUNK 31
-// 31 bytes expands to 62 chars in domain
-// We just use hex as encoding right now
-
 	avail = 0xFF - strlen(topdomain) - 2;
-
-	avail /= 2; // use two chars per byte in encoding
-	avail -= (avail/CHUNK); // make space for parts
-
-	avail = MIN(avail, len); // do not use more bytes than is available;
-	final = (avail == len);	// is this the last block?
 	bzero(data, sizeof(data));
 	d = data;
-
-	if (flag != 0) {
-		*d = flag;
-	} else {
-		// First byte is 0 for middle packet and 1 for last packet
-		*d = '0' + final;
-	}
-	d++;
-
-	if (len > 0) {
-		for (i = 0; i < avail; i++) {
-			if (i > 0 && i % 31 == 0) {
-				*d = '.';
-				d++;
-			}
-			put_hex(d, buf[i]);
-			d += 2;
-		}
-	}
+	written = encode_data(buf, len, avail, d, flag);
+	encoded = strlen(data);
+	d += encoded;
 	if (*d != '.') {
 		*d++ = '.';
 	}
 	strncpy(d, topdomain, strlen(topdomain)+1);
 	
 	dns_query(fd, id, data, T_NULL);
-	return avail;
+	return written;
 }
 
 int
@@ -433,32 +392,12 @@ dnsd_send(int fd, struct query *q, char *data, int datalen)
 static int
 decodepacket(const char *name, char *buf, int buflen)
 {
-	int r;
 	int len;
-	char *dp;
 	char *domain;
-	const char *np;
 
-	len = 1;
 	domain = strstr(name, topdomain);
 
-	buf[0] = name[0];
-
-	dp = buf + 1;
-	np = name + 1;
-
-	while(len < buflen && np < domain) {
-		if(*np == '.') {
-			np++;
-			continue;
-		}
-
-		sscanf(np, "%02X", &r);
-		*dp++ = (char)r;
-		np+=2;	
-		len++;
-	} 
-
+	len = decode_data(buf, buflen, name, domain);
 	if (len == buflen)
 		return -1; 
 	return len;
