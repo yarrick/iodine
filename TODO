@@ -14,5 +14,3 @@ STUFF TO DO:
 - Some kind of authentication?
 
 - Detect if EDNS0 can be used, probe MTU size
-
-- Listen to specific IP on server?
