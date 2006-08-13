@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
