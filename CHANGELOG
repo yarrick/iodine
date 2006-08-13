@@ -7,6 +7,10 @@ iodine - IP over DNS is now easy
 
 CHANGES:
 
+xxxx-xx-xx: 0.4
+	- New encoding, 25% more peak upstream throughput
+	- New -l option to set local ip to listen to on server
+
 2006-07-11: 0.3.1 
 	- Add Mac OSX support
 	- Add setting device name

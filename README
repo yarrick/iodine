@@ -10,6 +10,20 @@ server. This can be usable in different situations where internet access is
 firewalled, but DNS queries are allowed.
 
 
+QUICKSTART:
+
+Try it out within your own LAN! Follow these simple steps:
+- On your server, run: ./iodined -f 10.0.0.1 test.asdf
+  (If you already use the 10.0.0.0 network, use another internal net like 
+  172.16.0.0)
+- On the client, run: ./iodine -f 192.168.0.1 test.asdf
+  (Replace 192.168.0.1 with the server's ip address)
+- Now the client has the tunnel ip 10.0.0.2 and the server has 10.0.0.1
+- Try pinging each other through the tunnel
+- Done! :)
+To actually use it through a relaying nameserver, see below.
+
+
 HOW TO USE:
 
 Server side:
@@ -71,6 +85,11 @@ THE NAME:
 
 The name iodine was chosen since it starts with IOD (IP Over DNS) and since
 iodine has atomic number 53, which happens to be the DNS port number.
+
+
+THANKS:
+
+- To kuxien for FreeBSD and OS X testing
 
 
 AUTHORS & LICENSE:
