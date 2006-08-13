@@ -9,8 +9,6 @@ STUFF TO DO:
 
 - Handle multiple concurrent users on one server
 
-- Better encoding (use all five bits in upstream data, a-z0-9)
-
 - Some kind of authentication?
 
 - Detect if EDNS0 can be used, probe MTU size
