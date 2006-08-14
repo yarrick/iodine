@@ -165,7 +165,7 @@ extern char *__progname;
 
 static void
 usage() {
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device]"
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"nameserver topdomain\n", __progname);
 	exit(2);
 }
