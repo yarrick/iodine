@@ -25,9 +25,6 @@ readname(char *packet, char **src, char *dst, size_t length)
 	char c;
 
 	len = 0;
-
-	p = *src;
-
 	p = *src;
 	while(*p && len < length) {
 		c = *p++;
