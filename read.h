@@ -17,19 +17,14 @@
 #ifndef _READ_H_
 #define _READ_H_
 
-int readname(char *, char *, char *);
+int readname(char *, char **, char *, size_t);
+int readshort(char *, char **, short *);
+int readlong(char *, char **, long *);
+int readdata(char *, char **, char *, size_t);
 
-#define READNAME(packet, dst, src) (src) += readname((packet), (dst), (src));
-
-#define READSHORT(dst, src) \
-	memcpy(&dst, src, 2); \
-        (dst) = ntohs(dst); (src)+=2;
-
-#define READLONG(dst, src) \
-	memcpy(&dst, src, 2); \
-	(dst) = ntohl(dst); (src)+=4; 
-
-#define READDATA(dst, src, len) \
-	memcpy((dst), (src), (len)); (src)+=(len);
+int putbyte(char **, char);
+int putshort(char **, short);
+int putlong(char **, long);
+int putdata(char **, char *, size_t);
 
 #endif
