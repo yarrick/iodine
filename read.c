@@ -31,6 +31,7 @@ readname(char *packet, char **src, char *dst, size_t length)
 	p = *src;
 	while(*p && len < length) {
 		c = *p++;
+		len++;
 
 		/* is this a compressed label? */
 		if((c & 0xc0) == 0xc0) {
@@ -47,9 +48,9 @@ readname(char *packet, char **src, char *dst, size_t length)
 		}
 
 		if (*p != 0)
-			*dst = '.';
+			*dst++ = '.';
 		else 
-			*dst = '\0';
+			*dst++ = '\0';
 	}
 	(*src) = p+1;
 
