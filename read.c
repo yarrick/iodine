@@ -57,11 +57,10 @@ readname(char *packet, char **src, char *dst, size_t length)
 int
 readshort(char *packet, char **src, short *dst)
 {
-	char *p;
+	unsigned char *p;
 
 	p = *src;
-	*dst = ((short)p[0] << 8) 
-		 | ((short)p[1]);
+	*dst = (p[0] << 8) | p[1];
 
 	(*src) += sizeof(short);
 	return sizeof(short);
@@ -70,7 +69,7 @@ readshort(char *packet, char **src, short *dst)
 int
 readlong(char *packet, char **src, long *dst)
 {
-	char *p;
+	unsigned char *p;
 
 	p = *src;
 
@@ -86,6 +85,9 @@ readlong(char *packet, char **src, long *dst)
 int
 readdata(char *packet, char **src, char *dst, size_t len)
 {
+	if (len < 0)
+		return len;
+
 	memcpy(dst, *src, len);
 
 	(*src) += len;
@@ -105,7 +107,7 @@ putbyte(char **dst, char value)
 int
 putshort(char **dst, short value)
 {
-	char *p;
+	unsigned char *p;
 
 	p = *dst;
 
@@ -119,7 +121,7 @@ putshort(char **dst, short value)
 int
 putlong(char **dst, long value)
 {
-	char *p;
+	unsigned char *p;
 
 	p = *dst;
 
@@ -135,6 +137,9 @@ putlong(char **dst, long value)
 int
 putdata(char **dst, char *data, size_t len)
 {
+	if (len < 0)
+		return len;
+
 	memcpy(*dst, data, len);
 	
 	(*dst) += len;
