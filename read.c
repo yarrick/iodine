@@ -86,7 +86,7 @@ int
 readdata(char *packet, char **src, char *dst, size_t len)
 {
 	if (len < 0)
-		return len;
+		return 0;
 
 	memcpy(dst, *src, len);
 
@@ -138,7 +138,7 @@ int
 putdata(char **dst, char *data, size_t len)
 {
 	if (len < 0)
-		return len;
+		return 0;
 
 	memcpy(*dst, data, len);
 	
