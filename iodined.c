@@ -58,17 +58,18 @@ sigint(int sig) {
 static int
 tunnel(int tun_fd, int dns_fd)
 {
-	int i;
+	struct in_addr clientip;
+	struct in_addr myip;
+	struct timeval tv;
+	char out[64*1024];
+	char in[64*1024];
+	char *tmp[2];
+	long outlen;
+	fd_set fds;
 	int read;
 	int code;
-	int ipadder;
-	struct in_addr nextip;
-	fd_set fds;
-	struct timeval tv;
-	char in[64*1024];
-	long outlen;
-	char out[64*1024];
-	
+	int i;
+
 	while (running) {
 		if (q.id != 0) {
 			tv.tv_sec = 0;
@@ -114,17 +115,20 @@ tunnel(int tun_fd, int dns_fd)
 			   		continue;
 
 				if(in[0] == 'H' || in[0] == 'h') {
-					ipadder = htonl(my_ip); // To get the last byte last
-					if ((ipadder & 0xFF) == 0xFF) {
-						// IP ends with 255.
-						ipadder--;
-					} else {
-						ipadder++;
-					}
-					nextip.s_addr = ntohl(ipadder);
-					read = snprintf(out, sizeof(out), "%s-%d", inet_ntoa(nextip), my_mtu);
+					myip.s_addr = my_ip;	
+					clientip.s_addr = my_ip + inet_addr("0.0.0.1");
+
+					tmp[0] = strdup(inet_ntoa(myip));
+					tmp[1] = strdup(inet_ntoa(clientip));
+					
+					read = snprintf(out, sizeof(out), "%s-%s-%d", 
+							tmp[0], tmp[1], my_mtu);
+
 					dnsd_send(dns_fd, &q, out, read);
 					q.id = 0;
+
+					free(tmp[1]);
+					free(tmp[0]);
 				} else if((in[0] >= '0' && in[0] <= '9')
 						|| (in[0] >= 'a' && in[0] <= 'f')
 						|| (in[0] >= 'A' && in[0] <= 'F')) {

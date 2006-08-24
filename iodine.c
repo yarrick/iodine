@@ -110,15 +110,16 @@ tunnel(int tun_fd, int dns_fd)
 static int
 handshake(int dns_fd)
 {
+	struct timeval tv;
+	char server[128];
+	char client[128];
+	char in[4096];
+	int timeout;
+	fd_set fds;
+	int read;
+	int mtu;
 	int i;
 	int r;
-	char *p;
-	int mtu;
-	int read;
-	fd_set fds;
-	int timeout;
-	char in[4096];
-	struct timeval tv;
 
 	timeout = 1;
 	
@@ -142,12 +143,10 @@ handshake(int dns_fd)
 			}
 
 			if (read > 0) {
-				p = strchr(in, '-');
-				if (p) {
-					*p++ = '\0';
-					mtu = atoi(p);
+				if (sscanf(in, "%[^-]-%[^-]-%d", server, client, &mtu) == 3) {
+					printf("%s %s %d\n", server, client, mtu);
 
-					if (tun_setip(in) == 0 && tun_setmtu(atoi(p)) == 0)
+					if (tun_setip(client) == 0 && tun_setmtu(mtu) == 0)
 						return 0;
 					else 
 						warn("Received handshake but b0rk");
@@ -161,10 +160,10 @@ handshake(int dns_fd)
 	return 1;
 }
 
-extern char *__progname;
-
 static void
 usage() {
+	extern char *__progname;
+
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"nameserver topdomain\n", __progname);
 	exit(2);
@@ -172,6 +171,8 @@ usage() {
 
 static void
 help() {
+	extern char *__progname;
+
 	printf("iodine IP over DNS tunneling client\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"nameserver topdomain\n", __progname);
@@ -197,17 +198,17 @@ version() {
 int
 main(int argc, char **argv)
 {
-	int choice;
-	char *newroot;
-	char *username;
-	char *device;
-	int foreground;
 	struct passwd *pw;
+	char *username;
+	int foreground;
+	char *newroot;
+	char *device;
+	int choice;
 
-	newroot = NULL;
 	username = NULL;
-	device = NULL;
 	foreground = 0;
+	newroot = NULL;
+	device = NULL;
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:")) != -1) {
 		switch(choice) {
