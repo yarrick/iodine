@@ -14,36 +14,31 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <sys/stat.h>
+#include <arpa/nameser.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "structs.h"
 #include "dns.h"
 #include "read.h"
-
-int
-main()
+	
+static void
+test_readputshort()
 {
 	short tshort;
-	short temps;
 	short putted;
-	short *s;
-
-	long tint;
-	long tempi;
-	long putint;
-	long *l;
-	
-	int i;
+	short temps;
 	char buf[4];
+	short *s;
 	char* p;
+	int i;
 
-	printf("** iodine test suite\n");
 	printf(" * Testing read/putshort... ");
 	fflush(stdout);
 
@@ -69,6 +64,18 @@ main()
 	}
 
 	printf("OK\n");
+}
+
+static void
+test_readputlong()
+{
+	char buf[4];
+	long putint;
+	long tempi;
+	long tint;
+	long *l;
+	char* p;
+	int i;
 
 	printf(" * Testing read/putlong... ");
 	fflush(stdout);
@@ -95,7 +102,52 @@ main()
 	}
 
 	printf("OK\n");
+}
 
+static void
+test_readname()
+{
+	char emptyloop[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 }; 
+	char infloop[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 'A', 0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 }; 
+	char buf[1024];
+	char *data;
+	int rv;
+
+	printf(" * Testing readname... ");
+	fflush(stdout);
+
+	bzero(buf, sizeof(buf));
+	data = emptyloop + sizeof(HEADER);
+	buf[1023] = 'A';
+	rv = readname(emptyloop, &data, buf, 1023);
+	assert(buf[1023] == 'A');
+	
+
+	bzero(buf, sizeof(buf));
+	data = infloop + sizeof(HEADER);
+
+	buf[4] = '\a';
+	rv = readname(infloop, &data, buf, 4);
+	printf("%s\n", buf);
+	assert(buf[4] == '\a');
+	
+
+
+	printf("OK\n");
+}
+
+int
+main()
+{
+	printf("** iodine test suite\n");
+
+	test_readputshort();
+	test_readputlong();
+	test_readname();
 
 	printf("** All went well :)\n");
 	return 0;

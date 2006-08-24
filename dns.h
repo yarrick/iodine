@@ -37,5 +37,7 @@ int dnsd_hasack();
 void dnsd_forceack(int);
 void dnsd_queuepacket(const char *, const int);
 
+int dns_parse_reply(char *, int, char *, int);
+
 
 #endif /* _DNS_H_ */

@@ -46,7 +46,6 @@
 static int host2dns(const char *, char *, int);
 static int dns_write(int, int, char *, int, char);
 static void dns_query(int, int, char *, int);
-static int dns_parse_reply(char *, int, char *, int);
 
 struct sockaddr_in peer;
 char topdomain[256];
@@ -284,7 +283,7 @@ dns_read(int fd, char *buf, int buflen)
 	return dns_parse_reply(buf, buflen, packet, r);
 }
 
-static int
+int
 dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 {
 	int rv;

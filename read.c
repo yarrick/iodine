@@ -16,35 +16,37 @@
 
 #include <string.h>
 
-int
-readname(char *packet, char **src, char *dst, size_t length)
+static int
+readname_loop(char *packet, char **src, char *dst, size_t length, size_t loop)
 {
 	char *dummy;
 	int len;
 	char *p;
 	char c;
 
+	if (loop <= 0)
+		return 0;
+
 	len = 0;
 	p = *src;
-	while(*p && len < length) {
+	while(*p && len < length - 2) {
 		c = *p++;
-		len++;
 
 		/* is this a compressed label? */
 		if((c & 0xc0) == 0xc0) {
 			dummy = packet + (((p[-1] & 0x3f) << 8) | p[0]);
-			readname(packet, &dummy, dst, length - len);
+			len += readname_loop(packet, &dummy, dst, length - len, loop - 1);
 			break;
 		}
 
-		while(c && len < length) {
+		while(c && len < length - 2) {
 			*dst++ = *p++;
 			len++;
 
 			c--;
 		}
 
-		if (*p != 0)
+		if (*p != 0 && len < length - 2)
 			*dst++ = '.';
 		else 
 			*dst++ = '\0';
@@ -52,6 +54,12 @@ readname(char *packet, char **src, char *dst, size_t length)
 	(*src) = p+1;
 
 	return strlen(dst);
+}
+
+int
+readname(char *packet, char **src, char *dst, size_t length)
+{
+	return readname_loop(packet, src, dst, length, 10);
 }
 
 int
