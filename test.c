@@ -43,8 +43,8 @@ main()
 	char buf[4];
 	char* p;
 
-	printf("iodine test suite\n");
-	printf("Testing read/putshort... ");
+	printf("** iodine test suite\n");
+	printf(" * Testing read/putshort... ");
 	fflush(stdout);
 
 	for (i = 0; i < 65536; i++) {
@@ -70,7 +70,7 @@ main()
 
 	printf("OK\n");
 
-	printf("Testing read/putlong... ");
+	printf(" * Testing read/putlong... ");
 	fflush(stdout);
 
 	for (i = 0; i < 32; i++) {
@@ -97,6 +97,6 @@ main()
 	printf("OK\n");
 
 
-	printf("All went well :)\n");
+	printf("** All went well :)\n");
 	return 0;
 }
