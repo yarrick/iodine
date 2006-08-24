@@ -122,7 +122,10 @@ test_readname()
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
-		"\x00\x01\x00\x01";
+		"\x00\x00\x01\x00\x01";
+	char onejump[] = 
+		"AA\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
+		"\x02hh\xc0\x15\x00\x01\x00\x01\x05zBCDE\x00";
 	char buf[1024];
 	char *data;
 	int rv;
@@ -147,6 +150,11 @@ test_readname()
 	buf[256] = '\a';
 	rv = readname(longname, &data, buf, 256);
 	assert(buf[256] == '\a');
+
+	bzero(buf, sizeof(buf));
+	data = onejump + sizeof(HEADER);
+	rv = readname(onejump, &data, buf, 256);
+	assert(rv == 9);
 
 	printf("OK\n");
 }
