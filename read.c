@@ -20,40 +20,42 @@ static int
 readname_loop(char *packet, char **src, char *dst, size_t length, size_t loop)
 {
 	char *dummy;
+	char *s;
+	char *d;
 	int len;
-	char *p;
 	char c;
 
 	if (loop <= 0)
 		return 0;
 
 	len = 0;
-	p = *src;
-	while(*p && len < length - 2) {
-		c = *p++;
+	s = *src;
+	d = dst;
+	while(*s && len < length - 2) {
+		c = *s++;
 
 		/* is this a compressed label? */
 		if((c & 0xc0) == 0xc0) {
-			dummy = packet + (((p[-1] & 0x3f) << 8) | p[0]);
-			len += readname_loop(packet, &dummy, dst, length - len, loop - 1);
+			dummy = packet + (((s[-1] & 0x3f) << 8) | s[0]);
+			len += readname_loop(packet, &dummy, d, length - len, loop - 1);
 			break;
 		}
 
 		while(c && len < length - 2) {
-			*dst++ = *p++;
+			*d++ = *s++;
 			len++;
 
 			c--;
 		}
 
-		if (*p != 0 && len < length - 2)
-			*dst++ = '.';
-		else 
-			*dst++ = '\0';
+		if (*s != 0 && len < length - 2)
+			*d++ = '.';
 	}
-	(*src) = p+1;
+	(*src) = s+1;
 
-	return strlen(dst);
+	dst[len] = '\0';
+
+	return len;
 }
 
 int
