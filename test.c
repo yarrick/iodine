@@ -146,7 +146,6 @@ test_readname()
 	data = longname + sizeof(HEADER);
 	buf[256] = '\a';
 	rv = readname(longname, &data, buf, 256);
-	printf("got %d, '%s' len %d \n", rv, buf, strlen(buf));
 	assert(buf[256] == '\a');
 
 	printf("OK\n");

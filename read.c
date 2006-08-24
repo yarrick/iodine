@@ -47,8 +47,12 @@ readname_loop(char *packet, char **src, char *dst, size_t length, size_t loop)
 
 			c--;
 		}
+		
+		if (len < length - 1) {
+			break; /* We used up all space */
+		}
 
-		if (*s != 0 && len < length - 1)
+		if (*s != 0)
 			*d++ = '.';
 	}
 	(*src) = s+1;
