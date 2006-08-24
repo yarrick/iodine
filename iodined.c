@@ -164,10 +164,10 @@ tunnel(int tun_fd, int dns_fd)
 	return 0;
 }
 
-extern char *__progname;
-
 static void
 usage() {
+	extern char *__progname;
+
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] "
 			"tunnel_ip topdomain\n", __progname);
 	exit(2);
@@ -175,6 +175,8 @@ usage() {
 
 static void
 help() {
+	extern char *__progname;
+
 	printf("iodine IP over DNS tunneling server\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] "
 		   "tunnel_ip topdomain\n", __progname);
