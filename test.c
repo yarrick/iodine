@@ -126,16 +126,11 @@ test_readname()
 	rv = readname(emptyloop, &data, buf, 1023);
 	assert(buf[1023] == 'A');
 	
-
 	bzero(buf, sizeof(buf));
 	data = infloop + sizeof(HEADER);
-
 	buf[4] = '\a';
 	rv = readname(infloop, &data, buf, 4);
-	printf("%s\n", buf);
 	assert(buf[4] == '\a');
-	
-
 
 	printf("OK\n");
 }
