@@ -104,6 +104,7 @@ test_readputlong()
 	printf("OK\n");
 }
 
+
 static void
 test_readname()
 {
@@ -113,6 +114,15 @@ test_readname()
 	char infloop[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x01, 'A', 0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 }; 
+	char longname[] = 
+		"AA\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
+		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
+		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
+		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
+		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
+		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
+		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
+		"\x00\x01\x00\x01";
 	char buf[1024];
 	char *data;
 	int rv;
@@ -131,6 +141,13 @@ test_readname()
 	buf[4] = '\a';
 	rv = readname(infloop, &data, buf, 4);
 	assert(buf[4] == '\a');
+	
+	bzero(buf, sizeof(buf));
+	data = longname + sizeof(HEADER);
+	buf[256] = '\a';
+	rv = readname(longname, &data, buf, 256);
+	printf("got %d, '%s' len %d \n", rv, buf, strlen(buf));
+	assert(buf[256] == '\a');
 
 	printf("OK\n");
 }

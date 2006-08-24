@@ -41,20 +41,19 @@ readname_loop(char *packet, char **src, char *dst, size_t length, size_t loop)
 			break;
 		}
 
-		while(c && len < length - 2) {
+		while(c && len < length - 1) {
 			*d++ = *s++;
 			len++;
 
 			c--;
 		}
 
-		if (*s != 0 && len < length - 2)
+		if (*s != 0 && len < length - 1)
 			*d++ = '.';
 	}
 	(*src) = s+1;
 
-	dst[len] = '\0';
-
+	dst[len++] = '\0';
 	return len;
 }
 
