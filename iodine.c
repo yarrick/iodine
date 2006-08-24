@@ -75,11 +75,7 @@ tunnel(int tun_fd, int dns_fd)
 				warn("select");
 			}
 			return 1;
-		}
-		
-		if(i == 0) {
-			dns_ping(dns_fd);
-		} else {
+		} else if (i > 0) {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, in, sizeof(in));
 				if(read <= 0)
@@ -101,7 +97,8 @@ tunnel(int tun_fd, int dns_fd)
 				if (!dns_sending()) 
 					dns_ping(dns_fd);
 			} 
-		}
+		} else
+			dns_ping(dns_fd);
 	}
 
 	return 0;
@@ -144,8 +141,6 @@ handshake(int dns_fd)
 
 			if (read > 0) {
 				if (sscanf(in, "%[^-]-%[^-]-%d", server, client, &mtu) == 3) {
-					printf("%s %s %d\n", server, client, mtu);
-
 					if (tun_setip(client) == 0 && tun_setmtu(mtu) == 0)
 						return 0;
 					else 
