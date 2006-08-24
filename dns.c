@@ -46,6 +46,7 @@
 static int host2dns(const char *, char *, int);
 static int dns_write(int, int, char *, int, char);
 static void dns_query(int, int, char *, int);
+static int dns_parse_reply(char *, int, char *, int);
 
 struct sockaddr_in peer;
 char topdomain[256];
@@ -254,6 +255,38 @@ int
 dns_read(int fd, char *buf, int buflen)
 {
 	int r;
+	socklen_t addrlen;
+	char packet[64*1024];
+	struct sockaddr_in from;
+	HEADER *header;
+
+	addrlen = sizeof(struct sockaddr);
+	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+	if(r == -1) {
+		perror("recvfrom");
+		return 0;
+	}
+
+	header = (HEADER*)packet;
+	if (dns_sending() && chunkid == ntohs(header->id)) {
+		/* Got ACK on sent packet */
+		packetpos += lastlen;
+		if (packetpos == packetlen) {
+			/* Packet completed */
+			packetpos = 0;
+			packetlen = 0;
+			lastlen = 0;
+		} else {
+			/* More to send */
+			dns_send_chunk(fd);
+		}
+	}
+	return dns_parse_reply(buf, buflen, packet, r);
+}
+
+static int
+dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
+{
 	int rv;
 	long ttl;
 	short rlen;
@@ -265,58 +298,35 @@ dns_read(int fd, char *buf, int buflen)
 	char name[255];
 	char rdata[4*1024];
 	HEADER *header;
-	socklen_t addrlen;
-	char packet[64*1024];
-	struct sockaddr_in from;
-
-	addrlen = sizeof(struct sockaddr);
-	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 
 	rv = 0;
-	if(r == -1) {
-		perror("recvfrom");
-	} else {
-		header = (HEADER*)packet;
-		
-		data = packet + sizeof(HEADER);
+	header = (HEADER*)packet;
+	
+	data = packet + sizeof(HEADER);
 
-		if(header->qr) { /* qr=1 => response */
-			qdcount = ntohs(header->qdcount);
-			ancount = ntohs(header->ancount);
+	if(header->qr) { /* qr=1 => response */
+		qdcount = ntohs(header->qdcount);
+		ancount = ntohs(header->ancount);
 
-			rlen = 0;
+		rlen = 0;
 
-			if(qdcount == 1) {
-				readname(packet, &data, name, sizeof(name));
-				readshort(packet, &data, &type);
-				readshort(packet, &data, &class);
-			}
-			if(ancount == 1) {
-				readname(packet, &data, name, sizeof(name));
-				readshort(packet, &data, &type);
-				readshort(packet, &data, &class);
-				readlong(packet, &data, &ttl);
-				readshort(packet, &data, &rlen);
-				readdata(packet, &data, rdata, rlen);
-			}
-			if (dns_sending() && chunkid == ntohs(header->id)) {
-				// Got ACK on sent packet
-				packetpos += lastlen;
-				if (packetpos == packetlen) {
-					// Packet completed
-					packetpos = 0;
-					packetlen = 0;
-					lastlen = 0;
-				} else {
-					// More to send
-					dns_send_chunk(fd);
-				}
-			}
+		if(qdcount == 1) {
+			readname(packet, &data, name, sizeof(name));
+			readshort(packet, &data, &type);
+			readshort(packet, &data, &class);
+		}
+		if(ancount == 1) {
+			readname(packet, &data, name, sizeof(name));
+			readshort(packet, &data, &type);
+			readshort(packet, &data, &class);
+			readlong(packet, &data, &ttl);
+			readshort(packet, &data, &rlen);
+			readdata(packet, &data, rdata, rlen);
+		}
 
-			if(type == T_NULL && rlen > 2) {
-				memcpy(buf, rdata, rlen);
-				rv = rlen;
-			}
+		if(type == T_NULL && rlen > 2) {
+			memcpy(outbuf, rdata, rlen);
+			rv = rlen;
 		}
 	}
 
