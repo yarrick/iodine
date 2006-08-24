@@ -30,7 +30,9 @@ $(SERVER): $(SERVEROBJS)
 $(TESTSUITE): $(TESTOBJS)
 	@echo LD $@
 	@$(CC) $(TESTOBJS) -o $(TESTSUITE) $(LDFLAGS)
-	@echo To run test suite, do \"make test\"
+	@echo Running tests... 
+	@./$(TESTSUITE)
+
 .c.o: 
 	@echo CC $<
 	@$(CC) $(CFLAGS) $< -o $@
