@@ -40,9 +40,6 @@
 	
 int running = 1;
 
-int tun_fd;
-int dns_fd;
-
 static void
 sighandler(int sig) {
 	running = 0;
@@ -51,13 +48,16 @@ sighandler(int sig) {
 static int
 tunnel(int tun_fd, int dns_fd)
 {
-	int i;
-	int read;
-	fd_set fds;
-	struct timeval tv;
-	char in[64*1024];
-	long outlen;
 	char out[64*1024];
+	char in[64*1024];
+	struct timeval tv;
+	long outlen;
+	fd_set fds;
+	int read;
+	int i;
+	int rv;
+
+	rv = 0;
 
 	while (running) {
 		tv.tv_sec = 1;
@@ -69,12 +69,16 @@ tunnel(int tun_fd, int dns_fd)
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
+
+		if (!running) {
+			rv = 1;
+			break;
+		}
 		
 		if(i < 0) {
-			if (running) {
-				warn("select");
-			}
-			return 1;
+			warn("select");
+			rv = 1;
+			break;
 		} else if (i > 0) {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, in, sizeof(in));
@@ -101,7 +105,7 @@ tunnel(int tun_fd, int dns_fd)
 			dns_ping(dns_fd);
 	}
 
-	return 0;
+	return rv;
 }
 
 static int
@@ -140,7 +144,8 @@ handshake(int dns_fd)
 			}
 
 			if (read > 0) {
-				if (sscanf(in, "%[^-]-%[^-]-%d", server, client, &mtu) == 3) {
+				if (sscanf(in, "%[^-]-%[^-]-%d", 
+					server, client, &mtu) == 3) {
 					if (tun_setip(client) == 0 && tun_setmtu(mtu) == 0)
 						return 0;
 					else 
@@ -199,6 +204,8 @@ main(int argc, char **argv)
 	char *newroot;
 	char *device;
 	int choice;
+	int tun_fd;
+	int dns_fd;
 
 	username = NULL;
 	foreground = 0;
