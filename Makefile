@@ -39,5 +39,5 @@ $(TESTSUITE): $(TESTOBJS)
 
 clean:
 	@echo "Cleaning..."
-	@rm -f $(CLIENT) $(SERVER) *~ *.o *.core
+	@rm -f $(CLIENT) $(SERVER) $(TESTSUITE) *~ *.o *.core
 
