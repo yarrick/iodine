@@ -8,6 +8,8 @@ iodine - IP over DNS is now easy
 CHANGES:
 
 xxxx-xx-xx: 0.3.2
+	- Support for NetBSD
+	- Name parsing routines rewritten, added regression tests
 	- New encoding, 25% more peak upstream throughput
 	- New -l option to set local ip to listen to on server
 

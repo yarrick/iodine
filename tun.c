@@ -142,7 +142,7 @@ close_tun(int tun_fd)
 int 
 write_tun(int tun_fd, char *data, int len) 
 {
-#if defined (FREEBSD) || defined (DARWIN)
+#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
 	data += 4;
 	len -= 4;
 #else /* !FREEBSD/DARWIN */
@@ -169,7 +169,7 @@ write_tun(int tun_fd, char *data, int len)
 int 
 read_tun(int tun_fd, char *buf, int len) 
 {
-#if defined (FREEBSD) || defined (DARWIN)
+#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
 	// FreeBSD has no header
 	return read(tun_fd, buf + 4, len - 4) + 4;
 #else /* !FREEBSD */
