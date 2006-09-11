@@ -25,7 +25,7 @@ struct packet
 };
 
 struct query {
-	char name[256];
+	char name[258];
 	short type;
 	short id;
 	struct sockaddr from;

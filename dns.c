@@ -324,8 +324,8 @@ dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 		}
 
 		if(type == T_NULL && rlen > 2) {
-			memcpy(outbuf, rdata, rlen);
-			rv = rlen;
+			rv = MIN(rlen, sizeof(rdata));
+			memcpy(outbuf, rdata, rv);
 		}
 	}
 
@@ -429,7 +429,7 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 	short class;
 	short qdcount;
 	char *data;
-	char name[255];
+	char name[257];
 	HEADER *header;
 	socklen_t addrlen;
 	char packet[64*1024];
@@ -449,11 +449,12 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 			qdcount = ntohs(header->qdcount);
 
 			if(qdcount == 1) {
-				readname(packet, &data, name, sizeof(name));
+				readname(packet, &data, name, sizeof(name) -1);
+				name[256] = 0;
 				readshort(packet, &data, &type);
 				readshort(packet, &data, &class);
 
-				strncpy(q->name, name, 256);
+				strncpy(q->name, name, 257);
 				q->type = type;
 				q->id = id;
 				q->fromlen = addrlen;
