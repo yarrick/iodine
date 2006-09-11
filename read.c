@@ -16,39 +16,149 @@
 
 #include <string.h>
 
-int
-readname(char *packet, char *dst, char *src)
+static int
+readname_loop(char *packet, char **src, char *dst, size_t length, size_t loop)
 {
-	char l;
+	char *dummy;
+	char *s;
+	char *d;
 	int len;
-	int offset;
+	char c;
+
+	if (loop <= 0)
+		return 0;
 
 	len = 0;
+	s = *src;
+	d = dst;
+	while(*s && len < length - 2) {
+		c = *s++;
 
-	while(*src) {
-		l = *src++;
-		len++;
-
-		if(l & 0x80 && l & 0x40) {
-			offset = ((src[-1] & 0x3f) << 8) | src[0];		
-			readname(packet, dst, packet + offset);
-			dst += strlen(dst);
-			break;
+		/* is this a compressed label? */
+		if((c & 0xc0) == 0xc0) {
+			dummy = packet + (((s[-1] & 0x3f) << 8) | s[0]);
+			len += readname_loop(packet, &dummy, d, length - len, loop - 1);
+			goto end;
 		}
 
-		while(l) {
-			*dst++ = *src++;
-			l--;
+		while(c && len < length - 1) {
+			*d++ = *s++;
+			len++;
+
+			c--;
+		}
+		
+		if (len >= length - 1) {
+			break; /* We used up all space */
+		}
+
+		if (*s != 0) {
+			*d++ = '.';
 			len++;
 		}
-
-		*dst++ = '.';
 	}
+	dst[len++] = '\0';
 
-	*dst = '\0';
-	src++;
-	len++;
+end:
+	(*src) = s+1;
+	return len;
+}
 
+int
+readname(char *packet, char **src, char *dst, size_t length)
+{
+	return readname_loop(packet, src, dst, length, 10);
+}
+
+int
+readshort(char *packet, char **src, short *dst)
+{
+	unsigned char *p;
+
+	p = *src;
+	*dst = (p[0] << 8) | p[1];
+
+	(*src) += sizeof(short);
+	return sizeof(short);
+}
+
+int
+readlong(char *packet, char **src, long *dst)
+{
+	unsigned char *p;
+
+	p = *src;
+
+	*dst = ((long)p[0] << 24) 
+		 | ((long)p[1] << 16) 
+		 | ((long)p[2] << 8)
+		 | ((long)p[3]);
+
+	(*src) += sizeof(long);
+	return sizeof(long);
+}
+
+int
+readdata(char *packet, char **src, char *dst, size_t len)
+{
+	if (len < 0)
+		return 0;
+
+	memcpy(dst, *src, len);
+
+	(*src) += len;
+
+	return len;
+}
+
+int
+putbyte(char **dst, char value)
+{
+	**dst = value;
+	(*dst)++;
+
+	return sizeof(char);
+}
+
+int
+putshort(char **dst, short value)
+{
+	unsigned char *p;
+
+	p = *dst;
+
+	*p++ = (value >> 8);
+	*p++ = value;
+
+	(*dst) = p;
+	return sizeof(short);
+}
+
+int
+putlong(char **dst, long value)
+{
+	unsigned char *p;
+
+	p = *dst;
+
+	*p++ = (value >> 24);
+	*p++ = (value >> 16);
+	*p++ = (value >> 8);
+	*p++ = (value);
+
+	(*dst) = p;
+	return sizeof(long);
+}
+
+int
+putdata(char **dst, char *data, size_t len)
+{
+	if (len < 0)
+		return 0;
+
+	memcpy(*dst, data, len);
+	
+	(*dst) += len;
 	return len;
 }
 

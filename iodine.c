@@ -20,6 +20,7 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+#include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -39,9 +40,6 @@
 	
 int running = 1;
 
-int tun_fd;
-int dns_fd;
-
 static void
 sighandler(int sig) {
 	running = 0;
@@ -50,13 +48,16 @@ sighandler(int sig) {
 static int
 tunnel(int tun_fd, int dns_fd)
 {
-	int i;
-	int read;
-	fd_set fds;
-	struct timeval tv;
-	char in[64*1024];
-	long outlen;
 	char out[64*1024];
+	char in[64*1024];
+	struct timeval tv;
+	long outlen;
+	fd_set fds;
+	int read;
+	int i;
+	int rv;
+
+	rv = 0;
 
 	while (running) {
 		tv.tv_sec = 1;
@@ -68,17 +69,17 @@ tunnel(int tun_fd, int dns_fd)
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
-		
-		if(i < 0) {
-			if (running) {
-				warn("select");
-			}
-			return 1;
+
+		if (!running) {
+			rv = 1;
+			break;
 		}
 		
-		if(i == 0) {
-			dns_ping(dns_fd);
-		} else {
+		if(i < 0) {
+			warn("select");
+			rv = 1;
+			break;
+		} else if (i > 0) {
 			if(FD_ISSET(tun_fd, &fds)) {
 				read = read_tun(tun_fd, in, sizeof(in));
 				if(read <= 0)
@@ -100,24 +101,26 @@ tunnel(int tun_fd, int dns_fd)
 				if (!dns_sending()) 
 					dns_ping(dns_fd);
 			} 
-		}
+		} else
+			dns_ping(dns_fd);
 	}
 
-	return 0;
+	return rv;
 }
 
 static int
 handshake(int dns_fd)
 {
+	struct timeval tv;
+	char server[128];
+	char client[128];
+	char in[4096];
+	int timeout;
+	fd_set fds;
+	int read;
+	int mtu;
 	int i;
 	int r;
-	char *p;
-	int mtu;
-	int read;
-	fd_set fds;
-	int timeout;
-	char in[4096];
-	struct timeval tv;
 
 	timeout = 1;
 	
@@ -141,12 +144,9 @@ handshake(int dns_fd)
 			}
 
 			if (read > 0) {
-				p = strchr(in, '-');
-				if (p) {
-					*p++ = '\0';
-					mtu = atoi(p);
-
-					if (tun_setip(in) == 0 && tun_setmtu(atoi(p)) == 0)
+				if (sscanf(in, "%[^-]-%[^-]-%d", 
+					server, client, &mtu) == 3) {
+					if (tun_setip(client) == 0 && tun_setmtu(mtu) == 0)
 						return 0;
 					else 
 						warn("Received handshake but b0rk");
@@ -160,17 +160,19 @@ handshake(int dns_fd)
 	return 1;
 }
 
-extern char *__progname;
-
 static void
 usage() {
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device]"
+	extern char *__progname;
+
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"nameserver topdomain\n", __progname);
 	exit(2);
 }
 
 static void
 help() {
+	extern char *__progname;
+
 	printf("iodine IP over DNS tunneling client\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"nameserver topdomain\n", __progname);
@@ -188,24 +190,26 @@ help() {
 static void
 version() {
 	printf("iodine IP over DNS tunneling client\n");
-	printf("version: 0.3.1 from 2006-07-11\n");
+	printf("version: 0.3.2 from 2006-09-11\n");
 	exit(0);
 }
 
 int
 main(int argc, char **argv)
 {
-	int choice;
-	char *newroot;
-	char *username;
-	char *device;
-	int foreground;
 	struct passwd *pw;
+	char *username;
+	int foreground;
+	char *newroot;
+	char *device;
+	int choice;
+	int tun_fd;
+	int dns_fd;
 
-	newroot = NULL;
 	username = NULL;
-	device = NULL;
 	foreground = 0;
+	newroot = NULL;
+	device = NULL;
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:")) != -1) {
 		switch(choice) {
@@ -254,7 +258,7 @@ main(int argc, char **argv)
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup1;
-	if ((dns_fd = open_dns(argv[1], 0)) == -1)
+	if ((dns_fd = open_dns(argv[1], 0, INADDR_ANY)) == -1)
 		goto cleanup2;
 	if (dns_settarget(argv[0]) == -1)
 		goto cleanup2;

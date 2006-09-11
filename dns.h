@@ -17,7 +17,7 @@
 #ifndef _DNS_H_
 #define _DNS_H_
 
-int open_dns(const char *, int);
+int open_dns(const char *, int, in_addr_t);
 int dns_settarget(const char*);
 void close_dns(int);
 
@@ -25,7 +25,6 @@ int dns_sending();
 void dns_handle_tun(int, char *, int);
 void dns_ping(int);
 void dns_handshake(int);
-void dns_query(int, int, char *, int);
 int dns_read(int, char *, int);
 
 extern struct sockaddr_in peer;
@@ -37,6 +36,8 @@ int dnsd_haspacket();
 int dnsd_hasack();
 void dnsd_forceack(int);
 void dnsd_queuepacket(const char *, const int);
+
+int dns_parse_reply(char *, int, char *, int);
 
 
 #endif /* _DNS_H_ */

@@ -14,22 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _STRUCTS_H_
-#define _STRUCTS_H_
+#ifndef _ENCODING_H_
+#define _ENCODING_H_
 
-struct packet 
-{
-	int len;
-	int offset;
-	char data[64*1024];
-};
+int encode_data(char *, int, int, char *, char);
+int decode_data(char *, int, const char *, char *);
 
-struct query {
-	char name[258];
-	short type;
-	short id;
-	struct sockaddr from;
-	int fromlen;
-};
-
-#endif /* _STRUCTS_H_ */
+#endif /* _ENCODING_H_ */

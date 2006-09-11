@@ -1,0 +1,19 @@
+
+iodine - IP over DNS is now easy
+
+   http://code.kryo.se/iodine
+
+********************************
+
+STUFF TO DO:
+
+- Handle multiple concurrent users on one server
+
+- Some kind of authentication?
+
+- Detect if EDNS0 can be used, probe MTU size
+
+- Port to more platforms (Solaris? Windows?)
+
+- More/better documentation (as always)
+

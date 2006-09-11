@@ -32,17 +32,20 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "read.h"
 #include "structs.h"
 #include "dns.h"
+#include "encoding.h"
+#include "read.h"
 
 // For FreeBSD
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
 
+
 static int host2dns(const char *, char *, int);
 static int dns_write(int, int, char *, int, char);
+static void dns_query(int, int, char *, int);
 
 struct sockaddr_in peer;
 char topdomain[256];
@@ -58,7 +61,7 @@ uint16_t pingid;
 
 
 int 
-open_dns(const char *domain, int localport) 
+open_dns(const char *domain, int localport, in_addr_t listen_ip) 
 {
 	int fd;
 	int flag;
@@ -67,9 +70,10 @@ open_dns(const char *domain, int localport)
 	bzero(&addr, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(localport);
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	/* listen_ip already in network byte order from inet_addr, or 0 */
+	addr.sin_addr.s_addr = listen_ip; 
 
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if(fd < 0) {
 		warn("socket");
 		return -1;
@@ -87,10 +91,11 @@ open_dns(const char *domain, int localport)
 	}
 
 	// Save top domain used
-	strncpy(topdomain, domain, sizeof(topdomain) - 2);
-	topdomain[sizeof(topdomain) - 1] = 0;
+	strncpy(topdomain, domain, sizeof(topdomain) - 1);
+	topdomain[sizeof(topdomain) - 1] = '\0';
 
 	printf("Opened UDP socket\n");
+
 	return fd;
 }
 
@@ -176,7 +181,7 @@ dns_handshake(int dns_fd)
 	dns_write(dns_fd, ++pingid, data, 2, 'H');
 }
 
-void 
+static void 
 dns_query(int fd, int id, char *host, int type)
 {
 	char *p;
@@ -204,16 +209,16 @@ dns_query(int fd, int id, char *host, int type)
 	p = buf + sizeof(HEADER);
 	p += host2dns(host, p, strlen(host));	
 
-	PUTSHORT(type, p);
-	PUTSHORT(C_IN, p);
+	putshort(&p, type);
+	putshort(&p, C_IN);
 
 	// EDNS0
-	*p++ = 0x00; //Root
-	PUTSHORT(0x0029, p); // OPT
-	PUTSHORT(0x1000, p); // Payload size: 4096
-	PUTSHORT(0x0000, p); // Higher bits/ edns version
-	PUTSHORT(0x8000, p); // Z
-	PUTSHORT(0x0000, p); // Data length
+	putbyte(&p, 0x00); //Root
+	putshort(&p, 0x0029); // OPT
+	putshort(&p, 0x1000); // Payload size: 4096
+	putshort(&p, 0x0000); // Higher bits/edns version
+	putshort(&p, 0x8000); // Z
+	putshort(&p, 0x0000); // Data length
 
 	peerlen = sizeof(peer);
 
@@ -221,72 +226,67 @@ dns_query(int fd, int id, char *host, int type)
 	sendto(fd, buf, len, 0, (struct sockaddr*)&peer, peerlen);
 }
 
-static void
-put_hex(char *p, char h)
-{
-	int t;
-	static const char to_hex[] = "0123456789ABCDEF";
-
-	t = (h & 0xF0) >> 4;
-	p[0] = to_hex[t];
-	t = h & 0x0F;
-	p[1] = to_hex[t];
-}
-
 static int
 dns_write(int fd, int id, char *buf, int len, char flag)
 {
 	int avail;
-	int i;
-	int final;
+	int written;
+	int encoded;
 	char data[257];
 	char *d;
 
-#define CHUNK 31
-// 31 bytes expands to 62 chars in domain
-// We just use hex as encoding right now
-
 	avail = 0xFF - strlen(topdomain) - 2;
-
-	avail /= 2; // use two chars per byte in encoding
-	avail -= (avail/CHUNK); // make space for parts
-
-	avail = MIN(avail, len); // do not use more bytes than is available;
-	final = (avail == len);	// is this the last block?
 	bzero(data, sizeof(data));
 	d = data;
-
-	if (flag != 0) {
-		*d = flag;
-	} else {
-		// First byte is 0 for middle packet and 1 for last packet
-		*d = '0' + final;
-	}
-	d++;
-
-	if (len > 0) {
-		for (i = 0; i < avail; i++) {
-			if (i > 0 && i % 31 == 0) {
-				*d = '.';
-				d++;
-			}
-			put_hex(d, buf[i]);
-			d += 2;
-		}
-	}
+	written = encode_data(buf, len, avail, d, flag);
+	encoded = strlen(data);
+	d += encoded;
 	if (*d != '.') {
 		*d++ = '.';
 	}
 	strncpy(d, topdomain, strlen(topdomain)+1);
 	
 	dns_query(fd, id, data, T_NULL);
-	return avail;
+	return written;
 }
 
 int
 dns_read(int fd, char *buf, int buflen)
 {
 	int r;
+	socklen_t addrlen;
+	char packet[64*1024];
+	struct sockaddr_in from;
+	HEADER *header;
+
+	addrlen = sizeof(struct sockaddr);
+	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+	if(r == -1) {
+		perror("recvfrom");
+		return 0;
+	}
+
+	header = (HEADER*)packet;
+	if (dns_sending() && chunkid == ntohs(header->id)) {
+		/* Got ACK on sent packet */
+		packetpos += lastlen;
+		if (packetpos == packetlen) {
+			/* Packet completed */
+			packetpos = 0;
+			packetlen = 0;
+			lastlen = 0;
+		} else {
+			/* More to send */
+			dns_send_chunk(fd);
+		}
+	}
+	return dns_parse_reply(buf, buflen, packet, r);
+}
+
+int
+dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
+{
+	int rv;
 	long ttl;
 	short rlen;
 	short type;
@@ -297,63 +297,39 @@ dns_read(int fd, char *buf, int buflen)
 	char name[255];
 	char rdata[4*1024];
 	HEADER *header;
-	socklen_t addrlen;
-	char packet[64*1024];
-	struct sockaddr_in from;
 
-	addrlen = sizeof(struct sockaddr);
-	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+	rv = 0;
+	header = (HEADER*)packet;
+	
+	data = packet + sizeof(HEADER);
 
-	if(r == -1) {
-		perror("recvfrom");
-	} else {
-		header = (HEADER*)packet;
-		
-		data = packet + sizeof(HEADER);
+	if(header->qr) { /* qr=1 => response */
+		qdcount = ntohs(header->qdcount);
+		ancount = ntohs(header->ancount);
 
-		if(header->qr) { /* qr=1 => response */
-			qdcount = ntohs(header->qdcount);
-			ancount = ntohs(header->ancount);
+		rlen = 0;
 
-			rlen = 0;
+		if(qdcount == 1) {
+			readname(packet, &data, name, sizeof(name));
+			readshort(packet, &data, &type);
+			readshort(packet, &data, &class);
+		}
+		if(ancount == 1) {
+			readname(packet, &data, name, sizeof(name));
+			readshort(packet, &data, &type);
+			readshort(packet, &data, &class);
+			readlong(packet, &data, &ttl);
+			readshort(packet, &data, &rlen);
+			readdata(packet, &data, rdata, rlen);
+		}
 
-			if(qdcount == 1) {
-				READNAME(packet, name, data);
-				READSHORT(type, data);
-				READSHORT(class, data);
-			}
-			if(ancount == 1) {
-				READNAME(packet, name, data);
-				READSHORT(type, data);
-				READSHORT(class, data);
-				READLONG(ttl, data);
-				READSHORT(rlen, data);
-				READDATA(rdata, data, rlen);
-			}
-			if (dns_sending() && chunkid == ntohs(header->id)) {
-				// Got ACK on sent packet
-				packetpos += lastlen;
-				if (packetpos == packetlen) {
-					// Packet completed
-					packetpos = 0;
-					packetlen = 0;
-					lastlen = 0;
-				} else {
-					// More to send
-					dns_send_chunk(fd);
-				}
-			}
-
-			if(type == T_NULL && rlen > 2) {
-				memcpy(buf, rdata, rlen);
-				return rlen;
-			} else {
-				return 0;
-			}
+		if(type == T_NULL && rlen > 2) {
+			rv = MIN(rlen, sizeof(rdata));
+			memcpy(outbuf, rdata, rv);
 		}
 	}
 
-	return 0;
+	return rv;
 }
 
 static int
@@ -412,19 +388,18 @@ dnsd_send(int fd, struct query *q, char *data, int datalen)
 	
 	name = 0xc000 | ((p - buf) & 0x3fff);
 	p += host2dns(q->name, p, strlen(q->name));
-	PUTSHORT(q->type, p);
-	PUTSHORT(C_IN, p);
-	
-	PUTSHORT(name, p);
-	PUTSHORT(q->type, p);
-	PUTSHORT(C_IN, p);
-	PUTLONG(0, p);
+	putshort(&p, q->type);
+	putshort(&p, C_IN);
+
+	putshort(&p, name);	
+	putshort(&p, q->type);
+	putshort(&p, C_IN);
+	putlong(&p, 0);
 
 	q->id = 0;
 
-	PUTSHORT(datalen, p);
-	memcpy(p, data, datalen);
-	p += datalen;
+	putshort(&p, datalen);
+	putdata(&p, data, datalen);
 
 	len = p - buf;
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
@@ -433,32 +408,12 @@ dnsd_send(int fd, struct query *q, char *data, int datalen)
 static int
 decodepacket(const char *name, char *buf, int buflen)
 {
-	int r;
 	int len;
-	char *dp;
 	char *domain;
-	const char *np;
 
-	len = 1;
 	domain = strstr(name, topdomain);
 
-	buf[0] = name[0];
-
-	dp = buf + 1;
-	np = name + 1;
-
-	while(len < buflen && np < domain) {
-		if(*np == '.') {
-			np++;
-			continue;
-		}
-
-		sscanf(np, "%02X", &r);
-		*dp++ = (char)r;
-		np+=2;	
-		len++;
-	} 
-
+	len = decode_data(buf, buflen, name, domain);
 	if (len == buflen)
 		return -1; 
 	return len;
@@ -468,12 +423,13 @@ int
 dnsd_read(int fd, struct query *q, char *buf, int buflen)
 {
 	int r;
+	int rv;
 	short id;
 	short type;
 	short class;
 	short qdcount;
 	char *data;
-	char name[255];
+	char name[257];
 	HEADER *header;
 	socklen_t addrlen;
 	char packet[64*1024];
@@ -493,23 +449,24 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 			qdcount = ntohs(header->qdcount);
 
 			if(qdcount == 1) {
-				bzero(name, sizeof(name));
-				READNAME(packet, name, data);
-				READSHORT(type, data);
-				READSHORT(class, data);
+				readname(packet, &data, name, sizeof(name) -1);
+				name[256] = 0;
+				readshort(packet, &data, &type);
+				readshort(packet, &data, &class);
 
-				strncpy(q->name, name, 256);
+				strncpy(q->name, name, 257);
 				q->type = type;
 				q->id = id;
 				q->fromlen = addrlen;
 				memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 
-				return decodepacket(name, buf, buflen);
+				rv = decodepacket(name, buf, buflen);
 			}
 		}
 	} else {
 		perror("recvfrom");
+		rv = 0;
 	}
 
-	return 0;
+	return rv;
 }

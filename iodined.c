@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -57,17 +58,18 @@ sigint(int sig) {
 static int
 tunnel(int tun_fd, int dns_fd)
 {
-	int i;
+	struct in_addr clientip;
+	struct in_addr myip;
+	struct timeval tv;
+	char out[64*1024];
+	char in[64*1024];
+	char *tmp[2];
+	long outlen;
+	fd_set fds;
 	int read;
 	int code;
-	int ipadder;
-	struct in_addr nextip;
-	fd_set fds;
-	struct timeval tv;
-	char in[64*1024];
-	long outlen;
-	char out[64*1024];
-	
+	int i;
+
 	while (running) {
 		if (q.id != 0) {
 			tv.tv_sec = 0;
@@ -113,17 +115,20 @@ tunnel(int tun_fd, int dns_fd)
 			   		continue;
 
 				if(in[0] == 'H' || in[0] == 'h') {
-					ipadder = htonl(my_ip); // To get the last byte last
-					if ((ipadder & 0xFF) == 0xFF) {
-						// IP ends with 255.
-						ipadder--;
-					} else {
-						ipadder++;
-					}
-					nextip.s_addr = ntohl(ipadder);
-					read = snprintf(out, sizeof(out), "%s-%d", inet_ntoa(nextip), my_mtu);
+					myip.s_addr = my_ip;	
+					clientip.s_addr = my_ip + inet_addr("0.0.0.1");
+
+					tmp[0] = strdup(inet_ntoa(myip));
+					tmp[1] = strdup(inet_ntoa(clientip));
+					
+					read = snprintf(out, sizeof(out), "%s-%s-%d", 
+							tmp[0], tmp[1], my_mtu);
+
 					dnsd_send(dns_fd, &q, out, read);
 					q.id = 0;
+
+					free(tmp[1]);
+					free(tmp[0]);
 				} else if((in[0] >= '0' && in[0] <= '9')
 						|| (in[0] >= 'a' && in[0] <= 'f')
 						|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -159,19 +164,21 @@ tunnel(int tun_fd, int dns_fd)
 	return 0;
 }
 
-extern char *__progname;
-
 static void
 usage() {
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	extern char *__progname;
+
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] "
 			"tunnel_ip topdomain\n", __progname);
 	exit(2);
 }
 
 static void
 help() {
+	extern char *__progname;
+
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] "
 		   "tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
@@ -180,6 +187,7 @@ help() {
 	printf("  -t dir to chroot to directory dir\n");
 	printf("  -d device to set tunnel device name\n");
 	printf("  -m mtu to set tunnel device mtu\n");
+	printf("  -l ip address to listen on for incoming dns traffic (default 0.0.0.0)\n");
 	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
 	printf("topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
@@ -188,7 +196,7 @@ help() {
 static void
 version() {
 	printf("iodine IP over DNS tunneling server\n");
-	printf("version: 0.3.1 from 2006-07-11\n");
+	printf("version: 0.3.2 from 2006-09-11\n");
 	exit(0);
 }
 
@@ -204,19 +212,21 @@ main(int argc, char **argv)
 	int foreground;
 	int mtu;
 	struct passwd *pw;
+	in_addr_t listen_ip;
 
 	username = NULL;
 	newroot = NULL;
 	device = NULL;
 	foreground = 0;
 	mtu = 1024;
+	listen_ip = INADDR_ANY;
 
 	packetbuf.len = 0;
 	packetbuf.offset = 0;
 	outpacket.len = 0;
 	q.id = 0;
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:d:m:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -238,6 +248,9 @@ main(int argc, char **argv)
 			break;
 		case 'm':
 			mtu = atoi(optarg);
+			break;
+		case 'l':
+			listen_ip = inet_addr(optarg);
 			break;
 		default:
 			usage();
@@ -269,11 +282,16 @@ main(int argc, char **argv)
 		usage();
 	}
 
+	if (listen_ip == INADDR_NONE) {
+		printf("Bad IP address to listen on.\n");
+		usage();
+	}
+
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup0;
 	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
 		goto cleanup1;
-	if ((dnsd_fd = open_dns(argv[1], 53)) == -1) 
+	if ((dnsd_fd = open_dns(argv[1], 53, listen_ip)) == -1) 
 		goto cleanup2;
 
 	my_ip = inet_addr(argv[0]);
