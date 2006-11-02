@@ -320,11 +320,11 @@ dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 			readshort(packet, &data, &class);
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
-			readdata(packet, &data, rdata, rlen);
+			rv = MIN(rlen, sizeof(rdata));
+			readdata(packet, &data, rdata, rv);
 		}
 
-		if(type == T_NULL && rlen > 2) {
-			rv = MIN(rlen, sizeof(rdata));
+		if(type == T_NULL && rv > 2) {
 			memcpy(outbuf, rdata, rv);
 		}
 	}
