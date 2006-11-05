@@ -168,7 +168,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] "
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] [-p port]"
 			"tunnel_ip topdomain\n", __progname);
 	exit(2);
 }
@@ -178,7 +178,7 @@ help() {
 	extern char *__progname;
 
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] "
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] [-p port]"
 		   "tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
@@ -188,6 +188,7 @@ help() {
 	printf("  -d device to set tunnel device name\n");
 	printf("  -m mtu to set tunnel device mtu\n");
 	printf("  -l ip address to listen on for incoming dns traffic (default 0.0.0.0)\n");
+	printf("  -p port to listen on for incoming dns traffic (default 53)\n");
 	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
 	printf("topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
@@ -214,6 +215,7 @@ main(int argc, char **argv)
 	int mtu;
 	struct passwd *pw;
 	in_addr_t listen_ip;
+	int port;
 
 	username = NULL;
 	newroot = NULL;
@@ -221,13 +223,14 @@ main(int argc, char **argv)
 	foreground = 0;
 	mtu = 1024;
 	listen_ip = INADDR_ANY;
+	port = 53;
 
 	packetbuf.len = 0;
 	packetbuf.offset = 0;
 	outpacket.len = 0;
 	q.id = 0;
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:p:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -252,6 +255,9 @@ main(int argc, char **argv)
 			break;
 		case 'l':
 			listen_ip = inet_addr(optarg);
+			break;
+		case 'p':
+			port = atoi(optarg);
 			break;
 		default:
 			usage();
@@ -292,7 +298,7 @@ main(int argc, char **argv)
 		goto cleanup0;
 	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
 		goto cleanup1;
-	if ((dnsd_fd = open_dns(argv[1], 53, listen_ip)) == -1) 
+	if ((dnsd_fd = open_dns(argv[1], port, listen_ip)) == -1) 
 		goto cleanup2;
 
 	my_ip = inet_addr(argv[0]);
