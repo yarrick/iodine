@@ -162,6 +162,33 @@ test_readname()
 	printf("OK\n");
 }
 
+static void
+test_encode_hostname() {
+	char buf[256];
+	int len;
+	int ret;
+
+	len = 256;
+	printf(" * Testing hostname encoding... ");
+
+	memset(buf, 0, 256);
+	ret = dns_encode_hostname(	// More than 63 chars between dots
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		, buf, len);
+	assert(ret == -1);
+	
+	memset(buf, 0, 256);
+	ret = dns_encode_hostname(	// More chars than fits into array
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+		, buf, len);
+	assert(ret == -1);
+	assert(strlen(buf) < len);
+	
+	printf("OK\n");
+}
+
 int
 main()
 {
@@ -170,6 +197,7 @@ main()
 	test_readputshort();
 	test_readputlong();
 	test_readname();
+	test_encode_hostname();
 
 	printf("** All went well :)\n");
 	return 0;

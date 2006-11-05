@@ -26,6 +26,7 @@ void dns_handle_tun(int, char *, int);
 void dns_ping(int);
 void dns_handshake(int);
 int dns_read(int, char *, int);
+int dns_encode_hostname(const char *, char *, int);
 
 extern struct sockaddr_in peer;
 

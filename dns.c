@@ -43,7 +43,6 @@
 #endif
 
 
-static int host2dns(const char *, char *, int);
 static int dns_write(int, int, char *, int, char);
 static void dns_query(int, int, char *, int);
 
@@ -207,7 +206,7 @@ dns_query(int fd, int id, char *host, int type)
 	header->arcount = htons(1);
 
 	p = buf + sizeof(HEADER);
-	p += host2dns(host, p, strlen(host));	
+	p += dns_encode_hostname(host, p, strlen(host));	
 
 	putshort(&p, type);
 	putshort(&p, C_IN);
@@ -320,11 +319,12 @@ dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 			readshort(packet, &data, &class);
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
-			readdata(packet, &data, rdata, rlen);
+			rv = MIN(rlen, sizeof(rdata));
+			readdata(packet, &data, rdata, rv);
 		}
 
-		if(type == T_NULL && rlen > 2) {
-			rv = MIN(rlen, sizeof(rdata));
+		if(type == T_NULL && rv > 2) {
+			rv = MIN(rv, buflen);
 			memcpy(outbuf, rdata, rv);
 		}
 	}
@@ -332,19 +332,25 @@ dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 	return rv;
 }
 
-static int
-host2dns(const char *host, char *buffer, int size)
+int
+dns_encode_hostname(const char *host, char *buffer, int size)
 {
 	char *h;
 	char *p;
 	char *word;
+	int left;
 
 	h = strdup(host);
 	memset(buffer, 0, size);
 	p = buffer;
+	left = size;
 	
 	word = strtok(h, ".");
 	while(word) {
+		if (strlen(word) > 63 || strlen(word) > left) {
+			return -1;
+		}
+		left -= (strlen(word) + 1);
 		*p++ = (char)strlen(word);
 		memcpy(p, word, strlen(word));
 		p += strlen(word);
@@ -387,7 +393,7 @@ dnsd_send(int fd, struct query *q, char *data, int datalen)
 	p = buf + sizeof(HEADER);
 	
 	name = 0xc000 | ((p - buf) & 0x3fff);
-	p += host2dns(q->name, p, strlen(q->name));
+	p += dns_encode_hostname(q->name, p, strlen(q->name));
 	putshort(&p, q->type);
 	putshort(&p, C_IN);
 

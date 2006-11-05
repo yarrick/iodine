@@ -190,7 +190,7 @@ help() {
 static void
 version() {
 	printf("iodine IP over DNS tunneling client\n");
-	printf("version: 0.3.2 from 2006-09-11\n");
+	printf("version: 0.3.3 from 2006-11-05\n");
 	exit(0);
 }
 

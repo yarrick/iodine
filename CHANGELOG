@@ -7,6 +7,11 @@ iodine - IP over DNS is now easy
 
 CHANGES:
 
+2006-11-06: 0.3.3
+	- Fixed possible buffer overflow
+	  (Found by poplix)
+	- Reworked dns hostname encoding
+
 2006-09-11: 0.3.2
 	- Support for NetBSD
 	- Fixed potential security problems

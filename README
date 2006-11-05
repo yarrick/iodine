@@ -67,7 +67,7 @@ If you have problems, try inspecting the traffic with network monitoring tools
 and make sure that the relaying DNS server has not cached the response. A
 cached error message could mean that you started the client before the server.
 
-The upstream data is sent gzipped encoded in hexadecimal. DNS protocol allows
+The upstream data is sent gzipped encoded with Base32. DNS protocol allows
 one query per packet, and one query can be max 256 chars. Each domain name part
 can be max 63 chars. So your domain name and subdomain should be as short as
 possible to allow maximum throughput.
@@ -91,6 +91,7 @@ iodine has atomic number 53, which happens to be the DNS port number.
 THANKS:
 
 - To kuxien for FreeBSD and OS X testing
+- To poplix for code audit
 
 
 AUTHORS & LICENSE:
