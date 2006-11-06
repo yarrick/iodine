@@ -169,7 +169,7 @@ usage() {
 	extern char *__progname;
 
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] [-p port]"
-			"tunnel_ip topdomain\n", __progname);
+			" tunnel_ip topdomain\n", __progname);
 	exit(2);
 }
 
@@ -179,7 +179,7 @@ help() {
 
 	printf("iodine IP over DNS tunneling server\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] [-p port]"
-		   "tunnel_ip topdomain\n", __progname);
+		   " tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
