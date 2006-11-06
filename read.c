@@ -15,14 +15,16 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 
 static int
-readname_loop(char *packet, char **src, char *dst, size_t length, size_t loop)
+readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length, size_t loop)
 {
 	char *dummy;
 	char *s;
 	char *d;
 	int len;
+	unsigned offset;
 	char c;
 
 	if (loop <= 0)
@@ -36,8 +38,18 @@ readname_loop(char *packet, char **src, char *dst, size_t length, size_t loop)
 
 		/* is this a compressed label? */
 		if((c & 0xc0) == 0xc0) {
-			dummy = packet + (((s[-1] & 0x3f) << 8) | s[0]);
-			len += readname_loop(packet, &dummy, d, length - len, loop - 1);
+			offset = (((s[-1] & 0x3f) << 8) | s[0]);
+			if (offset > packetlen) {
+				if (len == 0) {
+					// Bad jump first in packet
+					return 0;
+				} else {
+					// Bad jump after some data
+					break;
+				}
+			}
+			dummy = packet + offset;
+			len += readname_loop(packet, packetlen, &dummy, d, length - len, loop - 1);
 			goto end;
 		}
 
@@ -65,9 +77,9 @@ end:
 }
 
 int
-readname(char *packet, char **src, char *dst, size_t length)
+readname(char *packet, int packetlen, char **src, char *dst, size_t length)
 {
-	return readname_loop(packet, src, dst, length, 10);
+	return readname_loop(packet, packetlen, src, dst, length, 10);
 }
 
 int

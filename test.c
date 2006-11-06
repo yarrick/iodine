@@ -129,6 +129,13 @@ test_readname()
 	char onejump[] = 
 		"AA\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
 		"\x02hh\xc0\x15\x00\x01\x00\x01\x05zBCDE\x00";
+	char badjump[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 }; 
+	char badjump2[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x02, 'B', 'A', 0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 }; 
+	char *jumper;
 	char buf[1024];
 	char *data;
 	int rv;
@@ -139,25 +146,46 @@ test_readname()
 	bzero(buf, sizeof(buf));
 	data = emptyloop + sizeof(HEADER);
 	buf[1023] = 'A';
-	rv = readname(emptyloop, &data, buf, 1023);
+	rv = readname(emptyloop, sizeof(emptyloop), &data, buf, 1023);
 	assert(buf[1023] == 'A');
 	
 	bzero(buf, sizeof(buf));
 	data = infloop + sizeof(HEADER);
 	buf[4] = '\a';
-	rv = readname(infloop, &data, buf, 4);
+	rv = readname(infloop, sizeof(infloop), &data, buf, 4);
 	assert(buf[4] == '\a');
 	
 	bzero(buf, sizeof(buf));
 	data = longname + sizeof(HEADER);
 	buf[256] = '\a';
-	rv = readname(longname, &data, buf, 256);
+	rv = readname(longname, sizeof(longname), &data, buf, 256);
 	assert(buf[256] == '\a');
 
 	bzero(buf, sizeof(buf));
 	data = onejump + sizeof(HEADER);
-	rv = readname(onejump, &data, buf, 256);
+	rv = readname(onejump, sizeof(onejump), &data, buf, 256);
 	assert(rv == 9);
+	
+	// These two tests use malloc to fail with segfault if jump is executed
+	bzero(buf, sizeof(buf));
+	jumper = malloc(sizeof(badjump));
+	if (jumper) {
+		memcpy(jumper, badjump, sizeof(badjump));
+		data = jumper + sizeof(HEADER);
+		rv = readname(jumper, sizeof(badjump), &data, buf, 256);
+		assert(rv == 0);
+	}
+	free(jumper);
+	
+	bzero(buf, sizeof(buf));
+	jumper = malloc(sizeof(badjump2));
+	if (jumper) {
+		memcpy(jumper, badjump2, sizeof(badjump2));
+		data = jumper + sizeof(HEADER);
+		rv = readname(jumper, sizeof(badjump2), &data, buf, 256);
+		assert(rv == 4);
+	}
+	free(jumper);
 
 	printf("OK\n");
 }

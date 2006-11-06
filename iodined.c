@@ -111,7 +111,7 @@ tunnel(int tun_fd, int dns_fd)
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
 				read = dnsd_read(dns_fd, &q, in, sizeof(in));
-				if (read < 0)
+				if (read <= 0)
 			   		continue;
 
 				if(in[0] == 'H' || in[0] == 'h') {

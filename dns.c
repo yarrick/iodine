@@ -309,12 +309,12 @@ dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 		rlen = 0;
 
 		if(qdcount == 1) {
-			readname(packet, &data, name, sizeof(name));
+			readname(packet, packetlen, &data, name, sizeof(name));
 			readshort(packet, &data, &type);
 			readshort(packet, &data, &class);
 		}
 		if(ancount == 1) {
-			readname(packet, &data, name, sizeof(name));
+			readname(packet, packetlen, &data, name, sizeof(name));
 			readshort(packet, &data, &type);
 			readshort(packet, &data, &class);
 			readlong(packet, &data, &ttl);
@@ -455,7 +455,7 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 			qdcount = ntohs(header->qdcount);
 
 			if(qdcount == 1) {
-				readname(packet, &data, name, sizeof(name) -1);
+				readname(packet, r, &data, name, sizeof(name) -1);
 				name[256] = 0;
 				readshort(packet, &data, &type);
 				readshort(packet, &data, &class);
@@ -469,8 +469,10 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 				rv = decodepacket(name, buf, buflen);
 			}
 		}
-	} else {
+	} else if (r < 0) { 	// Error
 		perror("recvfrom");
+		rv = 0;
+	} else {		// Packet too small to be dns protocol
 		rv = 0;
 	}
 
