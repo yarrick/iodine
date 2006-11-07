@@ -23,6 +23,7 @@
 #include <arpa/nameser8_compat.h>
 #endif
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -73,10 +74,10 @@ static void
 test_readputlong()
 {
 	char buf[4];
-	long putint;
-	long tempi;
-	long tint;
-	long *l;
+	uint32_t putint;
+	uint32_t tempi;
+	uint32_t tint;
+	uint32_t *l;
 	char* p;
 	int i;
 
@@ -89,13 +90,13 @@ test_readputlong()
 		p = buf;
 		putlong(&p, tint);
 		l = &putint;
-		memcpy(l, buf, sizeof(int));
+		memcpy(l, buf, sizeof(uint32_t));
 		if (putint != tempi) {
 			printf("Bad value on putlong for %d\n", i);
 			exit(2);
 		}
 		l = &tempi;
-		memcpy(buf, l, sizeof(int));
+		memcpy(buf, l, sizeof(uint32_t));
 		p = buf;
 		readlong(NULL, &p, &tempi);
 		if (tempi != tint) {

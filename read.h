@@ -19,12 +19,12 @@
 
 int readname(char *, int, char **, char *, size_t);
 int readshort(char *, char **, short *);
-int readlong(char *, char **, long *);
+int readlong(char *, char **, uint32_t *);
 int readdata(char *, char **, char *, size_t);
 
 int putbyte(char **, char);
 int putshort(char **, short);
-int putlong(char **, long);
+int putlong(char **, uint32_t);
 int putdata(char **, char *, size_t);
 
 #endif

@@ -26,6 +26,7 @@
 #include <time.h>
 #include <err.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -286,7 +287,7 @@ int
 dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 {
 	int rv;
-	long ttl;
+	uint32_t ttl;
 	short rlen;
 	short type;
 	short class;
