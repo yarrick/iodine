@@ -24,7 +24,7 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 	char *s;
 	char *d;
 	int len;
-	unsigned offset;
+	int offset;
 	char c;
 
 	if (loop <= 0)
@@ -38,7 +38,7 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 
 		/* is this a compressed label? */
 		if((c & 0xc0) == 0xc0) {
-			offset = (((s[-1] & 0x3f) << 8) | s[0]);
+			offset = (((s[-1] & 0x3f) << 8) | (s[0] & 0xff));
 			if (offset > packetlen) {
 				if (len == 0) {
 					// Bad jump first in packet
