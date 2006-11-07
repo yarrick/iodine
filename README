@@ -84,11 +84,11 @@ iptables -t nat -A PREROUTING -i eth0 -p udp --dport 53 -j DNAT --to :5353
 
 PORTABILITY:
 
-iodine has been tested on Linux (x86 and SPARC64), FreeBSD (x86), OpenBSD (x86),
-NetBSD (x86) and MacOS X (10.3, ppc, with 
+iodine has been tested on Linux (x86, AMD64 and SPARC64), FreeBSD (x86), 
+OpenBSD (x86), NetBSD (x86) and MacOS X (10.3, ppc, with 
 http://www-user.rhrk.uni-kl.de/~nissler/tuntap/). It should work on other 
-unix-like systems as well that has TUN/TAP tunneling support. Let us know if you 
-get it to run on other platforms. 
+unix-like systems as well that has TUN/TAP tunneling support (after some 
+patching). Let us know if you get it to run on other platforms. 
 
 
 THE NAME:

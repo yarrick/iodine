@@ -7,9 +7,14 @@ iodine - IP over DNS is now easy
 
 CHANGES:
 
+2006-xx-xx: 0.3.4
+	- More name parsing enhancements
+	- Now runs on Linux/AMD64
+	- Added setting to change server port
+
 2006-11-05: 0.3.3
 	- Fixed possible buffer overflow
-	  (Found by poplix)
+	  (Found by poplix, Bugtraq ID: 20883)
 	- Reworked dns hostname encoding
 
 2006-09-11: 0.3.2
