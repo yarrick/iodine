@@ -29,6 +29,7 @@
 #include <assert.h>
 
 #include "structs.h"
+#include "encoding.h"
 #include "dns.h"
 #include "read.h"
 	
@@ -144,31 +145,31 @@ test_readname()
 	printf(" * Testing readname... ");
 	fflush(stdout);
 
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	data = emptyloop + sizeof(HEADER);
 	buf[1023] = 'A';
 	rv = readname(emptyloop, sizeof(emptyloop), &data, buf, 1023);
 	assert(buf[1023] == 'A');
 	
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	data = infloop + sizeof(HEADER);
 	buf[4] = '\a';
 	rv = readname(infloop, sizeof(infloop), &data, buf, 4);
 	assert(buf[4] == '\a');
 	
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	data = longname + sizeof(HEADER);
 	buf[256] = '\a';
 	rv = readname(longname, sizeof(longname), &data, buf, 256);
 	assert(buf[256] == '\a');
 
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	data = onejump + sizeof(HEADER);
 	rv = readname(onejump, sizeof(onejump), &data, buf, 256);
 	assert(rv == 9);
 	
 	// These two tests use malloc to cause segfault if jump is executed
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	jumper = malloc(sizeof(badjump));
 	if (jumper) {
 		memcpy(jumper, badjump, sizeof(badjump));
@@ -178,13 +179,14 @@ test_readname()
 	}
 	free(jumper);
 	
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	jumper = malloc(sizeof(badjump2));
 	if (jumper) {
 		memcpy(jumper, badjump2, sizeof(badjump2));
 		data = jumper + sizeof(HEADER);
 		rv = readname(jumper, sizeof(badjump2), &data, buf, 256);
 		assert(rv == 4);
+		assert(strcmp("BA.", buf) == 0);
 	}
 	free(jumper);
 
@@ -219,6 +221,31 @@ test_encode_hostname() {
 	printf("OK\n");
 }
 
+static void
+test_base32() {
+	char temp[256];
+	char *start = "HELLOTEST";
+	char *out = "1HELLOTEST";
+	char *end;
+	char *tempend;
+	int codedlength;
+
+	printf(" * Testing base32 encoding... ");
+	fflush(stdout);
+
+	memset(temp, 0, sizeof(temp));
+	end = malloc(16);
+	memset(end, 0, 16);
+
+	codedlength = encode_data(start, 9, 256, temp, 0);
+	tempend = temp + strlen(temp);
+	decode_data(end, 16, temp, tempend);
+	assert(strcmp(out, end) == 0);
+	free(end);
+	
+	printf("OK\n");
+}
+
 int
 main()
 {
@@ -228,6 +255,7 @@ main()
 	test_readputlong();
 	test_readname();
 	test_encode_hostname();
+	test_base32();
 
 	printf("** All went well :)\n");
 	return 0;

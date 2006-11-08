@@ -67,7 +67,7 @@ open_dns(const char *domain, int localport, in_addr_t listen_ip)
 	int flag;
 	struct sockaddr_in addr;
 
-	bzero(&addr, sizeof(addr));
+	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(localport);
 	/* listen_ip already in network byte order from inet_addr, or 0 */
@@ -111,7 +111,7 @@ dns_settarget(const char *host)
 		return -1;
 	}
 
-	bzero(&peer, sizeof(peer));
+	memset(&peer, 0, sizeof(peer));
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons(53);
 	peer.sin_addr = *((struct in_addr *) h->h_addr);
@@ -236,7 +236,7 @@ dns_write(int fd, int id, char *buf, int len, char flag)
 	char *d;
 
 	avail = 0xFF - strlen(topdomain) - 2;
-	bzero(data, sizeof(data));
+	memset(data, 0, sizeof(data));
 	d = data;
 	written = encode_data(buf, len, avail, d, flag);
 	encoded = strlen(data);

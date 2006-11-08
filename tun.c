@@ -52,7 +52,7 @@ open_tun(const char *tun_device)
 		return -1;
 	}
 
-	bzero(&ifreq, sizeof(ifreq));
+	memset(&ifreq, 0, sizeof(ifreq));
 
 	ifreq.ifr_flags = IFF_TUN; 
 
