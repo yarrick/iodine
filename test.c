@@ -199,6 +199,7 @@ test_encode_hostname() {
 
 	len = 256;
 	printf(" * Testing hostname encoding... ");
+	fflush(stdout);
 
 	memset(buf, 0, 256);
 	ret = dns_encode_hostname(	// More than 63 chars between dots
