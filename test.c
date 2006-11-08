@@ -167,7 +167,7 @@ test_readname()
 	rv = readname(onejump, sizeof(onejump), &data, buf, 256);
 	assert(rv == 9);
 	
-	// These two tests use malloc to fail with segfault if jump is executed
+	// These two tests use malloc to cause segfault if jump is executed
 	bzero(buf, sizeof(buf));
 	jumper = malloc(sizeof(badjump));
 	if (jumper) {
