@@ -112,8 +112,8 @@ static int
 handshake(int dns_fd)
 {
 	struct timeval tv;
-	char server[128];
-	char client[128];
+	char server[65];
+	char client[65];
 	char in[4096];
 	int timeout;
 	fd_set fds;
@@ -144,12 +144,20 @@ handshake(int dns_fd)
 			}
 
 			if (read > 0) {
-				if (sscanf(in, "%[^-]-%[^-]-%d", 
+				if (sscanf(in, "%64[^-]-%64[^-]-%d", 
 					server, client, &mtu) == 3) {
-					if (tun_setip(client) == 0 && tun_setmtu(mtu) == 0)
+					
+					server[64] = 0;
+					client[64] = 0;
+					if (tun_setip(client) == 0 && 
+						tun_setmtu(mtu) == 0) {
+
 						return 0;
-					else 
-						warn("Received handshake but b0rk");
+					} else {
+						warn("Received handshake with bad data");
+					}
+				} else {
+					printf("Received bad handshake\n");
 				}
 			}
 		}
