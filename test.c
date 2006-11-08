@@ -23,11 +23,13 @@
 #include <arpa/nameser8_compat.h>
 #endif
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
 #include "structs.h"
+#include "encoding.h"
 #include "dns.h"
 #include "read.h"
 	
@@ -73,10 +75,10 @@ static void
 test_readputlong()
 {
 	char buf[4];
-	long putint;
-	long tempi;
-	long tint;
-	long *l;
+	uint32_t putint;
+	uint32_t tempi;
+	uint32_t tint;
+	uint32_t *l;
 	char* p;
 	int i;
 
@@ -89,13 +91,13 @@ test_readputlong()
 		p = buf;
 		putlong(&p, tint);
 		l = &putint;
-		memcpy(l, buf, sizeof(int));
+		memcpy(l, buf, sizeof(uint32_t));
 		if (putint != tempi) {
 			printf("Bad value on putlong for %d\n", i);
 			exit(2);
 		}
 		l = &tempi;
-		memcpy(buf, l, sizeof(int));
+		memcpy(buf, l, sizeof(uint32_t));
 		p = buf;
 		readlong(NULL, &p, &tempi);
 		if (tempi != tint) {
@@ -129,6 +131,13 @@ test_readname()
 	char onejump[] = 
 		"AA\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
 		"\x02hh\xc0\x15\x00\x01\x00\x01\x05zBCDE\x00";
+	char badjump[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 }; 
+	char badjump2[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x02, 'B', 'A', 0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 }; 
+	char *jumper;
 	char buf[1024];
 	char *data;
 	int rv;
@@ -136,28 +145,50 @@ test_readname()
 	printf(" * Testing readname... ");
 	fflush(stdout);
 
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	data = emptyloop + sizeof(HEADER);
 	buf[1023] = 'A';
-	rv = readname(emptyloop, &data, buf, 1023);
+	rv = readname(emptyloop, sizeof(emptyloop), &data, buf, 1023);
 	assert(buf[1023] == 'A');
 	
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	data = infloop + sizeof(HEADER);
 	buf[4] = '\a';
-	rv = readname(infloop, &data, buf, 4);
+	rv = readname(infloop, sizeof(infloop), &data, buf, 4);
 	assert(buf[4] == '\a');
 	
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	data = longname + sizeof(HEADER);
 	buf[256] = '\a';
-	rv = readname(longname, &data, buf, 256);
+	rv = readname(longname, sizeof(longname), &data, buf, 256);
 	assert(buf[256] == '\a');
 
-	bzero(buf, sizeof(buf));
+	memset(buf, 0, sizeof(buf));
 	data = onejump + sizeof(HEADER);
-	rv = readname(onejump, &data, buf, 256);
+	rv = readname(onejump, sizeof(onejump), &data, buf, 256);
 	assert(rv == 9);
+	
+	// These two tests use malloc to cause segfault if jump is executed
+	memset(buf, 0, sizeof(buf));
+	jumper = malloc(sizeof(badjump));
+	if (jumper) {
+		memcpy(jumper, badjump, sizeof(badjump));
+		data = jumper + sizeof(HEADER);
+		rv = readname(jumper, sizeof(badjump), &data, buf, 256);
+		assert(rv == 0);
+	}
+	free(jumper);
+	
+	memset(buf, 0, sizeof(buf));
+	jumper = malloc(sizeof(badjump2));
+	if (jumper) {
+		memcpy(jumper, badjump2, sizeof(badjump2));
+		data = jumper + sizeof(HEADER);
+		rv = readname(jumper, sizeof(badjump2), &data, buf, 256);
+		assert(rv == 4);
+		assert(strcmp("BA.", buf) == 0);
+	}
+	free(jumper);
 
 	printf("OK\n");
 }
@@ -170,6 +201,7 @@ test_encode_hostname() {
 
 	len = 256;
 	printf(" * Testing hostname encoding... ");
+	fflush(stdout);
 
 	memset(buf, 0, 256);
 	ret = dns_encode_hostname(	// More than 63 chars between dots
@@ -189,6 +221,31 @@ test_encode_hostname() {
 	printf("OK\n");
 }
 
+static void
+test_base32() {
+	char temp[256];
+	char *start = "HELLOTEST";
+	char *out = "1HELLOTEST";
+	char *end;
+	char *tempend;
+	int codedlength;
+
+	printf(" * Testing base32 encoding... ");
+	fflush(stdout);
+
+	memset(temp, 0, sizeof(temp));
+	end = malloc(16);
+	memset(end, 0, 16);
+
+	codedlength = encode_data(start, 9, 256, temp, 0);
+	tempend = temp + strlen(temp);
+	decode_data(end, 16, temp, tempend);
+	assert(strcmp(out, end) == 0);
+	free(end);
+	
+	printf("OK\n");
+}
+
 int
 main()
 {
@@ -198,6 +255,7 @@ main()
 	test_readputlong();
 	test_readname();
 	test_encode_hostname();
+	test_base32();
 
 	printf("** All went well :)\n");
 	return 0;

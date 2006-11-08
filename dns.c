@@ -26,6 +26,7 @@
 #include <time.h>
 #include <err.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -66,7 +67,7 @@ open_dns(const char *domain, int localport, in_addr_t listen_ip)
 	int flag;
 	struct sockaddr_in addr;
 
-	bzero(&addr, sizeof(addr));
+	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(localport);
 	/* listen_ip already in network byte order from inet_addr, or 0 */
@@ -110,7 +111,7 @@ dns_settarget(const char *host)
 		return -1;
 	}
 
-	bzero(&peer, sizeof(peer));
+	memset(&peer, 0, sizeof(peer));
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons(53);
 	peer.sin_addr = *((struct in_addr *) h->h_addr);
@@ -235,7 +236,7 @@ dns_write(int fd, int id, char *buf, int len, char flag)
 	char *d;
 
 	avail = 0xFF - strlen(topdomain) - 2;
-	bzero(data, sizeof(data));
+	memset(data, 0, sizeof(data));
 	d = data;
 	written = encode_data(buf, len, avail, d, flag);
 	encoded = strlen(data);
@@ -286,7 +287,7 @@ int
 dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 {
 	int rv;
-	long ttl;
+	uint32_t ttl;
 	short rlen;
 	short type;
 	short class;
@@ -309,12 +310,12 @@ dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
 		rlen = 0;
 
 		if(qdcount == 1) {
-			readname(packet, &data, name, sizeof(name));
+			readname(packet, packetlen, &data, name, sizeof(name));
 			readshort(packet, &data, &type);
 			readshort(packet, &data, &class);
 		}
 		if(ancount == 1) {
-			readname(packet, &data, name, sizeof(name));
+			readname(packet, packetlen, &data, name, sizeof(name));
 			readshort(packet, &data, &type);
 			readshort(packet, &data, &class);
 			readlong(packet, &data, &ttl);
@@ -455,7 +456,7 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 			qdcount = ntohs(header->qdcount);
 
 			if(qdcount == 1) {
-				readname(packet, &data, name, sizeof(name) -1);
+				readname(packet, r, &data, name, sizeof(name) -1);
 				name[256] = 0;
 				readshort(packet, &data, &type);
 				readshort(packet, &data, &class);
@@ -469,8 +470,10 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 				rv = decodepacket(name, buf, buflen);
 			}
 		}
-	} else {
+	} else if (r < 0) { 	// Error
 		perror("recvfrom");
+		rv = 0;
+	} else {		// Packet too small to be dns protocol
 		rv = 0;
 	}
 

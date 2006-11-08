@@ -127,6 +127,7 @@ encode_data(char *buf, int len, int space, char *dest, char flag)
 	chunks = write / RAW_CHUNK;
 	leftovers = write % RAW_CHUNK;
 
+	// flag is special character to be placed first in the encoded data
 	if (flag != 0) {
 		*dest = flag;
 	} else {
@@ -135,7 +136,7 @@ encode_data(char *buf, int len, int space, char *dest, char flag)
 	}
 	dest++;
 
-	bzero(encoded, sizeof(encoded));
+	memset(encoded, 0, sizeof(encoded));
 	ep = encoded;
 	dp = buf;
 	for (i = 0; i < chunks; i++) {
@@ -144,7 +145,7 @@ encode_data(char *buf, int len, int space, char *dest, char flag)
 		dp += RAW_CHUNK;
 	}
 	realwrite = ENC_CHUNK * chunks;
-	bzero(padding, sizeof(padding));
+	memset(padding, 0, sizeof(padding));
 	pp = padding;
 	if (leftovers) {
 		pp += RAW_CHUNK - leftovers;
@@ -187,7 +188,7 @@ decode_data(char *dest, int size, const char *src, char *srcend)
 	dest++;
 	src++;
 
-	bzero(encoded, sizeof(encoded));
+	memset(encoded, 0, sizeof(encoded));
 	ep = encoded;
 	while(len < size && src < srcend) {
 		if(*src == '.') {

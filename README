@@ -73,13 +73,22 @@ can be max 63 chars. So your domain name and subdomain should be as short as
 possible to allow maximum throughput.
 
 
+TIPS & TRICKS:
+
+If your port 53 is taken on a specific interface by an application that does 
+not use it, use -p on iodined to specify an alternate port (like -p 5353) and 
+use for instance iptables (on Linux) to forward the traffic:
+iptables -t nat -A PREROUTING -i eth0 -p udp --dport 53 -j DNAT --to :5353
+(Sent in by Tom Schouten)
+
+
 PORTABILITY:
 
-iodine has been tested on Linux (x86 and SPARC64), FreeBSD (x86), OpenBSD (x86),
-NetBSD (x86) and MacOS X (10.3, ppc, with 
+iodine has been tested on Linux (x86, AMD64 and SPARC64), FreeBSD (x86), 
+OpenBSD (x86), NetBSD (x86) and MacOS X (10.3, ppc, with 
 http://www-user.rhrk.uni-kl.de/~nissler/tuntap/). It should work on other 
-unix-like systems as well that has TUN/TAP tunneling support. Let us know if you 
-get it to run on other platforms. 
+unix-like systems as well that has TUN/TAP tunneling support (after some 
+patching). Let us know if you get it to run on other platforms. 
 
 
 THE NAME:
