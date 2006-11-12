@@ -258,6 +258,10 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			port = atoi(optarg);
+			if (port) {
+				printf("ALERT! Other dns servers expect you to run on port 53.\n");
+				printf("You must manually forward port 53 to port %d for things to work.\n", port);
+			}
 			break;
 		default:
 			usage();
