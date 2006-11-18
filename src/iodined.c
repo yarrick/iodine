@@ -150,26 +150,32 @@ tunnel(int tun_fd, int dns_fd)
 						dnsd_send(dns_fd, &q, out, 8);
 					}
 				} else if(in[0] == 'L' || in[0] == 'l') {
-					// Login phase, handle auth
-					login_calculate(logindata, 16, password, seed);
-					if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
-						// Login ok, send ip/mtu info
-						myip.s_addr = my_ip;
-						clientip.s_addr = my_ip + inet_addr("0.0.0.1");
-
-						tmp[0] = strdup(inet_ntoa(myip));
-						tmp[1] = strdup(inet_ntoa(clientip));
-						
-						read = snprintf(out, sizeof(out), "%s-%s-%d", 
-								tmp[0], tmp[1], my_mtu);
-
-						dnsd_send(dns_fd, &q, out, read);
-						q.id = 0;
-
-						free(tmp[1]);
-						free(tmp[0]);
+					// Check sending ip number
+					if (q.fromlen != u.addrlen ||
+						memcmp(&(u.host), &(q.from), q.fromlen) != 0) {
+						dnsd_send(dns_fd, &q, "BADIP", 5);
 					} else {
-						dnsd_send(dns_fd, &q, "LNAK", 4);
+						// Login phase, handle auth
+						login_calculate(logindata, 16, password, seed);
+						if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
+							// Login ok, send ip/mtu info
+							myip.s_addr = my_ip;
+							clientip.s_addr = my_ip + inet_addr("0.0.0.1");
+
+							tmp[0] = strdup(inet_ntoa(myip));
+							tmp[1] = strdup(inet_ntoa(clientip));
+							
+							read = snprintf(out, sizeof(out), "%s-%s-%d", 
+									tmp[0], tmp[1], my_mtu);
+
+							dnsd_send(dns_fd, &q, out, read);
+							q.id = 0;
+
+							free(tmp[1]);
+							free(tmp[0]);
+						} else {
+							dnsd_send(dns_fd, &q, "LNAK", 4);
+						}
 					}
 				} else if((in[0] >= '0' && in[0] <= '9')
 						|| (in[0] >= 'a' && in[0] <= 'f')
@@ -180,21 +186,30 @@ tunnel(int tun_fd, int dns_fd)
 						code = in[0] - 'a' + 10;
 					if ((in[0] >= 'A' && in[0] <= 'F'))
 						code = in[0] - 'A' + 10;
+					
+					// Check sending ip number
+					if (q.fromlen != u.addrlen ||
+						memcmp(&(u.host), &(q.from), q.fromlen) != 0) {
+						dnsd_send(dns_fd, &q, "BADIP", 5);
+					} else {
+						memcpy(packetbuf.data + packetbuf.offset, in + 1, read - 1);
+						packetbuf.len += read - 1;
+						packetbuf.offset += read - 1;
 
-					memcpy(packetbuf.data + packetbuf.offset, in + 1, read - 1);
-					packetbuf.len += read - 1;
-					packetbuf.offset += read - 1;
+						if (code & 1) {
+							outlen = sizeof(out);
+							uncompress(out, &outlen, packetbuf.data, packetbuf.len);
 
-					if (code & 1) {
-						outlen = sizeof(out);
-						uncompress(out, &outlen, packetbuf.data, packetbuf.len);
+							write_tun(tun_fd, out, outlen);
 
-						write_tun(tun_fd, out, outlen);
-
-						packetbuf.len = packetbuf.offset = 0;
+							packetbuf.len = packetbuf.offset = 0;
+						}
 					}
 				}
-				if (outpacket.len > 0) {
+				if (q.fromlen == u.addrlen &&
+					memcmp(&(u.host), &(q.from), q.fromlen) == 0 &&
+					outpacket.len > 0) {
+
 					dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
 					outpacket.len = 0;
 					q.id = 0;
