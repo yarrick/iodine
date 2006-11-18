@@ -28,10 +28,10 @@
 #include <string.h>
 #include <assert.h>
 
-#include "structs.h"
-#include "encoding.h"
-#include "dns.h"
-#include "read.h"
+#include "../src/structs.h"
+#include "../src/encoding.h"
+#include "../src/dns.h"
+#include "../src/read.h"
 	
 static void
 test_readputshort()

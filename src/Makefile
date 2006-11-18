@@ -29,6 +29,6 @@ $(SERVER): $(SERVEROBJS)
 	@$(CC) $(CFLAGS) $< -o $@
 
 clean:
-	@echo "Cleaning..."
-	@rm -f $(CLIENT) $(SERVER) $(TESTSUITE) *~ *.o *.core
+	@echo "Cleaning src/"
+	@rm -f $(CLIENT) $(SERVER) *~ *.o *.core
 
