@@ -33,12 +33,15 @@
 #include "tun.h"
 #include "structs.h"
 #include "dns.h"
+#include "version.h"
+#include "login.h"
 
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
 	
 int running = 1;
+char password[33];
 
 static void
 sighandler(int sig) {
@@ -114,21 +117,21 @@ handshake(int dns_fd)
 	struct timeval tv;
 	char server[65];
 	char client[65];
+	char login[16];
 	char in[4096];
-	int timeout;
 	fd_set fds;
 	int read;
 	int mtu;
+	int seed;
+	int version;
 	int i;
 	int r;
 
-	timeout = 1;
-	
 	for (i=0; running && i<5 ;i++) {
-		tv.tv_sec = timeout++;
+		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		dns_handshake(dns_fd);
+		dns_send_version(dns_fd, VERSION);
 		
 		FD_ZERO(&fds);
 		FD_SET(dns_fd, &fds);
@@ -144,14 +147,60 @@ handshake(int dns_fd)
 			}
 
 			if (read > 0) {
-				if (sscanf(in, "%64[^-]-%64[^-]-%d", 
+				if (strncmp("VACK", in, 4) == 0) {
+					if (read >= 8) {
+						memcpy(&seed, in + 4, 4);
+						seed = ntohl(seed);
+						printf("Version ok, both running 0x%08x\n", VERSION);
+						break;
+					} else {
+						printf("Version ok but did not receive proper login challenge\n");
+					}
+				} else {
+					memcpy(&version, in + 4, 4);
+					version = ntohl(version);
+					printf("You run 0x%08x, server runs 0x%08x. Giving up\n", VERSION, version);
+					return 1;
+				}
+			}
+		}
+		
+		if (i == 4)
+			return 1;
+		printf("Retrying version check...\n");
+	}
+	
+	login_calculate(login, 16, password, seed);
+	for (i=0; running && i<5 ;i++) {
+		tv.tv_sec = i + 1;
+		tv.tv_usec = 0;
+
+		dns_login(dns_fd, login, 16);
+		
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = dns_read(dns_fd, in, sizeof(in));
+			
+			if(read <= 0) {
+				perror("read");
+				continue;
+			}
+
+			if (read > 0) {
+				if (strncmp("LNAK", in, 4) == 0) {
+					printf("Bad password\n");
+					return 1;
+				} else if (sscanf(in, "%64[^-]-%64[^-]-%d", 
 					server, client, &mtu) == 3) {
 					
 					server[64] = 0;
 					client[64] = 0;
 					if (tun_setip(client) == 0 && 
 						tun_setmtu(mtu) == 0) {
-
 						return 0;
 					} else {
 						warn("Received handshake with bad data");
@@ -162,7 +211,7 @@ handshake(int dns_fd)
 			}
 		}
 
-		printf("Retrying...\n");
+		printf("Retrying login...\n");
 	}
 
 	return 1;
@@ -216,11 +265,12 @@ main(int argc, char **argv)
 	int dns_fd;
 
 	username = NULL;
+	memset(password, 0, 33);
 	foreground = 0;
 	newroot = NULL;
 	device = NULL;
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:d:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:d:P:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -239,6 +289,10 @@ main(int argc, char **argv)
 			break;
 		case 'd':
 			device = optarg;
+			break;
+		case 'P':
+			strncpy(password, optarg, 32);
+			password[32] = 0;
 			break;
 		default:
 			usage();
@@ -264,6 +318,12 @@ main(int argc, char **argv)
 			usage();
 		}
 	}
+	
+	if (strlen(password) == 0) {
+		printf("Enter password on stdin:\n");
+		scanf("%32s", password);
+		password[32] = 0;
+	}
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup1;
@@ -272,13 +332,13 @@ main(int argc, char **argv)
 	if (dns_settarget(argv[0]) == -1)
 		goto cleanup2;
 
-	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
-
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
 	if(handshake(dns_fd))
 		goto cleanup2;
+	
+	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
 
 	if (newroot) {
 		if (chroot(newroot) != 0 || chdir("/") != 0)

@@ -32,4 +32,10 @@ struct query {
 	int fromlen;
 };
 
+struct user {
+	int id;
+	struct sockaddr host;
+	int addrlen;
+};
+
 #endif /* _STRUCTS_H_ */

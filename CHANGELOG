@@ -7,6 +7,10 @@ iodine - IP over DNS is now easy
 
 CHANGES:
 
+xxxx-xx-xx: 0.3.5
+	- Added authentication (password entered as argument or on stdin)
+	- Changed directory structure
+
 2006-11-08: 0.3.4
 	- Fixed handshake() buffer overflow
 	  (Found by poplix, Secunia: SA22674 / FrSIRT/ADV-2006-4333)

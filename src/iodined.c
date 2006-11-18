@@ -34,6 +34,8 @@
 #include "tun.h"
 #include "structs.h"
 #include "dns.h"
+#include "login.h"
+#include "version.h"
 
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -46,6 +48,9 @@ struct packet outpacket;
 int outid;
 
 struct query q;
+
+struct user u;
+char password[33];
 
 int my_mtu;
 in_addr_t my_ip;
@@ -64,10 +69,14 @@ tunnel(int tun_fd, int dns_fd)
 	char out[64*1024];
 	char in[64*1024];
 	char *tmp[2];
+	char logindata[16];
 	long outlen;
 	fd_set fds;
 	int read;
 	int code;
+	int version;
+	int seed;
+	int nseed;
 	int i;
 
 	while (running) {
@@ -114,21 +123,54 @@ tunnel(int tun_fd, int dns_fd)
 				if (read <= 0)
 			   		continue;
 
-				if(in[0] == 'H' || in[0] == 'h') {
-					myip.s_addr = my_ip;	
-					clientip.s_addr = my_ip + inet_addr("0.0.0.1");
+				if(in[0] == 'V' || in[0] == 'v') {
+					// Version greeting, compare and send ack/nak
+					if (read >= 5) { // Received V + 32bits version
+						memcpy(&version, in + 1, 4);
+						version = ntohl(version);
+						if (version == VERSION) {
+							seed = rand();
+							nseed = htonl(seed);
+							strcpy(out, "VACK");
+							memcpy(out+4, &nseed, 4);
+							dnsd_send(dns_fd, &q, out, 8);
 
-					tmp[0] = strdup(inet_ntoa(myip));
-					tmp[1] = strdup(inet_ntoa(clientip));
-					
-					read = snprintf(out, sizeof(out), "%s-%s-%d", 
-							tmp[0], tmp[1], my_mtu);
+							memcpy(&(u.host), &(q.from), q.fromlen);
+							u.addrlen = q.fromlen;
+						} else {
+							version = htonl(VERSION);
+							strcpy(out, "VNAK");
+							memcpy(out+4, &version, 4);
+							dnsd_send(dns_fd, &q, out, 8);
+						}
+					} else {
+						version = htonl(VERSION);
+						strcpy(out, "VNAK");
+						memcpy(out+4, &version, 4);
+						dnsd_send(dns_fd, &q, out, 8);
+					}
+				} else if(in[0] == 'L' || in[0] == 'l') {
+					// Login phase, handle auth
+					login_calculate(logindata, 16, password, seed);
+					if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
+						// Login ok, send ip/mtu info
+						myip.s_addr = my_ip;
+						clientip.s_addr = my_ip + inet_addr("0.0.0.1");
 
-					dnsd_send(dns_fd, &q, out, read);
-					q.id = 0;
+						tmp[0] = strdup(inet_ntoa(myip));
+						tmp[1] = strdup(inet_ntoa(clientip));
+						
+						read = snprintf(out, sizeof(out), "%s-%s-%d", 
+								tmp[0], tmp[1], my_mtu);
 
-					free(tmp[1]);
-					free(tmp[0]);
+						dnsd_send(dns_fd, &q, out, read);
+						q.id = 0;
+
+						free(tmp[1]);
+						free(tmp[0]);
+					} else {
+						dnsd_send(dns_fd, &q, "LNAK", 4);
+					}
 				} else if((in[0] >= '0' && in[0] <= '9')
 						|| (in[0] >= 'a' && in[0] <= 'f')
 						|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -168,8 +210,9 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] [-p port]"
-			" tunnel_ip topdomain\n", __progname);
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+		"[-l ip address to listen on] [-p port] [-P password]"
+		" tunnel_ip topdomain\n", __progname);
 	exit(2);
 }
 
@@ -178,8 +221,9 @@ help() {
 	extern char *__progname;
 
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] [-l ip address to listen on] [-p port]"
-		   " tunnel_ip topdomain\n", __progname);
+	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+		"[-l ip address to listen on] [-p port] [-P password]"
+		" tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
@@ -189,6 +233,7 @@ help() {
 	printf("  -m mtu to set tunnel device mtu\n");
 	printf("  -l ip address to listen on for incoming dns traffic (default 0.0.0.0)\n");
 	printf("  -p port to listen on for incoming dns traffic (default 53)\n");
+	printf("  -P password used for authentication (max 32 chars will be used)\n");
 	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
 	printf("topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
@@ -229,8 +274,9 @@ main(int argc, char **argv)
 	packetbuf.offset = 0;
 	outpacket.len = 0;
 	q.id = 0;
+	memset(password, 0, 33);
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:p:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:p:P:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -262,6 +308,10 @@ main(int argc, char **argv)
 				printf("ALERT! Other dns servers expect you to run on port 53.\n");
 				printf("You must manually forward port 53 to port %d for things to work.\n", port);
 			}
+			break;
+		case 'P':
+			strncpy(password, optarg, 32);
+			password[32] = 0;
 			break;
 		default:
 			usage();
@@ -296,6 +346,12 @@ main(int argc, char **argv)
 	if (listen_ip == INADDR_NONE) {
 		printf("Bad IP address to listen on.\n");
 		usage();
+	}
+
+	if (strlen(password) == 0) {
+		printf("Enter password on stdin:\n");
+		scanf("%32s", password);
+		password[32] = 0;
 	}
 
 	if ((tun_fd = open_tun(device)) == -1)

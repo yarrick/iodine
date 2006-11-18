@@ -172,13 +172,27 @@ dns_ping(int dns_fd)
 	dns_write(dns_fd, ++pingid, data, 2, 'P');
 }
 
-void 
-dns_handshake(int dns_fd)
+void
+dns_login(int dns_fd, char *login, int len)
 {
-	char data[2];
-	data[0] = (pingid & 0xFF00) >> 8;
-	data[1] = (pingid & 0xFF);
-	dns_write(dns_fd, ++pingid, data, 2, 'H');
+	char data[18];
+	memcpy(data, login, MIN(len, 16));
+	data[16] = (pingid & 0xFF00) >> 8;
+	data[17] = (pingid & 0xFF);
+	dns_write(dns_fd, ++pingid, data, 18, 'L');
+}
+
+void 
+dns_send_version(int dns_fd, int version)
+{
+	char data[6];
+	int v;
+
+	v = htonl(version);
+	memcpy(data, &v, 4);
+	data[4] = (pingid & 0xFF00) >> 8;
+	data[5] = (pingid & 0xFF);
+	dns_write(dns_fd, ++pingid, data, 6, 'V');
 }
 
 static void 
