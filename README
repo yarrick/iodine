@@ -16,8 +16,10 @@ Try it out within your own LAN! Follow these simple steps:
 - On your server, run: ./iodined -f 10.0.0.1 test.asdf
   (If you already use the 10.0.0.0 network, use another internal net like 
   172.16.0.0)
+- Enter a password
 - On the client, run: ./iodine -f 192.168.0.1 test.asdf
   (Replace 192.168.0.1 with the server's ip address)
+- Enter the same password
 - Now the client has the tunnel ip 10.0.0.2 and the server has 10.0.0.1
 - Try pinging each other through the tunnel
 - Done! :)
@@ -40,8 +42,9 @@ to your server. Start iodined on the server. The first argument is the tunnel
 IP address (like 192.168.99.1) and the second is the assigned domain (in this
 case tunnel1.mytunnel.com). The -f argument will keep iodined running in the
 foreground, which helps when testing. iodined will start a virtual interface,
-and also start listening for DNS queries on UDP port 53. Now everything is
-ready for the client.
+and also start listening for DNS queries on UDP port 53. Either enter a
+password on the commandline (-P pass) or after the server has started. Now 
+everything is ready for the client.
 
 Client side: 
 All the setup is done, just start iodine. It also takes two
@@ -49,8 +52,10 @@ arguments, the first is the local relaying DNS server and the second is the
 domain used (tunnel1.mytunnnel.com). If DNS queries are allowed to any
 computer, you can use the tunnel endpoint (example: 10.15.213.99 or
 tunnel1host.mytunnel.com) as the first argument. The tunnel interface will get
-an IP close to the servers (in this case 192.168.99.2) and a suitable MTU. Now
-you should be able to ping the other end of the tunnel from either side.  
+an IP close to the servers (in this case 192.168.99.2) and a suitable MTU. 
+Enter the same password as on the server either by argument or after the client
+has started. Now you should be able to ping the other end of the tunnel from 
+either side.  
 
 
 MISC. INFO:
