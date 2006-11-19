@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <err.h>
+#include <time.h>
 #include <pwd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -290,6 +291,7 @@ main(int argc, char **argv)
 	outpacket.len = 0;
 	q.id = 0;
 	memset(password, 0, 33);
+	srand(time(NULL));
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:p:P:")) != -1) {
 		switch(choice) {
