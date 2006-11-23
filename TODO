@@ -9,7 +9,11 @@ STUFF TO DO:
 
 - Handle multiple concurrent users on one server
 
-- Detect if EDNS0 can be used, probe MTU size
+- Fragment downstream packets if 512 byte limit present
+
+- Implement sliding window
+
+- Use better encoding if dns servers preserve case
 
 - Port to more platforms (Solaris? Windows?)
 
