@@ -1,7 +1,6 @@
 
 all: 
 	@(cd src; make all)
-	@(cd tests; make all)
 
 test: all
 	(cd tests; make all)
