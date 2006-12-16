@@ -1,28 +1,26 @@
 CC = gcc
-TESTSUITE = tester
-TESTOBJS = test.o ../src/dns.o ../src/read.o ../src/encoding.o
+TEST = test
+OBJS = test.o base32.o
+SRCOBJS = ../src/base32.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
-LDFLAGS =  -lz
-CFLAGS = -c -g -Wall -D$(OS)
+LDFLAGS =  -L/usr/local/lib -lcheck
+CFLAGS = -g -Wall -D$(OS) -I../src -I/usr/local/include
 
-all: $(TESTSUITE) 
+all: $(TEST)
+	./$(TEST)
 
-test:	$(TESTSUITE)
-	@./$(TESTSUITE)
-
-$(TESTSUITE): $(TESTOBJS)
-	@echo LD $@
-	@$(CC) $(TESTOBJS) -o $(TESTSUITE) $(LDFLAGS)
-	@echo Running tests... 
-	@./$(TESTSUITE)
+$(TEST): $(OBJS) $(SRCOBJS)
+	@echo Linking test
+	@$(CC) -o $@ $(SRCOBJS) $(OBJS) $(LDFLAGS) 
 
 .c.o: 
-	@echo CC $<
-	@$(CC) $(CFLAGS) $< -o $@
+	@echo Building $<
+	@$(CC) $(CFLAGS) -c $<
+
 
 clean:
-	@echo "Cleaning tests/"
-	@rm -f $(TESTSUITE) *~ *.o *.core
+	@echo "Cleaning..."
+	@rm -f *~ *.core $(TESTS) $(OBJS)
 
