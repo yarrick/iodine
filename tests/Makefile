@@ -1,7 +1,7 @@
 CC = gcc
 TEST = test
-OBJS = test.o base32.o read.o
-SRCOBJS = ../src/base32.o ../src/read.o
+OBJS = test.o base32.o read.o dns.o encoding.o
+SRCOBJS = ../src/base32.o ../src/read.o ../src/dns.o ../src/encoding.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
@@ -22,5 +22,5 @@ $(TEST): $(OBJS) $(SRCOBJS)
 
 clean:
 	@echo "Cleaning..."
-	@rm -f *~ *.core $(TESTS) $(OBJS)
+	@rm -f *~ *.core $(TEST) $(OBJS)
 

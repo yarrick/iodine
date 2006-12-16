@@ -14,14 +14,44 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __TEST_H__
-#define __TEST_H__
+#include <check.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-TCase *test_base32_create_tests();
-TCase *test_dns_create_tests();
-TCase *test_encoding_create_tests();
-TCase *test_read_create_tests();
+#include "encoding.h"
+#include "test.h"
 
-char *va_str(const char *, ...);
+START_TEST(test_encoding_base32)
+{
+	char temp[256];
+	char *start = "HELLOTEST";
+	char *out = "1HELLOTEST";
+	char *end;
+	char *tempend;
+	int codedlength;
 
-#endif
+	memset(temp, 0, sizeof(temp));
+	end = malloc(16);
+	memset(end, 0, 16);
+
+	codedlength = encode_data(start, 9, 256, temp, 0);
+	tempend = temp + strlen(temp);
+	decode_data(end, 16, temp, tempend);
+
+	fail_unless(strcmp(out, end) == 0, NULL);
+
+	free(end);
+}
+END_TEST
+
+TCase *
+test_encoding_create_tests()
+{
+	TCase *tc;
+
+	tc = tcase_create("Encoding");
+	tcase_add_test(tc, test_encoding_base32);
+
+	return tc;
+}
