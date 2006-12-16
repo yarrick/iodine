@@ -31,6 +31,9 @@ main()
 	test = test_base32_create_tests();
 	suite_add_tcase(iodine, test);
 
+ 	test = test_read_create_tests();
+	suite_add_tcase(iodine, test);
+
 	runner = srunner_create(iodine);
 	srunner_run_all(runner, CK_VERBOSE);
 	failed = srunner_ntests_failed(runner);

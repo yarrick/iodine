@@ -1,7 +1,7 @@
 CC = gcc
 TEST = test
-OBJS = test.o base32.o
-SRCOBJS = ../src/base32.o
+OBJS = test.o base32.o read.o
+SRCOBJS = ../src/base32.o ../src/read.o
 
 OS = `uname | tr "a-z" "A-Z"`
 

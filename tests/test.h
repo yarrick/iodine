@@ -2,6 +2,8 @@
 #define __TEST_H__
 
 TCase *test_base32_create_tests();
+TCase *test_read_create_tests();
+
 char *va_str(const char *, ...);
 
 #endif
