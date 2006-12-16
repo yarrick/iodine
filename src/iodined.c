@@ -132,7 +132,7 @@ tunnel(int tun_fd, int dns_fd)
 						if (version == VERSION) {
 							seed = rand();
 							nseed = htonl(seed);
-							strcpy(out, "VACK");
+							strncpy(out, "VACK", sizeof(out));
 							memcpy(out+4, &nseed, 4);
 							dnsd_send(dns_fd, &q, out, 8);
 
@@ -140,13 +140,13 @@ tunnel(int tun_fd, int dns_fd)
 							u.addrlen = q.fromlen;
 						} else {
 							version = htonl(VERSION);
-							strcpy(out, "VNAK");
+							strncpy(out, "VNAK", sizeof(out));
 							memcpy(out+4, &version, 4);
 							dnsd_send(dns_fd, &q, out, 8);
 						}
 					} else {
 						version = htonl(VERSION);
-						strcpy(out, "VNAK");
+						strncpy(out, "VNAK", sizeof(out));
 						memcpy(out+4, &version, 4);
 						dnsd_send(dns_fd, &q, out, 8);
 					}
