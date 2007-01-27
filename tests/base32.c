@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "base32.h"
 #include "test.h"
@@ -35,14 +36,17 @@ START_TEST(test_base32_encode)
 {
 	size_t len;
 	char *buf;
+	int val;
 	int i;
 
 	len = 0;
 	buf = NULL;
 
 	for (i = 0; testpairs[i].a != NULL; i++) {
-		base32_encode(&buf, &len, testpairs[i].a, strlen(testpairs[i].a));
+		val = base32_encode(&buf, &len, testpairs[i].a, strlen(testpairs[i].a));
 
+		fail_unless(val > 0, strerror(errno));
+		fail_unless(buf != NULL, "buf == NULL");
 		fail_unless(strcmp(buf, testpairs[i].b) == 0, 
 				va_str("'%s' != '%s'", buf, testpairs[i].b));
 	}
@@ -53,14 +57,17 @@ START_TEST(test_base32_decode)
 {
 	size_t len;
 	void *buf;
+	int val;
 	int i;
 
 	len = 0;
 	buf = NULL;
 
 	for (i = 0; testpairs[i].a != NULL; i++) {
-		base32_decode(&buf, &len, testpairs[i].b);
+		val = base32_decode(&buf, &len, testpairs[i].b);
 
+		fail_unless(val > 0, strerror(errno));
+		fail_unless(buf != NULL, "buf == NULL");
 		fail_unless(strcmp(buf, testpairs[i].a) == 0, 
 				va_str("'%s' != '%s'", buf, testpairs[i].a));
 	}
