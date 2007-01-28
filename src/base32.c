@@ -23,24 +23,6 @@
 static const char cb32[] = 
 	"abcdefghijklmnopqrstuvwxyz0123456789";
 
-/*
-6 2
-4 4
-2 6
-
-3 -> 4
-*/
-
-/*
-q[0]: 5 3
-q[1]: 2 5 1
-q[2]: 4 4
-q[3]: 1 5 2
-q[4]: 3 5
-
-5 -> 8
-*/
-
 int 
 base32_encode(char **buf, size_t *buflen, const void *data, size_t size)
 {
@@ -95,14 +77,6 @@ pos(char c)
 			return p - cb32;
     return -1;
 }
-/*
-
-q[0]: 5 3
-q[1]: 2 5 1
-q[2]: 4 4
-q[3]: 1 5 2
-q[4]: 3 5
-*/
 
 static int
 decode_token(const char *t, char *data) 
@@ -170,7 +144,7 @@ base32_decode(void **buf, size_t *buflen, const char *str)
 
 	q = *buf;
 	for (p = str; *p && strchr(cb32, *p); p += 8) {
-		len = decode_token(p, q);	
+		len = decode_token(p, (char *) q);	
 		q += len;
 		
 		if (len < 5)
