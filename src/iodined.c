@@ -375,7 +375,8 @@ main(int argc, char **argv)
 		goto cleanup0;
 	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
 		goto cleanup1;
-	if ((dnsd_fd = open_dns(argv[1], port, listen_ip)) == -1) 
+	dns_set_topdomain(argv[1]);
+	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) 
 		goto cleanup2;
 
 	my_ip = inet_addr(argv[0]);

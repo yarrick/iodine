@@ -62,7 +62,7 @@ static uint16_t pingid;
 
 
 int 
-open_dns(const char *domain, int localport, in_addr_t listen_ip) 
+open_dns(int localport, in_addr_t listen_ip) 
 {
 	int fd;
 	int flag;
@@ -91,13 +91,17 @@ open_dns(const char *domain, int localport, in_addr_t listen_ip)
 		return -1;
 	}
 
-	// Save top domain used
-	strncpy(topdomain, domain, sizeof(topdomain) - 1);
-	topdomain[sizeof(topdomain) - 1] = '\0';
 
 	printf("Opened UDP socket\n");
 
 	return fd;
+}
+
+void
+dns_set_topdomain(const char *domain)
+{
+	strncpy(topdomain, domain, sizeof(topdomain) - 1);
+	topdomain[sizeof(topdomain) - 1] = '\0';
 }
 
 int 

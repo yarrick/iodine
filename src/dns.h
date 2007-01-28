@@ -17,8 +17,9 @@
 #ifndef _DNS_H_
 #define _DNS_H_
 
-int open_dns(const char *, int, in_addr_t);
+int open_dns(int, in_addr_t);
 int dns_settarget(const char*);
+void dns_set_topdomain(const char*);
 void close_dns(int);
 
 int dns_sending();

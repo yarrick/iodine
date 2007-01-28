@@ -26,13 +26,16 @@
 
 #include "structs.h"
 #include "dns.h"
+#include "encoding.h"
 #include "test.h"
 
 static char queryPacket[] = 
-	"\x05\x39\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01\x05\x73\x69\x6C\x6C"
-	"\x79\x04\x68\x6F\x73\x74\x02\x6F\x66\x06\x69\x6F\x64\x69\x6E\x65\x04"
-	"\x63\x6F\x64\x65\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00\x0A\x00\x01"
-	"\x00\x00\x29\x10\x00\x00\x00\x80\x00\x00\x00";
+	"\x05\x39\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01\x32\x41\x4A\x42\x43"
+	"\x55\x59\x54\x43\x50\x45\x42\x39\x47\x51\x39\x4C\x54\x45\x42\x55\x58"
+	"\x47\x49\x44\x55\x4E\x42\x53\x53\x41\x36\x44\x46\x4F\x4E\x39\x43\x41"
+	"\x5A\x44\x42\x32\x41\x41\x41\x41\x41\x36\x44\x42\x04\x6B\x72\x79\x6F"
+	"\x02\x73\x65\x00\x00\x0A\x00\x01\x00\x00\x29\x10\x00\x00\x00\x80\x00"
+	"\x00\x00";
 
 static char answerPacket[] = 
 	"\x05\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00\x05\x73\x69\x6C\x6C"
@@ -43,6 +46,9 @@ static char answerPacket[] =
 	"\x20\x62\x65\x20\x64\x65\x6C\x69\x76\x65\x72\x65\x64";
 	
 static char *msgData = "this is the message to be delivered";
+	
+static char *queryData = "HELLO this is the test data";
+static char *recData = "AHELLO this is the test data";	// The A flag is added
 
 START_TEST(test_encode_hostname)
 {
@@ -102,21 +108,53 @@ END_TEST
 START_TEST(test_encode_query)
 {
 	char buf[512];
-	char *host = "silly.host.of.iodine.code.kryo.se";
+	char resolv[512];
+	char *host = "kryo.se";
 	struct query q;
+	char *d;
 	int len;
+	int pos;
 	int ret;
 
 	len = sizeof(buf);
+	memset(&buf, 0, sizeof(buf));
 	memset(&q, 0, sizeof(struct query));
 	q.type = T_NULL;
 	q.id = 1337;
+	d = resolv;
 
-	ret = dns_encode(buf, len, &q, QR_QUERY, host, strlen(host));
+	encode_data(queryData, strlen(queryData), 100, d, 'A');
+	pos = strlen(resolv);
+	d += pos;
+	if (*d != '.') {
+		*d++ = '.';
+	}
+	strncpy(d, host, strlen(host)+1);
+	ret = dns_encode(buf, len, &q, QR_QUERY, resolv, strlen(resolv));
 	len = sizeof(queryPacket) - 1; // Skip extra null character
 
 	fail_unless(strncmp(queryPacket, buf, sizeof(queryPacket)) == 0, "Did not compile expected packet");
 	fail_unless(ret == len, va_str("Bad packet length: %d, expected %d", ret, len));
+}
+END_TEST
+
+START_TEST(test_decode_query)
+{
+	char buf[512];
+	struct query q;
+	int len;
+	int ret;
+
+	memset(&q, 0, sizeof(struct query));
+	memset(&buf, 0, sizeof(buf));
+	q.id = 0;
+	len = sizeof(queryPacket) - 1;
+
+	dns_set_topdomain("kryo.se");
+	ret = dns_decode(buf, sizeof(buf), &q, QR_QUERY, queryPacket, len);
+
+	fail_unless(strncmp(buf, recData, ret) == 0, "Did not extract expected host: '%s'", buf);
+	fail_unless(strlen(buf) == strlen(recData), va_str("Bad host length: %d, expected %d", strlen(q.name), strlen(recData)));
 }
 END_TEST
 
@@ -129,6 +167,7 @@ START_TEST(test_encode_response)
 	int ret;
 
 	len = sizeof(buf);
+	memset(&buf, 0, sizeof(buf));
 	memset(&q, 0, sizeof(struct query));
 	strncpy(q.name, host, strlen(host));
 	q.type = T_NULL;
@@ -149,6 +188,7 @@ START_TEST(test_decode_response)
 	int ret;
 
 	len = sizeof(buf);
+	memset(&buf, 0, sizeof(buf));
 
 	ret = dns_decode(buf, len, NULL, QR_ANSWER, answerPacket, sizeof(answerPacket)-1);
 	fail_unless(strncmp(msgData, buf, sizeof(msgData)) == 0, "Did not extract expected data");
@@ -166,6 +206,7 @@ test_dns_create_tests()
 	tcase_add_test(tc, test_encode_hostname_nodot);
 	tcase_add_test(tc, test_encode_hostname_toolong);
 	tcase_add_test(tc, test_encode_query);
+	tcase_add_test(tc, test_decode_query);
 	tcase_add_test(tc, test_encode_response);
 	tcase_add_test(tc, test_decode_response);
 
