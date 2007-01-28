@@ -47,17 +47,17 @@
 static int dns_write(int, int, char *, int, char);
 static void dns_query(int, int, char *, int);
 
-struct sockaddr_in peer;
-char topdomain[256];
+static struct sockaddr_in peer;
+static char topdomain[256];
 
 // Current IP packet
-char activepacket[4096];
-int lastlen;
-int packetpos;
-int packetlen;
-uint16_t chunkid;
+static char activepacket[4096];
+static int lastlen;
+static int packetpos;
+static int packetlen;
+static uint16_t chunkid;
 
-uint16_t pingid;
+static uint16_t pingid;
 
 
 int 
