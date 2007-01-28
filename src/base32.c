@@ -51,7 +51,7 @@ base32_encode(char **buf, size_t *buflen, const void *data, size_t size)
 	char *q;
 	int i;
 
-	newsize = size * 8 / 5 + 5;
+	newsize = 8 * (size / 5 + 1) + 1;
 	if (newsize > *buflen) {
 		if ((newbuf = realloc(*buf, newsize)) == NULL) {
 			free(*buf);
@@ -155,7 +155,7 @@ base32_decode(void **buf, size_t *buflen, const char *str)
 	char *newbuf;
 	int len;
 	
-	newsize = 5 * (strlen(str) / 8 + 4);
+	newsize = 5 * (strlen(str) / 8 + 1) + 1;
 	if (newsize > *buflen) {
 		if ((newbuf = realloc(*buf, newsize)) == NULL) {
 			free(*buf);
