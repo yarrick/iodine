@@ -5,6 +5,7 @@ SERVER = ../bin/iodined
 SERVEROBJS = iodined.o tun.o dns.o read.o encoding.o login.o base32.o md5.o
 
 OS = `uname | tr "a-z" "A-Z"`
+ARCH = `uname -m`
 
 LDFLAGS =  -lz
 CFLAGS = -c -g -Wall -D$(OS)
@@ -12,7 +13,7 @@ CFLAGS = -c -g -Wall -D$(OS)
 all: stateos $(CLIENT) $(SERVER) $(TESTSUITE) 
 
 stateos:
-	@echo OS is $(OS)
+	@echo OS is $(OS), arch is $(ARCH)
 
 $(CLIENT): $(CLIENTOBJS)
 	@echo LD $@
