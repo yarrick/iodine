@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -28,6 +29,8 @@
 #include "dns.h"
 #include "encoding.h"
 #include "test.h"
+
+static void dump_packet(char *, size_t);
 
 static char queryPacket[] = 
 	"\x05\x39\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01\x32\x41\x4A\x42\x43"
@@ -118,6 +121,7 @@ START_TEST(test_encode_query)
 
 	len = sizeof(buf);
 	memset(&buf, 0, sizeof(buf));
+	memset(&resolv, 0, sizeof(resolv));
 	memset(&q, 0, sizeof(struct query));
 	q.type = T_NULL;
 	q.id = 1337;
@@ -133,6 +137,11 @@ START_TEST(test_encode_query)
 	ret = dns_encode(buf, len, &q, QR_QUERY, resolv, strlen(resolv));
 	len = sizeof(queryPacket) - 1; // Skip extra null character
 
+	if (strncmp(queryPacket, buf, sizeof(queryPacket)) || ret != len) {
+		printf("\n");
+		dump_packet(queryPacket, len);
+		dump_packet(buf, ret);
+	}
 	fail_unless(strncmp(queryPacket, buf, sizeof(queryPacket)) == 0, "Did not compile expected packet");
 	fail_unless(ret == len, va_str("Bad packet length: %d, expected %d", ret, len));
 }
@@ -195,6 +204,25 @@ START_TEST(test_decode_response)
 	fail_unless(ret == strlen(msgData), va_str("Bad data length: %d, expected %d", ret, strlen(msgData)));
 }
 END_TEST
+
+static void
+dump_packet(char *buf, size_t len)
+{
+	int pos;
+
+	for (pos = 0; pos < len; pos++) {
+		printf("\\x%02X", (unsigned char) buf[pos]);
+	}
+	printf("\n");
+	for (pos = 0; pos < len; pos++) {
+		if (isalnum((unsigned char) buf[pos])) {
+			printf(" %c  ", (unsigned char) buf[pos]);
+		} else {
+			printf("    ");
+		}
+	}
+	printf("\n");
+}
 
 TCase *
 test_dns_create_tests()
