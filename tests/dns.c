@@ -110,6 +110,37 @@ START_TEST(test_encode_query)
 }
 END_TEST
 
+char answerPacket[] = 
+	"\x05\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00\x05\x73\x69\x6C\x6C"
+	"\x79\x04\x68\x6F\x73\x74\x02\x6F\x66\x06\x69\x6F\x64\x69\x6E\x65\x04"
+	"\x63\x6F\x64\x65\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00\x0A\x00\x01"
+	"\xC0\x0C\x00\x0A\x00\x01\x00\x00\x00\x00\x00\x23\x74\x68\x69\x73\x20"
+	"\x69\x73\x20\x74\x68\x65\x20\x6D\x65\x73\x73\x61\x67\x65\x20\x74\x6F"
+	"\x20\x62\x65\x20\x64\x65\x6C\x69\x76\x65\x72\x65\x64";
+
+START_TEST(test_encode_response)
+{
+	char buf[512];
+	char *host = "silly.host.of.iodine.code.kryo.se";
+	char *data = "this is the message to be delivered";
+	struct query q;
+	int len;
+	int ret;
+
+	len = sizeof(buf);
+	memset(&q, 0, sizeof(struct query));
+	strncpy(q.name, host, strlen(host));
+	q.type = T_NULL;
+	q.id = 1337;
+
+	ret = dns_encode(buf, len, &q, QR_ANSWER, data, strlen(data));
+	len = sizeof(answerPacket) - 1; // Skip extra null character
+
+	fail_unless(strncmp(answerPacket, buf, sizeof(answerPacket)) == 0, "Did not compile expected packet");
+	fail_unless(ret == len, va_str("Bad packet length: %d, expected %d", ret, len));
+}
+END_TEST
+
 TCase *
 test_dns_create_tests()
 {
@@ -120,6 +151,7 @@ test_dns_create_tests()
 	tcase_add_test(tc, test_encode_hostname_nodot);
 	tcase_add_test(tc, test_encode_hostname_toolong);
 	tcase_add_test(tc, test_encode_query);
+	tcase_add_test(tc, test_encode_response);
 
 	return tc;
 }
