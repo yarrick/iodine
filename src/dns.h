@@ -17,6 +17,11 @@
 #ifndef _DNS_H_
 #define _DNS_H_
 
+typedef enum {
+	QR_QUERY = 0,
+	QR_ANSWER = 1
+} qr_t;
+
 int open_dns(int, in_addr_t);
 int dns_settarget(const char*);
 void dns_set_topdomain(const char*);
@@ -29,8 +34,8 @@ void dns_send_version(int, int);
 void dns_login(int, char *, int);
 int dns_read(int, char *, int);
 int dns_encode_hostname(const char *, char *, int);
-int dns_encode(char *, size_t, struct query *, int, char *, size_t);
-int dns_decode(char *, size_t, struct query *, int, char *, size_t);
+int dns_encode(char *, size_t, struct query *, qr_t, char *, size_t);
+int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);
 
 extern struct sockaddr_in peer;
 
@@ -43,8 +48,5 @@ void dnsd_forceack(int);
 void dnsd_queuepacket(const char *, const int);
 
 int dns_parse_reply(char *, int, char *, int);
-
-#define QR_QUERY 0
-#define QR_ANSWER 1
 
 #endif /* _DNS_H_ */

@@ -201,7 +201,7 @@ dns_send_version(int dns_fd, int version)
 }
 
 int
-dns_encode(char *buf, size_t buflen, struct query *q, int qr, char *data, size_t datalen)
+dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_t datalen)
 {
 	HEADER *header;
 	short name;
@@ -273,7 +273,7 @@ dns_encode(char *buf, size_t buflen, struct query *q, int qr, char *data, size_t
 }
 
 int
-dns_decode(char *buf, size_t buflen, struct query *q, int qr, char *packet, size_t packetlen)
+dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, size_t packetlen)
 {
 	char rdata[4*1024];
 	HEADER *header;
