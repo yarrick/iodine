@@ -50,6 +50,8 @@ START_TEST(test_base32_encode)
 		fail_unless(strcmp(buf, testpairs[i].b) == 0, 
 				va_str("'%s' != '%s'", buf, testpairs[i].b));
 	}
+
+	free(buf);
 }
 END_TEST
 
@@ -71,6 +73,8 @@ START_TEST(test_base32_decode)
 		fail_unless(strcmp(buf, testpairs[i].a) == 0, 
 				va_str("'%s' != '%s'", buf, testpairs[i].a));
 	}
+
+	free(buf);
 }
 END_TEST
 
