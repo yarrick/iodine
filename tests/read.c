@@ -41,7 +41,7 @@ START_TEST(test_read_putshort)
 	char* p;
 	int i;
 
-	for (i = 0; i < 1; i++) {
+	for (i = 0; i < 65536; i++) {
 		p = (char*)&k;
 		putshort(&p, i);
 		fail_unless(ntohs(k) == i, 

@@ -23,5 +23,9 @@ TCase *test_encoding_create_tests();
 TCase *test_read_create_tests();
 
 char *va_str(const char *, ...);
+	
+#ifndef tcase_set_timeout
+#define tcase_set_timeout(...) 
+#endif
 
 #endif
