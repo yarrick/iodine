@@ -22,7 +22,7 @@
 
 /* Needs a 16byte array for output, and 32 bytes password */
 void login_calculate(char *out, int len, char *pass, int seed) {
-	char temp[32];
+	unsigned char temp[32];
 	md5_state_t ctx;
 	int i;
 	int k;
@@ -41,6 +41,6 @@ void login_calculate(char *out, int len, char *pass, int seed) {
 	}
 	md5_init(&ctx);
 	md5_append(&ctx, temp, 32);
-	md5_finish(&ctx, out);
+	md5_finish(&ctx, (unsigned char *) out);
 }
 
