@@ -42,7 +42,7 @@ main()
 	TCase *test;
 	int failed;
 
-	iodine = suite_create("Iodine");
+	iodine = suite_create("iodine");
 
 	test = test_base32_create_tests();
 	suite_add_tcase(iodine, test);
