@@ -44,9 +44,9 @@
 #endif
 
 
-int dns_decode(char*, int, int, char*, int);
 static int dns_write(int, int, char *, int, char);
 static void dns_query(int, int, char *, int);
+static int decodepacket(const char*, char*, int);
 
 static struct sockaddr_in peer;
 static char topdomain[256];
@@ -268,6 +268,84 @@ dns_encode(char *buf, size_t buflen, struct query *q, int qr, char *data, size_t
 	return len;
 }
 
+int
+dns_decode(char *buf, size_t buflen, struct query *q, int qr, char *packet, size_t packetlen)
+{
+	char rdata[4*1024];
+	HEADER *header;
+	short qdcount;
+	short ancount;
+	char name[255];
+	uint32_t ttl;
+	short class;
+	short type;
+	char *data;
+	short rlen;
+	int id; 
+	int rv;
+
+	rv = 0;
+	header = (HEADER*)packet;
+	
+	if (header->qr != qr) {
+		warnx("header->qr does not match the requested qr");
+		return -1;
+	}
+	
+	data = packet + sizeof(HEADER);
+	qdcount = ntohs(header->qdcount);
+	ancount = ntohs(header->ancount);
+	
+	id = ntohs(header->id);
+		
+	rlen = 0;
+
+	switch (qr) {
+	case QR_ANSWER:
+		if(qdcount != 1 || ancount != 1) {
+			warnx("no query or answer in answer");
+			return -1;
+		}
+
+		readname(packet, packetlen, &data, name, sizeof(name));
+		readshort(packet, &data, &type);
+		readshort(packet, &data, &class);
+		
+		readname(packet, packetlen, &data, name, sizeof(name));
+		readshort(packet, &data, &type);
+		readshort(packet, &data, &class);
+		readlong(packet, &data, &ttl);
+		readshort(packet, &data, &rlen);
+		rv = MIN(rlen, sizeof(rdata));
+		readdata(packet, &data, rdata, rv);
+
+		if(type == T_NULL && rv > 2) {
+			rv = MIN(rv, buflen);
+			memcpy(buf, rdata, rv);
+		}
+		break;
+	case QR_QUERY:
+		if (qdcount != 1) {
+			warnx("no query on query");
+			return -1;
+		}
+
+		readname(packet, packetlen, &data, name, sizeof(name) -1);
+		name[256] = 0;
+		readshort(packet, &data, &type);
+		readshort(packet, &data, &class);
+
+		strncpy(q->name, name, 257);
+		q->type = type;
+		q->id = id;
+
+		rv = decodepacket(name, buf, buflen);
+		break;
+	}
+
+	return rv;
+}
+
 static void 
 dns_query(int fd, int id, char *host, int type)
 {
@@ -339,68 +417,7 @@ dns_read(int fd, char *buf, int buflen)
 			dns_send_chunk(fd);
 		}
 	}
-	return dns_decode(buf, buflen, QR_ANSWER, packet, r);
-}
-
-int
-dns_decode(char *outbuf, int buflen, int qr, char *packet, int packetlen)
-{
-	char rdata[4*1024];
-	HEADER *header;
-	short qdcount;
-	short ancount;
-	char name[255];
-	uint32_t ttl;
-	short class;
-	short type;
-	char *data;
-	short rlen;
-	int rv;
-
-	rv = 0;
-	header = (HEADER*)packet;
-	
-	if (header->qr != qr) {
-		warnx("header->qr does not match the requested qr");
-		return -1;
-	}
-	
-	data = packet + sizeof(HEADER);
-	qdcount = ntohs(header->qdcount);
-	ancount = ntohs(header->ancount);
-		
-	rlen = 0;
-
-	switch (qr) {
-	case QR_ANSWER:
-		if(qdcount != 1 || ancount != 1) {
-			warnx("no query or answer in answer");
-			return -1;
-		}
-
-		readname(packet, packetlen, &data, name, sizeof(name));
-		readshort(packet, &data, &type);
-		readshort(packet, &data, &class);
-		
-		readname(packet, packetlen, &data, name, sizeof(name));
-		readshort(packet, &data, &type);
-		readshort(packet, &data, &class);
-		readlong(packet, &data, &ttl);
-		readshort(packet, &data, &rlen);
-		rv = MIN(rlen, sizeof(rdata));
-		readdata(packet, &data, rdata, rv);
-
-		if(type == T_NULL && rv > 2) {
-			rv = MIN(rv, buflen);
-			memcpy(outbuf, rdata, rv);
-		}
-		break;
-	case QR_QUERY:
-		errx(1, "unimplemented query behavior");
-		break;
-	}
-
-	return rv;
+	return dns_decode(buf, buflen, NULL, QR_ANSWER, packet, r);
 }
 
 int
@@ -466,47 +483,22 @@ decodepacket(const char *name, char *buf, int buflen)
 int
 dnsd_read(int fd, struct query *q, char *buf, int buflen)
 {
-	int r;
-	int rv;
-	short id;
-	short type;
-	short class;
-	short qdcount;
-	char *data;
-	char name[257];
-	HEADER *header;
-	socklen_t addrlen;
-	char packet[64*1024];
 	struct sockaddr_in from;
+	char packet[64*1024];
+	socklen_t addrlen;
+	int len;
+	int rv;
+	int r;
 
 	addrlen = sizeof(struct sockaddr);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 
 	if (r >= sizeof(HEADER)) {
-		header = (HEADER*)packet;
+		len = dns_decode(buf, buflen, q, QR_QUERY, packet, r);
 
-		id = ntohs(header->id);
-
-		data = packet + sizeof(HEADER);
-
-		if(!header->qr) {
-			qdcount = ntohs(header->qdcount);
-
-			if(qdcount == 1) {
-				readname(packet, r, &data, name, sizeof(name) -1);
-				name[256] = 0;
-				readshort(packet, &data, &type);
-				readshort(packet, &data, &class);
-
-				strncpy(q->name, name, 257);
-				q->type = type;
-				q->id = id;
-				q->fromlen = addrlen;
-				memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
-
-				rv = decodepacket(name, buf, buflen);
-			}
-		}
+		q->fromlen = addrlen;
+		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
+		rv = len;
 	} else if (r < 0) { 	// Error
 		perror("recvfrom");
 		rv = 0;

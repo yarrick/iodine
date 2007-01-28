@@ -150,7 +150,7 @@ START_TEST(test_decode_response)
 
 	len = sizeof(buf);
 
-	ret = dns_decode(buf, len, QR_ANSWER, answerPacket, sizeof(answerPacket)-1);
+	ret = dns_decode(buf, len, NULL, QR_ANSWER, answerPacket, sizeof(answerPacket)-1);
 	fail_unless(strncmp(msgData, buf, sizeof(msgData)) == 0, "Did not extract expected data");
 	fail_unless(ret == strlen(msgData), va_str("Bad data length: %d, expected %d", ret, strlen(msgData)));
 }

@@ -29,7 +29,7 @@ void dns_login(int, char *, int);
 int dns_read(int, char *, int);
 int dns_encode_hostname(const char *, char *, int);
 int dns_encode(char *, size_t, struct query *, int, char *, size_t);
-int dns_decode(char *, int, int, char *, int);
+int dns_decode(char *, size_t, struct query *, int, char *, size_t);
 
 extern struct sockaddr_in peer;
 
