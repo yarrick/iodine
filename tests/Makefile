@@ -12,11 +12,11 @@ all: $(TEST)
 	./$(TEST)
 
 $(TEST): $(OBJS) $(SRCOBJS)
-	@echo Linking test
+	@echo LD $(TEST)
 	@$(CC) -o $@ $(SRCOBJS) $(OBJS) $(LDFLAGS) 
 
 .c.o: 
-	@echo Building $<
+	@echo CC $<
 	@$(CC) $(CFLAGS) -c $<
 
 
