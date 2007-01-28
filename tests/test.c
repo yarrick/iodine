@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "test.h"
 
@@ -27,6 +28,7 @@ va_str(const char *fmt, ...)
 	static char buf[512];
 	va_list ap;
 
+	memset(buf, 0, sizeof(buf));
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);	
 	va_end(ap);
