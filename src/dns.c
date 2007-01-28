@@ -38,9 +38,6 @@
 #include "encoding.h"
 #include "read.h"
 
-#define QR_QUERY 0
-#define QR_ANSWER 1
-
 // For FreeBSD
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))

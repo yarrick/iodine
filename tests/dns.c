@@ -83,6 +83,33 @@ START_TEST(test_encode_hostname_toolong)
 }
 END_TEST
 
+char queryPacket[] = 
+	"\x05\x39\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01\x05\x73\x69\x6C\x6C"
+	"\x79\x04\x68\x6F\x73\x74\x02\x6F\x66\x06\x69\x6F\x64\x69\x6E\x65\x04"
+	"\x63\x6F\x64\x65\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00\x0A\x00\x01"
+	"\x00\x00\x29\x10\x00\x00\x00\x80\x00\x00\x00";
+
+START_TEST(test_encode_query)
+{
+	char buf[512];
+	char *host = "silly.host.of.iodine.code.kryo.se";
+	struct query q;
+	int len;
+	int ret;
+
+	len = sizeof(buf);
+	memset(&q, 0, sizeof(struct query));
+	q.type = T_NULL;
+	q.id = 1337;
+
+	ret = dns_encode(buf, len, &q, QR_QUERY, host, strlen(host));
+	len = sizeof(queryPacket) - 1; // Skip extra null character
+
+	fail_unless(strncmp(queryPacket, buf, sizeof(queryPacket)) == 0, "Did not compile expected packet");
+	fail_unless(ret == len, va_str("Bad packet length: %d, expected %d", ret, len));
+}
+END_TEST
+
 TCase *
 test_dns_create_tests()
 {
@@ -92,6 +119,7 @@ test_dns_create_tests()
 	tcase_add_test(tc, test_encode_hostname);
 	tcase_add_test(tc, test_encode_hostname_nodot);
 	tcase_add_test(tc, test_encode_hostname_toolong);
+	tcase_add_test(tc, test_encode_query);
 
 	return tc;
 }
