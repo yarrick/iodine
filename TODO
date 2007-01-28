@@ -19,3 +19,4 @@ STUFF TO DO:
 
 - More/better documentation (as always)
 
+- Modify readname to take the actual size of the buffer to fill, and make sure it adds a '\0' at the end. Then clean up dns.c to match the changes.

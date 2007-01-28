@@ -38,6 +38,9 @@
 #include "encoding.h"
 #include "read.h"
 
+#define QR_QUERY 0
+#define QR_ANSWER 1
+
 // For FreeBSD
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -195,48 +198,92 @@ dns_send_version(int dns_fd, int version)
 	dns_write(dns_fd, ++pingid, data, 6, 'V');
 }
 
+int
+dns_encode(char *buf, size_t buflen, struct query *q, int qr, char *data, size_t datalen)
+{
+	HEADER *header;
+	short name;
+	char *p;
+	int len;
+
+	memset(buf, 0, buflen);
+	
+	header = (HEADER*)buf;
+	
+	header->id = htons(q->id);
+	header->qr = qr;
+	header->opcode = 0;
+	header->aa = (qr == QR_ANSWER);
+	header->tc = 0;
+	header->rd = (qr == QR_QUERY);
+	header->ra = 0;
+
+	p = buf + sizeof(HEADER);
+
+	switch (qr) {
+	case QR_ANSWER:
+		header->ancount = htons(1);
+		header->qdcount = htons(1);
+	
+		name = 0xc000 | ((p - buf) & 0x3fff);
+		p += dns_encode_hostname(q->name, p, strlen(q->name));
+		putshort(&p, q->type);
+		putshort(&p, C_IN);
+
+		putshort(&p, name);	
+		putshort(&p, q->type);
+		putshort(&p, C_IN);
+		putlong(&p, 0);
+
+		/* 
+		 * XXX: This is jidder! This is used to detect if there's packets to be sent. 
+		 */
+		q->id = 0;
+
+		putshort(&p, datalen);
+		putdata(&p, data, datalen);
+		break;
+	case QR_QUERY:
+		header->qdcount = htons(1);
+		header->arcount = htons(1);
+	
+		p += dns_encode_hostname(data, p, datalen);	
+
+		putshort(&p, q->type);
+		putshort(&p, C_IN);
+
+		// EDNS0
+		putbyte(&p, 0x00); //Root
+		putshort(&p, 0x0029); // OPT
+		putshort(&p, 0x1000); // Payload size: 4096
+		putshort(&p, 0x0000); // Higher bits/edns version
+		putshort(&p, 0x8000); // Z
+		putshort(&p, 0x0000); // Data length
+		break;
+	default:
+		errx(1, "dns_encode: qr is wrong!!!");
+		/* NOTREACHED */
+	}
+	
+	len = p - buf;
+
+	return len;
+}
+
 static void 
 dns_query(int fd, int id, char *host, int type)
 {
-	char *p;
-	int len;
-	int peerlen;
 	char buf[1024];
-	HEADER *header;
+	struct query q;
+	int peerlen;
+	int len;
+
+	q.id = id;
+	q.type = type;
 	
-	len = 0;
-	memset(buf, 0, sizeof(buf));
-
-	header = (HEADER*)buf;	
-	
-	header->id = htons(id);
-	header->qr = 0;
-	header->opcode = 0;
-	header->aa = 0;
-	header->tc = 0;
-	header->rd = 1;
-	header->ra = 0;
-
-	header->qdcount = htons(1);
-	header->arcount = htons(1);
-
-	p = buf + sizeof(HEADER);
-	p += dns_encode_hostname(host, p, strlen(host));	
-
-	putshort(&p, type);
-	putshort(&p, C_IN);
-
-	// EDNS0
-	putbyte(&p, 0x00); //Root
-	putshort(&p, 0x0029); // OPT
-	putshort(&p, 0x1000); // Payload size: 4096
-	putshort(&p, 0x0000); // Higher bits/edns version
-	putshort(&p, 0x8000); // Z
-	putshort(&p, 0x0000); // Data length
+	len = dns_encode(buf, sizeof(buf), &q, QR_QUERY, host, strlen(host));
 
 	peerlen = sizeof(peer);
-
-	len = p - buf;
 	sendto(fd, buf, len, 0, (struct sockaddr*)&peer, peerlen);
 }
 
@@ -381,49 +428,15 @@ dns_encode_hostname(const char *host, char *buffer, int size)
 	return p - buffer;
 }
 
+
 void
 dnsd_send(int fd, struct query *q, char *data, int datalen)
 {
-	int len;
-	char *p;
 	char buf[64*1024];
-	short name;
-	HEADER *header;
+	int len;
 
-	memset(buf, 0, sizeof(buf));
-
-	len = 0;
-	header = (HEADER*)buf;	
-
-	header->id = htons(q->id);
-	header->qr = 1;
-	header->opcode = 0;
-	header->aa = 1;
-	header->tc = 0;
-	header->rd = 0;
-	header->ra = 0;
-
-	header->qdcount = htons(1);
-	header->ancount = htons(1);
-
-	p = buf + sizeof(HEADER);
+	len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
 	
-	name = 0xc000 | ((p - buf) & 0x3fff);
-	p += dns_encode_hostname(q->name, p, strlen(q->name));
-	putshort(&p, q->type);
-	putshort(&p, C_IN);
-
-	putshort(&p, name);	
-	putshort(&p, q->type);
-	putshort(&p, C_IN);
-	putlong(&p, 0);
-
-	q->id = 0;
-
-	putshort(&p, datalen);
-	putdata(&p, data, datalen);
-
-	len = p - buf;
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
 
@@ -494,3 +507,4 @@ dnsd_read(int fd, struct query *q, char *buf, int buflen)
 
 	return rv;
 }
+
