@@ -59,34 +59,26 @@ END_TEST
 
 START_TEST(test_read_putlong)
 {
-	char buf[4];
-	uint32_t putint;
-	uint32_t tempi;
-	uint32_t tint;
-	uint32_t *l;
+	uint32_t k;
+	uint32_t l;
 	char* p;
 	int i;
+	int j;
 
 	for (i = 0; i < 32; i++) {
-		tint = 0xF << i;
-		tempi = htonl(tint);
-		p = buf;
-		putlong(&p, tint);
-		l = &putint;
-		memcpy(l, buf, sizeof(uint32_t));
+		p = (char*)&k;
+		j = 0xf << i;
 
-		fail_unless(putint == tempi, 
-				va_str("Bad value on putlong for %d: %d != %d",
-					i, putint, tempi));
+		putlong(&p, j);
 
-		l = &tempi;
-		memcpy(buf, l, sizeof(uint32_t));
-		p = buf;
-		readlong(NULL, &p, &tempi);
+		fail_unless(ntohl(k) == j, 
+				va_str("Bad value on putlong for %d: %d != %d", i, ntohl(j), j));
+		
+		p = (char*)&k;
+		readlong(NULL, &p, &l);
 
-		fail_unless(tempi == tint, 
-				va_str("Bad value on readlong for %d: %d != %d",
-					i, tempi, tint));
+		fail_unless(l == j,
+				va_str("Bad value on readlong for %d: %d != %d", i, l, j));
 	}
 }
 END_TEST
