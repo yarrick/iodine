@@ -9,7 +9,7 @@ LDFLAGS =  -L/usr/local/lib -lcheck
 CFLAGS = -g -Wall -D$(OS) -I../src -I/usr/local/include
 
 all: $(TEST)
-	./$(TEST)
+	@./$(TEST)
 
 $(TEST): $(OBJS) $(SRCOBJS)
 	@echo LD $(TEST)
