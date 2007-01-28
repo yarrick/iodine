@@ -44,6 +44,7 @@
 #endif
 
 
+int dns_decode(char*, int, int, char*, int);
 static int dns_write(int, int, char *, int, char);
 static void dns_query(int, int, char *, int);
 
@@ -338,54 +339,65 @@ dns_read(int fd, char *buf, int buflen)
 			dns_send_chunk(fd);
 		}
 	}
-	return dns_parse_reply(buf, buflen, packet, r);
+	return dns_decode(buf, buflen, QR_ANSWER, packet, r);
 }
 
 int
-dns_parse_reply(char *outbuf, int buflen, char *packet, int packetlen)
+dns_decode(char *outbuf, int buflen, int qr, char *packet, int packetlen)
 {
-	int rv;
-	uint32_t ttl;
-	short rlen;
-	short type;
-	short class;
-	short qdcount;
-	short ancount;
-	char *data;
-	char name[255];
 	char rdata[4*1024];
 	HEADER *header;
+	short qdcount;
+	short ancount;
+	char name[255];
+	uint32_t ttl;
+	short class;
+	short type;
+	char *data;
+	short rlen;
+	int rv;
 
 	rv = 0;
 	header = (HEADER*)packet;
 	
+	if (header->qr != qr) {
+		warnx("header->qr does not match the requested qr");
+		return -1;
+	}
+	
 	data = packet + sizeof(HEADER);
+	qdcount = ntohs(header->qdcount);
+	ancount = ntohs(header->ancount);
+		
+	rlen = 0;
 
-	if(header->qr) { /* qr=1 => response */
-		qdcount = ntohs(header->qdcount);
-		ancount = ntohs(header->ancount);
-
-		rlen = 0;
-
-		if(qdcount == 1) {
-			readname(packet, packetlen, &data, name, sizeof(name));
-			readshort(packet, &data, &type);
-			readshort(packet, &data, &class);
+	switch (qr) {
+	case QR_ANSWER:
+		if(qdcount != 1 || ancount != 1) {
+			warnx("no query or answer in answer");
+			return -1;
 		}
-		if(ancount == 1) {
-			readname(packet, packetlen, &data, name, sizeof(name));
-			readshort(packet, &data, &type);
-			readshort(packet, &data, &class);
-			readlong(packet, &data, &ttl);
-			readshort(packet, &data, &rlen);
-			rv = MIN(rlen, sizeof(rdata));
-			readdata(packet, &data, rdata, rv);
-		}
+
+		readname(packet, packetlen, &data, name, sizeof(name));
+		readshort(packet, &data, &type);
+		readshort(packet, &data, &class);
+		
+		readname(packet, packetlen, &data, name, sizeof(name));
+		readshort(packet, &data, &type);
+		readshort(packet, &data, &class);
+		readlong(packet, &data, &ttl);
+		readshort(packet, &data, &rlen);
+		rv = MIN(rlen, sizeof(rdata));
+		readdata(packet, &data, rdata, rv);
 
 		if(type == T_NULL && rv > 2) {
 			rv = MIN(rv, buflen);
 			memcpy(outbuf, rdata, rv);
 		}
+		break;
+	case QR_QUERY:
+		errx(1, "unimplemented query behavior");
+		break;
 	}
 
 	return rv;
