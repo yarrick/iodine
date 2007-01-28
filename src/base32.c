@@ -111,20 +111,39 @@ decode_token(const char *t, char *data)
 
 	len = strlen(t);
 
-	data[0] = (len > 1) ? ((pos(t[0]) & 0x1f) << 3) | 
-						  ((pos(t[1]) & 0x1c) >> 2) : '\0';
-	data[1] = (len > 2) ? ((pos(t[1]) & 0x03) << 6) | 
-						  ((pos(t[2]) & 0x1f) << 1) | 
-						  ((pos(t[3]) & 0x10) >> 4) : '\0';
-	data[2] = (len > 3) ? ((pos(t[3]) & 0x0f) << 4) |
-						  ((pos(t[4]) & 0x1e) >> 1) : '\0';
-	data[3] = (len > 4) ? ((pos(t[4]) & 0x01) << 7) |
-						  ((pos(t[5]) & 0x1f) << 2) |
-						  ((pos(t[6]) & 0x18) >> 3) : '\0';
-	data[4] = (len > 5) ? ((pos(t[6]) & 0x07) << 5) |
-						  ((pos(t[7]) & 0x1f)) : '\0';
+	if (len < 2)
+		return 0;
 
-	return (len > 5) ? 5 : len;
+	data[0] = ((pos(t[0]) & 0x1f) << 3) | 
+			  ((pos(t[1]) & 0x1c) >> 2);
+	
+	if (len < 4)
+		return 1;
+
+	data[1] = ((pos(t[1]) & 0x03) << 6) | 
+			  ((pos(t[2]) & 0x1f) << 1) | 
+			  ((pos(t[3]) & 0x10) >> 4);
+
+	if (len < 5)
+		return 2;
+
+	data[2] = ((pos(t[3]) & 0x0f) << 4) |
+			  ((pos(t[4]) & 0x1e) >> 1);
+
+	if (len < 7)
+		return 3;
+
+	data[3] = ((pos(t[4]) & 0x01) << 7) |
+			  ((pos(t[5]) & 0x1f) << 2) |
+			  ((pos(t[6]) & 0x18) >> 3);
+
+	if (len < 8)
+		return 4;
+
+	data[4] = ((pos(t[6]) & 0x07) << 5) |
+			  ((pos(t[7]) & 0x1f));
+
+	return 5;
 }
 
 int
@@ -135,8 +154,8 @@ base32_decode(void **buf, size_t *buflen, const char *str)
 	const char *p;
 	char *newbuf;
 	int len;
-
-	newsize = strlen(str) * 5 / 8;
+	
+	newsize = 5 * (strlen(str) / 8 + 4);
 	if (newsize > *buflen) {
 		if ((newbuf = realloc(*buf, newsize)) == NULL) {
 			free(*buf);
@@ -153,6 +172,9 @@ base32_decode(void **buf, size_t *buflen, const char *str)
 	for (p = str; *p && strchr(cb32, *p); p += 8) {
 		len = decode_token(p, q);	
 		q += len;
+		
+		if (len < 5)
+			break;
 	}
 	*q = '\0';
 	

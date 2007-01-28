@@ -36,32 +36,26 @@
 	
 START_TEST(test_read_putshort)
 {
-	short tshort;
-	short putted;
-	short temps;
-	char buf[4];
-	short *s;
+	unsigned short k;
+	unsigned short l;
 	char* p;
 	int i;
 
-	for (i = 0; i < 65536; i++) {
-		tshort = (unsigned short) i;
-		temps = htons(tshort);
-		p = buf;
-		putshort(&p, tshort);
-		s = &putted;
-		memcpy(s, buf, sizeof(short));
-		fail_unless(putted == temps, 
-				va_str("Bad value on putshort for %d: %d != %d", 
-					i, putted, temps));
-		s = &temps;
-		memcpy(buf, s, sizeof(short));
-		p = buf;
-		readshort(NULL, &p, &temps);
+	for (i = 0; i < 65535; i++) {
+		p = (char*)&k;
 
-		fail_unless(temps == tshort,
+		putshort(&p, i);
+
+		fail_unless(ntohs(k) == i, 
+				va_str("Bad value on putshort for %d: %d != %d", 
+					i, ntohs(k), i));
+		
+		p = (char*)&k;
+		readshort(NULL, &p, &l);
+
+		fail_unless(l == i,
 				va_str("Bad value on readshort for %d: %d != %d", 
-					i, temps, tshort));
+					i, l, i));
 	}
 }
 END_TEST
