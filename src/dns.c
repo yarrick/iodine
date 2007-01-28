@@ -363,6 +363,7 @@ dns_encode_hostname(const char *host, char *buffer, int size)
 	word = strtok(h, ".");
 	while(word) {
 		if (strlen(word) > 63 || strlen(word) > left) {
+			free(h);
 			return -1;
 		}
 		left -= (strlen(word) + 1);
