@@ -87,7 +87,7 @@ readshort(char *packet, char **src, short *dst)
 {
 	unsigned char *p;
 
-	p = *src;
+	p = (unsigned char *) *src;
 	*dst = (p[0] << 8) | p[1];
 
 	(*src) += sizeof(short);
@@ -100,7 +100,7 @@ readlong(char *packet, char **src, uint32_t *dst)
 	// A long as described in dns protocol is always 32 bits
 	unsigned char *p;
 
-	p = *src;
+	p = (unsigned char *) *src;
 
 	*dst = ((uint32_t)p[0] << 24) 
 		 | ((uint32_t)p[1] << 16) 
@@ -138,12 +138,12 @@ putshort(char **dst, short value)
 {
 	unsigned char *p;
 
-	p = *dst;
+	p = (unsigned char *) *dst;
 
 	*p++ = (value >> 8);
 	*p++ = value;
 
-	(*dst) = p;
+	(*dst) = (char *) p;
 	return sizeof(short);
 }
 
@@ -153,14 +153,14 @@ putlong(char **dst, uint32_t value)
 	// A long as described in dns protocol is always 32 bits
 	unsigned char *p;
 
-	p = *dst;
+	p = (unsigned char *) *dst;
 
 	*p++ = (value >> 24);
 	*p++ = (value >> 16);
 	*p++ = (value >> 8);
 	*p++ = (value);
 
-	(*dst) = p;
+	(*dst) = (char *) p;
 	return sizeof(uint32_t);
 }
 
