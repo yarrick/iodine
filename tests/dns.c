@@ -30,19 +30,44 @@
 
 START_TEST(test_encode_hostname)
 {
+	char out[] = "\x06" "BADGER\x06" "BADGER\x04" "KRYO\x02" "SE\x00";
 	char buf[256];
 	int len;
 	int ret;
 
 	len = 256;
+
+	memset(buf, 0, 256);
+	ret = dns_encode_hostname("BADGER.BADGER.KRYO.SE", buf, len);
+	fail_unless(strncmp(buf, out, ret) == 0, "Happy flow failed");
+}
+END_TEST
 	
+START_TEST(test_encode_hostname_nodot)
+{
+	char buf[256];
+	int len;
+	int ret;
+
+	len = 256;
+
 	memset(buf, 0, 256);
 	ret = dns_encode_hostname(	// More than 63 chars between dots
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		, buf, len);
 	fail_unless(ret == -1, NULL);
+}
+END_TEST
 	
+START_TEST(test_encode_hostname_toolong)
+{
+	char buf[256];
+	int len;
+	int ret;
+
+	len = 256;
+
 	memset(buf, 0, 256);
 	ret = dns_encode_hostname(	// More chars than fits into array
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
@@ -65,6 +90,8 @@ test_dns_create_tests()
 
 	tc = tcase_create("Dns");
 	tcase_add_test(tc, test_encode_hostname);
+	tcase_add_test(tc, test_encode_hostname_nodot);
+	tcase_add_test(tc, test_encode_hostname_toolong);
 
 	return tc;
 }
