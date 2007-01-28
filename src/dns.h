@@ -37,8 +37,6 @@ int dns_encode_hostname(const char *, char *, int);
 int dns_encode(char *, size_t, struct query *, qr_t, char *, size_t);
 int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);
 
-extern struct sockaddr_in peer;
-
 int dnsd_read(int, struct query*, char *, int);
 void dnsd_send(int, struct query*, char *, int);
 
