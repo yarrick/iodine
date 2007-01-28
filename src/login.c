@@ -15,6 +15,8 @@
  */
 
 #include <string.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
 
 #include "md5.h"
 
