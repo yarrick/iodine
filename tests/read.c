@@ -146,6 +146,7 @@ START_TEST(test_read_name)
 		rv = readname(jumper, sizeof(badjump), &data, buf, 256);
 
 		fail_unless(rv == 0, NULL);
+		fail_unless(buf[0] == 0, NULL);
 	}
 	free(jumper);
 	
