@@ -23,6 +23,7 @@ void login_calculate(char *out, int len, char *pass, int seed) {
 	char temp[32];
 	md5_state_t ctx;
 	int i;
+	int k;
 	int *ix;
 
 	if (len < 16) {
@@ -30,9 +31,11 @@ void login_calculate(char *out, int len, char *pass, int seed) {
 	}
 
 	memcpy(temp, pass, 32);
-	ix = (int *) temp;
+	ix = (int*) temp;
 	for (i = 0; i < 8; i++) {
-		*ix++ ^= seed;
+		k = ntohl(*ix);
+		k ^= seed;
+		*ix++ = htonl(k);
 	}
 	md5_init(&ctx);
 	md5_append(&ctx, temp, 32);
