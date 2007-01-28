@@ -9,6 +9,7 @@ CHANGES:
 
 xxxx-xx-xx: 0.3.5
 	- Added authentication (password entered as argument or on stdin)
+	- Cleanup of dns code, more test cases
 	- Changed directory structure
 
 2006-11-08: 0.3.4
