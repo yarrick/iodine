@@ -3,7 +3,7 @@ all:
 	@(cd src; make all)
 
 test: all
-	(cd tests; make all)
+	@(cd tests; make all)
 
 clean:
 	@echo "Cleaning..."
