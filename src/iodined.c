@@ -135,9 +135,6 @@ tunnel(int tun_fd, int dns_fd)
 							strncpy(out, "VACK", sizeof(out));
 							memcpy(out+4, &nseed, 4);
 							dnsd_send(dns_fd, &q, out, 8);
-
-							memcpy(&(u.host), &(q.from), q.fromlen);
-							u.addrlen = q.fromlen;
 						} else {
 							version = htonl(VERSION);
 							strncpy(out, "VNAK", sizeof(out));
@@ -151,32 +148,30 @@ tunnel(int tun_fd, int dns_fd)
 						dnsd_send(dns_fd, &q, out, 8);
 					}
 				} else if(in[0] == 'L' || in[0] == 'l') {
-					// Check sending ip number
-					if (q.fromlen != u.addrlen ||
-						memcmp(&(u.host), &(q.from), q.fromlen) != 0) {
-						dnsd_send(dns_fd, &q, "BADIP", 5);
+					// Login phase, handle auth
+					login_calculate(logindata, 16, password, seed);
+					if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
+						// Login ok, send ip/mtu info
+						myip.s_addr = my_ip;
+						clientip.s_addr = my_ip + inet_addr("0.0.0.1");
+
+						tmp[0] = strdup(inet_ntoa(myip));
+						tmp[1] = strdup(inet_ntoa(clientip));
+						
+						read = snprintf(out, sizeof(out), "%s-%s-%d", 
+								tmp[0], tmp[1], my_mtu);
+						
+						// Store user ip
+						memcpy(&(u.host), &(q.from), q.fromlen);
+						u.addrlen = q.fromlen;
+
+						dnsd_send(dns_fd, &q, out, read);
+						q.id = 0;
+
+						free(tmp[1]);
+						free(tmp[0]);
 					} else {
-						// Login phase, handle auth
-						login_calculate(logindata, 16, password, seed);
-						if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
-							// Login ok, send ip/mtu info
-							myip.s_addr = my_ip;
-							clientip.s_addr = my_ip + inet_addr("0.0.0.1");
-
-							tmp[0] = strdup(inet_ntoa(myip));
-							tmp[1] = strdup(inet_ntoa(clientip));
-							
-							read = snprintf(out, sizeof(out), "%s-%s-%d", 
-									tmp[0], tmp[1], my_mtu);
-
-							dnsd_send(dns_fd, &q, out, read);
-							q.id = 0;
-
-							free(tmp[1]);
-							free(tmp[0]);
-						} else {
-							dnsd_send(dns_fd, &q, "LNAK", 4);
-						}
+						dnsd_send(dns_fd, &q, "LNAK", 4);
 					}
 				} else if((in[0] >= '0' && in[0] <= '9')
 						|| (in[0] >= 'a' && in[0] <= 'f')
