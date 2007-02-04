@@ -269,6 +269,7 @@ send_ping(int fd)
 	}
 
 	q.id = rand_seed;
+	q.type = T_NULL;
 
 	data[0] = (rand_seed >> 8) & 0xff;
 	data[1] = (rand_seed >> 0) & 0xff;

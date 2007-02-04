@@ -159,7 +159,6 @@ START_TEST(test_decode_query)
 	q.id = 0;
 	len = sizeof(queryPacket) - 1;
 
-	dns_set_topdomain("kryo.se");
 	ret = dns_decode(buf, sizeof(buf), &q, QR_QUERY, queryPacket, len);
 
 	fail_unless(strncmp(buf, recData, ret) == 0, "Did not extract expected host: '%s'", buf);

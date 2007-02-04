@@ -37,11 +37,6 @@
 #include "encoding.h"
 #include "read.h"
 
-static int decodepacket(const char*, char*, int);
-
-/* XXX: remove this (used by server) and make topdomain static in iodine[d].c */
-extern char *topdomain;
-
 int
 dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_t datalen)
 {
@@ -194,7 +189,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		q->type = type;
 		q->id = id;
 
-		rv = decodepacket(name, buf, buflen);
+		rv = strlen(q->name);
 		break;
 	}
 
@@ -267,22 +262,5 @@ dnsd_send(int fd, struct query *q, char *data, int datalen)
 	len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
 	
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
-}
-
-static int
-decodepacket(const char *name, char *buf, int buflen)
-{
-	/*
-	int len;
-	char *domain;
-
-	domain = strstr(name, topdomain);
-
-	len = decode_data(buf, buflen, name, domain);
-	if (len == buflen)
-		return -1; 
-	return len;
-	*/
-	return 0;
 }
 

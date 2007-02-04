@@ -174,6 +174,11 @@ decode_data(char *dest, int size, const char *src, char *srcend)
 	char *ep;
 
 	memset(encoded, 0, sizeof(encoded));
+	memset(dest, 0, size);
+
+	// The first char is not Base32-encoded, just pass it through
+	*dest++ = *src++;
+	
 	ep = encoded;
 	while(len < size && src < srcend) {
 		if(*src == '.') {

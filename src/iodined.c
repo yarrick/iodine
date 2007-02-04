@@ -36,6 +36,7 @@
 #include "dns.h"
 #include "login.h"
 #include "tun.h"
+#include "encoding.h"
 #include "version.h"
 
 int running = 1;
@@ -246,8 +247,8 @@ read_dns(int fd, struct query *q, char *buf, int buflen)
 {
 	struct sockaddr_in from;
 	char packet[64*1024];
+	char *domain;
 	socklen_t addrlen;
-	int len;
 	int rv;
 	int r;
 
@@ -255,11 +256,11 @@ read_dns(int fd, struct query *q, char *buf, int buflen)
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 
 	if (r > 0) {
-		len = dns_decode(buf, buflen, q, QR_QUERY, packet, r);
-
+		dns_decode(buf, buflen, q, QR_QUERY, packet, r);
+		domain = strstr(q->name, topdomain);
+		rv = decode_data(buf, buflen, q->name, domain);
 		q->fromlen = addrlen;
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
-		rv = len;
 	} else if (r < 0) { 	
 		/* Error */
 		perror("recvfrom");
