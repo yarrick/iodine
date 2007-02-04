@@ -38,10 +38,6 @@
 #include "tun.h"
 #include "version.h"
 
-#ifndef MAX
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#endif
-
 int running = 1;
 
 struct packet packetbuf;
@@ -59,27 +55,145 @@ in_addr_t my_ip;
 static int read_dns(int, struct query *, char *, int);
 
 static void
-sigint(int sig) {
+sigint(int sig) 
+{
 	running = 0;
 }
 
 static int
-tunnel(int tun_fd, int dns_fd)
+tunnel_tun(int tun_fd, int dns_fd)
+{
+	char out[64*1024];
+	char in[64*1024];
+	long outlen;
+	int read;
+
+	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
+		return 0;
+
+	outlen = sizeof(out);
+	compress2(out, &outlen, in, read, 9);
+	memcpy(outpacket.data, out, outlen);
+	outpacket.len = outlen;
+
+	return outlen;
+}
+
+static int
+tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct in_addr clientip;
 	struct in_addr myip;
-	struct timeval tv;
 	char out[64*1024];
 	char in[64*1024];
 	char *tmp[2];
 	char logindata[16];
 	long outlen;
-	fd_set fds;
 	int read;
 	int code;
 	int version;
 	int seed;
 	int nseed;
+
+	if ((read = read_dns(dns_fd, &q, in, sizeof(in))) <= 0)
+		return 0;
+				
+	if(in[0] == 'V' || in[0] == 'v') {
+		/* Version greeting, compare and send ack/nak */
+		if (read >= 5) { 
+			/* Received V + 32bits version */
+			memcpy(&version, in + 1, 4);
+			version = ntohl(version);
+			if (version == VERSION) {
+				seed = rand();
+				nseed = htonl(seed);
+				strncpy(out, "VACK", sizeof(out));
+				memcpy(out+4, &nseed, 4);
+				dnsd_send(dns_fd, &q, out, 8);
+			} else {
+				version = htonl(VERSION);
+				strncpy(out, "VNAK", sizeof(out));
+				memcpy(out+4, &version, 4);
+				dnsd_send(dns_fd, &q, out, 8);
+			}
+		} else {
+			version = htonl(VERSION);
+			strncpy(out, "VNAK", sizeof(out));
+			memcpy(out+4, &version, 4);
+			dnsd_send(dns_fd, &q, out, 8);
+		}
+	} else if(in[0] == 'L' || in[0] == 'l') {
+		/* Login phase, handle auth */
+		login_calculate(logindata, 16, password, seed);
+		if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
+			/* Login ok, send ip/mtu info */
+			myip.s_addr = my_ip;
+			clientip.s_addr = my_ip + inet_addr("0.0.0.1");
+
+			tmp[0] = strdup(inet_ntoa(myip));
+			tmp[1] = strdup(inet_ntoa(clientip));
+
+			read = snprintf(out, sizeof(out), "%s-%s-%d", 
+					tmp[0], tmp[1], my_mtu);
+
+			/* Store user ip */
+			memcpy(&(u.host), &(q.from), q.fromlen);
+			u.addrlen = q.fromlen;
+
+			dnsd_send(dns_fd, &q, out, read);
+			q.id = 0;
+
+			free(tmp[1]);
+			free(tmp[0]);
+		} else {
+			dnsd_send(dns_fd, &q, "LNAK", 4);
+		}
+	} else if((in[0] >= '0' && in[0] <= '9')
+			|| (in[0] >= 'a' && in[0] <= 'f')
+			|| (in[0] >= 'A' && in[0] <= 'F')) {
+		if ((in[0] >= '0' && in[0] <= '9'))
+			code = in[0] - '0';
+		if ((in[0] >= 'a' && in[0] <= 'f'))
+			code = in[0] - 'a' + 10;
+		if ((in[0] >= 'A' && in[0] <= 'F'))
+			code = in[0] - 'A' + 10;
+
+		/* Check sending ip number */
+		if (q.fromlen != u.addrlen ||
+				memcmp(&(u.host), &(q.from), q.fromlen) != 0) {
+			dnsd_send(dns_fd, &q, "BADIP", 5);
+		} else {
+			memcpy(packetbuf.data + packetbuf.offset, in + 1, read - 1);
+			packetbuf.len += read - 1;
+			packetbuf.offset += read - 1;
+
+			if (code & 1) {
+				outlen = sizeof(out);
+				uncompress(out, &outlen, packetbuf.data, packetbuf.len);
+
+				write_tun(tun_fd, out, outlen);
+
+				packetbuf.len = packetbuf.offset = 0;
+			}
+		}
+	}
+	if (q.fromlen == u.addrlen &&
+			memcmp(&(u.host), &(q.from), q.fromlen) == 0 &&
+			outpacket.len > 0) {
+
+		dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
+		outpacket.len = 0;
+		q.id = 0;
+	}
+
+	return 0;
+}
+
+static int
+tunnel(int tun_fd, int dns_fd)
+{
+	struct timeval tv;
+	fd_set fds;
 	int i;
 
 	while (running) {
@@ -112,106 +226,12 @@ tunnel(int tun_fd, int dns_fd)
 			}
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
-				read = read_tun(tun_fd, in, sizeof(in));
-				if (read <= 0)
-					continue;
-				
-				outlen = sizeof(out);
-				compress2(out, &outlen, in, read, 9);
-				memcpy(outpacket.data, out, outlen);
-				outpacket.len = outlen;
+				tunnel_tun(tun_fd, dns_fd);
+				continue;
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = read_dns(dns_fd, &q, in, sizeof(in));
-				if (read <= 0)
-			   		continue;
-
-				if(in[0] == 'V' || in[0] == 'v') {
-					// Version greeting, compare and send ack/nak
-					if (read >= 5) { // Received V + 32bits version
-						memcpy(&version, in + 1, 4);
-						version = ntohl(version);
-						if (version == VERSION) {
-							seed = rand();
-							nseed = htonl(seed);
-							strncpy(out, "VACK", sizeof(out));
-							memcpy(out+4, &nseed, 4);
-							dnsd_send(dns_fd, &q, out, 8);
-						} else {
-							version = htonl(VERSION);
-							strncpy(out, "VNAK", sizeof(out));
-							memcpy(out+4, &version, 4);
-							dnsd_send(dns_fd, &q, out, 8);
-						}
-					} else {
-						version = htonl(VERSION);
-						strncpy(out, "VNAK", sizeof(out));
-						memcpy(out+4, &version, 4);
-						dnsd_send(dns_fd, &q, out, 8);
-					}
-				} else if(in[0] == 'L' || in[0] == 'l') {
-					// Login phase, handle auth
-					login_calculate(logindata, 16, password, seed);
-					if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
-						// Login ok, send ip/mtu info
-						myip.s_addr = my_ip;
-						clientip.s_addr = my_ip + inet_addr("0.0.0.1");
-
-						tmp[0] = strdup(inet_ntoa(myip));
-						tmp[1] = strdup(inet_ntoa(clientip));
-						
-						read = snprintf(out, sizeof(out), "%s-%s-%d", 
-								tmp[0], tmp[1], my_mtu);
-						
-						// Store user ip
-						memcpy(&(u.host), &(q.from), q.fromlen);
-						u.addrlen = q.fromlen;
-
-						dnsd_send(dns_fd, &q, out, read);
-						q.id = 0;
-
-						free(tmp[1]);
-						free(tmp[0]);
-					} else {
-						dnsd_send(dns_fd, &q, "LNAK", 4);
-					}
-				} else if((in[0] >= '0' && in[0] <= '9')
-						|| (in[0] >= 'a' && in[0] <= 'f')
-						|| (in[0] >= 'A' && in[0] <= 'F')) {
-					if ((in[0] >= '0' && in[0] <= '9'))
-						code = in[0] - '0';
-					if ((in[0] >= 'a' && in[0] <= 'f'))
-						code = in[0] - 'a' + 10;
-					if ((in[0] >= 'A' && in[0] <= 'F'))
-						code = in[0] - 'A' + 10;
-					
-					// Check sending ip number
-					if (q.fromlen != u.addrlen ||
-						memcmp(&(u.host), &(q.from), q.fromlen) != 0) {
-						dnsd_send(dns_fd, &q, "BADIP", 5);
-					} else {
-						memcpy(packetbuf.data + packetbuf.offset, in + 1, read - 1);
-						packetbuf.len += read - 1;
-						packetbuf.offset += read - 1;
-
-						if (code & 1) {
-							outlen = sizeof(out);
-							uncompress(out, &outlen, packetbuf.data, packetbuf.len);
-
-							write_tun(tun_fd, out, outlen);
-
-							packetbuf.len = packetbuf.offset = 0;
-						}
-					}
-				}
-				if (q.fromlen == u.addrlen &&
-					memcmp(&(u.host), &(q.from), q.fromlen) == 0 &&
-					outpacket.len > 0) {
-
-					dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
-					outpacket.len = 0;
-					q.id = 0;
-				}
+				tunnel_dns(tun_fd, dns_fd);
+				continue;
 			} 
 		}
 	}
@@ -238,7 +258,8 @@ read_dns(int fd, struct query *q, char *buf, int buflen)
 		q->fromlen = addrlen;
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 		rv = len;
-	} else if (r < 0) { 	// Error
+	} else if (r < 0) { 	
+		/* Error */
 		perror("recvfrom");
 		rv = 0;
 	}

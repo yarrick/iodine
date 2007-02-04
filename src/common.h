@@ -17,6 +17,10 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#ifndef MAX
+#define MAX(a,b) ((a)>(b)?(a):(b))
+#endif
+
 struct packet 
 {
 	int len;

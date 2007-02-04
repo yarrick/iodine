@@ -36,15 +36,12 @@
 #include "tun.h"
 #include "version.h"
 
-#ifndef MAX
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#endif
-
 int running = 1;
 char password[33];
 
 static void
-sighandler(int sig) {
+sighandler(int sig) 
+{
 	running = 0;
 }
 
@@ -319,7 +316,7 @@ main(int argc, char **argv)
 			break;
 		default:
 			usage();
-			break;
+			/* NOTREACHED */
 		}
 	}
 	
