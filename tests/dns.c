@@ -127,7 +127,7 @@ START_TEST(test_encode_query)
 	q.id = 1337;
 	d = resolv;
 
-	encode_data(queryData, strlen(queryData), 100, d, 'A');
+	encode_data(queryData, strlen(queryData), 100, d);
 	pos = strlen(resolv);
 	d += pos;
 	if (*d != '.') {

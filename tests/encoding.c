@@ -35,7 +35,7 @@ START_TEST(test_encoding_base32)
 	end = malloc(16);
 	memset(end, 0, 16);
 
-	codedlength = encode_data(start, 9, 256, temp, 0);
+	codedlength = encode_data(start, 9, 256, temp);
 	tempend = temp + strlen(temp);
 	decode_data(end, 16, temp, tempend);
 
