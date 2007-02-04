@@ -39,16 +39,8 @@
 
 static int decodepacket(const char*, char*, int);
 
-static char *topdomain;
-
-
-/* XXX: only used from server, remove! */
-void
-dns_set_topdomain(const char *domain)
-{
-	topdomain = strdup(domain);
-}
-
+/* XXX: remove this (used by server) and make topdomain static in iodine[d].c */
+extern char *topdomain;
 
 int
 dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_t datalen)

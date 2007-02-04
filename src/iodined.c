@@ -44,7 +44,7 @@ struct packet packetbuf;
 struct packet outpacket;
 int outid;
 
-static char *topdomain;
+char *topdomain;
 
 struct query q;
 
