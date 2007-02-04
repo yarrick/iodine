@@ -28,7 +28,7 @@
 #include <string.h>
 #include <check.h>
 
-#include "structs.h"
+#include "common.h"
 #include "encoding.h"
 #include "dns.h"
 #include "read.h"

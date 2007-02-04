@@ -25,7 +25,7 @@
 #include <sys/stat.h>
 #include <arpa/nameser.h>
 
-#include "structs.h"
+#include "common.h"
 #include "dns.h"
 #include "encoding.h"
 #include "test.h"
