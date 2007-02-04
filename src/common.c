@@ -1,0 +1,72 @@
+/*
+ * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser8_compat.h>
+#endif
+#include <netdb.h>
+#include <time.h>
+#include <err.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+
+#include "common.h"
+
+int 
+open_dns(int localport, in_addr_t listen_ip) 
+{
+	struct sockaddr_in addr;
+	int flag;
+	int fd;
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(localport);
+	/* listen_ip already in network byte order from inet_addr, or 0 */
+	addr.sin_addr.s_addr = listen_ip; 
+
+	if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+		err(1, "socket");
+
+	flag = 1;
+#ifdef SO_REUSEPORT
+	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
+#endif
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
+
+	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
+		err(1, "bind");
+
+	printf("Opened UDP socket\n");
+
+	return fd;
+}
+
+void
+close_dns(int fd)
+{
+	close(fd);
+}
