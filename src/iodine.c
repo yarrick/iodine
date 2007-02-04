@@ -54,7 +54,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 	char out[64*1024];
 	char in[64*1024];
 	size_t outlen;
-	int read;
+	size_t read;
 
 	read = read_tun(tun_fd, in, sizeof(in));
 	if(read > 0) {
@@ -72,7 +72,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	char out[64*1024];
 	char in[64*1024];
 	size_t outlen;
-	int read;
+	size_t read;
 
 	read = dns_read(dns_fd, in, sizeof(in));
 	if (read > 0) {
