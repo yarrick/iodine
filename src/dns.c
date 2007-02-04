@@ -248,12 +248,17 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 
 	rv = 0;
 	header = (HEADER*)packet;
+
+	// Reject short packets
+	if (packetlen < sizeof(HEADER)) {
+		return rv;
+	}
 	
 	if (header->qr != qr) {
 		warnx("header->qr does not match the requested qr");
 		return -1;
 	}
-	
+
 	data = packet + sizeof(HEADER);
 	qdcount = ntohs(header->qdcount);
 	ancount = ntohs(header->ancount);
@@ -440,34 +445,5 @@ decodepacket(const char *name, char *buf, int buflen)
 	if (len == buflen)
 		return -1; 
 	return len;
-}
-
-int
-dnsd_read(int fd, struct query *q, char *buf, int buflen)
-{
-	struct sockaddr_in from;
-	char packet[64*1024];
-	socklen_t addrlen;
-	int len;
-	int rv;
-	int r;
-
-	addrlen = sizeof(struct sockaddr);
-	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
-
-	if (r >= sizeof(HEADER)) {
-		len = dns_decode(buf, buflen, q, QR_QUERY, packet, r);
-
-		q->fromlen = addrlen;
-		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
-		rv = len;
-	} else if (r < 0) { 	// Error
-		perror("recvfrom");
-		rv = 0;
-	} else {		// Packet too small to be dns protocol
-		rv = 0;
-	}
-
-	return rv;
 }
 

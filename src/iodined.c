@@ -56,6 +56,8 @@ char password[33];
 int my_mtu;
 in_addr_t my_ip;
 
+static int read_dns(int, struct query *, char *, int);
+
 static void
 sigint(int sig) {
 	running = 0;
@@ -120,7 +122,7 @@ tunnel(int tun_fd, int dns_fd)
 				outpacket.len = outlen;
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dnsd_read(dns_fd, &q, in, sizeof(in));
+				read = read_dns(dns_fd, &q, in, sizeof(in));
 				if (read <= 0)
 			   		continue;
 
@@ -215,6 +217,33 @@ tunnel(int tun_fd, int dns_fd)
 	}
 
 	return 0;
+}
+
+static int
+read_dns(int fd, struct query *q, char *buf, int buflen)
+{
+	struct sockaddr_in from;
+	char packet[64*1024];
+	socklen_t addrlen;
+	int len;
+	int rv;
+	int r;
+
+	addrlen = sizeof(struct sockaddr);
+	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+
+	if (r > 0) {
+		len = dns_decode(buf, buflen, q, QR_QUERY, packet, r);
+
+		q->fromlen = addrlen;
+		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
+		rv = len;
+	} else if (r < 0) { 	// Error
+		perror("recvfrom");
+		rv = 0;
+	}
+
+	return rv;
 }
 
 static void
