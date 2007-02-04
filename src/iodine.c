@@ -65,11 +65,30 @@ sighandler(int sig)
 }
 
 static void
+send_packet(int fd, char cmd, const char *data, const size_t datalen)
+{
+	char packet[4096];
+	struct query q;
+	char buf[4096];
+	size_t len;
+
+	q.id = rand_seed;
+	q.type = T_NULL;
+
+	buf[0] = cmd;
+	
+	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain);
+	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+
+	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+}
+
+static void
 dns_send_chunk(int fd)
 {
-	char packet[512];
+	char packet[4096];
 	struct query q;
-	char buf[256];
+	char buf[4096];
 	int avail;
 	char *p;
 	int len;
@@ -188,8 +207,8 @@ tunnel(int tun_fd, int dns_fd)
 {
 	struct timeval tv;
 	fd_set fds;
-	int i;
 	int rv;
+	int i;
 
 	rv = 0;
 
@@ -203,20 +222,21 @@ tunnel(int tun_fd, int dns_fd)
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
-
-		if (running == 0 || i < 0) {
-			rv = 1;
-			break;
-		}
 		
+		if (running == 0)
+			break;
+
+		if (i < 0) 
+			err(1, "select");
+
 		if (i == 0) /* timeout */
 			send_ping(dns_fd);
-		else {	
-			if(FD_ISSET(tun_fd, &fds)) {
+		else {
+			if (FD_ISSET(tun_fd, &fds)) {
 				if (tunnel_tun(tun_fd, dns_fd) <= 0)
 					continue;
 			}
-			if(FD_ISSET(dns_fd, &fds)) {
+			if (FD_ISSET(dns_fd, &fds)) {
 				if (tunnel_dns(tun_fd, dns_fd) <= 0)
 					continue;
 			} 
@@ -229,13 +249,7 @@ tunnel(int tun_fd, int dns_fd)
 void
 send_login(int fd, char *login, int len)
 {
-	char packet[512];
-	struct query q;
-	char buf[256];
 	char data[18];
-
-	q.id = rand_seed;
-	q.type = T_NULL;
 
 	memset(data, 0, sizeof(data));
 	memcpy(data, login, MIN(len, 16));
@@ -245,22 +259,13 @@ send_login(int fd, char *login, int len)
 	
 	rand_seed++;
 
-	buf[0] = 'L';
-	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, sizeof(data), topdomain);
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
-
-	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+	send_packet(fd, 'L', data, sizeof(data));
 }
 
 static void
 send_ping(int fd)
 {
-	
-	char packet[512];
-	struct query q;
-	char buf[256];
 	char data[2];
-	int len;
 	
 	if (dns_sending()) {
 		lastlen = 0;
@@ -268,32 +273,18 @@ send_ping(int fd)
 		packetlen = 0;
 	}
 
-	q.id = rand_seed;
-	q.type = T_NULL;
-
 	data[0] = (rand_seed >> 8) & 0xff;
 	data[1] = (rand_seed >> 0) & 0xff;
 	
 	rand_seed++;
 
-	buf[0] = 'P';
-	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, sizeof(data), topdomain);
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
-
-	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+	send_packet(fd, 'P', data, sizeof(data));
 }
 
 void 
 send_version(int fd, uint32_t version)
 {
-	char packet[512];
-	struct query q;
-	char buf[256];
 	char data[6];
-	int len;
-
-	q.id = rand_seed;
-	q.type = T_NULL;
 
 	data[0] = (version >> 24) & 0xff;
 	data[1] = (version >> 16) & 0xff;
@@ -305,11 +296,7 @@ send_version(int fd, uint32_t version)
 	
 	rand_seed++;
 
-	buf[0] = 'V';
-	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, sizeof(data), topdomain);
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
-
-	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+	send_packet(fd, 'V', data, sizeof(data));
 }
 
 static int
@@ -352,16 +339,17 @@ handshake(int dns_fd)
 					if (read >= 8) {
 						memcpy(&seed, in + 4, 4);
 						seed = ntohl(seed);
-						printf("Version ok, both running 0x%08x\n", VERSION);
+						printf("version ok, both running 0x%08x\n", VERSION);
 						break;
 					} else {
-						printf("Version ok but did not receive proper login challenge\n");
+						printf("version ok but did not receive proper login challenge\n");
 					}
 				} else {
 					memcpy(&version, in + 4, 4);
 					version = ntohl(version);
-					printf("You run 0x%08x, server runs 0x%08x. Giving up\n", VERSION, version);
-					return 1;
+					errx(1, "you run 0x%08x, server runs 0x%08x. giving up\n", 
+							VERSION, version);
+					/* NOTREACHED */
 				}
 			}
 		}

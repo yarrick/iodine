@@ -34,7 +34,7 @@ static int reverse_init = 0;
 
 /* Eat 5 bytes from src, write 8 bytes to dest */
 static void
-encode_chunk(char *dest, char *src)
+encode_chunk(char *dest, const char *src)
 {
 	unsigned char c;
 
@@ -102,7 +102,7 @@ decode_chunk(char *dest, char *src)
 }
 
 int
-encode_data(char *buf, int len, int space, char *dest)
+encode_data(const char *buf, const size_t len, int space, char *dest)
 {
 	int final;
 	int write;
@@ -112,8 +112,8 @@ encode_data(char *buf, int len, int space, char *dest)
 	int i;
 	char encoded[255];
 	char padding[5];
+	const char *dp;
 	char *pp;
-	char *dp;
 	char *ep;
 
 	space -= space / SPACING;

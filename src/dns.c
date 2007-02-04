@@ -197,7 +197,9 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 }
 
 int
-dns_build_hostname(char *buf, size_t buflen, char *data, size_t datalen, char *topdomain)
+dns_build_hostname(char *buf, size_t buflen, 
+				   const char *data, const size_t datalen, 
+				   const char *topdomain)
 {
 	int avail;
 	int written;
