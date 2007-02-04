@@ -14,18 +14,18 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _DNS_H_
-#define _DNS_H_
+#ifndef __DNS_H__
+#define __DNS_H__
+
+#include "common.h"
 
 typedef enum {
 	QR_QUERY = 0,
 	QR_ANSWER = 1
 } qr_t;
 
-int open_dns(int, in_addr_t);
 int dns_settarget(const char*);
 void dns_set_topdomain(const char*);
-void close_dns(int);
 
 int dns_sending();
 void dns_handle_tun(int, char *, int);

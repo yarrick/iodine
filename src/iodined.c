@@ -32,10 +32,10 @@
 #include <netinet/in.h>
 #include <zlib.h>
 
-#include "tun.h"
-#include "structs.h"
+#include "common.h"
 #include "dns.h"
 #include "login.h"
+#include "tun.h"
 #include "version.h"
 
 #ifndef MAX

@@ -30,16 +30,16 @@
 #include <arpa/inet.h>
 #include <zlib.h>
 
-#include "tun.h"
-#include "structs.h"
+#include "common.h"
 #include "dns.h"
-#include "version.h"
 #include "login.h"
+#include "tun.h"
+#include "version.h"
 
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
-	
+
 int running = 1;
 char password[33];
 
@@ -49,14 +49,49 @@ sighandler(int sig) {
 }
 
 static int
-tunnel(int tun_fd, int dns_fd)
+tunnel_tun(int tun_fd, int dns_fd)
 {
 	char out[64*1024];
 	char in[64*1024];
-	struct timeval tv;
-	long outlen;
-	fd_set fds;
+	size_t outlen;
 	int read;
+
+	read = read_tun(tun_fd, in, sizeof(in));
+	if(read > 0) {
+		outlen = sizeof(out);
+		compress2(out, &outlen, in, read, 9);
+		dns_handle_tun(dns_fd, out, outlen);
+	}
+
+	return read;
+}
+
+static int
+tunnel_dns(int tun_fd, int dns_fd)
+{
+	char out[64*1024];
+	char in[64*1024];
+	size_t outlen;
+	int read;
+
+	read = dns_read(dns_fd, in, sizeof(in));
+	if (read > 0) {
+		outlen = sizeof(out);
+		uncompress(out, &outlen, in, read);
+
+		write_tun(tun_fd, out, outlen);
+		if (!dns_sending()) 
+			dns_ping(dns_fd);
+	}
+	
+	return read;
+}
+
+static int
+tunnel(int tun_fd, int dns_fd)
+{
+	struct timeval tv;
+	fd_set fds;
 	int i;
 	int rv;
 
@@ -73,39 +108,23 @@ tunnel(int tun_fd, int dns_fd)
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
 
-		if (!running) {
+		if (running == 0 || i < 0) {
 			rv = 1;
 			break;
 		}
 		
-		if(i < 0) {
-			warn("select");
-			rv = 1;
-			break;
-		} else if (i > 0) {
+		if (i == 0) /* timeout */
+			dns_ping(dns_fd);
+		else {	
 			if(FD_ISSET(tun_fd, &fds)) {
-				read = read_tun(tun_fd, in, sizeof(in));
-				if(read <= 0)
+				if (tunnel_tun(tun_fd, dns_fd) <= 0)
 					continue;
-
-				outlen = sizeof(out);
-				compress2(out, &outlen, in, read, 9);
-				dns_handle_tun(dns_fd, out, outlen);
 			}
 			if(FD_ISSET(dns_fd, &fds)) {
-				read = dns_read(dns_fd, in, sizeof(in));
-				if (read <= 0) 
+				if (tunnel_dns(tun_fd, dns_fd) <= 0)
 					continue;
-
-				outlen = sizeof(out);
-				uncompress(out, &outlen, in, read);
-
-				write_tun(tun_fd, out, outlen);
-				if (!dns_sending()) 
-					dns_ping(dns_fd);
 			} 
-		} else
-			dns_ping(dns_fd);
+		}
 	}
 
 	return rv;

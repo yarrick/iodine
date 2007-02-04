@@ -33,7 +33,6 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "structs.h"
 #include "dns.h"
 #include "encoding.h"
 #include "read.h"
@@ -60,42 +59,6 @@ static uint16_t chunkid;
 
 static uint16_t pingid;
 
-
-int 
-open_dns(int localport, in_addr_t listen_ip) 
-{
-	int fd;
-	int flag;
-	struct sockaddr_in addr;
-
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(localport);
-	/* listen_ip already in network byte order from inet_addr, or 0 */
-	addr.sin_addr.s_addr = listen_ip; 
-
-	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if(fd < 0) {
-		warn("socket");
-		return -1;
-	}
-
-	flag = 1;
-#ifdef SO_REUSEPORT
-	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
-#endif
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
-
-	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-		warn("bind");
-		return -1;
-	}
-
-
-	printf("Opened UDP socket\n");
-
-	return fd;
-}
 
 void
 dns_set_topdomain(const char *domain)
@@ -128,11 +91,6 @@ dns_settarget(const char *host)
 	return 0;
 }
 
-void
-close_dns(int fd)
-{
-	close(fd);
-}
 
 int
 dns_sending()
