@@ -53,13 +53,15 @@ tunnel_tun(int tun_fd, int dns_fd)
 {
 	char out[64*1024];
 	char in[64*1024];
-	size_t outlen;
+	unsigned long outlen;
+	unsigned long inlen;
 	size_t read;
 
 	read = read_tun(tun_fd, in, sizeof(in));
 	if(read > 0) {
 		outlen = sizeof(out);
-		compress2(out, &outlen, in, read, 9);
+		inlen = read;
+		compress2(out, &outlen, in, inlen, 9);
 		dns_handle_tun(dns_fd, out, outlen);
 	}
 
@@ -71,13 +73,15 @@ tunnel_dns(int tun_fd, int dns_fd)
 {
 	char out[64*1024];
 	char in[64*1024];
-	size_t outlen;
+	unsigned long outlen;
+	unsigned long inlen;
 	size_t read;
 
 	read = dns_read(dns_fd, in, sizeof(in));
 	if (read > 0) {
 		outlen = sizeof(out);
-		uncompress(out, &outlen, in, read);
+		inlen = read;
+		uncompress(out, &outlen, in, inlen);
 
 		write_tun(tun_fd, out, outlen);
 		if (!dns_sending()) 
