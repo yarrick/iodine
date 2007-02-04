@@ -24,18 +24,18 @@ typedef enum {
 	QR_ANSWER = 1
 } qr_t;
 
-int dns_settarget(const char*);
 void dns_set_topdomain(const char*);
 
 int dns_sending();
 void dns_handle_tun(int, char *, int);
 void dns_ping(int);
-void dns_send_version(int, int);
 void dns_login(int, char *, int);
 int dns_read(int, char *, int);
 int dns_encode_hostname(const char *, char *, int);
 int dns_encode(char *, size_t, struct query *, qr_t, char *, size_t);
 int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);
+	
+int dns_build_hostname(char *, size_t, char *, size_t, char *);
 
 void dnsd_send(int, struct query*, char *, int);
 

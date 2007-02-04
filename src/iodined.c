@@ -44,6 +44,8 @@ struct packet packetbuf;
 struct packet outpacket;
 int outid;
 
+static char *topdomain;
+
 struct query q;
 
 struct user u;
@@ -383,7 +385,7 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-	
+
 	if (geteuid() != 0) {
 		printf("Run as root and you'll be happy.\n");
 		usage();
@@ -391,6 +393,8 @@ main(int argc, char **argv)
 
 	if (argc != 2) 
 		usage();
+
+	topdomain = strdup(argv[1]);
 
 	if (username) {
 		pw = getpwnam(username);
@@ -420,7 +424,6 @@ main(int argc, char **argv)
 		goto cleanup0;
 	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
 		goto cleanup1;
-	dns_set_topdomain(argv[1]);
 	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) 
 		goto cleanup2;
 

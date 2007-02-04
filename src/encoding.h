@@ -17,7 +17,7 @@
 #ifndef _ENCODING_H_
 #define _ENCODING_H_
 
-int encode_data(char *, int, int, char *, char);
+int encode_data(char *, int, int, char *);
 int decode_data(char *, int, const char *, char *);
 
 #endif /* _ENCODING_H_ */

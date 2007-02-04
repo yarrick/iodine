@@ -102,7 +102,7 @@ decode_chunk(char *dest, char *src)
 }
 
 int
-encode_data(char *buf, int len, int space, char *dest, char flag)
+encode_data(char *buf, int len, int space, char *dest)
 {
 	int final;
 	int write;
@@ -126,15 +126,6 @@ encode_data(char *buf, int len, int space, char *dest, char flag)
 	final = (write == len);	// is this the last block?
 	chunks = write / RAW_CHUNK;
 	leftovers = write % RAW_CHUNK;
-
-	// flag is special character to be placed first in the encoded data
-	if (flag != 0) {
-		*dest = flag;
-	} else {
-		// First byte is 0 for middle packet and 1 for last packet
-		*dest = '0' + final;
-	}
-	dest++;
 
 	memset(encoded, 0, sizeof(encoded));
 	ep = encoded;
@@ -181,12 +172,6 @@ decode_data(char *dest, int size, const char *src, char *srcend)
 	char padding[5];
 	char *pp;
 	char *ep;
-
-	// Copy flag
-	len = 1;
-	*dest = *src;
-	dest++;
-	src++;
 
 	memset(encoded, 0, sizeof(encoded));
 	ep = encoded;

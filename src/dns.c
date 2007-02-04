@@ -37,126 +37,18 @@
 #include "encoding.h"
 #include "read.h"
 
-// For FreeBSD
-#ifndef MIN
-#define MIN(a,b) ((a)<(b)?(a):(b))
-#endif
-
-
-static int dns_write(int, int, char *, int, char);
-static void dns_query(int, int, char *, int);
 static int decodepacket(const char*, char*, int);
 
-static struct sockaddr_in peer;
-static char topdomain[256];
-
-// Current IP packet
-static char activepacket[4096];
-static int lastlen;
-static int packetpos;
-static int packetlen;
-static uint16_t chunkid;
-
-static uint16_t pingid;
+static char *topdomain;
 
 
+/* XXX: only used from server, remove! */
 void
 dns_set_topdomain(const char *domain)
 {
-	strncpy(topdomain, domain, sizeof(topdomain) - 1);
-	topdomain[sizeof(topdomain) - 1] = '\0';
+	topdomain = strdup(domain);
 }
 
-int 
-dns_settarget(const char *host) 
-{
-	struct hostent *h;
-
-	// Init dns target struct
-	h = gethostbyname(host);
-	if (!h) {
-		printf("Could not resolve name %s, exiting\n", host);
-		return -1;
-	}
-
-	memset(&peer, 0, sizeof(peer));
-	peer.sin_family = AF_INET;
-	peer.sin_port = htons(53);
-	peer.sin_addr = *((struct in_addr *) h->h_addr);
-
-	// Init chunk id
-	chunkid = 0;
-	pingid = 0;
-
-	return 0;
-}
-
-
-int
-dns_sending()
-{
-	return (packetlen != 0);
-}
-
-static void
-dns_send_chunk(int fd)
-{
-	int avail;
-	char *p;
-
-	p = activepacket;
-	p += packetpos;
-	avail = packetlen - packetpos;
-	lastlen = dns_write(fd, ++chunkid, p, avail, 0);
-}
-
-void
-dns_handle_tun(int fd, char *data, int len)
-{
-	memcpy(activepacket, data, MIN(len, sizeof(activepacket)));
-	lastlen = 0;
-	packetpos = 0;
-	packetlen = len;
-
-	dns_send_chunk(fd);
-}
-
-void
-dns_ping(int dns_fd)
-{
-	char data[2];
-	if (dns_sending()) {
-		lastlen = 0;
-		packetpos = 0;
-		packetlen = 0;
-	}
-	data[0] = (pingid & 0xFF00) >> 8;
-	data[1] = (pingid & 0xFF);
-	dns_write(dns_fd, ++pingid, data, 2, 'P');
-}
-
-void
-dns_login(int dns_fd, char *login, int len)
-{
-	char data[18];
-	memcpy(data, login, MIN(len, 16));
-	data[16] = (pingid & 0xFF00) >> 8;
-	data[17] = (pingid & 0xFF);
-	dns_write(dns_fd, ++pingid, data, 18, 'L');
-}
-
-void 
-dns_send_version(int dns_fd, int version)
-{
-	char data[6];
-	int v;
-
-	v = htonl(version);
-	memcpy(data, &v, 4);
-	data[4] = (pingid & 0xFF00) >> 8;
-	data[5] = (pingid & 0xFF);
-	dns_write(dns_fd, ++pingid, data, 6, 'V');
-}
 
 int
 dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_t datalen)
@@ -171,7 +63,7 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 	header = (HEADER*)buf;
 	
 	header->id = htons(q->id);
-	header->qr = qr;
+	header->qr = (qr == QR_ANSWER);
 	header->opcode = 0;
 	header->aa = (qr == QR_ANSWER);
 	header->tc = 0;
@@ -220,9 +112,6 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		putshort(&p, 0x8000); // Z
 		putshort(&p, 0x0000); // Data length
 		break;
-	default:
-		errx(1, "dns_encode: qr is wrong!!!");
-		/* NOTREACHED */
 	}
 	
 	len = p - buf;
@@ -250,9 +139,8 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	header = (HEADER*)packet;
 
 	// Reject short packets
-	if (packetlen < sizeof(HEADER)) {
-		return rv;
-	}
+	if (packetlen < sizeof(HEADER)) 
+		return 0;
 	
 	if (header->qr != qr) {
 		warnx("header->qr does not match the requested qr");
@@ -273,6 +161,9 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			warnx("no query or answer in answer");
 			return -1;
 		}
+
+		if (q != NULL) 
+			q->id = header->id;
 
 		readname(packet, packetlen, &data, name, sizeof(name));
 		readshort(packet, &data, &type);
@@ -318,78 +209,26 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	return rv;
 }
 
-static void 
-dns_query(int fd, int id, char *host, int type)
-{
-	char buf[1024];
-	struct query q;
-	int peerlen;
-	int len;
-
-	q.id = id;
-	q.type = type;
-	
-	len = dns_encode(buf, sizeof(buf), &q, QR_QUERY, host, strlen(host));
-
-	peerlen = sizeof(peer);
-	sendto(fd, buf, len, 0, (struct sockaddr*)&peer, peerlen);
-}
-
-static int
-dns_write(int fd, int id, char *buf, int len, char flag)
+int
+dns_build_hostname(char *buf, size_t buflen, char *data, size_t datalen, char *topdomain)
 {
 	int avail;
 	int written;
 	int encoded;
-	char data[257];
-	char *d;
+	char *b;
 
-	avail = 0xFF - strlen(topdomain) - 2;
-	memset(data, 0, sizeof(data));
-	d = data;
-	written = encode_data(buf, len, avail, d, flag);
-	encoded = strlen(data);
-	d += encoded;
-	if (*d != '.') {
-		*d++ = '.';
+	avail = MIN(0xFF, buflen) - strlen(topdomain) - 2;
+	memset(buf, 0, buflen);
+	b = buf;
+	written = encode_data(data, datalen, avail, b);
+	encoded = strlen(buf);
+	b += encoded;
+	if (*b != '.') {
+		*b++ = '.';
 	}
-	strncpy(d, topdomain, strlen(topdomain)+1);
+	strncpy(b, topdomain, strlen(topdomain)+1);
 	
-	dns_query(fd, id, data, T_NULL);
 	return written;
-}
-
-int
-dns_read(int fd, char *buf, int buflen)
-{
-	int r;
-	socklen_t addrlen;
-	char packet[64*1024];
-	struct sockaddr_in from;
-	HEADER *header;
-
-	addrlen = sizeof(struct sockaddr);
-	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
-	if(r == -1) {
-		perror("recvfrom");
-		return 0;
-	}
-
-	header = (HEADER*)packet;
-	if (dns_sending() && chunkid == ntohs(header->id)) {
-		/* Got ACK on sent packet */
-		packetpos += lastlen;
-		if (packetpos == packetlen) {
-			/* Packet completed */
-			packetpos = 0;
-			packetlen = 0;
-			lastlen = 0;
-		} else {
-			/* More to send */
-			dns_send_chunk(fd);
-		}
-	}
-	return dns_decode(buf, buflen, NULL, QR_ANSWER, packet, r);
 }
 
 int
@@ -441,6 +280,7 @@ dnsd_send(int fd, struct query *q, char *data, int datalen)
 static int
 decodepacket(const char *name, char *buf, int buflen)
 {
+	/*
 	int len;
 	char *domain;
 
@@ -450,5 +290,7 @@ decodepacket(const char *name, char *buf, int buflen)
 	if (len == buflen)
 		return -1; 
 	return len;
+	*/
+	return 0;
 }
 

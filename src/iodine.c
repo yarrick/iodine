@@ -20,6 +20,7 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -29,6 +30,10 @@
 #include <pwd.h>
 #include <arpa/inet.h>
 #include <zlib.h>
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser8_compat.h>
+#endif
 
 #include "common.h"
 #include "dns.h"
@@ -36,14 +41,98 @@
 #include "tun.h"
 #include "version.h"
 
+static void send_ping(int fd);
+
 int running = 1;
 char password[33];
+
+struct sockaddr_in peer;
+static char *topdomain;
+
+uint16_t rand_seed;
+
+/* Current IP packet */
+static char activepacket[4096];
+static int lastlen;
+static int packetpos;
+static int packetlen;
+static uint16_t chunkid;
 
 static void
 sighandler(int sig) 
 {
 	running = 0;
 }
+
+static void
+dns_send_chunk(int fd)
+{
+	char packet[512];
+	struct query q;
+	char buf[256];
+	int avail;
+	char *p;
+	int len;
+
+	q.id = rand_seed;
+	q.type = T_NULL;
+
+	p = activepacket;
+	p += packetpos;
+	avail = packetlen - packetpos;
+
+	lastlen = dns_build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
+	if (lastlen == avail)
+		buf[0] = '1';
+	else 
+		buf[0] = '0';
+		
+	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+
+	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+}
+
+int
+dns_sending()
+{
+	return (packetlen != 0);
+}
+
+int
+dns_read(int fd, char *buf, int buflen)
+{
+	struct sockaddr_in from;
+	char packet[64*1024];
+	socklen_t addrlen;
+	struct query q;
+	int rv;
+	int r;
+
+	addrlen = sizeof(struct sockaddr);
+	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+	if(r == -1) {
+		perror("recvfrom");
+		return 0;
+	}
+
+	rv = dns_decode(buf, buflen, &q, QR_ANSWER, packet, r);
+
+	if (dns_sending() && chunkid == q.id) {
+		/* Got ACK on sent packet */
+		packetpos += lastlen;
+		if (packetpos == packetlen) {
+			/* Packet completed */
+			packetpos = 0;
+			packetlen = 0;
+			lastlen = 0;
+		} else {
+			/* More to send */
+			dns_send_chunk(fd);
+		}
+	}
+	return rv;
+}
+
 
 static int
 tunnel_tun(int tun_fd, int dns_fd)
@@ -59,7 +148,13 @@ tunnel_tun(int tun_fd, int dns_fd)
 		outlen = sizeof(out);
 		inlen = read;
 		compress2(out, &outlen, in, inlen, 9);
-		dns_handle_tun(dns_fd, out, outlen);
+		
+		memcpy(activepacket, out, MIN(outlen, sizeof(activepacket)));
+		lastlen = 0;
+		packetpos = 0;
+		packetlen = outlen;
+
+		dns_send_chunk(dns_fd);
 	}
 
 	return read;
@@ -82,7 +177,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 		write_tun(tun_fd, out, outlen);
 		if (!dns_sending()) 
-			dns_ping(dns_fd);
+			send_ping(dns_fd);
 	}
 	
 	return read;
@@ -115,7 +210,7 @@ tunnel(int tun_fd, int dns_fd)
 		}
 		
 		if (i == 0) /* timeout */
-			dns_ping(dns_fd);
+			send_ping(dns_fd);
 		else {	
 			if(FD_ISSET(tun_fd, &fds)) {
 				if (tunnel_tun(tun_fd, dns_fd) <= 0)
@@ -129,6 +224,91 @@ tunnel(int tun_fd, int dns_fd)
 	}
 
 	return rv;
+}
+
+void
+send_login(int fd, char *login, int len)
+{
+	char packet[512];
+	struct query q;
+	char buf[256];
+	char data[18];
+
+	q.id = rand_seed;
+	q.type = T_NULL;
+
+	memset(data, 0, sizeof(data));
+	memcpy(data, login, MIN(len, 16));
+
+	data[16] = (rand_seed >> 8) & 0xff;
+	data[17] = (rand_seed >> 0) & 0xff;
+	
+	rand_seed++;
+
+	buf[0] = 'L';
+	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, sizeof(data), topdomain);
+	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+
+	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+}
+
+static void
+send_ping(int fd)
+{
+	
+	char packet[512];
+	struct query q;
+	char buf[256];
+	char data[2];
+	int len;
+	
+	if (dns_sending()) {
+		lastlen = 0;
+		packetpos = 0;
+		packetlen = 0;
+	}
+
+	q.id = rand_seed;
+
+	data[0] = (rand_seed >> 8) & 0xff;
+	data[1] = (rand_seed >> 0) & 0xff;
+	
+	rand_seed++;
+
+	buf[0] = 'P';
+	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, sizeof(data), topdomain);
+	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+
+	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+}
+
+void 
+send_version(int fd, uint32_t version)
+{
+	char packet[512];
+	struct query q;
+	char buf[256];
+	char data[6];
+	int len;
+
+	q.id = rand_seed;
+	q.type = T_NULL;
+
+	data[0] = (version >> 24) & 0xff;
+	data[1] = (version >> 16) & 0xff;
+	data[2] = (version >> 8) & 0xff;
+	data[3] = (version >> 0) & 0xff;
+
+	data[4] = (rand_seed >> 8) & 0xff;
+	data[5] = (rand_seed >> 0) & 0xff;
+	
+	rand_seed++;
+
+	buf[0] = 'V';
+	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, sizeof(data), topdomain);
+	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+
+	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
 }
 
 static int
@@ -151,7 +331,7 @@ handshake(int dns_fd)
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		dns_send_version(dns_fd, VERSION);
+		send_version(dns_fd, VERSION);
 		
 		FD_ZERO(&fds);
 		FD_SET(dns_fd, &fds);
@@ -185,8 +365,9 @@ handshake(int dns_fd)
 			}
 		}
 		
-		if (i == 4)
-			return 1;
+		if (i == 4) 
+			errx(1, "couldn't connect to server");
+		
 		printf("Retrying version check...\n");
 	}
 	
@@ -195,7 +376,7 @@ handshake(int dns_fd)
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		dns_login(dns_fd, login, 16);
+		send_login(dns_fd, login, 16);
 		
 		FD_ZERO(&fds);
 		FD_SET(dns_fd, &fds);
@@ -236,6 +417,24 @@ handshake(int dns_fd)
 
 	return 1;
 }
+
+int 
+set_target(const char *host) 
+{
+	struct hostent *h;
+
+	// Init dns target struct
+	if ((h = gethostbyname(host)) <= 0)
+		err(1, "couldn't resovle name %s", host);
+
+	memset(&peer, 0, sizeof(peer));
+	peer.sin_family = AF_INET;
+	peer.sin_port = htons(53);
+	peer.sin_addr = *((struct in_addr *) h->h_addr);
+
+	return 0;
+}
+
 
 static void
 usage() {
@@ -330,7 +529,9 @@ main(int argc, char **argv)
 	
 	if (argc != 2) 
 		usage();
-	
+
+	topdomain = strdup(argv[1]);
+
 	if(username) {
 		pw = getpwnam(username);
 		if (!pw) {
@@ -347,10 +548,9 @@ main(int argc, char **argv)
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup1;
-	dns_set_topdomain(argv[1]);
 	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1)
 		goto cleanup2;
-	if (dns_settarget(argv[0]) == -1)
+	if (set_target(argv[0]) == -1)
 		goto cleanup2;
 
 	signal(SIGINT, sighandler);
