@@ -284,7 +284,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		readlong(packet, &data, &ttl);
 		readshort(packet, &data, &rlen);
 		rv = MIN(rlen, sizeof(rdata));
-		readdata(packet, &data, rdata, rv);
+		rv = readdata(packet, &data, rdata, rv);
 
 		if(type == T_NULL && rv > 2) {
 			rv = MIN(rv, buflen);
@@ -301,6 +301,11 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		name[256] = 0;
 		readshort(packet, &data, &type);
 		readshort(packet, &data, &class);
+
+		if(type != T_NULL) {
+			rv = 0;
+			break;
+		}
 
 		strncpy(q->name, name, 257);
 		q->type = type;
