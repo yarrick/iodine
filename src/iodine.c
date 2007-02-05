@@ -42,6 +42,7 @@
 #include "version.h"
 
 static void send_ping(int fd);
+static void send_chunk(int fd);
 
 int running = 1;
 char password[33];
@@ -83,42 +84,14 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
 }
 
-static void
-dns_send_chunk(int fd)
-{
-	char packet[4096];
-	struct query q;
-	char buf[4096];
-	int avail;
-	char *p;
-	int len;
-
-	q.id = rand_seed;
-	q.type = T_NULL;
-
-	p = activepacket;
-	p += packetpos;
-	avail = packetlen - packetpos;
-
-	lastlen = dns_build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
-	if (lastlen == avail)
-		buf[0] = '1';
-	else 
-		buf[0] = '0';
-		
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
-
-	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
-}
-
 int
-dns_sending()
+is_sending()
 {
 	return (packetlen != 0);
 }
 
 int
-dns_read(int fd, char *buf, int buflen)
+read_dns(int fd, char *buf, int buflen)
 {
 	struct sockaddr_in from;
 	char packet[64*1024];
@@ -136,7 +109,7 @@ dns_read(int fd, char *buf, int buflen)
 
 	rv = dns_decode(buf, buflen, &q, QR_ANSWER, packet, r);
 
-	if (dns_sending() && chunkid == q.id) {
+	if (is_sending() && chunkid == q.id) {
 		/* Got ACK on sent packet */
 		packetpos += lastlen;
 		if (packetpos == packetlen) {
@@ -146,7 +119,7 @@ dns_read(int fd, char *buf, int buflen)
 			lastlen = 0;
 		} else {
 			/* More to send */
-			dns_send_chunk(fd);
+			send_chunk(fd);
 		}
 	}
 	return rv;
@@ -173,7 +146,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 		packetpos = 0;
 		packetlen = outlen;
 
-		dns_send_chunk(dns_fd);
+		send_chunk(dns_fd);
 	}
 
 	return read;
@@ -188,14 +161,14 @@ tunnel_dns(int tun_fd, int dns_fd)
 	unsigned long inlen;
 	size_t read;
 
-	read = dns_read(dns_fd, in, sizeof(in));
+	read = read_dns(dns_fd, in, sizeof(in));
 	if (read > 0) {
 		outlen = sizeof(out);
 		inlen = read;
 		uncompress(out, &outlen, in, inlen);
 
 		write_tun(tun_fd, out, outlen);
-		if (!dns_sending()) 
+		if (!is_sending()) 
 			send_ping(dns_fd);
 	}
 	
@@ -217,7 +190,7 @@ tunnel(int tun_fd, int dns_fd)
 		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
-		if (!dns_sending()) 
+		if (!is_sending()) 
 			FD_SET(tun_fd, &fds);
 		FD_SET(dns_fd, &fds);
 
@@ -246,6 +219,34 @@ tunnel(int tun_fd, int dns_fd)
 	return rv;
 }
 
+static void
+send_chunk(int fd)
+{
+	char packet[4096];
+	struct query q;
+	char buf[4096];
+	int avail;
+	char *p;
+	int len;
+
+	q.id = rand_seed;
+	q.type = T_NULL;
+
+	p = activepacket;
+	p += packetpos;
+	avail = packetlen - packetpos;
+
+	lastlen = dns_build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
+	if (lastlen == avail)
+		buf[0] = '1';
+	else 
+		buf[0] = '0';
+		
+	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+
+	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+}
+
 void
 send_login(int fd, char *login, int len)
 {
@@ -267,7 +268,7 @@ send_ping(int fd)
 {
 	char data[2];
 	
-	if (dns_sending()) {
+	if (is_sending()) {
 		lastlen = 0;
 		packetpos = 0;
 		packetlen = 0;
@@ -327,7 +328,7 @@ handshake(int dns_fd)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = dns_read(dns_fd, in, sizeof(in));
+			read = read_dns(dns_fd, in, sizeof(in));
 			
 			if(read < 0) {
 				perror("read");
@@ -373,7 +374,7 @@ handshake(int dns_fd)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = dns_read(dns_fd, in, sizeof(in));
+			read = read_dns(dns_fd, in, sizeof(in));
 			
 			if(read <= 0) {
 				perror("read");
@@ -412,7 +413,6 @@ set_target(const char *host)
 {
 	struct hostent *h;
 
-	// Init dns target struct
 	if ((h = gethostbyname(host)) <= 0)
 		err(1, "couldn't resovle name %s", host);
 
