@@ -56,6 +56,7 @@ int my_mtu;
 in_addr_t my_ip;
 
 static int read_dns(int, struct query *, char *, int);
+static void write_dns(int, struct query *, char *, int);
 
 static void
 sigint(int sig) 
@@ -112,18 +113,18 @@ tunnel_dns(int tun_fd, int dns_fd)
 				nseed = htonl(seed);
 				strncpy(out, "VACK", sizeof(out));
 				memcpy(out+4, &nseed, 4);
-				dnsd_send(dns_fd, &q, out, 8);
+				write_dns(dns_fd, &q, out, 8);
 			} else {
 				version = htonl(VERSION);
 				strncpy(out, "VNAK", sizeof(out));
 				memcpy(out+4, &version, 4);
-				dnsd_send(dns_fd, &q, out, 8);
+				write_dns(dns_fd, &q, out, 8);
 			}
 		} else {
 			version = htonl(VERSION);
 			strncpy(out, "VNAK", sizeof(out));
 			memcpy(out+4, &version, 4);
-			dnsd_send(dns_fd, &q, out, 8);
+			write_dns(dns_fd, &q, out, 8);
 		}
 	} else if(in[0] == 'L' || in[0] == 'l') {
 		/* Login phase, handle auth */
@@ -143,13 +144,13 @@ tunnel_dns(int tun_fd, int dns_fd)
 			memcpy(&(u.host), &(q.from), q.fromlen);
 			u.addrlen = q.fromlen;
 
-			dnsd_send(dns_fd, &q, out, read);
+			write_dns(dns_fd, &q, out, read);
 			q.id = 0;
 
 			free(tmp[1]);
 			free(tmp[0]);
 		} else {
-			dnsd_send(dns_fd, &q, "LNAK", 4);
+			write_dns(dns_fd, &q, "LNAK", 4);
 		}
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
@@ -164,7 +165,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		/* Check sending ip number */
 		if (q.fromlen != u.addrlen ||
 				memcmp(&(u.host), &(q.from), q.fromlen) != 0) {
-			dnsd_send(dns_fd, &q, "BADIP", 5);
+			write_dns(dns_fd, &q, "BADIP", 5);
 		} else {
 			memcpy(packetbuf.data + packetbuf.offset, in + 1, read - 1);
 			packetbuf.len += read - 1;
@@ -184,7 +185,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 			memcmp(&(u.host), &(q.from), q.fromlen) == 0 &&
 			outpacket.len > 0) {
 
-		dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
+		write_dns(dns_fd, &q, outpacket.data, outpacket.len);
 		outpacket.len = 0;
 		q.id = 0;
 	}
@@ -223,7 +224,7 @@ tunnel(int tun_fd, int dns_fd)
 	
 		if (i==0) {	
 			if (q.id != 0) {
-				dnsd_send(dns_fd, &q, outpacket.data, outpacket.len);
+				write_dns(dns_fd, &q, outpacket.data, outpacket.len);
 				outpacket.len = 0;
 				q.id = 0;
 			}
@@ -268,6 +269,17 @@ read_dns(int fd, struct query *q, char *buf, int buflen)
 	}
 
 	return rv;
+}
+
+static void
+write_dns(int fd, struct query *q, char *data, int datalen)
+{
+	char buf[64*1024];
+	int len;
+
+	len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
+	
+	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
 
 static void

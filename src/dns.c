@@ -254,15 +254,3 @@ dns_encode_hostname(const char *host, char *buffer, int size)
 	return p - buffer;
 }
 
-
-void
-dnsd_send(int fd, struct query *q, char *data, int datalen)
-{
-	char buf[64*1024];
-	int len;
-
-	len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
-	
-	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
-}
-
