@@ -150,7 +150,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		}
 
 		if (q != NULL) 
-			q->id = header->id;
+			q->id = id;
 
 		readname(packet, packetlen, &data, name, sizeof(name));
 		readshort(packet, &data, &type);

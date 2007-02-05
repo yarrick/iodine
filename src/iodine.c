@@ -73,7 +73,7 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 	char buf[4096];
 	size_t len;
 
-	q.id = rand_seed;
+	q.id = ++chunkid;
 	q.type = T_NULL;
 
 	buf[0] = cmd;
@@ -229,7 +229,7 @@ send_chunk(int fd)
 	char *p;
 	int len;
 
-	q.id = rand_seed;
+	q.id = ++chunkid;
 	q.type = T_NULL;
 
 	p = activepacket;
@@ -239,7 +239,7 @@ send_chunk(int fd)
 	lastlen = dns_build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
 	if (lastlen == avail)
 		buf[0] = '1';
-	else 
+	else
 		buf[0] = '0';
 		
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
@@ -340,10 +340,10 @@ handshake(int dns_fd)
 					if (read >= 8) {
 						memcpy(&seed, in + 4, 4);
 						seed = ntohl(seed);
-						printf("version ok, both running 0x%08x\n", VERSION);
+						printf("Version ok, both running 0x%08x\n", VERSION);
 						break;
 					} else {
-						printf("version ok but did not receive proper login challenge\n");
+						printf("Version ok but did not receive proper login challenge\n");
 					}
 				} else {
 					memcpy(&version, in + 4, 4);
@@ -475,6 +475,7 @@ main(int argc, char **argv)
 	username = NULL;
 	memset(password, 0, 33);
 	foreground = 0;
+	chunkid = 0;
 	newroot = NULL;
 	device = NULL;
 	
