@@ -101,9 +101,9 @@ read_dns(int fd, char *buf, int buflen)
 	int r;
 
 	addrlen = sizeof(struct sockaddr);
-	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
-	if(r == -1) {
-		perror("recvfrom");
+	if ((r = recvfrom(fd, packet, sizeof(packet), 0, 
+					  (struct sockaddr*)&from, &addrlen)) == -1) {
+		warn("recvfrom");
 		return 0;
 	}
 
@@ -129,25 +129,25 @@ read_dns(int fd, char *buf, int buflen)
 static int
 tunnel_tun(int tun_fd, int dns_fd)
 {
-	char out[64*1024];
-	char in[64*1024];
 	unsigned long outlen;
 	unsigned long inlen;
+	char out[64*1024];
+	char in[64*1024];
 	size_t read;
 
-	read = read_tun(tun_fd, in, sizeof(in));
-	if(read > 0) {
-		outlen = sizeof(out);
-		inlen = read;
-		compress2(out, &outlen, in, inlen, 9);
-		
-		memcpy(activepacket, out, MIN(outlen, sizeof(activepacket)));
-		lastlen = 0;
-		packetpos = 0;
-		packetlen = outlen;
+	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
+		return -1;
 
-		send_chunk(dns_fd);
-	}
+	outlen = sizeof(out);
+	inlen = read;
+	compress2(out, &outlen, in, inlen, 9);
+
+	memcpy(activepacket, out, MIN(outlen, sizeof(activepacket)));
+	lastlen = 0;
+	packetpos = 0;
+	packetlen = outlen;
+
+	send_chunk(dns_fd);
 
 	return read;
 }
@@ -155,22 +155,22 @@ tunnel_tun(int tun_fd, int dns_fd)
 static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
-	char out[64*1024];
-	char in[64*1024];
 	unsigned long outlen;
 	unsigned long inlen;
+	char out[64*1024];
+	char in[64*1024];
 	size_t read;
 
-	read = read_dns(dns_fd, in, sizeof(in));
-	if (read > 0) {
-		outlen = sizeof(out);
-		inlen = read;
-		uncompress(out, &outlen, in, inlen);
+	if ((read = read_dns(dns_fd, in, sizeof(in))) <= 0) 
+		return -1;
+		
+	outlen = sizeof(out);
+	inlen = read;
+	uncompress(out, &outlen, in, inlen);
 
-		write_tun(tun_fd, out, outlen);
-		if (!is_sending()) 
-			send_ping(dns_fd);
-	}
+	write_tun(tun_fd, out, outlen);
+	if (!is_sending()) 
+		send_ping(dns_fd);
 	
 	return read;
 }
@@ -408,7 +408,7 @@ handshake(int dns_fd)
 	return 1;
 }
 
-int 
+static void 
 set_target(const char *host) 
 {
 	struct hostent *h;
@@ -420,10 +420,7 @@ set_target(const char *host)
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons(53);
 	peer.sin_addr = *((struct in_addr *) h->h_addr);
-
-	return 0;
 }
-
 
 static void
 usage() {
@@ -449,14 +446,19 @@ help() {
 	printf("  -d device to set tunnel device name\n");
 	printf("nameserver is the IP number of the relaying nameserver\n");
 	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
+
 	exit(0);
 }
 
 static void
 version() {
-	char *svnver = "$Rev$ from $Date$";
+	char *svnver;
+   
+	svnver = "$Rev$ from $Date$";
+
 	printf("iodine IP over DNS tunneling client\n");
 	printf("SVN version: %s\n", svnver);
+
 	exit(0);
 }
 
@@ -472,12 +474,12 @@ main(int argc, char **argv)
 	int tun_fd;
 	int dns_fd;
 
-	username = NULL;
 	memset(password, 0, 33);
+	username = NULL;
 	foreground = 0;
-	chunkid = 0;
 	newroot = NULL;
 	device = NULL;
+	chunkid = 0;
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:P:")) != -1) {
 		switch(choice) {
@@ -540,8 +542,7 @@ main(int argc, char **argv)
 		goto cleanup1;
 	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1)
 		goto cleanup2;
-	if (set_target(argv[0]) == -1)
-		goto cleanup2;
+	set_target(argv[0]);
 
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
@@ -554,6 +555,7 @@ main(int argc, char **argv)
 	if (newroot) {
 		if (chroot(newroot) != 0 || chdir("/") != 0)
 			err(1, "%s", newroot);
+
 		seteuid(geteuid());
 		setuid(getuid());
 	}

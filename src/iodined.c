@@ -88,10 +88,10 @@ tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct in_addr clientip;
 	struct in_addr myip;
+	char logindata[16];
 	char out[64*1024];
 	char in[64*1024];
 	char *tmp[2];
-	char logindata[16];
 	long outlen;
 	int read;
 	int code;
