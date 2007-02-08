@@ -170,28 +170,31 @@ decode_data(char *dest, int size, const char *src, char *srcend)
 	int padded;
 	char encoded[255];
 	char padding[5];
+	int enclen;
 	char *pp;
 	char *ep;
 
 	memset(encoded, 0, sizeof(encoded));
 	memset(dest, 0, size);
 
-	// The first char is not Base32-encoded, just pass it through
+	/* First byte is not encoded */
 	*dest++ = *src++;
-	
+	len = 1;
+
 	ep = encoded;
-	while(src < srcend) {
+	enclen = 0;
+	while(enclen < sizeof(encoded) && src < srcend) {
 		if(*src == '.') {
 			src++;
 			continue;
 		}
 
 		*ep++ = *src++;
+		enclen++;
 	}
-	chunks = strlen(encoded) / 8;
-	padded = strlen(encoded) % 8;
+	chunks = enclen / 8;
+	padded = enclen % 8;
 
-	len = 0;
 	ep = encoded;
 	for (i = 0; i < chunks-1; i++) {
 		decode_chunk(dest, ep);
