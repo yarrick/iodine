@@ -113,11 +113,9 @@ START_TEST(test_encode_query)
 {
 	char buf[512];
 	char resolv[512];
-	char *host = "kryo.se";
 	struct query q;
 	char *d;
 	int len;
-	int pos;
 	int ret;
 
 	len = sizeof(buf);
@@ -128,13 +126,13 @@ START_TEST(test_encode_query)
 	q.id = 1337;
 	d = resolv;
 
+	*d++ = 'A';
 	encode_data(queryData, strlen(queryData), 100, d);
-	pos = strlen(resolv);
-	d += pos;
+	d = resolv + strlen(resolv);
 	if (*d != '.') {
 		*d++ = '.';
 	}
-	strncpy(d, host, strlen(host)+1);
+	strcpy(d, topdomain);
 	ret = dns_encode(buf, len, &q, QR_QUERY, resolv, strlen(resolv));
 	len = sizeof(queryPacket) - 1; // Skip extra null character
 
