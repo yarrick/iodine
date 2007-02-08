@@ -27,21 +27,19 @@ START_TEST(test_encoding_base32)
 	char temp[256];
 	char *start = "HELLOTEST";
 	char *out = "1HELLOTEST";
-	char *end;
+	char end[256];
 	char *tempend;
 	int codedlength;
 
 	memset(temp, 0, sizeof(temp));
-	end = malloc(16);
-	memset(end, 0, 16);
+	memset(end, 0, sizeof(end));
 
-	codedlength = encode_data(start, 9, 256, temp);
+	codedlength = encode_data(start, strlen(start), sizeof(temp) - 1, temp + 1);
+	temp[0] = '1';
 	tempend = temp + strlen(temp);
-	decode_data(end, 16, temp, tempend);
+	decode_data(end, sizeof(end), temp, tempend);
 
 	fail_unless(strcmp(out, end) == 0, NULL);
-
-	free(end);
 }
 END_TEST
 
