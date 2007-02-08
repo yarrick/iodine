@@ -180,7 +180,7 @@ decode_data(char *dest, int size, const char *src, char *srcend)
 	*dest++ = *src++;
 	
 	ep = encoded;
-	while(len < size && src < srcend) {
+	while(src < srcend) {
 		if(*src == '.') {
 			src++;
 			continue;
@@ -191,6 +191,7 @@ decode_data(char *dest, int size, const char *src, char *srcend)
 	chunks = strlen(encoded) / 8;
 	padded = strlen(encoded) % 8;
 
+	len = 0;
 	ep = encoded;
 	for (i = 0; i < chunks-1; i++) {
 		decode_chunk(dest, ep);
