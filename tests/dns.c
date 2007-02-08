@@ -49,6 +49,7 @@ static char answerPacket[] =
 	"\x20\x62\x65\x20\x64\x65\x6C\x69\x76\x65\x72\x65\x64";
 	
 static char *msgData = "this is the message to be delivered";
+static char *topdomain = "kryo.se";
 	
 static char *queryData = "HELLO this is the test data";
 static char *recData = "AHELLO this is the test data";	// The A flag is added
@@ -150,6 +151,7 @@ END_TEST
 START_TEST(test_decode_query)
 {
 	char buf[512];
+	char *domain;
 	struct query q;
 	int len;
 	int ret;
@@ -159,7 +161,9 @@ START_TEST(test_decode_query)
 	q.id = 0;
 	len = sizeof(queryPacket) - 1;
 
-	ret = dns_decode(buf, sizeof(buf), &q, QR_QUERY, queryPacket, len);
+	dns_decode(buf, sizeof(buf), &q, QR_QUERY, queryPacket, len);
+	domain = strstr(q.name, topdomain);
+	ret = decode_data(buf, sizeof(buf), q.name, domain);
 
 	fail_unless(strncmp(buf, recData, ret) == 0, "Did not extract expected host: '%s'", buf);
 	fail_unless(strlen(buf) == strlen(recData), va_str("Bad host length: %d, expected %d", strlen(q.name), strlen(recData)));
