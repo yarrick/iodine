@@ -166,7 +166,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 		
 	outlen = sizeof(out);
 	inlen = read;
-	uncompress(out, &outlen, in, inlen);
+	if (uncompress(out, &outlen, in, inlen) != Z_OK)
+		return -1;
 
 	write_tun(tun_fd, out, outlen);
 	if (!is_sending()) 
@@ -362,6 +363,7 @@ handshake(int dns_fd)
 	
 perform_login:
 	login_calculate(login, 16, password, seed);
+	
 	for (i=0; running && i<5 ;i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
