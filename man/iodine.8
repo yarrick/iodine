@@ -1,0 +1,185 @@
+.\" groff -man -Tascii iodine.8
+.TH IODINE 8 "FEB 2007" "User Manuals"
+.SH NAME
+iodine, iodined \- tunnel IPv4 over DNS
+.SH SYNOPSIS
+.B iodine [-v]
+
+.B iodine [-h]
+
+.B iodine [-f] [-u
+.I user
+.B ] [-P
+.I password
+.B ] [-t
+.I chrootdir
+.B ] [-d
+.I device
+.B ]
+.I nameserver
+.I topdomain
+
+.B iodined [-v]
+
+.B iodined [-h]
+
+.B iodined [-f] [-u
+.I user
+.B ] [-P
+.I password
+.B ] [-t
+.I chrootdir
+.B ] [-m
+.I mtu
+.B ] [-l
+.I listen_ip
+.B ] [-d
+.I device
+.B ]
+.I tunnel_ip
+.I topdomain
+.SH DESCRIPTION
+.B iodine
+lets you tunnel IPv4 data through a DNS 
+server. This can be useful in situations where Internet access is firewalled,
+but DNS queries are allowed. It needs a TUN/TAP device to operate. The 
+bandwidth is asymmetrical with limited upstream and up to 1 Mbit/s downstream.
+.B iodine
+is the client application,
+.B iodined
+is the server.
+.SH OPTIONS
+.SS Common Options:
+.TP
+.B -v
+Print version info and exit.
+.TP
+.B -h
+Print usage info and exit.
+.TP
+.B -f
+Keep running in foreground.
+.TP
+.B -u user
+Drop privileges and run as user 'user' after setting up tunnel.
+.TP
+.B -t chrootdir
+Chroot to 'chrootdir' after setting up tunnel.
+.TP
+.B -P password
+Use 'password' to authenticate. If not used, 
+.B stdin
+will be used as input. Only the first 32 characters will be used.
+.TP
+.B -d device
+Use the TUN device 'device' instead of the normal one, which is dnsX on Linux
+and otherwise tunX.
+.SS Server Options:
+.TP
+.B -m mtu
+Set 'mtu' as mtu size for the tunnel device. This will be sent to the client
+on connect, and the client will use the same mtu.
+.TP
+.B -l listen_ip
+Make the server listen only on 'listen_ip' instead of on 0.0.0.0 for incoming
+connections.
+.TP
+.B -p port
+Make the server listen on 'port' instead of 53 for traffic. 
+.B Note:
+You must make sure the dns requests are forwarded to this port yourself.
+.SS Client Arguments:
+.TP
+.B nameserver
+The nameserver to use to relay the dns traffic. This can be any relaying
+nameserver  or the ip number of the server running iodined if reachable.
+Normally, you should specify a nameserver from your 
+.I /etc/resolv.conf
+file.
+.TP
+.B topdomain
+The dns traffic will be sent as querys of type NULL for subdomains under
+\'topdomain'. This is normally a subdomain to a domain you own. Use a short
+domain name to get better throughput. If 
+.B nameserver
+is the iodined server, then the topdomain can be chosen freely. This argument
+must be the same on both the client and the server.
+.SS Server Arguments:
+.TP
+.B tunnel_ip
+This is the servers ip address on the tunnel interface. The client will be
+given the next ip number in the range. It is recommended to use the 
+10.0.0.0/8 or 172.16.0.0/12 ranges.
+.TP
+.B topdomain
+The dns traffic will is expected to be sent as querys of type NULL for 
+subdomains under 'topdomain'. This is normally a subdomain to a domain you 
+own. Use a short domain name to get better throughput. This argument must be 
+the same on both the client and the server.
+.SH EXAMPLES
+.SS Quickstart:
+.TP
+Try it out within your own LAN! Follow these simple steps:
+.TP
+- On your server, run: ./iodined -f 10.0.0.1 test.asdf
+(If you already use the 10.0.0.0 network, use another internal net like 
+172.16.0.0)
+.TP
+- Enter a password
+.TP
+- On the client, run: ./iodine -f 192.168.0.1 test.asdf
+(Replace 192.168.0.1 with the server's ip address)
+.TP
+- Enter the same password
+.TP
+- Now the client has the tunnel ip 10.0.0.2 and the server has 10.0.0.1
+.TP
+- Try pinging each other through the tunnel
+.TP
+- Done! :)
+.TP
+To actually use it through a relaying nameserver, see below.
+.SS Full setup:
+
+.TP
+.B Server side:
+To use this tunnel, you need control over a real domain (like mytunnel.com),
+and a server with a static public IP number that does not yet run a DNS
+server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the server.
+If you use BIND for the domain, add these lines to the zone file (replace
+10.15.213.99 with your server ip):
+
+.nf
+tunnel1host	IN	A	10.15.213.99
+tunnel1		IN	NS	tunnel1host.mytunnel.com.
+.fi
+
+Now any DNS querys for domains ending with tunnel1.mytunnnel.com will be sent
+to your server. Start iodined on the server. The first argument is the tunnel
+IP address (like 192.168.99.1) and the second is the assigned domain (in this
+case tunnel1.mytunnel.com). The -f argument will keep iodined running in the
+foreground, which helps when testing. iodined will start a virtual interface,
+and also start listening for DNS queries on UDP port 53. Either enter a
+password on the commandline (-P pass) or after the server has started. Now 
+everything is ready for the client.
+.TP
+.B Client side: 
+All the setup is done, just start iodine. It also takes two
+arguments, the first is the local relaying DNS server and the second is the
+domain used (tunnel1.mytunnnel.com). If DNS queries are allowed to any
+computer, you can use the tunnel endpoint (example: 10.15.213.99 or
+tunnel1host.mytunnel.com) as the first argument. The tunnel interface will get
+an IP close to the servers (in this case 192.168.99.2) and a suitable MTU. 
+Enter the same password as on the server either by argument or after the client
+has started. Now you should be able to ping the other end of the tunnel from 
+either side.  
+.TP
+.B Routing:
+The normal case is to route all traffic through the DNS tunnel. To do this, first
+add a route to the nameserver you use with the default gateway as gateway. Then
+replace the default gateway with the servers IP address within the DNS tunnel,
+and configure the server to do NAT.
+.SH BUGS
+File bugs at http://dev.kryo.se/iodine/
+.SH AUTHORS
+Erik Ekman <yarrick@kryo.se> and Bjorn Andersson <flex@kryo.se>
