@@ -25,7 +25,6 @@ typedef enum {
 } qr_t;
 
 int dns_build_hostname(char *, size_t, const char *, const size_t, const char *);
-int dns_encode_hostname(const char *, char *, int);
 
 int dns_encode(char *, size_t, struct query *, qr_t, char *, size_t);
 int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);

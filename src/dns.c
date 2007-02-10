@@ -60,7 +60,9 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		header->qdcount = htons(1);
 	
 		name = 0xc000 | ((p - buf) & 0x3fff);
-		p += dns_encode_hostname(q->name, p, strlen(q->name));
+
+		putname(&p, 256, q->name);
+
 		putshort(&p, q->type);
 		putshort(&p, C_IN);
 
@@ -69,11 +71,6 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		putshort(&p, C_IN);
 		putlong(&p, 0);
 
-		/* 
-		 * XXX: This is jidder! This is used to detect if there's packets to be sent. 
-		 */
-		q->id = 0;
-
 		putshort(&p, datalen);
 		putdata(&p, data, datalen);
 		break;
@@ -81,7 +78,7 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		header->qdcount = htons(1);
 		header->arcount = htons(1);
 	
-		p += dns_encode_hostname(data, p, datalen);	
+		putname(&p, 256, data);
 
 		putshort(&p, q->type);
 		putshort(&p, C_IN);
@@ -213,39 +210,5 @@ dns_build_hostname(char *buf, size_t buflen,
 	strncpy(b, topdomain, strlen(topdomain)+1);
 	
 	return written;
-}
-
-int
-dns_encode_hostname(const char *host, char *buffer, int size)
-{
-	char *h;
-	char *p;
-	char *word;
-	int left;
-
-	h = strdup(host);
-	memset(buffer, 0, size);
-	p = buffer;
-	left = size;
-	
-	word = strtok(h, ".");
-	while(word) {
-		if (strlen(word) > 63 || strlen(word) > left) {
-			free(h);
-			return -1;
-		}
-		left -= (strlen(word) + 1);
-		*p++ = (char)strlen(word);
-		memcpy(p, word, strlen(word));
-		p += strlen(word);
-
-		word = strtok(NULL, ".");
-	}
-
-	*p++ = 0;
-
-	free(h);
-
-	return p - buffer;
 }
 

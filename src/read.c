@@ -16,6 +16,7 @@
 
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 static int
 readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length, size_t loop)
@@ -122,6 +123,41 @@ readdata(char *packet, char **src, char *dst, size_t len)
 	(*src) += len;
 
 	return len;
+}
+
+int
+putname(char **buf, size_t buflen, const char *host)
+{
+	char *word;
+	int left;
+	char *h;
+	char *p;
+
+	h = strdup(host);
+	left = buflen;
+	p = *buf;
+	
+	word = strtok(h, ".");
+	while(word) {
+		if (strlen(word) > 63 || strlen(word) > left) {
+			free(h);
+			return -1;
+		}
+
+		left -= (strlen(word) + 1);
+		*p++ = (char)strlen(word);
+		memcpy(p, word, strlen(word));
+		p += strlen(word);
+
+		word = strtok(NULL, ".");
+	}
+
+	*p++ = 0;
+
+	free(h);
+
+	*buf = p;
+	return buflen - left;
 }
 
 int
