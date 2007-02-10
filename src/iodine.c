@@ -437,13 +437,14 @@ help() {
 
 	printf("iodine IP over DNS tunneling client\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"nameserver topdomain\n", __progname);
+			"[-P password] nameserver topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
 	printf("  -d device to set tunnel device name\n");
+	printf("  -P password used for authentication (max 32 chars will be used)\n");
 	printf("nameserver is the IP number of the relaying nameserver\n");
 	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
