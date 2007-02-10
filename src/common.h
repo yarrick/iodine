@@ -17,6 +17,9 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
