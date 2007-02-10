@@ -140,7 +140,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 
 	outlen = sizeof(out);
 	inlen = read;
-	compress2(out, &outlen, in, inlen, 9);
+	compress2((uint8_t*)out, &outlen, (uint8_t*)in, inlen, 9);
 
 	memcpy(activepacket, out, MIN(outlen, sizeof(activepacket)));
 	lastlen = 0;
@@ -166,7 +166,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		
 	outlen = sizeof(out);
 	inlen = read;
-	if (uncompress(out, &outlen, in, inlen) != Z_OK)
+	if (uncompress((uint8_t*)out, &outlen, (uint8_t*)in, inlen) != Z_OK)
 		return -1;
 
 	write_tun(tun_fd, out, outlen);
