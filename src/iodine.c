@@ -304,6 +304,7 @@ static int
 handshake(int dns_fd)
 {
 	struct timeval tv;
+	uint32_t payload;
 	char server[65];
 	char client[65];
 	char login[16];
@@ -312,11 +313,10 @@ handshake(int dns_fd)
 	int read;
 	int mtu;
 	int seed;
-	int version;
 	int i;
 	int r;
 
-	for (i=0; running && i<5 ;i++) {
+	for (i = 0; running && i < 5; i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
@@ -335,32 +335,32 @@ handshake(int dns_fd)
 				continue;
 			}
 
-			if (read > 0) {
+			if (read >= 8) {
+				payload =  (((in[4] & 0xff) << 24) |
+							((in[5] & 0xff) << 16) |
+							((in[6] & 0xff) << 8) |
+							((in[7] & 0xff)));
+
 				if (strncmp("VACK", in, 4) == 0) {
-					if (read >= 8) {
-						memcpy(&seed, in + 4, 4);
-						seed = ntohl(seed);
-						printf("Version ok, both running 0x%08x\n", VERSION);
-						break;
-					} else {
-						printf("Version ok but did not receive proper login challenge\n");
-					}
+					seed = payload;
+
+					printf("Version ok, both running 0x%08x\n", VERSION);
+					goto perform_login;
 				} else {
-					memcpy(&version, in + 4, 4);
-					version = ntohl(version);
 					errx(1, "you run 0x%08x, server runs 0x%08x. giving up\n", 
-							VERSION, version);
+							VERSION, payload);
 					/* NOTREACHED */
 				}
-			}
+			} else 
+				warnx("did not receive proper login challenge\n");
 		}
-		
-		if (i == 4) 
-			errx(1, "couldn't connect to server");
 		
 		printf("Retrying version check...\n");
 	}
+	errx(1, "couldn't connect to server");
+	/* NOTREACHED */
 	
+perform_login:
 	login_calculate(login, 16, password, seed);
 	for (i=0; running && i<5 ;i++) {
 		tv.tv_sec = i + 1;
@@ -377,7 +377,7 @@ handshake(int dns_fd)
 			read = read_dns(dns_fd, in, sizeof(in));
 			
 			if(read <= 0) {
-				perror("read");
+				warn("read");
 				continue;
 			}
 
@@ -394,7 +394,7 @@ handshake(int dns_fd)
 						tun_setmtu(mtu) == 0) {
 						return 0;
 					} else {
-						warn("Received handshake with bad data");
+						warnx("Received handshake with bad data");
 					}
 				} else {
 					printf("Received bad handshake\n");
