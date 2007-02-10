@@ -20,27 +20,32 @@
 
 #include "md5.h"
 
-/* Needs a 16byte array for output, and 32 bytes password */
-void login_calculate(char *out, int len, char *pass, int seed) {
+/* 
+ * Needs a 16byte array for output, and 32 bytes password 
+ */
+void 
+login_calculate(char *buf, int buflen, char *pass, int seed) 
+{
 	unsigned char temp[32];
 	md5_state_t ctx;
+	int *ix;
 	int i;
 	int k;
-	int *ix;
 
-	if (len < 16) {
+	if (buflen < 16) 
 		return;
-	}
 
 	memcpy(temp, pass, 32);
 	ix = (int*) temp;
+
 	for (i = 0; i < 8; i++) {
 		k = ntohl(*ix);
 		k ^= seed;
 		*ix++ = htonl(k);
 	}
+
 	md5_init(&ctx);
 	md5_append(&ctx, temp, 32);
-	md5_finish(&ctx, (unsigned char *) out);
+	md5_finish(&ctx, (unsigned char *) buf);
 }
 
