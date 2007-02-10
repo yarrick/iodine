@@ -1,7 +1,7 @@
 PREFIX=/usr/local
 
 INSTALL=/usr/bin/install
-INSTALL_FLAGS= -S
+INSTALL_FLAGS= -d
 
 RM=rm
 RM_FLAGS=-f
