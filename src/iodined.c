@@ -67,68 +67,91 @@ sigint(int sig)
 static int
 tunnel_tun(int tun_fd, int dns_fd)
 {
+	unsigned long outlen;
 	char out[64*1024];
 	char in[64*1024];
-	long outlen;
 	int read;
 
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return 0;
 
 	outlen = sizeof(out);
-	compress2(out, &outlen, in, read, 9);
+	compress2((uint8_t*)out, &outlen, (uint8_t*)in, read, 9);
 	memcpy(outpacket.data, out, outlen);
 	outpacket.len = outlen;
 
 	return outlen;
 }
 
+typedef enum {
+	VERSION_ACK,
+	VERSION_NACK
+} version_ack_t;
+
+static void
+send_version_response(int fd, version_ack_t ack, uint32_t payload)
+{
+	char out[8];
+	
+	switch (ack) {
+	case VERSION_ACK:
+		strncpy(out, "VACK", sizeof(out));
+		break;
+	case VERSION_NACK:
+		strncpy(out, "VNAK", sizeof(out));
+		break;
+	}
+	
+	out[4] = ((payload >> 24) & 0xff);
+	out[5] = ((payload >> 16) & 0xff);
+	out[6] = ((payload >> 8) & 0xff);
+	out[7] = ((payload) & 0xff);
+
+	write_dns(fd, &q, out, 8);
+}
+
 static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct in_addr clientip;
+	unsigned long outlen;
 	struct in_addr myip;
 	char logindata[16];
 	char out[64*1024];
 	char in[64*1024];
+	static int seed;
 	char *tmp[2];
-	long outlen;
+	int version;
 	int read;
 	int code;
-	int version;
-	int seed;
-	int nseed;
 
 	if ((read = read_dns(dns_fd, &q, in, sizeof(in))) <= 0)
 		return 0;
 				
 	if(in[0] == 'V' || in[0] == 'v') {
 		/* Version greeting, compare and send ack/nak */
-		if (read >= 5) { 
+		if (read > 4) { 
 			/* Received V + 32bits version */
-			memcpy(&version, in + 1, 4);
-			version = ntohl(version);
+
+			version = (((in[1] & 0xff) << 24) |
+					   ((in[2] & 0xff) << 16) |
+					   ((in[3] & 0xff) << 8) |
+					   ((in[4] & 0xff)));
+
 			if (version == VERSION) {
 				seed = rand();
-				nseed = htonl(seed);
-				strncpy(out, "VACK", sizeof(out));
-				memcpy(out+4, &nseed, 4);
-				write_dns(dns_fd, &q, out, 8);
+		
+				send_version_response(dns_fd, VERSION_ACK, seed);
 			} else {
-				version = htonl(VERSION);
-				strncpy(out, "VNAK", sizeof(out));
-				memcpy(out+4, &version, 4);
-				write_dns(dns_fd, &q, out, 8);
+				send_version_response(dns_fd, VERSION_NACK, VERSION);
 			}
 		} else {
-			version = htonl(VERSION);
-			strncpy(out, "VNAK", sizeof(out));
-			memcpy(out+4, &version, 4);
-			write_dns(dns_fd, &q, out, 8);
+			send_version_response(dns_fd, VERSION_NACK, VERSION);
 		}
 	} else if(in[0] == 'L' || in[0] == 'l') {
 		/* Login phase, handle auth */
 		login_calculate(logindata, 16, password, seed);
+
 		if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
 			/* Login ok, send ip/mtu info */
 			myip.s_addr = my_ip;
@@ -173,7 +196,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 			if (code & 1) {
 				outlen = sizeof(out);
-				uncompress(out, &outlen, packetbuf.data, packetbuf.len);
+				uncompress((uint8_t*)out, &outlen, 
+						   (uint8_t*)packetbuf.data, packetbuf.len);
 
 				write_tun(tun_fd, out, outlen);
 
