@@ -193,22 +193,22 @@ dns_build_hostname(char *buf, size_t buflen,
 				   const char *data, const size_t datalen, 
 				   const char *topdomain)
 {
+	int consumed;
 	int avail;
-	int written;
-	int encoded;
 	char *b;
 
 	avail = MIN(0xFF, buflen) - strlen(topdomain) - 2;
 	memset(buf, 0, buflen);
 	b = buf;
-	written = encode_data(data, datalen, avail, b);
-	encoded = strlen(buf);
-	b += encoded;
-	if (*b != '.') {
+	
+	consumed = encode_data(data, datalen, avail, b);
+
+	b += strlen(buf);
+	if (*b != '.') 
 		*b++ = '.';
-	}
+
 	strncpy(b, topdomain, strlen(topdomain)+1);
 	
-	return written;
+	return consumed;
 }
 
