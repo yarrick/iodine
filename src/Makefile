@@ -2,7 +2,7 @@ CC = gcc
 CLIENT = ../bin/iodine
 CLIENTOBJS = iodine.o tun.o dns.o read.o encoding.o login.o base32.o md5.o common.o
 SERVER = ../bin/iodined
-SERVEROBJS = iodined.o tun.o dns.o read.o encoding.o login.o base32.o md5.o common.o
+SERVEROBJS = iodined.o tun.o dns.o read.o encoding.o login.o base32.o md5.o common.o user.o
 
 OS = `uname | tr "a-z" "A-Z"`
 ARCH = `uname -m`

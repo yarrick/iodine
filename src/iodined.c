@@ -18,7 +18,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netinet/in.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -36,6 +35,7 @@
 
 #include "common.h"
 #include "dns.h"
+#include "user.h"
 #include "login.h"
 #include "tun.h"
 #include "encoding.h"
@@ -45,8 +45,6 @@ int running = 1;
 
 char *topdomain;
 
-#define USERS 8
-struct user users[USERS];
 char password[33];
 
 int my_mtu;
@@ -59,76 +57,6 @@ static void
 sigint(int sig) 
 {
 	running = 0;
-}
-
-static void
-init_users()
-{
-	int i;
-	char newip[16];
-	
-	memset(users, 0, USERS * sizeof(struct user));
-	for (i = 0; i < USERS; i++) {
-		users[i].id = i;
-		snprintf(newip, sizeof(newip), "0.0.0.%d", i + 1);
-		users[i].tun_ip = my_ip + inet_addr(newip);;
-		users[i].inpacket.len = 0;
-		users[i].inpacket.offset = 0;
-		users[i].outpacket.len = 0;
-		users[i].q.id = 0;
-	}
-}
-
-static int
-users_waiting_on_reply()
-{
-	int ret;
-	int i;
-
-	ret = 0;
-	for (i = 0; i < USERS; i++) {
-		if (users[i].active && users[i].last_pkt + 60 > time(NULL) &&
-			users[i].q.id != 0) {
-			ret++;
-		}
-	}
-	
-	return ret;
-}
-
-static int
-find_user_by_ip(uint32_t ip)
-{
-	int ret;
-	int i;
-
-	ret = -1;
-	for (i = 0; i < USERS; i++) {
-		if (users[i].active && users[i].last_pkt + 60 > time(NULL) &&
-			ip == users[i].tun_ip) {
-			ret = i;
-			break;
-		}
-	}
-	return ret;
-}
-
-static int
-find_available_user()
-{
-	int ret = -1;
-	int i;
-
-	for (i = 0; i < USERS; i++) {
-		/* Not used at all or not used in one minute */
-		if (!users[i].active || users[i].last_pkt + 60 < time(NULL)) {
-			users[i].active = 1;
-			users[i].last_pkt = time(NULL);
-			ret = i;
-			break;
-		}
-	}
-	return ret;
 }
 
 static int
@@ -282,6 +210,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
 		}
+		users[userid].last_pkt = time(NULL);
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -582,7 +511,7 @@ main(int argc, char **argv)
 
 	my_ip = inet_addr(argv[0]);
 	my_mtu = mtu;
-	init_users();
+	init_users(my_ip);
 
 	printf("Listening to dns for domain %s\n", argv[1]);
 

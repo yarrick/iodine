@@ -14,35 +14,29 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __COMMON_H__
-#define __COMMON_H__
+#ifndef __USER_H__
+#define __USER_H__
 
-#include <sys/types.h>
-#include <sys/socket.h>
+#define USERS 8
 
-#ifndef MIN
-#define MIN(a,b) ((a)<(b)?(a):(b))
-#endif
-#ifndef MAX
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#endif
-
-struct packet 
-{
-	int len;
-	int offset;
-	char data[64*1024];
+struct user {
+	char id;
+	int active;
+	time_t last_pkt;
+	int seed;
+	in_addr_t tun_ip;
+	struct sockaddr host;
+	int addrlen;
+	struct query q;
+	struct packet inpacket;
+	struct packet outpacket;
 };
 
-struct query {
-	char name[258];
-	short type;
-	short id;
-	struct sockaddr from;
-	int fromlen;
-};
+extern struct user users[USERS];
 
-int open_dns(int, in_addr_t);
-void close_dns(int);
+void init_users(in_addr_t);
+int users_waiting_on_reply();
+int find_user_by_ip(uint32_t);
+int find_available_user();
 
 #endif
