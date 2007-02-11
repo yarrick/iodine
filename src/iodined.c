@@ -129,12 +129,14 @@ tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct in_addr tempip;
 	struct user dummy;
+	struct ip *hdr;
 	unsigned long outlen;
 	char logindata[16];
 	char out[64*1024];
 	char in[64*1024];
 	char *tmp[2];
 	int userid;
+	int touser;
 	int version;
 	int read;
 	int code;
@@ -248,8 +250,20 @@ tunnel_dns(int tun_fd, int dns_fd)
 				uncompress((uint8_t*)out, &outlen, 
 						   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
 
-				write_tun(tun_fd, out, outlen);
+				hdr = (struct ip*) (out + 4);
+				touser = find_user_by_ip(hdr->ip_dst.s_addr);
 
+				if (touser == -1) {
+					/* send the uncompressed packet to tun device */
+					write_tun(tun_fd, out, outlen);
+				} else {
+					/* send the compressed packet to other client
+					 * if another packet is queued, throw away this one. TODO build queue */
+					if (users[touser].outpacket.len == 0) {
+						memcpy(users[touser].outpacket.data, users[userid].inpacket.data, users[userid].inpacket.len);
+						users[touser].outpacket.len = users[userid].inpacket.len;
+					}
+				}
 				users[userid].inpacket.len = users[userid].inpacket.offset = 0;
 			}
 		}
