@@ -136,10 +136,12 @@ START_TEST(test_find_available_user)
 	users[3].active = 0;
 
 	fail_unless(find_available_user() == 3);
+	fail_unless(find_available_user() == -1);
 
 	users[3].last_pkt = 55;
 	
 	fail_unless(find_available_user() == 3);
+	fail_unless(find_available_user() == -1);
 }
 END_TEST
 
