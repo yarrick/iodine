@@ -18,7 +18,7 @@
 #include <strings.h>
 #include <string.h>
 
-// For FreeBSD
+/* For FreeBSD */
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
@@ -38,29 +38,29 @@ encode_chunk(char *dest, const char *src)
 {
 	unsigned char c;
 
-	*dest++ = base32[(*src & 0xF8) >> 3];	// 1111 1000 first byte
+	*dest++ = base32[(*src & 0xF8) >> 3];	/* 1111 1000 first byte */
 
-	c = (*src++ & 0x07) << 2;		// 0000 0111 first byte
-	c |=  ((*src & 0xC0) >> 6);		// 1100 0000 second byte
+	c = (*src++ & 0x07) << 2;		/* 0000 0111 first byte */
+	c |=  ((*src & 0xC0) >> 6);		/* 1100 0000 second byte */
 	*dest++ = base32[(int) c];
 
-	*dest++ = base32[(*src & 0x3E) >> 1];	// 0011 1110 second byte
+	*dest++ = base32[(*src & 0x3E) >> 1];	/* 0011 1110 second byte */
 
-	c = (*src++ & 0x01) << 4;		// 0000 0001 second byte
-	c |=  ((*src & 0xF0) >> 4);		// 1111 0000 third byte
-	*dest++ = base32[(int) c];
-	
-	c = (*src++ & 0x0F) << 1;		// 0000 1111 third byte
-	c |=  ((*src & 0x80) >> 7);		// 1000 0000 fourth byte
+	c = (*src++ & 0x01) << 4;		/* 0000 0001 second byte */
+	c |=  ((*src & 0xF0) >> 4);		/* 1111 0000 third byte */
 	*dest++ = base32[(int) c];
 	
-	*dest++ = base32[(*src & 0x7C) >> 2];	// 0111 1100 fourth byte
+	c = (*src++ & 0x0F) << 1;		/* 0000 1111 third byte */
+	c |=  ((*src & 0x80) >> 7);		/* 1000 0000 fourth byte */
+	*dest++ = base32[(int) c];
+	
+	*dest++ = base32[(*src & 0x7C) >> 2];	/* 0111 1100 fourth byte */
 
-	c = (*src++ & 0x03) << 3;		// 0000 0011 fourth byte
-	c |=  ((*src & 0xE0) >> 5);		// 1110 0000 fifth byte
+	c = (*src++ & 0x03) << 3;		/* 0000 0011 fourth byte */
+	c |=  ((*src & 0xE0) >> 5);		/* 1110 0000 fifth byte */
 	*dest++ = base32[(int) c];
 
-	*dest++ = base32[*src++ & 0x1F];	// 0001 1111 fifth byte
+	*dest++ = base32[*src++ & 0x1F];	/* 0001 1111 fifth byte */
 }
 
 /* Eat 8 bytes from src, write 5 bytes to dest */
@@ -78,26 +78,26 @@ decode_chunk(char *dest, char *src)
 		reverse_init = 1;
 	}
 
-	c = reverse32[(int) *src++] << 3;		// Take bits 11111 from byte 1
-	c |= (reverse32[(int) *src] & 0x1C) >> 2;	// Take bits 11100 from byte 2
+	c = reverse32[(int) *src++] << 3;		/* Take bits 11111 from byte 1 */
+	c |= (reverse32[(int) *src] & 0x1C) >> 2;	/* Take bits 11100 from byte 2 */
 	*dest++ = c;
 	
-	c = (reverse32[(int) *src++] & 0x3) << 6;	// Take bits 00011 from byte 2
-	c |= reverse32[(int) *src++] << 1;		// Take bits 11111 from byte 3
-	c |= (reverse32[(int) *src] & 0x10) >> 4;	// Take bits 10000 from byte 4
+	c = (reverse32[(int) *src++] & 0x3) << 6;	/* Take bits 00011 from byte 2 */
+	c |= reverse32[(int) *src++] << 1;		/* Take bits 11111 from byte 3 */
+	c |= (reverse32[(int) *src] & 0x10) >> 4;	/* Take bits 10000 from byte 4 */
 	*dest++ = c;
 	
-	c = (reverse32[(int) *src++] & 0xF) << 4;	// Take bits 01111 from byte 4
-	c |= (reverse32[(int) *src] & 0x1E) >> 1;	// Take bits 11110 from byte 5
+	c = (reverse32[(int) *src++] & 0xF) << 4;	/* Take bits 01111 from byte 4 */
+	c |= (reverse32[(int) *src] & 0x1E) >> 1;	/* Take bits 11110 from byte 5 */
 	*dest++ = c;
 	
-	c = reverse32[(int) *src++] << 7;		// Take bits 00001 from byte 5
-	c |= reverse32[(int) *src++] << 2;		// Take bits 11111 from byte 6
-	c |= (reverse32[(int) *src] & 0x18) >> 3;	// Take bits 11000 from byte 7
+	c = reverse32[(int) *src++] << 7;		/* Take bits 00001 from byte 5 */
+	c |= reverse32[(int) *src++] << 2;		/* Take bits 11111 from byte 6 */
+	c |= (reverse32[(int) *src] & 0x18) >> 3;	/* Take bits 11000 from byte 7 */
 	*dest++ = c;
 	
-	c = (reverse32[(int) *src++] & 0x7) << 5;	// Take bits 00111 from byte 7
-	c |= reverse32[(int) *src++];			// Take bits 11111 from byte 8
+	c = (reverse32[(int) *src++] & 0x7) << 5;	/* Take bits 00111 from byte 7 */
+	c |= reverse32[(int) *src++];			/* Take bits 11111 from byte 8 */
 	*dest++ = c;
 }
 
@@ -122,8 +122,8 @@ encode_data(const char *buf, const size_t len, int space, char *dest)
 		chunks--;
 	}
 	write = RAW_CHUNK * chunks;
-	write = MIN(write, len); // do not use more bytes than is available;
-	final = (write == len);	// is this the last block?
+	write = MIN(write, len); /* do not use more bytes than is available; */
+	final = (write == len);	/* is this the last block? */
 	chunks = write / RAW_CHUNK;
 	leftovers = write % RAW_CHUNK;
 
@@ -146,7 +146,7 @@ encode_data(const char *buf, const size_t len, int space, char *dest)
 		*ep++ = padder[leftovers];
 		encode_chunk(ep, pp);
 		
-		realwrite += ENC_CHUNK + 1;	// plus padding character
+		realwrite += ENC_CHUNK + 1;	/* plus padding character */
 	}
 	ep = encoded;
 	if (len > 0) {
@@ -202,7 +202,7 @@ decode_data(char *dest, int size, const char *src, char *srcend)
 		ep += ENC_CHUNK;
 		len += RAW_CHUNK;
 	}
-	// Read last chunk:
+	/* Read last chunk */
 	if (padded) {
 		pp = padding;
 		padded = *ep++ - '0';

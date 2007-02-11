@@ -17,8 +17,8 @@
 #ifndef _VERSION_H_
 #define _VERSION_H_
 
-// This is the version of the network protocol
-// It is usually equal to the latest iodine version number
+/* This is the version of the network protocol
+   It is usually equal to the latest iodine version number */
 #define VERSION 0x00000400
 
 #endif /* _VERSION_H_ */

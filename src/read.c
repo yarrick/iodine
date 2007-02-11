@@ -42,10 +42,10 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 			offset = (((s[-1] & 0x3f) << 8) | (s[0] & 0xff));
 			if (offset > packetlen) {
 				if (len == 0) {
-					// Bad jump first in packet
+					/* Bad jump first in packet */
 					return 0;
 				} else {
-					// Bad jump after some data
+					/* Bad jump after some data */
 					break;
 				}
 			}
@@ -98,7 +98,7 @@ readshort(char *packet, char **src, short *dst)
 int
 readlong(char *packet, char **src, uint32_t *dst)
 {
-	// A long as described in dns protocol is always 32 bits
+	/* A long as described in dns protocol is always 32 bits */
 	unsigned char *p;
 
 	p = (unsigned char *) *src;
@@ -161,7 +161,7 @@ putname(char **buf, size_t buflen, const char *host)
 }
 
 int
-putbyte(char **dst, char value)
+putbyte(char **dst, unsigned char value)
 {
 	**dst = value;
 	(*dst)++;
@@ -170,7 +170,7 @@ putbyte(char **dst, char value)
 }
 
 int
-putshort(char **dst, short value)
+putshort(char **dst, unsigned short value)
 {
 	unsigned char *p;
 
@@ -186,7 +186,7 @@ putshort(char **dst, short value)
 int
 putlong(char **dst, uint32_t value)
 {
-	// A long as described in dns protocol is always 32 bits
+	/* A long as described in dns protocol is always 32 bits */
 	unsigned char *p;
 
 	p = (unsigned char *) *dst;

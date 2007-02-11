@@ -8,7 +8,7 @@ OS = `uname | tr "a-z" "A-Z"`
 ARCH = `uname -m`
 
 LDFLAGS =  -lz
-CFLAGS = -c -g -Wall -D$(OS)
+CFLAGS = -c -g -Wall -D$(OS) -pedantic
 
 all: stateos $(CLIENT) $(SERVER) $(TESTSUITE) 
 

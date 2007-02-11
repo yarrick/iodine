@@ -83,13 +83,13 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		putshort(&p, q->type);
 		putshort(&p, C_IN);
 
-		// EDNS0
-		putbyte(&p, 0x00); //Root
-		putshort(&p, 0x0029); // OPT
-		putshort(&p, 0x1000); // Payload size: 4096
-		putshort(&p, 0x0000); // Higher bits/edns version
-		putshort(&p, 0x8000); // Z
-		putshort(&p, 0x0000); // Data length
+		/* EDNS0 */
+		putbyte(&p, 0x00);    /* Root */
+		putshort(&p, 0x0029); /* OPT */
+		putshort(&p, 0x1000); /* Payload size: 4096 */
+		putshort(&p, 0x0000); /* Higher bits/edns version */
+		putshort(&p, 0x8000); /* Z */
+		putshort(&p, 0x0000); /* Data length */
 		break;
 	}
 	
@@ -117,7 +117,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	rv = 0;
 	header = (HEADER*)packet;
 
-	// Reject short packets
+	/* Reject short packets */
 	if (packetlen < sizeof(HEADER)) 
 		return 0;
 	

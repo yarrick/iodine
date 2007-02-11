@@ -427,8 +427,9 @@ set_target(const char *host)
 {
 	struct hostent *h;
 
-	if ((h = gethostbyname(host)) <= 0)
-		err(1, "couldn't resovle name %s", host);
+	h = gethostbyname(host);
+	if (!h)
+		err(1, "couldn't resolve name %s", host);
 
 	memset(&peer, 0, sizeof(peer));
 	peer.sin_family = AF_INET;

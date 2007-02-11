@@ -170,7 +170,7 @@ int
 read_tun(int tun_fd, char *buf, int len) 
 {
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
-	// FreeBSD has no header
+	/* FreeBSD/Darwin/NetBSD has no header */
 	return read(tun_fd, buf + 4, len - 4) + 4;
 #else /* !FREEBSD */
 	return read(tun_fd, buf, len);
