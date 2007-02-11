@@ -80,10 +80,15 @@ tunnel_tun(int tun_fd, int dns_fd)
 
 	outlen = sizeof(out);
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, read, 9);
-	memcpy(users[userid].outpacket.data, out, outlen);
-	users[userid].outpacket.len = outlen;
 
-	return outlen;
+	/* if another packet is queued, throw away this one. TODO build queue */
+	if (users[userid].outpacket.len == 0) {
+		memcpy(users[userid].outpacket.data, out, outlen);
+		users[userid].outpacket.len = outlen;
+		return outlen;
+	} else {
+		return 0;
+	}
 }
 
 typedef enum {
@@ -281,7 +286,8 @@ tunnel(int tun_fd, int dns_fd)
 		}
 
 		FD_ZERO(&fds);
-		//if(outpacket.len == 0) TODO fix this
+		/* TODO : use some kind of packet queue */
+		if(!all_users_waiting_to_send())
 			FD_SET(tun_fd, &fds);
 		FD_SET(dns_fd, &fds);
 

@@ -80,11 +80,29 @@ find_user_by_ip(uint32_t ip)
 }
 
 int
+all_users_waiting_to_send()
+{
+	time_t now;
+	int ret;
+	int i;
+
+	ret = 1;
+	now = time(NULL);
+	for (i = 0; i < USERS; i++) {
+		if (users[i].active && users[i].last_pkt + 60 > now &&
+			users[i].outpacket.len == 0) {
+			ret = 0;
+			break;
+		}
+	}
+	return ret;
+}
+
+int
 find_available_user()
 {
 	int ret = -1;
 	int i;
-
 	for (i = 0; i < USERS; i++) {
 		/* Not used at all or not used in one minute */
 		if (!users[i].active || users[i].last_pkt + 60 < time(NULL)) {
