@@ -165,6 +165,73 @@ START_TEST(test_read_name)
 }
 END_TEST
 
+START_TEST(test_putname)
+{
+	char out[] = "\x06" "BADGER\x06" "BADGER\x04" "KRYO\x02" "SE\x00";
+	char buf[256];
+	char *domain = "BADGER.BADGER.KRYO.SE";
+	char *b;
+	int len;
+	int ret;
+
+	len = 256;
+
+	memset(buf, 0, 256);
+	b = buf;
+	ret = putname(&b, 256, domain);
+
+	fail_unless(ret == strlen(domain) + 1, NULL);
+	fail_unless(strncmp(buf, out, ret) == 0, "Happy flow failed");
+}
+END_TEST
+	
+START_TEST(test_putname_nodot)
+{
+	char buf[256];
+	char *nodot = 
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	char *b;
+	int len;
+	int ret;
+
+	len = 256;
+
+	memset(buf, 0, 256);
+	b = buf;
+	ret = putname(&b, 256, nodot);
+
+	fail_unless(ret == -1, NULL);
+	fail_unless(b == buf, NULL);
+}
+END_TEST
+	
+START_TEST(test_putname_toolong)
+{
+	char buf[256];
+	char *toolong = 
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ.";
+	char *b;
+	int len;
+	int ret;
+
+	len = 256;
+
+	memset(buf, 0, 256);
+	b = buf;
+	ret = putname(&b, 256, toolong);
+
+	fail_unless(ret == -1, NULL);
+	fail_unless(b == buf, NULL);
+}
+END_TEST
+
+
 TCase *
 test_read_create_tests()
 {
@@ -175,6 +242,9 @@ test_read_create_tests()
 	tcase_add_test(tc, test_read_putshort);
 	tcase_add_test(tc, test_read_putlong);
 	tcase_add_test(tc, test_read_name);
+	tcase_add_test(tc, test_putname);
+	tcase_add_test(tc, test_putname_nodot);
+	tcase_add_test(tc, test_putname_toolong);
 
 	return tc;
 }
