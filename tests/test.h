@@ -22,6 +22,7 @@ TCase *test_dns_create_tests();
 TCase *test_encoding_create_tests();
 TCase *test_read_create_tests();
 TCase *test_login_create_tests();
+TCase *test_user_create_tests();
 
 char *va_str(const char *, ...);
 	
