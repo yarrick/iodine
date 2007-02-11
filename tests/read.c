@@ -85,13 +85,13 @@ END_TEST
 
 START_TEST(test_read_name)
 {
-	char emptyloop[] = {
+	unsigned char emptyloop[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 }; 
-	char infloop[] = {
+	unsigned char infloop[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x01, 'A', 0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 }; 
-	char longname[] = 
+	unsigned char longname[] = 
 		"AA\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
@@ -100,50 +100,50 @@ START_TEST(test_read_name)
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
 		"\x00\x00\x01\x00\x01";
-	char onejump[] = 
+	unsigned char onejump[] = 
 		"AA\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
 		"\x02hh\xc0\x15\x00\x01\x00\x01\x05zBCDE\x00";
-	char badjump[] = {
+	unsigned char badjump[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 }; 
-	char badjump2[] = {
+	unsigned char badjump2[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x02, 'B', 'A', 0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 }; 
-	char *jumper;
+	unsigned char *jumper;
 	char buf[1024];
 	char *data;
 	int rv;
 
 	memset(buf, 0, sizeof(buf));
-	data = emptyloop + sizeof(HEADER);
+	data = (char*) emptyloop + sizeof(HEADER);
 	buf[1023] = 'A';
-	rv = readname(emptyloop, sizeof(emptyloop), &data, buf, 1023);
+	rv = readname((char *) emptyloop, sizeof(emptyloop), &data, buf, 1023);
 	fail_unless(buf[1023] == 'A', NULL);
 	
 	memset(buf, 0, sizeof(buf));
-	data = infloop + sizeof(HEADER);
+	data = (char*) infloop + sizeof(HEADER);
 	buf[4] = '\a';
-	rv = readname(infloop, sizeof(infloop), &data, buf, 4);
+	rv = readname((char*) infloop, sizeof(infloop), &data, buf, 4);
 	fail_unless(buf[4] == '\a', NULL);
 	
 	memset(buf, 0, sizeof(buf));
-	data = longname + sizeof(HEADER);
+	data = (char*) longname + sizeof(HEADER);
 	buf[256] = '\a';
-	rv = readname(longname, sizeof(longname), &data, buf, 256);
+	rv = readname((char*) longname, sizeof(longname), &data, buf, 256);
 	fail_unless(buf[256] == '\a', NULL);
 
 	memset(buf, 0, sizeof(buf));
-	data = onejump + sizeof(HEADER);
-	rv = readname(onejump, sizeof(onejump), &data, buf, 256);
+	data = (char*) onejump + sizeof(HEADER);
+	rv = readname((char*) onejump, sizeof(onejump), &data, buf, 256);
 	fail_unless(rv == 9, NULL);
 	
-	// These two tests use malloc to cause segfault if jump is executed
+	/* These two tests use malloc to cause segfault if jump is executed */
 	memset(buf, 0, sizeof(buf));
 	jumper = malloc(sizeof(badjump));
 	if (jumper) {
 		memcpy(jumper, badjump, sizeof(badjump));
-		data = jumper + sizeof(HEADER);
-		rv = readname(jumper, sizeof(badjump), &data, buf, 256);
+		data = (char*) jumper + sizeof(HEADER);
+		rv = readname((char*) jumper, sizeof(badjump), &data, buf, 256);
 
 		fail_unless(rv == 0, NULL);
 		fail_unless(buf[0] == 0, NULL);
@@ -154,8 +154,8 @@ START_TEST(test_read_name)
 	jumper = malloc(sizeof(badjump2));
 	if (jumper) {
 		memcpy(jumper, badjump2, sizeof(badjump2));
-		data = jumper + sizeof(HEADER);
-		rv = readname(jumper, sizeof(badjump2), &data, buf, 256);
+		data = (char*) jumper + sizeof(HEADER);
+		rv = readname((char*) jumper, sizeof(badjump2), &data, buf, 256);
 
 		fail_unless(rv == 4, NULL);
 		fail_unless(strcmp("BA.", buf) == 0, 

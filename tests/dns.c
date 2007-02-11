@@ -52,7 +52,7 @@ static char *msgData = "this is the message to be delivered";
 static char *topdomain = "kryo.se";
 	
 static char *queryData = "HELLO this is the test data";
-static char *recData = "AHELLO this is the test data";	// The A flag is added
+static char *recData = "AHELLO this is the test data";	/* The A flag is added */
 
 START_TEST(test_encode_query)
 {
@@ -79,7 +79,7 @@ START_TEST(test_encode_query)
 	}
 	strcpy(d, topdomain);
 	ret = dns_encode(buf, len, &q, QR_QUERY, resolv, strlen(resolv));
-	len = sizeof(queryPacket) - 1; // Skip extra null character
+	len = sizeof(queryPacket) - 1; /* Skip extra null character */
 
 	if (strncmp(queryPacket, buf, sizeof(queryPacket)) || ret != len) {
 		printf("\n");
@@ -129,7 +129,7 @@ START_TEST(test_encode_response)
 	q.id = 1337;
 
 	ret = dns_encode(buf, len, &q, QR_ANSWER, msgData, strlen(msgData));
-	len = sizeof(answerPacket) - 1; // Skip extra null character
+	len = sizeof(answerPacket) - 1; /* Skip extra null character */
 
 	fail_unless(strncmp(answerPacket, buf, sizeof(answerPacket)) == 0, "Did not compile expected packet");
 	fail_unless(ret == len, va_str("Bad packet length: %d, expected %d", ret, len));

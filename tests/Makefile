@@ -6,7 +6,7 @@ SRCOBJS = ../src/base32.o ../src/read.o ../src/dns.o ../src/encoding.o ../src/lo
 OS = `uname | tr "a-z" "A-Z"`
 
 LDFLAGS =  -L/usr/local/lib -lcheck
-CFLAGS = -g -Wall -D$(OS) -I../src -I/usr/local/include
+CFLAGS = -g -Wall -D$(OS) -I../src -I/usr/local/include -pedantic
 
 all: $(TEST)
 	@./$(TEST)
