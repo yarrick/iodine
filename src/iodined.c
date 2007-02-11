@@ -158,10 +158,10 @@ tunnel_dns(int tun_fd, int dns_fd)
 				if (userid >= 0) {
 					users[userid].seed = rand();
 					memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
-					users[userid].addrlen = dummy.q.fromlen;
 					memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-					users[userid].q.id = 0;
+					users[userid].addrlen = dummy.q.fromlen;
 					send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
+					users[userid].q.id = 0;
 				} else {
 					/* No space for another user */
 					send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
@@ -180,8 +180,6 @@ tunnel_dns(int tun_fd, int dns_fd)
 			return 0; /* illegal id */
 		}
 		users[userid].last_pkt = time(NULL);
-		memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-		users[userid].q.id = 0;
 		login_calculate(logindata, 16, password, users[userid].seed);
 
 		if (dummy.q.fromlen != users[userid].addrlen ||
@@ -215,6 +213,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
 		}
+		memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
 		users[userid].last_pkt = time(NULL);
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
@@ -262,7 +261,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 		write_dns(dns_fd, &(dummy.q), users[userid].outpacket.data, users[userid].outpacket.len);
 		users[userid].outpacket.len = 0;
-		dummy.q.id = 0;
+		users[userid].q.id = 0;
 	}
 
 	return 0;
@@ -287,8 +286,9 @@ tunnel(int tun_fd, int dns_fd)
 
 		FD_ZERO(&fds);
 		/* TODO : use some kind of packet queue */
-		if(!all_users_waiting_to_send())
+		if(!all_users_waiting_to_send()) {
 			FD_SET(tun_fd, &fds);
+		}
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
