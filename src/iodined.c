@@ -134,7 +134,7 @@ static int
 tunnel_tun(int tun_fd, int dns_fd)
 {
 	unsigned long outlen;
-	struct iphdr *header;
+	struct ip *header;
 	char out[64*1024];
 	char in[64*1024];
 	int userid;
@@ -144,8 +144,8 @@ tunnel_tun(int tun_fd, int dns_fd)
 		return 0;
 	
 	/* find target ip in packet, in is padded with 4 bytes TUN header */
-	header = (struct iphdr*) (in + 4);
-	userid = find_user_by_ip(header->daddr);
+	header = (struct ip*) (in + 4);
+	userid = find_user_by_ip(header->ip_dst.s_addr);
 	if (userid < 0)
 		return 0;
 
