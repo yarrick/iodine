@@ -54,6 +54,7 @@ uint16_t rand_seed;
 
 /* Current IP packet */
 static char activepacket[4096];
+static char userid;
 static int lastlen;
 static int packetpos;
 static int packetlen;
@@ -223,10 +224,12 @@ tunnel(int tun_fd, int dns_fd)
 static void
 send_chunk(int fd)
 {
+	char hex[] = "0123456789ABCDEF";
 	char packet[4096];
 	struct query q;
 	char buf[4096];
 	int avail;
+	int code;
 	char *p;
 	int len;
 
@@ -238,11 +241,14 @@ send_chunk(int fd)
 	avail = packetlen - packetpos;
 
 	lastlen = dns_build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
+
 	if (lastlen == avail)
-		buf[0] = '1';
+		code = 1;
 	else
-		buf[0] = '0';
+		code = 0;
 		
+	code |= (userid << 1);
+	buf[0] = hex[code];
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
 
 	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
@@ -251,13 +257,14 @@ send_chunk(int fd)
 void
 send_login(int fd, char *login, int len)
 {
-	char data[18];
+	char data[19];
 
 	memset(data, 0, sizeof(data));
-	memcpy(data, login, MIN(len, 16));
+	data[0] = userid;
+	memcpy(&data[1], login, MIN(len, 16));
 
-	data[16] = (rand_seed >> 8) & 0xff;
-	data[17] = (rand_seed >> 0) & 0xff;
+	data[17] = (rand_seed >> 8) & 0xff;
+	data[18] = (rand_seed >> 0) & 0xff;
 	
 	rand_seed++;
 
@@ -267,7 +274,7 @@ send_login(int fd, char *login, int len)
 static void
 send_ping(int fd)
 {
-	char data[2];
+	char data[3];
 	
 	if (is_sending()) {
 		lastlen = 0;
@@ -275,8 +282,9 @@ send_ping(int fd)
 		packetlen = 0;
 	}
 
-	data[0] = (rand_seed >> 8) & 0xff;
-	data[1] = (rand_seed >> 0) & 0xff;
+	data[0] = userid;
+	data[1] = (rand_seed >> 8) & 0xff;
+	data[2] = (rand_seed >> 0) & 0xff;
 	
 	rand_seed++;
 
@@ -336,7 +344,7 @@ handshake(int dns_fd)
 				continue;
 			}
 
-			if (read >= 8) {
+			if (read >= 9) {
 				payload =  (((in[4] & 0xff) << 24) |
 							((in[5] & 0xff) << 16) |
 							((in[6] & 0xff) << 8) |
@@ -344,12 +352,16 @@ handshake(int dns_fd)
 
 				if (strncmp("VACK", in, 4) == 0) {
 					seed = payload;
+					userid = in[8];
 
-					printf("Version ok, both running 0x%08x\n", VERSION);
+					printf("Version ok, both running 0x%08x. You are user #%d\n", VERSION, userid);
 					goto perform_login;
-				} else {
+				} else if (strncmp("VACK", in, 4) == 0) {
 					errx(1, "you run 0x%08x, server runs 0x%08x. giving up\n", 
 							VERSION, payload);
+					/* NOTREACHED */
+				} else if (strncmp("VFUL", in, 4) == 0) {
+					errx(1, "server full, all %d slots are taken. try again later\n", payload);
 					/* NOTREACHED */
 				}
 			} else 

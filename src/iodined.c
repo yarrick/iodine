@@ -30,6 +30,7 @@
 #include <pwd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
 #include <zlib.h>
 
 #include "common.h"
@@ -41,15 +42,10 @@
 
 int running = 1;
 
-struct packet packetbuf;
-struct packet outpacket;
-int outid;
-
 char *topdomain;
 
-struct query q;
-
-struct user u;
+#define USERS 8
+struct user users[USERS];
 char password[33];
 
 int my_mtu;
@@ -64,34 +60,96 @@ sigint(int sig)
 	running = 0;
 }
 
+static void
+init_users()
+{
+	int i;
+	char newip[16];
+	
+	memset(users, 0, USERS * sizeof(struct user));
+	for (i = 0; i < USERS; i++) {
+		users[i].id = i;
+		snprintf(newip, sizeof(newip), "0.0.0.%d", i + 1);
+		users[i].tun_ip = my_ip + inet_addr(newip);;
+		users[i].inpacket.len = 0;
+		users[i].inpacket.offset = 0;
+		users[i].outpacket.len = 0;
+		users[i].q.id = 0;
+	}
+}
+
+static int
+find_user_by_ip(uint32_t ip)
+{
+	int ret = -1;
+	int i;
+
+	for (i = 0; i < USERS; i++) {
+		/* Not used at all or not used in one minute */
+		if (users[i].active && users[i].last_pkt + 60 > time(NULL) &&
+			ip == users[i].tun_ip) {
+			ret = i;
+			break;
+		}
+	}
+	return ret;
+}
+
+static int
+find_available_user()
+{
+	int ret = -1;
+	int i;
+
+	for (i = 0; i < USERS; i++) {
+		/* Not used at all or not used in one minute */
+		if (!users[i].active || users[i].last_pkt + 60 < time(NULL)) {
+			users[i].active = 1;
+			users[i].last_pkt = time(NULL);
+			ret = i;
+			break;
+		}
+	}
+	return ret;
+}
+
 static int
 tunnel_tun(int tun_fd, int dns_fd)
 {
 	unsigned long outlen;
+	struct iphdr *header;
 	char out[64*1024];
 	char in[64*1024];
+	int userid;
 	int read;
 
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return 0;
+	
+	/* find target ip in packet, in is padded with 4 bytes TUN header */
+	header = (struct iphdr*) (in + 4);
+	userid = find_user_by_ip(header->daddr);
+	if (userid < 0)
+		return 0;
 
 	outlen = sizeof(out);
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, read, 9);
-	memcpy(outpacket.data, out, outlen);
-	outpacket.len = outlen;
+	memcpy(users[userid].outpacket.data, out, outlen);
+	users[userid].outpacket.len = outlen;
 
 	return outlen;
 }
 
 typedef enum {
 	VERSION_ACK,
-	VERSION_NACK
+	VERSION_NACK,
+	VERSION_FULL
 } version_ack_t;
 
 static void
-send_version_response(int fd, version_ack_t ack, uint32_t payload)
+send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *u)
 {
-	char out[8];
+	char out[9];
 	
 	switch (ack) {
 	case VERSION_ACK:
@@ -100,31 +158,37 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload)
 	case VERSION_NACK:
 		strncpy(out, "VNAK", sizeof(out));
 		break;
+	case VERSION_FULL:
+		strncpy(out, "VFUL", sizeof(out));
+		break;
 	}
 	
 	out[4] = ((payload >> 24) & 0xff);
 	out[5] = ((payload >> 16) & 0xff);
 	out[6] = ((payload >> 8) & 0xff);
 	out[7] = ((payload) & 0xff);
+	out[8] = u->id;
 
-	write_dns(fd, &q, out, 8);
+
+	write_dns(fd, &u->q, out, sizeof(out));
 }
 
 static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
-	struct in_addr clientip;
+	struct in_addr tempip;
+	struct query q;
 	unsigned long outlen;
-	struct in_addr myip;
 	char logindata[16];
 	char out[64*1024];
 	char in[64*1024];
-	static int seed;
 	char *tmp[2];
+	int userid;
 	int version;
 	int read;
 	int code;
 
+	userid = -1;
 	if ((read = read_dns(dns_fd, &q, in, sizeof(in))) <= 0)
 		return 0;
 				
@@ -139,41 +203,63 @@ tunnel_dns(int tun_fd, int dns_fd)
 					   ((in[4] & 0xff)));
 
 			if (version == VERSION) {
-				seed = rand();
-		
-				send_version_response(dns_fd, VERSION_ACK, seed);
+				userid = find_available_user();
+				if (userid >= 0) {
+					users[userid].seed = rand();
+					memcpy(&(users[userid].host), &(q.from), q.fromlen);
+					memcpy(&(users[userid].q), &q, sizeof(struct query));
+					users[userid].addrlen = q.fromlen;
+					send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
+				} else {
+					/* No space for another user */
+					send_version_response(dns_fd, VERSION_FULL, USERS, NULL);
+				}
 			} else {
-				send_version_response(dns_fd, VERSION_NACK, VERSION);
+				send_version_response(dns_fd, VERSION_NACK, VERSION, NULL);
 			}
 		} else {
-			send_version_response(dns_fd, VERSION_NACK, VERSION);
+			send_version_response(dns_fd, VERSION_NACK, VERSION, NULL);
 		}
 	} else if(in[0] == 'L' || in[0] == 'l') {
 		/* Login phase, handle auth */
-		login_calculate(logindata, 16, password, seed);
+		userid = in[1];
+		if (userid < 0 || userid >= USERS) {
+			write_dns(dns_fd, &q, "BADIP", 5);
+			return 0; /* illegal id */
+		}
+		users[userid].last_pkt = time(NULL);
+		login_calculate(logindata, 16, password, users[userid].seed);
 
-		if (read >= 17 && (memcmp(logindata, in+1, 16) == 0)) {
-			/* Login ok, send ip/mtu info */
-			myip.s_addr = my_ip;
-			clientip.s_addr = my_ip + inet_addr("0.0.0.1");
-
-			tmp[0] = strdup(inet_ntoa(myip));
-			tmp[1] = strdup(inet_ntoa(clientip));
-
-			read = snprintf(out, sizeof(out), "%s-%s-%d", 
-					tmp[0], tmp[1], my_mtu);
-
-			/* Store user ip */
-			memcpy(&(u.host), &(q.from), q.fromlen);
-			u.addrlen = q.fromlen;
-
-			write_dns(dns_fd, &q, out, read);
-			q.id = 0;
-
-			free(tmp[1]);
-			free(tmp[0]);
+		if (q.fromlen != users[userid].addrlen ||
+				memcmp(&(users[userid].host), &(q.from), q.fromlen) != 0) {
+			write_dns(dns_fd, &q, "BADIP", 5);
 		} else {
-			write_dns(dns_fd, &q, "LNAK", 4);
+			if (read >= 18 && (memcmp(logindata, in+2, 16) == 0)) {
+				/* Login ok, send ip/mtu info */
+
+				tempip.s_addr = my_ip;
+				tmp[0] = strdup(inet_ntoa(tempip));
+				tempip.s_addr = users[userid].tun_ip;
+				tmp[1] = strdup(inet_ntoa(tempip));
+
+				read = snprintf(out, sizeof(out), "%s-%s-%d", 
+						tmp[0], tmp[1], my_mtu);
+
+				write_dns(dns_fd, &q, out, read);
+				q.id = 0;
+
+				free(tmp[1]);
+				free(tmp[0]);
+			} else {
+				write_dns(dns_fd, &q, "LNAK", 4);
+			}
+		}
+	} else if(in[0] == 'P' || in[0] == 'p') {
+		/* Ping packet, store userid */
+		userid = in[1];
+		if (userid < 0 || userid >= USERS) {
+			write_dns(dns_fd, &q, "BADIP", 5);
+			return 0; /* illegal id */
 		}
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
@@ -185,32 +271,40 @@ tunnel_dns(int tun_fd, int dns_fd)
 		if ((in[0] >= 'A' && in[0] <= 'F'))
 			code = in[0] - 'A' + 10;
 
+		userid = code >> 1;
+		if (userid < 0 || userid >= USERS) {
+			write_dns(dns_fd, &q, "BADIP", 5);
+			return 0; /* illegal id */
+		}
+		users[userid].last_pkt = time(NULL);
+
 		/* Check sending ip number */
-		if (q.fromlen != u.addrlen ||
-				memcmp(&(u.host), &(q.from), q.fromlen) != 0) {
+		if (q.fromlen != users[userid].addrlen ||
+				memcmp(&(users[userid].host), &(q.from), q.fromlen) != 0) {
 			write_dns(dns_fd, &q, "BADIP", 5);
 		} else {
-			memcpy(packetbuf.data + packetbuf.offset, in + 1, read - 1);
-			packetbuf.len += read - 1;
-			packetbuf.offset += read - 1;
+			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, in + 1, read - 1);
+			users[userid].inpacket.len += read - 1;
+			users[userid].inpacket.offset += read - 1;
 
 			if (code & 1) {
 				outlen = sizeof(out);
 				uncompress((uint8_t*)out, &outlen, 
-						   (uint8_t*)packetbuf.data, packetbuf.len);
+						   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
 
 				write_tun(tun_fd, out, outlen);
 
-				packetbuf.len = packetbuf.offset = 0;
+				users[userid].inpacket.len = users[userid].inpacket.offset = 0;
 			}
 		}
 	}
-	if (q.fromlen == u.addrlen &&
-			memcmp(&(u.host), &(q.from), q.fromlen) == 0 &&
-			outpacket.len > 0) {
+	/* userid must be set for a reply to be sent */
+	if (userid >= 0 && userid < USERS && q.fromlen == users[userid].addrlen &&
+			memcmp(&(users[userid].host), &(q.from), q.fromlen) == 0 &&
+			users[userid].outpacket.len > 0) {
 
-		write_dns(dns_fd, &q, outpacket.data, outpacket.len);
-		outpacket.len = 0;
+		write_dns(dns_fd, &q, users[userid].outpacket.data, users[userid].outpacket.len);
+		users[userid].outpacket.len = 0;
 		q.id = 0;
 	}
 
@@ -223,18 +317,19 @@ tunnel(int tun_fd, int dns_fd)
 	struct timeval tv;
 	fd_set fds;
 	int i;
+	int j;
 
 	while (running) {
-		if (q.id != 0) {
+		//if (q.id != 0) {
 			tv.tv_sec = 0;
 			tv.tv_usec = 5000;
-		} else {
+		/*} else {
 			tv.tv_sec = 1;
 			tv.tv_usec = 0;
-		}
+		}*/
 
 		FD_ZERO(&fds);
-		if(outpacket.len == 0)
+		//if(outpacket.len == 0) TODO fix this
 			FD_SET(tun_fd, &fds);
 		FD_SET(dns_fd, &fds);
 
@@ -247,10 +342,12 @@ tunnel(int tun_fd, int dns_fd)
 		}
 	
 		if (i==0) {	
-			if (q.id != 0) {
-				write_dns(dns_fd, &q, outpacket.data, outpacket.len);
-				outpacket.len = 0;
-				q.id = 0;
+			for (j = 0; j < USERS; j++) {
+				if (users[j].q.id != 0) {
+					write_dns(dns_fd, &(users[j].q), users[j].outpacket.data, users[j].outpacket.len);
+					users[j].outpacket.len = 0;
+					users[j].q.id = 0;
+				}
 			}
 		} else {
 			if(FD_ISSET(tun_fd, &fds)) {
@@ -370,10 +467,6 @@ main(int argc, char **argv)
 	listen_ip = INADDR_ANY;
 	port = 53;
 
-	packetbuf.len = 0;
-	packetbuf.offset = 0;
-	outpacket.len = 0;
-	q.id = 0;
 	memset(password, 0, 33);
 	srand(time(NULL));
 	
@@ -466,6 +559,7 @@ main(int argc, char **argv)
 
 	my_ip = inet_addr(argv[0]);
 	my_mtu = mtu;
+	init_users();
 
 	printf("Listening to dns for domain %s\n", argv[1]);
 

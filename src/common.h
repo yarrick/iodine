@@ -43,9 +43,16 @@ struct query {
 };
 
 struct user {
-	int id;
+	char id;
+	int active;
+	time_t last_pkt;
+	int seed;
+	in_addr_t tun_ip;
 	struct sockaddr host;
 	int addrlen;
+	struct query q;
+	struct packet inpacket;
+	struct packet outpacket;
 };
 
 int open_dns(int, in_addr_t);
