@@ -79,13 +79,30 @@ init_users()
 }
 
 static int
-find_user_by_ip(uint32_t ip)
+users_waiting_on_reply()
 {
-	int ret = -1;
+	int ret;
 	int i;
 
+	ret = 0;
 	for (i = 0; i < USERS; i++) {
-		/* Not used at all or not used in one minute */
+		if (users[i].active && users[i].last_pkt + 60 > time(NULL) &&
+			users[i].q.id != 0) {
+			ret++;
+		}
+	}
+	
+	return ret;
+}
+
+static int
+find_user_by_ip(uint32_t ip)
+{
+	int ret;
+	int i;
+
+	ret = -1;
+	for (i = 0; i < USERS; i++) {
 		if (users[i].active && users[i].last_pkt + 60 > time(NULL) &&
 			ip == users[i].tun_ip) {
 			ret = i;
@@ -177,7 +194,7 @@ static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct in_addr tempip;
-	struct query q;
+	struct user dummy;
 	unsigned long outlen;
 	char logindata[16];
 	char out[64*1024];
@@ -189,7 +206,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	int code;
 
 	userid = -1;
-	if ((read = read_dns(dns_fd, &q, in, sizeof(in))) <= 0)
+	if ((read = read_dns(dns_fd, &(dummy.q), in, sizeof(in))) <= 0)
 		return 0;
 				
 	if(in[0] == 'V' || in[0] == 'v') {
@@ -206,33 +223,36 @@ tunnel_dns(int tun_fd, int dns_fd)
 				userid = find_available_user();
 				if (userid >= 0) {
 					users[userid].seed = rand();
-					memcpy(&(users[userid].host), &(q.from), q.fromlen);
-					memcpy(&(users[userid].q), &q, sizeof(struct query));
-					users[userid].addrlen = q.fromlen;
+					memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
+					users[userid].addrlen = dummy.q.fromlen;
+					memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
+					users[userid].q.id = 0;
 					send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
 				} else {
 					/* No space for another user */
-					send_version_response(dns_fd, VERSION_FULL, USERS, NULL);
+					send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
 				}
 			} else {
-				send_version_response(dns_fd, VERSION_NACK, VERSION, NULL);
+				send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
 			}
 		} else {
-			send_version_response(dns_fd, VERSION_NACK, VERSION, NULL);
+			send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
 		}
 	} else if(in[0] == 'L' || in[0] == 'l') {
 		/* Login phase, handle auth */
 		userid = in[1];
 		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, &q, "BADIP", 5);
+			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
 		}
 		users[userid].last_pkt = time(NULL);
+		memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
+		users[userid].q.id = 0;
 		login_calculate(logindata, 16, password, users[userid].seed);
 
-		if (q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(q.from), q.fromlen) != 0) {
-			write_dns(dns_fd, &q, "BADIP", 5);
+		if (dummy.q.fromlen != users[userid].addrlen ||
+				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
+			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
 			if (read >= 18 && (memcmp(logindata, in+2, 16) == 0)) {
 				/* Login ok, send ip/mtu info */
@@ -245,20 +265,20 @@ tunnel_dns(int tun_fd, int dns_fd)
 				read = snprintf(out, sizeof(out), "%s-%s-%d", 
 						tmp[0], tmp[1], my_mtu);
 
-				write_dns(dns_fd, &q, out, read);
-				q.id = 0;
+				write_dns(dns_fd, &(dummy.q), out, read);
+				dummy.q.id = 0;
 
 				free(tmp[1]);
 				free(tmp[0]);
 			} else {
-				write_dns(dns_fd, &q, "LNAK", 4);
+				write_dns(dns_fd, &(dummy.q), "LNAK", 4);
 			}
 		}
 	} else if(in[0] == 'P' || in[0] == 'p') {
 		/* Ping packet, store userid */
 		userid = in[1];
 		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, &q, "BADIP", 5);
+			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
 		}
 	} else if((in[0] >= '0' && in[0] <= '9')
@@ -273,16 +293,18 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 		userid = code >> 1;
 		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, &q, "BADIP", 5);
+			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
 		}
-		users[userid].last_pkt = time(NULL);
 
 		/* Check sending ip number */
-		if (q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(q.from), q.fromlen) != 0) {
-			write_dns(dns_fd, &q, "BADIP", 5);
+		if (dummy.q.fromlen != users[userid].addrlen ||
+				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
+			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
+			users[userid].last_pkt = time(NULL);
+			memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
+			users[userid].addrlen = dummy.q.fromlen;
 			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, in + 1, read - 1);
 			users[userid].inpacket.len += read - 1;
 			users[userid].inpacket.offset += read - 1;
@@ -299,13 +321,13 @@ tunnel_dns(int tun_fd, int dns_fd)
 		}
 	}
 	/* userid must be set for a reply to be sent */
-	if (userid >= 0 && userid < USERS && q.fromlen == users[userid].addrlen &&
-			memcmp(&(users[userid].host), &(q.from), q.fromlen) == 0 &&
+	if (userid >= 0 && userid < USERS && dummy.q.fromlen == users[userid].addrlen &&
+			memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) == 0 &&
 			users[userid].outpacket.len > 0) {
 
-		write_dns(dns_fd, &q, users[userid].outpacket.data, users[userid].outpacket.len);
+		write_dns(dns_fd, &(dummy.q), users[userid].outpacket.data, users[userid].outpacket.len);
 		users[userid].outpacket.len = 0;
-		q.id = 0;
+		dummy.q.id = 0;
 	}
 
 	return 0;
@@ -320,13 +342,13 @@ tunnel(int tun_fd, int dns_fd)
 	int j;
 
 	while (running) {
-		//if (q.id != 0) {
+		if (users_waiting_on_reply()) {
 			tv.tv_sec = 0;
 			tv.tv_usec = 5000;
-		/*} else {
+		} else {
 			tv.tv_sec = 1;
 			tv.tv_usec = 0;
-		}*/
+		}
 
 		FD_ZERO(&fds);
 		//if(outpacket.len == 0) TODO fix this
