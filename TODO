@@ -5,18 +5,10 @@ iodine - IP over DNS is now easy
 
 ********************************
 
-STUFF TO DO:
+The TODO list is now located at
 
-- Handle multiple concurrent users on one server
+http://dev.kryo.se/iodine/
 
-- Fragment downstream packets if 512 byte limit present
+The list is under the "View tickets" page
 
-- Implement sliding window
-
-- Use better encoding if dns servers preserve case
-
-- Port to more platforms (Solaris? Windows?)
-
-- More/better documentation (as always)
-
-- Modify readname to take the actual size of the buffer to fill, and make sure it adds a '\0' at the end. Then clean up dns.c to match the changes.
+Feel free to add your own wishes.
