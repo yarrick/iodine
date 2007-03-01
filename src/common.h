@@ -46,5 +46,6 @@ int open_dns(int, in_addr_t);
 void close_dns(int);
 
 void do_chroot(char *);
+void do_detach();
 
 #endif

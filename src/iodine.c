@@ -24,7 +24,6 @@
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <err.h>
 #include <pwd.h>
@@ -571,10 +570,7 @@ main(int argc, char **argv)
 	do_chroot(newroot);
 	
 	if (!foreground) {
-		printf("Detaching from terminal...\n");
-		daemon(0, 0);
-		umask(0);
-		alarm(0);
+		do_detach();
 	}
 	
 	if (username) {

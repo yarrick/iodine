@@ -21,6 +21,7 @@
 #endif
 #include <time.h>
 #include <err.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -77,4 +78,13 @@ do_chroot(char *newroot)
 		seteuid(geteuid());
 		setuid(getuid());
 	}
+}
+
+void
+do_detach()
+{
+	printf("Detaching from terminal...\n");
+	daemon(0, 0);
+	umask(0);
+	alarm(0);
 }
