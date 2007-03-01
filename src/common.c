@@ -67,3 +67,14 @@ close_dns(int fd)
 	close(fd);
 }
 
+void
+do_chroot(char *newroot)
+{
+	if (newroot) {
+		if (chroot(newroot) != 0 || chdir("/") != 0)
+			err(1, "%s", newroot);
+
+		seteuid(geteuid());
+		setuid(getuid());
+	}
+}

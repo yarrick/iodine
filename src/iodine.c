@@ -568,13 +568,7 @@ main(int argc, char **argv)
 	
 	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
 
-	if (newroot) {
-		if (chroot(newroot) != 0 || chdir("/") != 0)
-			err(1, "%s", newroot);
-
-		seteuid(geteuid());
-		setuid(getuid());
-	}
+	do_chroot(newroot);
 	
 	if (!foreground) {
 		printf("Detaching from terminal...\n");
