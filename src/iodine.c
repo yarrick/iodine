@@ -356,7 +356,7 @@ handshake(int dns_fd)
 
 					printf("Version ok, both running 0x%08x. You are user #%d\n", VERSION, userid);
 					goto perform_login;
-				} else if (strncmp("VACK", in, 4) == 0) {
+				} else if (strncmp("VNAK", in, 4) == 0) {
 					errx(1, "you run 0x%08x, server runs 0x%08x. giving up\n", 
 							VERSION, payload);
 					/* NOTREACHED */
