@@ -7,9 +7,12 @@ iodine - IP over DNS is now easy
 
 CHANGES:
 
-xxxx-xx-xx: 0.3.5
+xxxx-xx-xx: 0.4.0 "Run Home"
+	- Added multiuser support (up to 8 users simultaneously)
 	- Added authentication (password entered as argument or on stdin)
-	- Cleanup of dns code, more test cases
+	- Added manpage
+	- Added install/uninstall make target
+	- Cleanup of dns code, more test cases, use check library
 	- Changed directory structure
 
 2006-11-08: 0.3.4
