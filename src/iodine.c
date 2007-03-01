@@ -569,15 +569,15 @@ main(int argc, char **argv)
 
 	do_chroot(newroot);
 	
-	if (!foreground) {
-		do_detach();
-	}
-	
 	if (username) {
 		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
 			printf("Could not switch to user %s!\n", username);
 			usage();
 		}
+	}
+	
+	if (!foreground) {
+		do_detach();
 	}
 
 	tunnel(tun_fd, dns_fd);

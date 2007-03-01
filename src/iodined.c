@@ -535,10 +535,6 @@ main(int argc, char **argv)
 	printf("Listening to dns for domain %s\n", argv[1]);
 
 	do_chroot(newroot);
-	
-	if (!foreground) {
-		do_detach();
-	}
 
 	signal(SIGINT, sigint);
 	if (username) {
@@ -546,6 +542,10 @@ main(int argc, char **argv)
 			printf("Could not switch to user %s!\n", username);
 			usage();
 		}
+	}
+	
+	if (!foreground) {
+		do_detach();
 	}
 	
 	tunnel(tun_fd, dnsd_fd);
