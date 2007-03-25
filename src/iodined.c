@@ -409,9 +409,8 @@ help() {
 
 static void
 version() {
-	char *svnver = "$Rev$ from $Date$";
 	printf("iodine IP over DNS tunneling server\n");
-	printf("SVN version: %s\n", svnver);
+	printf("version: 0.4.0 from 2007-03-25\n");
 	exit(0);
 }
 
