@@ -30,13 +30,14 @@ HOW TO USE:
 
 Server side:
 To use this tunnel, you need control over a real domain (like mytunnel.com),
-and a server with a static public IP number that does not yet run a DNS
-server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the server.
-If you use BIND for the domain, add these lines to the zone file:
+and a server with a static public IP number (not behind NAT) that does not 
+yet run a DNS server. Then, delegate a subdomain (say, tunnel1.mytunnel.com)
+to the server. If you use BIND for the domain, add these lines to the zone file:
 
 tunnel1host	IN	A	10.15.213.99
 tunnel1		IN	NS	tunnel1host.mytunnel.com.
 
+Do not use CNAME instead of A above.
 Now any DNS querys for domains ending with tunnel1.mytunnnel.com will be sent
 to your server. Start iodined on the server. The first argument is the tunnel
 IP address (like 192.168.99.1) and the second is the assigned domain (in this
