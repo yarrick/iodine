@@ -188,27 +188,3 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	return rv;
 }
 
-int
-dns_build_hostname(char *buf, size_t buflen, 
-				   const char *data, const size_t datalen, 
-				   const char *topdomain)
-{
-	int consumed;
-	int avail;
-	char *b;
-
-	avail = MIN(0xFF, buflen) - strlen(topdomain) - 2;
-	memset(buf, 0, buflen);
-	b = buf;
-	
-	consumed = encode_data(data, datalen, avail, b);
-
-	b += strlen(buf);
-	if (*b != '.') 
-		*b++ = '.';
-
-	strncpy(b, topdomain, strlen(topdomain)+1);
-	
-	return consumed;
-}
-

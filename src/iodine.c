@@ -42,6 +42,9 @@
 
 static void send_ping(int fd);
 static void send_chunk(int fd);
+static int build_hostname(char *buf, size_t buflen, 
+	const char *data, const size_t datalen, 
+	const char *topdomain);
 
 int running = 1;
 char password[33];
@@ -78,10 +81,34 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 
 	buf[0] = cmd;
 	
-	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain);
+	len = build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain);
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
 
 	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+}
+
+static int
+build_hostname(char *buf, size_t buflen, 
+		const char *data, const size_t datalen, 
+		const char *topdomain)
+{
+	int consumed;
+	int avail;
+	char *b;
+
+	avail = MIN(0xFF, buflen) - strlen(topdomain) - 2;
+	memset(buf, 0, buflen);
+	b = buf;
+	
+	consumed = encode_data(data, datalen, avail, b);
+
+	b += strlen(buf);
+	if (*b != '.') 
+		*b++ = '.';
+
+	strncpy(b, topdomain, strlen(topdomain)+1);
+	
+	return consumed;
 }
 
 int
@@ -239,7 +266,7 @@ send_chunk(int fd)
 	p += packetpos;
 	avail = packetlen - packetpos;
 
-	lastlen = dns_build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
+	lastlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
 
 	if (lastlen == avail)
 		code = 1;
