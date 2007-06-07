@@ -1,9 +1,7 @@
 
-iodine - IP over DNS is now easy
+iodine - http://code.kryo.se/iodine
 
-   http://code.kryo.se/iodine
-
-********************************
+***********************************
 
 This is a piece of software that lets you tunnel IPv4 data through a DNS
 server. This can be usable in different situations where internet access is
@@ -61,13 +59,11 @@ either side.
 
 MISC. INFO:
 
-Note that you can have only one client per server at the same time. This is
-because of the fragmentation of big packets going upstream, and will be fixed
-in future versions. 
-
 Try experimenting with the MTU size (-m option) to get maximum bandwidth. It is
 set to 1024 by default, which seems to work with most DNS servers. If you have
-problems, try setting it to below 512.
+problems, try setting it to 220 as this ensures all packets to be < 512 bytes.
+Some DNS servers enforce a 512 byte packet limit, and this is probably the case
+if you can ping through the tunnel but not login via SSH.
 
 If you have problems, try inspecting the traffic with network monitoring tools
 and make sure that the relaying DNS server has not cached the response. A
