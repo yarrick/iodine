@@ -1,8 +1,9 @@
 CC = gcc
+COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o md5.o common.o
+CLIENTOBJS = iodine.o
 CLIENT = ../bin/iodine
-CLIENTOBJS = iodine.o tun.o dns.o read.o encoding.o login.o base32.o md5.o common.o
+SERVEROBJS = iodined.o user.o
 SERVER = ../bin/iodined
-SERVEROBJS = iodined.o tun.o dns.o read.o encoding.o login.o base32.o md5.o common.o user.o
 
 OS = `uname | tr "a-z" "A-Z"`
 ARCH = `uname -m`
@@ -15,15 +16,15 @@ all: stateos $(CLIENT) $(SERVER) $(TESTSUITE)
 stateos:
 	@echo OS is $(OS), arch is $(ARCH)
 
-$(CLIENT): $(CLIENTOBJS)
+$(CLIENT): $(COMMONOBJS) $(CLIENTOBJS)
 	@echo LD $@
 	@mkdir -p ../bin
-	@$(CC) $(CLIENTOBJS) -o $(CLIENT) $(LDFLAGS)
+	@$(CC) $(COMMONOBJS) $(CLIENTOBJS) -o $(CLIENT) $(LDFLAGS)
 
-$(SERVER): $(SERVEROBJS)
+$(SERVER): $(COMMONOBJS) $(SERVEROBJS)
 	@echo LD $@
 	@mkdir -p ../bin
-	@$(CC) $(SERVEROBJS) -o $(SERVER) $(LDFLAGS)
+	@$(CC) $(COMMONOBJS) $(SERVEROBJS) -o $(SERVER) $(LDFLAGS)
 
 .c.o: 
 	@echo CC $<

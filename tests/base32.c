@@ -24,7 +24,7 @@
 #include "base32.h"
 #include "test.h"
 
-struct tuple
+static struct tuple
 {
 	char *a;
 	char *b;
@@ -41,9 +41,8 @@ START_TEST(test_base32_encode)
 	int val;
 	int i;
 
-	len = sizeof(buf);
-
 	for (i = 0; testpairs[i].a != NULL; i++) {
+		len = sizeof(buf);
 		val = base32_encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
 
 		fail_unless(val > 0, strerror(errno));
@@ -60,9 +59,8 @@ START_TEST(test_base32_decode)
 	int val;
 	int i;
 
-	len = sizeof(buf);
-
 	for (i = 0; testpairs[i].a != NULL; i++) {
+		len = sizeof(buf);
 		val = base32_decode(buf, &len, testpairs[i].b, strlen(testpairs[i].b));
 
 		fail_unless(val > 0, strerror(errno));

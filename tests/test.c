@@ -49,6 +49,9 @@ main()
 	test = test_base32_create_tests();
 	suite_add_tcase(iodine, test);
 
+	test = test_base64_create_tests();
+	suite_add_tcase(iodine, test);
+
 	test = test_dns_create_tests();
 	suite_add_tcase(iodine, test);
 
