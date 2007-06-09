@@ -35,6 +35,8 @@
 #endif
 
 #include "common.h"
+#include "encoding.h"
+#include "base32.h"
 #include "dns.h"
 #include "login.h"
 #include "tun.h"
@@ -61,6 +63,8 @@ static int lastlen;
 static int packetpos;
 static int packetlen;
 static uint16_t chunkid;
+
+static struct encoder *enc;
 
 static void
 sighandler(int sig) 
@@ -92,23 +96,31 @@ build_hostname(char *buf, size_t buflen,
 		const char *data, const size_t datalen, 
 		const char *topdomain)
 {
-	int consumed;
-	int avail;
+	int encsize;
+	unsigned space;
 	char *b;
 
-	avail = MIN(0xFF, buflen) - strlen(topdomain) - 2;
-	memset(buf, 0, buflen);
-	b = buf;
-	
-	consumed = encode_data(data, datalen, avail, b);
 
+	space = MIN(0xFF, buflen) - strlen(topdomain) - 2;
+	if (!enc->places_dots())
+		space -= (space / 62); /* space for dots */
+
+	memset(buf, 0, buflen);
+	
+	encsize = enc->encode(buf, &space, data, datalen);
+
+	if (!enc->places_dots())
+		inline_dotify(buf, buflen);
+
+	b = buf;
 	b += strlen(buf);
+
 	if (*b != '.') 
 		*b++ = '.';
 
 	strncpy(b, topdomain, strlen(topdomain)+1);
-	
-	return consumed;
+
+	return space;
 }
 
 int
@@ -522,6 +534,8 @@ main(int argc, char **argv)
 	newroot = NULL;
 	device = NULL;
 	chunkid = 0;
+
+	enc = get_base32_encoder();
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:P:")) != -1) {
 		switch(choice) {

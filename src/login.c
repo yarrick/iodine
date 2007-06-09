@@ -47,5 +47,6 @@ login_calculate(char *buf, int buflen, char *pass, int seed)
 	md5_init(&ctx);
 	md5_append(&ctx, temp, 32);
 	md5_finish(&ctx, (unsigned char *) buf);
+
 }
 

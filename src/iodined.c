@@ -34,10 +34,11 @@
 
 #include "common.h"
 #include "dns.h"
+#include "encoding.h"
+#include "base32.h"
 #include "user.h"
 #include "login.h"
 #include "tun.h"
-#include "encoding.h"
 #include "version.h"
 
 int running = 1;
@@ -45,6 +46,8 @@ int running = 1;
 char *topdomain;
 
 char password[33];
+
+struct encoder *b32;
 
 int my_mtu;
 in_addr_t my_ip;
@@ -124,6 +127,14 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *
 }
 
 static int
+unpack_data(char *buf, size_t buflen, char *data, size_t datalen, struct encoder *enc)
+{
+	if (!enc->eats_dots())
+		datalen = inline_undotify(data, datalen);
+	return enc->decode(buf, &buflen, data, datalen);
+}
+
+static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct in_addr tempip;
@@ -133,6 +144,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	char logindata[16];
 	char out[64*1024];
 	char in[64*1024];
+	char unpacked[64*1024];
 	char *tmp[2];
 	int userid;
 	int touser;
@@ -145,14 +157,15 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return 0;
 				
 	if(in[0] == 'V' || in[0] == 'v') {
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Version greeting, compare and send ack/nak */
 		if (read > 4) { 
 			/* Received V + 32bits version */
 
-			version = (((in[1] & 0xff) << 24) |
-					   ((in[2] & 0xff) << 16) |
-					   ((in[3] & 0xff) << 8) |
-					   ((in[4] & 0xff)));
+			version = (((unpacked[0] & 0xff) << 24) |
+					   ((unpacked[1] & 0xff) << 16) |
+					   ((unpacked[2] & 0xff) << 8) |
+					   ((unpacked[3] & 0xff)));
 
 			if (version == VERSION) {
 				userid = find_available_user();
@@ -161,6 +174,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 					memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
 					memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
 					users[userid].addrlen = dummy.q.fromlen;
+					users[userid].encoder = get_base32_encoder();
 					send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
 					users[userid].q.id = 0;
 				} else {
@@ -174,8 +188,9 @@ tunnel_dns(int tun_fd, int dns_fd)
 			send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
 		}
 	} else if(in[0] == 'L' || in[0] == 'l') {
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Login phase, handle auth */
-		userid = in[1];
+		userid = unpacked[0];
 		if (userid < 0 || userid >= USERS) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
@@ -187,7 +202,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
-			if (read >= 18 && (memcmp(logindata, in+2, 16) == 0)) {
+			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
 				/* Login ok, send ip/mtu info */
 
 				tempip.s_addr = my_ip;
@@ -208,8 +223,9 @@ tunnel_dns(int tun_fd, int dns_fd)
 			}
 		}
 	} else if(in[0] == 'P' || in[0] == 'p') {
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Ping packet, store userid */
-		userid = in[1];
+		userid = unpacked[0];
 		if (userid < 0 || userid >= USERS) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
@@ -237,12 +253,16 @@ tunnel_dns(int tun_fd, int dns_fd)
 				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
+			/* decode with this users encoding */
+			read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, 
+					   users[userid].encoder);
+
 			users[userid].last_pkt = time(NULL);
 			memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
 			users[userid].addrlen = dummy.q.fromlen;
-			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, in + 1, read - 1);
-			users[userid].inpacket.len += read - 1;
-			users[userid].inpacket.offset += read - 1;
+			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, unpacked, read);
+			users[userid].inpacket.len += read;
+			users[userid].inpacket.offset += read;
 
 			if (code & 1) {
 				outlen = sizeof(out);
@@ -351,10 +371,11 @@ read_dns(int fd, struct query *q, char *buf, int buflen)
 	if (r > 0) {
 		dns_decode(buf, buflen, q, QR_QUERY, packet, r);
 		domain = strstr(q->name, topdomain);
-		rv = decode_data(buf, buflen, q->name, domain);
+		rv = (int) (domain - q->name); 
+		memcpy(buf, q->name, MIN(rv, buflen));
 		q->fromlen = addrlen;
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
-	} else if (r < 0) { 	
+	} else if (r < 0) { 
 		/* Error */
 		perror("recvfrom");
 		rv = 0;
@@ -437,6 +458,8 @@ main(int argc, char **argv)
 	mtu = 1024;
 	listen_ip = INADDR_ANY;
 	port = 53;
+
+	b32 = get_base32_encoder();
 
 	memset(password, 0, 33);
 	srand(time(NULL));

@@ -23,6 +23,7 @@
 #include <netinet/in.h>
 
 #include "common.h"
+#include "encoding.h"
 #include "user.h"
 
 struct user users[USERS];
