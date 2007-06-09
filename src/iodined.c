@@ -127,14 +127,6 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *
 }
 
 static int
-unpack_data(char *buf, size_t buflen, char *data, size_t datalen, struct encoder *enc)
-{
-	if (!enc->eats_dots())
-		datalen = inline_undotify(data, datalen);
-	return enc->decode(buf, &buflen, data, datalen);
-}
-
-static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct in_addr tempip;

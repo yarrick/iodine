@@ -17,9 +17,6 @@
 #ifndef _ENCODING_H_
 #define _ENCODING_H_
 
-int inline_dotify(char *, size_t);
-int inline_undotify(char *, size_t);
-
 struct encoder {
 	char name[8];
 	int (*encode) (char *, size_t *, const void *, size_t);
@@ -28,5 +25,9 @@ struct encoder {
 	int (*eats_dots) (void);
 };
 
-#endif /* _ENCODING_H_ */
+int unpack_data(char *, size_t, char *, size_t, struct encoder *);
+int inline_dotify(char *, size_t);
+int inline_undotify(char *, size_t);
 
+
+#endif /* _ENCODING_H_ */

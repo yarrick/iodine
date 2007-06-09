@@ -17,6 +17,15 @@
 #include <string.h>
 #include "encoding.h"
 
+
+int
+unpack_data(char *buf, size_t buflen, char *data, size_t datalen, struct encoder *enc)
+{
+	if (!enc->eats_dots())
+		datalen = inline_undotify(data, datalen);
+	return enc->decode(buf, &buflen, data, datalen);
+}
+
 int 
 inline_dotify(char *buf, size_t buflen)
 {
