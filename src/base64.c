@@ -59,15 +59,15 @@ findesc(int *count, unsigned char *esc, char c1, char c2, char c3, char c4)
 	int min1 = 0;
 	int min2 = 0;
 
-	int num1 = 0xFF;
-	int num2 = 0xFE;
+	int num1 = 0xFF; /* a very big number */
+	int num2 = 0xFE; /* a nearly as big number */
 
 	int i;
 
 	/* check if no more escapes needed */
 	if (count[62] == 0 && count[63] == 0) {
-		esc[0] = P62;
-		esc[1] = P62;
+		esc[0] = MODE;
+		esc[1] = MODE;
 		return;
 	}
 
@@ -130,9 +130,9 @@ escape_chars(char *buf, size_t buflen)
 		    r[0] == esc[0] || r[1] == esc[0] ||r[2] == esc[0] ||r[2] == esc[0] ||
 		    r[0] == esc[1] || r[1] == esc[1] ||r[2] == esc[1] ||r[2] == esc[1])) {
 			/* last set of escape chars were unused.
-			 * if we reset last escape switch then we dont have to switch now */
+			 * if we reset last escape switch then maybe we dont have to switch now */
 
-			/* change last ecape switch to 999 (RESET) */
+			/* change the latest escape switch to 999 (RESET) */
 			e[1] = MODE;
 			e[2] = MODE;
 			 
@@ -142,6 +142,8 @@ escape_chars(char *buf, size_t buflen)
 
 			reset = 1;
 		}
+		/* these two if blocks can not be combined because a block can contain both
+		 * char 9 and/or . and the current escape chars. */
 		if (r[0] == esc[0] || r[1] == esc[0] ||r[2] == esc[0] ||r[2] == esc[0] ||
 		    r[0] == esc[1] || r[1] == esc[1] ||r[2] == esc[1] ||r[2] == esc[1]) {
 			/* switch escape chars */
@@ -160,11 +162,13 @@ escape_chars(char *buf, size_t buflen)
 			*w++ = esc[1];
 		}
 		
+		/* update counter on remaining chars */
 		for (i = 0; i < 4; i++) {
 			if (r[i])
 				counter[REV64(r[i])]--;
-		}	
-		
+		}
+
+		/* do the escaping */
 		for (i = 0; i < 4; i++) {
 			if (r[i] == P62) {
 				r[i] = esc[0];
@@ -175,6 +179,7 @@ escape_chars(char *buf, size_t buflen)
 			}
 		}	
 		
+		/* copy back to buf */
 		*w++ = *r++;
 		*w++ = *r++;
 		*w++ = *r++;
@@ -296,6 +301,7 @@ base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 
 	q = buf;
 	for (p = str; *p; p += 4) {
+		/* handle escape instructions */
 		if (*p == MODE) {
 			p++;
 			if (p[0] == MODE && p[1] == MODE) {
@@ -309,6 +315,7 @@ base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 				prot63 = *p++;
 			}
 		}
+		/* since the str is const, we unescape in another buf */
 		for (i = 0; i < 4; i++) {
 			block[i] = p[i];
 			if (prot62 == block[i]) {
