@@ -19,12 +19,18 @@
 #include <string.h>
 
 #include "encoding.h"
+#include "common.h"
 #include "base64.h"
 
 static const char cb64[] = 
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789.";
 static unsigned char rev64[128];
 static int reverse_init = 0;
+
+#define REV64(x) rev64[(int) (x)]
+#define MODE 	(cb64[62])
+#define P62	(cb64[62])
+#define P63	(cb64[63])
 
 static struct encoder base64_encoder =
 {
@@ -44,7 +50,136 @@ struct encoder
 int 
 base64_handles_dots()
 {
-	return 1;
+	return 0;
+}
+
+static void
+findesc(int *count, unsigned char *esc, char c1, char c2, char c3, char c4)
+{
+	int min1 = 0;
+	int min2 = 0;
+
+	int num1 = 0xFF;
+	int num2 = 0xFE;
+
+	int i;
+
+	/* check if no more escapes needed */
+	if (count[62] == 0 && count[63] == 0) {
+		esc[0] = P62;
+		esc[1] = P62;
+		return;
+	}
+
+	for (i = 0; i < 62; i++) {
+		if (i == c1 || i == c2 || i == c3 || i == c4) {
+			continue;
+		}
+
+		if (count[i] < num1) {
+			min2 = min1;
+			num2 = num1;
+			min1 = i;
+			num1 = count[i];
+		} else if (count[i] < num2) {
+			min2 = i;
+			num2 = count[i];
+		}
+	}
+
+	esc[0] = cb64[min1];
+	esc[1] = cb64[min2];
+}
+	
+static void
+escape_chars(char *buf, size_t buflen)
+{
+	int counter[64];
+	int escapes;
+	int reset;
+	int i;
+	unsigned char temp[4096];
+	unsigned char *r;
+	unsigned char *w;
+	unsigned char *e;
+	unsigned char esc[2];
+
+	memset(counter, 0, sizeof(counter));
+	esc[0] = P62;
+	esc[1] = P63;
+
+	/* first, find the number of times each token is used */
+	r = (unsigned char *) buf;
+	w = temp;
+	while (*r) {
+		counter[REV64(*r)]++;
+		*w++ = *r++;
+	}
+
+	/* check if work needed */
+	if (counter[62] == 0 && counter[63] == 0)
+		return;
+	
+	r = temp;
+	w = (unsigned char *) buf;
+	reset = 1;
+	escapes = 0;
+	/* check a block for esc chars */
+	while (*r) {
+		if (reset == 0 && escapes == 0 && (
+		    r[0] == esc[0] || r[1] == esc[0] ||r[2] == esc[0] ||r[2] == esc[0] ||
+		    r[0] == esc[1] || r[1] == esc[1] ||r[2] == esc[1] ||r[2] == esc[1])) {
+			/* last set of escape chars were unused.
+			 * if we reset last escape switch then we dont have to switch now */
+
+			/* change last ecape switch to 999 (RESET) */
+			e[1] = MODE;
+			e[2] = MODE;
+			 
+			/* store default esc chars */
+			esc[0] = P62;
+			esc[1] = P63;
+
+			reset = 1;
+		}
+		if (r[0] == esc[0] || r[1] == esc[0] ||r[2] == esc[0] ||r[2] == esc[0] ||
+		    r[0] == esc[1] || r[1] == esc[1] ||r[2] == esc[1] ||r[2] == esc[1]) {
+			/* switch escape chars */
+			escapes = 0;
+			reset = 0;
+
+			/* find 2 suitable escape chars */
+			findesc(counter, esc, REV64(r[0]), REV64(r[1]), REV64(r[2]), REV64(r[3]));
+
+			/* store escape switch position */
+			e = w;
+
+			/* write new escape chars */
+			*w++ = MODE;
+			*w++ = esc[0];
+			*w++ = esc[1];
+		}
+		
+		for (i = 0; i < 4; i++) {
+			if (r[i])
+				counter[REV64(r[i])]--;
+		}	
+		
+		for (i = 0; i < 4; i++) {
+			if (r[i] == P62) {
+				r[i] = esc[0];
+				escapes++;
+			} else if (r[i] == P63) {
+				r[i] = esc[1];
+				escapes++;
+			}
+		}	
+		
+		*w++ = *r++;
+		*w++ = *r++;
+		*w++ = *r++;
+		*w++ = *r++;
+	}
 }
 
 int 
@@ -52,12 +187,21 @@ base64_encode(char *buf, size_t *buflen, const void *data, size_t size)
 {
 	size_t newsize;
 	size_t maxsize;
+	unsigned char c;
 	unsigned char *s;
 	unsigned char *p;
 	unsigned char *q;
 	int i;
 
 	memset(buf, 0, *buflen);
+	
+	if (!reverse_init) {
+		for (i = 0; i < 64; i++) {
+			c = cb64[i];
+			rev64[(int) c] = i;
+		}
+		reverse_init = 1;
+	}
 
 	/* how many chars can we encode within the buf */
 	maxsize = 3 * (*buflen / 4 - 1) - 1;
@@ -82,6 +226,8 @@ base64_encode(char *buf, size_t *buflen, const void *data, size_t size)
 	}	
 	*p = 0;
 
+	escape_chars(buf, *buflen);
+
 	/* store number of bytes from data that was used */
 	*buflen = size;
 
@@ -89,7 +235,6 @@ base64_encode(char *buf, size_t *buflen, const void *data, size_t size)
 }
 
 #define DECODE_ERROR 0xffffffff
-#define REV64(x) rev64[(int) (x)]
 
 static int
 decode_token(const unsigned char *t, unsigned char *data, size_t len) 
@@ -123,6 +268,9 @@ base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 	size_t maxsize;
 	const char *p;
 	unsigned char c;
+	unsigned char block[4];
+	unsigned char prot62;
+	unsigned char prot63;
 	int len;
 	int i;
 
@@ -142,10 +290,34 @@ base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 	if (*buflen < newsize) {
 		slen = maxsize;
 	}
+	
+	prot62 = P62;
+	prot63 = P63;
 
 	q = buf;
-	for (p = str; *p && strchr(cb64, *p); p += 4) {
-		len = decode_token((unsigned char *) p, (unsigned char *) q, slen);	
+	for (p = str; *p; p += 4) {
+		if (*p == MODE) {
+			p++;
+			if (p[0] == MODE && p[1] == MODE) {
+				/* reset escape chars */
+				prot62 = P62;
+				prot63 = P63;
+				
+				p += 2;
+			} else {
+				prot62 = *p++;
+				prot63 = *p++;
+			}
+		}
+		for (i = 0; i < 4; i++) {
+			block[i] = p[i];
+			if (prot62 == block[i]) {
+				block[i] = P62;
+			} else if (prot63 == block[i]) {
+				block[i] = P63;
+			}
+		}
+		len = decode_token(block, (unsigned char *) q, slen);	
 		q += len;
 		slen -= 4;
 		
