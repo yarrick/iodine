@@ -17,6 +17,7 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
