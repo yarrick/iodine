@@ -181,6 +181,9 @@ int
 tun_setip(const char *ip)
 {
 	char cmdline[512];
+#ifndef LINUX
+		int r;
+#endif
 
 	if (inet_addr(ip) != INADDR_NONE) {
 		snprintf(cmdline, sizeof(cmdline), 
@@ -191,8 +194,6 @@ tun_setip(const char *ip)
 		
 		printf("Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
-		int r;
-
 		r = system(cmdline);
 		if(r != 0) {
 			return r;
