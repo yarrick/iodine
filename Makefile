@@ -19,10 +19,13 @@ all:
 
 install: all
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(sbindir)
-	$(INSTALL) $(INSTALL_FLAGS) bin/iodine $(DESTDIR)$(prefix)/iodine
-	$(INSTALL) $(INSTALL_FLAGS) bin/iodined $(DESTDIR)$(prefix)/iodined
+	$(INSTALL) $(INSTALL_FLAGS) bin/iodine $(DESTDIR)$(sbindir)/iodine
+	chmod 755 $(DESTDIR)$(sbindir)/iodine
+	$(INSTALL) $(INSTALL_FLAGS) bin/iodined $(DESTDIR)$(sbindir)/iodined
+	chmod 755 $(DESTDIR)$(sbindir)/iodined
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(mandir)/man8
 	$(INSTALL) $(INSTALL_FLAGS) man/iodine.8 $(DESTDIR)$(mandir)/man8/iodine.8
+	chmod 644 $(DESTDIR)$(mandir)/man8/iodine.8
 
 uninstall:
 	$(RM) $(RM_FLAGS) $(sbindir)/iodine
