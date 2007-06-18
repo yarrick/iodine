@@ -98,7 +98,7 @@ build_hostname(char *buf, size_t buflen,
 		const char *topdomain)
 {
 	int encsize;
-	unsigned space;
+	size_t space;
 	char *b;
 
 
