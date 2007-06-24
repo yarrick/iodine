@@ -47,7 +47,7 @@ static void send_ping(int fd);
 static void send_chunk(int fd);
 static int build_hostname(char *buf, size_t buflen, 
 	const char *data, const size_t datalen, 
-	const char *topdomain);
+	const char *topdomain, struct encoder *encoder);
 
 int running = 1;
 char password[33];
@@ -65,7 +65,11 @@ static int packetpos;
 static int packetlen;
 static uint16_t chunkid;
 
-static struct encoder *enc;
+/* Base32 encoder used for non-data packets */
+static struct encoder *b32;
+/* The encoder used for data packets
+ * Defaults to Base32, can be changed after handshake */
+static struct encoder *dataenc;
 
 static void
 sighandler(int sig) 
@@ -86,7 +90,7 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 
 	buf[0] = cmd;
 	
-	len = build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain);
+	len = build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain, b32);
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
 
 	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
@@ -95,7 +99,7 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 static int
 build_hostname(char *buf, size_t buflen, 
 		const char *data, const size_t datalen, 
-		const char *topdomain)
+		const char *topdomain, struct encoder *encoder)
 {
 	int encsize;
 	size_t space;
@@ -103,14 +107,14 @@ build_hostname(char *buf, size_t buflen,
 
 
 	space = MIN(0xFF, buflen) - strlen(topdomain) - 2;
-	if (!enc->places_dots())
+	if (!encoder->places_dots())
 		space -= (space / 62); /* space for dots */
 
 	memset(buf, 0, buflen);
 	
-	encsize = enc->encode(buf, &space, data, datalen);
+	encsize = encoder->encode(buf, &space, data, datalen);
 
-	if (!enc->places_dots())
+	if (!encoder->places_dots())
 		inline_dotify(buf, buflen);
 
 	b = buf;
@@ -279,7 +283,7 @@ send_chunk(int fd)
 	p += packetpos;
 	avail = packetlen - packetpos;
 
-	lastlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
+	lastlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
 
 	if (lastlen == avail)
 		code = 1;
@@ -536,7 +540,8 @@ main(int argc, char **argv)
 	device = NULL;
 	chunkid = 0;
 
-	enc = get_base32_encoder();
+	b32 = get_base32_encoder();
+	dataenc = get_base32_encoder();
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:P:")) != -1) {
 		switch(choice) {
