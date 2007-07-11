@@ -58,11 +58,8 @@ static char *topdomain;
 uint16_t rand_seed;
 
 /* Current IP packet */
-static char activepacket[4096];
+static struct packet packet;
 static char userid;
-static int lastlen;
-static int packetpos;
-static int packetlen;
 static uint16_t chunkid;
 
 /* Base32 encoder used for non-data packets */
@@ -131,36 +128,36 @@ build_hostname(char *buf, size_t buflen,
 int
 is_sending()
 {
-	return (packetlen != 0);
+	return (packet.len != 0);
 }
 
 int
 read_dns(int fd, char *buf, int buflen)
 {
 	struct sockaddr_in from;
-	char packet[64*1024];
+	char data[64*1024];
 	socklen_t addrlen;
 	struct query q;
 	int rv;
 	int r;
 
 	addrlen = sizeof(struct sockaddr);
-	if ((r = recvfrom(fd, packet, sizeof(packet), 0, 
-					  (struct sockaddr*)&from, &addrlen)) == -1) {
+	if ((r = recvfrom(fd, data, sizeof(data), 0, 
+			  (struct sockaddr*)&from, &addrlen)) == -1) {
 		warn("recvfrom");
 		return 0;
 	}
 
-	rv = dns_decode(buf, buflen, &q, QR_ANSWER, packet, r);
+	rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
 
 	if (is_sending() && chunkid == q.id) {
 		/* Got ACK on sent packet */
-		packetpos += lastlen;
-		if (packetpos == packetlen) {
+		packet.offset += packet.sentlen;
+		if (packet.offset == packet.len) {
 			/* Packet completed */
-			packetpos = 0;
-			packetlen = 0;
-			lastlen = 0;
+			packet.offset = 0;
+			packet.len = 0;
+			packet.sentlen = 0;
 		} else {
 			/* More to send */
 			send_chunk(fd);
@@ -186,10 +183,10 @@ tunnel_tun(int tun_fd, int dns_fd)
 	inlen = read;
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, inlen, 9);
 
-	memcpy(activepacket, out, MIN(outlen, sizeof(activepacket)));
-	lastlen = 0;
-	packetpos = 0;
-	packetlen = outlen;
+	memcpy(packet.data, out, MIN(outlen, sizeof(packet.data)));
+	packet.sentlen = 0;
+	packet.offset = 0;
+	packet.len = outlen;
 
 	send_chunk(dns_fd);
 
@@ -268,7 +265,7 @@ static void
 send_chunk(int fd)
 {
 	char hex[] = "0123456789ABCDEF";
-	char packet[4096];
+	char data[4096];
 	struct query q;
 	char buf[4096];
 	int avail;
@@ -279,22 +276,22 @@ send_chunk(int fd)
 	q.id = ++chunkid;
 	q.type = T_NULL;
 
-	p = activepacket;
-	p += packetpos;
-	avail = packetlen - packetpos;
+	p = packet.data;
+	p += packet.offset;
+	avail = packet.len - packet.offset;
 
-	lastlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
+	packet.sentlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
 
-	if (lastlen == avail)
+	if (packet.sentlen == avail)
 		code = 1;
 	else
 		code = 0;
 		
 	code |= (userid << 1);
 	buf[0] = hex[code];
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+	len = dns_encode(data, sizeof(data), &q, QR_QUERY, buf, strlen(buf));
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+	sendto(fd, data, len, 0, (struct sockaddr*)&peer, sizeof(peer));
 }
 
 void
@@ -320,9 +317,9 @@ send_ping(int fd)
 	char data[3];
 	
 	if (is_sending()) {
-		lastlen = 0;
-		packetpos = 0;
-		packetlen = 0;
+		packet.sentlen = 0;
+		packet.offset = 0;
+		packet.len = 0;
 	}
 
 	data[0] = userid;
