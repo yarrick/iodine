@@ -137,7 +137,29 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	switch (qr) {
 	case QR_ANSWER:
 		if(qdcount != 1 || ancount != 1) {
-			warnx("no query or answer in answer");
+			switch (header->rcode) {
+			case REFUSED:
+				warnx("Got REFUSED as reply");
+				break;
+
+			case NOTIMP:
+				warnx("Got NOTIMP as reply");
+				break;
+
+			case NXDOMAIN:
+				warnx("Got NXDOMAIN as reply");
+				break;
+
+
+			case SERVFAIL:
+				warnx("Got SERVFAIL as reply");
+				break;
+
+			case NOERROR:
+			default:
+				warnx("no query or answer in answer");
+				break;
+			}
 			return -1;
 		}
 
