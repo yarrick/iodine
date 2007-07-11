@@ -521,6 +521,10 @@ main(int argc, char **argv)
 		usage();
 
 	topdomain = strdup(argv[1]);
+	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
+		printf("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
+		usage();
+	}
 
 	if (username) {
 		pw = getpwnam(username);
