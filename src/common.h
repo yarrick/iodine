@@ -30,9 +30,10 @@
 
 struct packet 
 {
-	int len;
-	int offset;
-	char data[64*1024];
+	int len;		/* Total packet length */
+	int sentlen;		/* Length of chunk currently transmitted */
+	int offset;		/* Current offset */
+	char data[64*1024];	/* The data */
 };
 
 struct query {
