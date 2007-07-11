@@ -75,22 +75,29 @@ sighandler(int sig)
 }
 
 static void
-send_packet(int fd, char cmd, const char *data, const size_t datalen)
+send_query(int fd, char *hostname)
 {
 	char packet[4096];
 	struct query q;
-	char buf[4096];
 	size_t len;
 
 	q.id = ++chunkid;
 	q.type = T_NULL;
 
-	buf[0] = cmd;
-	
-	len = build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain, b32);
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
 
 	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+}
+
+static void
+send_packet(int fd, char cmd, const char *data, const size_t datalen)
+{
+	char buf[4096];
+
+	buf[0] = cmd;
+	
+	build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain, b32);
+	send_query(fd, buf);
 }
 
 static int
@@ -265,16 +272,10 @@ static void
 send_chunk(int fd)
 {
 	char hex[] = "0123456789ABCDEF";
-	char data[4096];
-	struct query q;
 	char buf[4096];
 	int avail;
 	int code;
 	char *p;
-	int len;
-
-	q.id = ++chunkid;
-	q.type = T_NULL;
 
 	p = packet.data;
 	p += packet.offset;
@@ -289,9 +290,8 @@ send_chunk(int fd)
 		
 	code |= (userid << 1);
 	buf[0] = hex[code];
-	len = dns_encode(data, sizeof(data), &q, QR_QUERY, buf, strlen(buf));
 
-	sendto(fd, data, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+	send_query(fd, buf);
 }
 
 void
