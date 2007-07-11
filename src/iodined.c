@@ -128,9 +128,18 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *
 }
 
 static int
+cmp_remote_ip(int userid, struct query *q) {
+	struct sockaddr_in *tempin;
+
+	tempin = (struct sockaddr_in *) &(q->from);
+	return memcmp(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+}
+
+static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct in_addr tempip;
+	struct sockaddr_in *tempin;
 	struct user dummy;
 	struct ip *hdr;
 	unsigned long outlen;
@@ -164,9 +173,10 @@ tunnel_dns(int tun_fd, int dns_fd)
 				userid = find_available_user();
 				if (userid >= 0) {
 					users[userid].seed = rand();
-					memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
+					/* Store remote IP number */
+					tempin = (struct sockaddr_in *) &(dummy.q.from);
+					memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
 					memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-					users[userid].addrlen = dummy.q.fromlen;
 					users[userid].encoder = get_base32_encoder();
 					send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
 					users[userid].q.id = 0;
@@ -191,8 +201,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		users[userid].last_pkt = time(NULL);
 		login_calculate(logindata, 16, password, users[userid].seed);
 
-		if (dummy.q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
+		if (cmp_remote_ip(userid, &(dummy.q)) != 0) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
 			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
@@ -223,8 +232,10 @@ tunnel_dns(int tun_fd, int dns_fd)
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
 		}
-		memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-		users[userid].last_pkt = time(NULL);
+		if (cmp_remote_ip(userid, &(dummy.q)) != 0) {
+			memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
+			users[userid].last_pkt = time(NULL);
+		}
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -242,8 +253,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		}
 
 		/* Check sending ip number */
-		if (dummy.q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
+		if (cmp_remote_ip(userid, &(dummy.q)) != 0) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
 			/* decode with this users encoding */
@@ -252,7 +262,6 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 			users[userid].last_pkt = time(NULL);
 			memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-			users[userid].addrlen = dummy.q.fromlen;
 			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, unpacked, read);
 			users[userid].inpacket.len += read;
 			users[userid].inpacket.offset += read;
@@ -281,8 +290,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 		}
 	}
 	/* userid must be set for a reply to be sent */
-	if (userid >= 0 && userid < USERS && dummy.q.fromlen == users[userid].addrlen &&
-			memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) == 0 &&
+	if (userid >= 0 && userid < USERS && 
+			cmp_remote_ip(userid, &(dummy.q)) != 0 &&
 			users[userid].outpacket.len > 0) {
 
 		write_dns(dns_fd, &(dummy.q), users[userid].outpacket.data, users[userid].outpacket.len);
