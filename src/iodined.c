@@ -379,10 +379,14 @@ read_dns(int fd, struct query *q, char *buf, int buflen)
 	if (r > 0) {
 		dns_decode(buf, buflen, q, QR_QUERY, packet, r);
 		domain = strstr(q->name, topdomain);
-		rv = (int) (domain - q->name); 
-		memcpy(buf, q->name, MIN(rv, buflen));
-		q->fromlen = addrlen;
-		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
+		if (domain) {
+			rv = (int) (domain - q->name); 
+			memcpy(buf, q->name, MIN(rv, buflen));
+			q->fromlen = addrlen;
+			memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
+		} else {
+			rv = 0;
+		}
 	} else if (r < 0) { 
 		/* Error */
 		perror("recvfrom");
