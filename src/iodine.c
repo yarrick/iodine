@@ -362,7 +362,7 @@ send_case_check(int fd)
 {
 	char buf[512] = "zZaAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyY123-4560789.";
 
-	strcat(buf, topdomain);
+	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, buf);
 }
 
@@ -397,7 +397,7 @@ handshake(int dns_fd)
 			read = read_dns(dns_fd, in, sizeof(in));
 			
 			if(read < 0) {
-				perror("read");
+				warn("handshake read");
 				continue;
 			}
 
@@ -527,20 +527,46 @@ perform_case_check:
 	printf("No reply on case check, continuing\n");
 	return 0;
 }
+		
+static char *
+get_resolvconf_addr()
+{
+	static char addr[16];
+	char buf[80];
+	char *rv;
+	FILE *fp;
+	
+	rv = NULL;
+
+	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL) 
+		err(1, "/etc/resolve.conf");
+	
+	while (feof(fp) == 0) {
+		fgets(buf, sizeof(buf), fp);
+
+		if (sscanf(buf, "nameserver %15s", addr) == 1) {
+			rv = addr;
+			break;
+		}
+	}
+	
+	fclose(fp);
+
+	return rv;
+}
 
 static void
-set_target(const char *host) 
+set_nameserver(const char *cp) 
 {
-	struct hostent *h;
+	struct in_addr addr;
 
-	h = gethostbyname(host);
-	if (!h)
-		err(1, "couldn't resolve name %s", host);
+	if (inet_aton(cp, &addr) != 1)
+		errx(1, "error parsing nameserver address: '%s'", cp);
 
 	memset(&peer, 0, sizeof(peer));
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons(53);
-	peer.sin_addr = *((struct in_addr *) h->h_addr);
+	peer.sin_addr = addr;
 }
 
 static void
@@ -548,7 +574,7 @@ usage() {
 	extern char *__progname;
 
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"nameserver topdomain\n", __progname);
+			"[nameserver] topdomain\n", __progname);
 	exit(2);
 }
 
@@ -558,7 +584,7 @@ help() {
 
 	printf("iodine IP over DNS tunneling client\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] nameserver topdomain\n", __progname);
+			"[-P password] [nameserver] topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
@@ -566,7 +592,7 @@ help() {
 	printf("  -t dir to chroot to directory dir\n");
 	printf("  -d device to set tunnel device name\n");
 	printf("  -P password used for authentication (max 32 chars will be used)\n");
-	printf("nameserver is the IP number of the relaying nameserver\n");
+	printf("nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
 	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
@@ -587,6 +613,7 @@ version() {
 int
 main(int argc, char **argv)
 {
+	char *nameserv_addr;
 	struct passwd *pw;
 	char *username;
 	int foreground;
@@ -643,11 +670,23 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-	
-	if (argc != 2) 
-		usage();
 
-	topdomain = strdup(argv[1]);
+	switch (argc) {
+	case 1:
+		nameserv_addr = get_resolvconf_addr();
+		topdomain = strdup(argv[0]);
+		break;
+	case 2:
+		nameserv_addr = argv[0];
+		topdomain = strdup(argv[1]);
+		break;
+	default:
+		usage();
+		/* NOTREACHED */
+	}
+
+	set_nameserver(nameserv_addr);
+
 	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
 		printf("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
 		usage();
@@ -671,7 +710,6 @@ main(int argc, char **argv)
 		goto cleanup1;
 	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1)
 		goto cleanup2;
-	set_target(argv[0]);
 
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);

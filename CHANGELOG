@@ -15,6 +15,7 @@ CHANGES:
 	- Top domain limited to 128 chars
 	- Case preservation check sent after login to decide codec
 	- Fixed crash on incoming NULL query in server with bad top domain
+	- /etc/resolv.conf is consulted if no nameserver is given on commandline
 
 2007-03-25: 0.4.0 "Run Home"
 	- Added multiuser support (up to 8 users simultaneously)
