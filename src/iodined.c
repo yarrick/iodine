@@ -42,16 +42,13 @@
 #include "tun.h"
 #include "version.h"
 
-int running = 1;
+static int running = 1;
+static char *topdomain;
+static char password[33];
+static struct encoder *b32;
 
-char *topdomain;
-
-char password[33];
-
-struct encoder *b32;
-
-int my_mtu;
-in_addr_t my_ip;
+static int my_mtu;
+static in_addr_t my_ip;
 
 static int read_dns(int, struct query *, char *, int);
 static void write_dns(int, struct query *, char *, int);
