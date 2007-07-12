@@ -451,17 +451,17 @@ version() {
 int
 main(int argc, char **argv)
 {
-	int choice;
-	int tun_fd;
-	int dnsd_fd;
-	char *newroot;
-	char *username;
-	char *device;
-	int foreground;
-	int mtu;
-	struct passwd *pw;
 	in_addr_t listen_ip;
+	struct passwd *pw;
+	int foreground;
+	char *username;
+	char *newroot;
+	char *device;
+	int dnsd_fd;
+	int tun_fd;
+	int choice;
 	int port;
+	int mtu;
 
 	username = NULL;
 	newroot = NULL;
@@ -473,7 +473,7 @@ main(int argc, char **argv)
 
 	b32 = get_base32_encoder();
 
-	memset(password, 0, 33);
+	memset(password, 0, sizeof(password));
 	srand(time(NULL));
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:p:P:")) != -1) {
@@ -512,6 +512,9 @@ main(int argc, char **argv)
 		case 'P':
 			strncpy(password, optarg, 32);
 			password[32] = 0;
+			
+			/* XXX: find better way of cleaning up ps(1) */
+			memset(optarg, 0, strlen(optarg)); 
 			break;
 		default:
 			usage();
