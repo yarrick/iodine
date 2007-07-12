@@ -389,7 +389,7 @@ read_dns(int fd, struct query *q, char *buf, int buflen)
 		}
 	} else if (r < 0) { 
 		/* Error */
-		perror("recvfrom");
+		warn("read dns");
 		rv = 0;
 	}
 
