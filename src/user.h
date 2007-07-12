@@ -25,7 +25,8 @@ struct user {
 	time_t last_pkt;
 	int seed;
 	in_addr_t tun_ip;
-	struct in_addr host;
+	struct sockaddr host;
+	int addrlen;
 	struct query q;
 	struct packet inpacket;
 	struct packet outpacket;
