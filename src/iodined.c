@@ -573,7 +573,8 @@ main(int argc, char **argv)
 
 	printf("Listening to dns for domain %s\n", argv[1]);
 
-	do_chroot(newroot);
+	if (newroot != NULL)
+		do_chroot(newroot);
 
 	signal(SIGINT, sigint);
 	if (username) {
