@@ -16,7 +16,9 @@ iodine, iodined \- tunnel IPv4 over DNS
 .B ] [-d
 .I device
 .B ]
+.B [
 .I nameserver
+.B ]
 .I topdomain
 
 .B iodined [-v]
@@ -93,7 +95,8 @@ You must make sure the dns requests are forwarded to this port yourself.
 .B nameserver
 The nameserver to use to relay the dns traffic. This can be any relaying
 nameserver  or the ip number of the server running iodined if reachable.
-Normally, you should specify a nameserver from your 
+This argument is optional, and if not specified a nameserver will be read
+from the
 .I /etc/resolv.conf
 file.
 .TP
