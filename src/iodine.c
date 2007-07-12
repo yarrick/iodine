@@ -34,6 +34,7 @@
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
 #endif
+#include <termios.h>
 
 #include "common.h"
 #include "encoding.h"
@@ -570,6 +571,30 @@ set_nameserver(const char *cp)
 }
 
 static void
+read_password(char *buf, size_t len)
+{
+	struct termios old;
+	struct termios tp;
+	char pwd[80];
+
+	tcgetattr(0, &tp);
+	old = tp;
+	
+	tp.c_lflag &= (~ECHO);
+	tcsetattr(0, TCSANOW, &tp);
+
+	printf("Enter password: ");
+	fflush(stdout);
+	scanf("%79s", pwd);
+	printf("\n");
+
+	tcsetattr(0, TCSANOW, &old);	
+
+	strncpy(buf, pwd, len);
+	buf[len-1] = '\0';
+}
+
+static void
 usage() {
 	extern char *__progname;
 
@@ -700,11 +725,8 @@ main(int argc, char **argv)
 		}
 	}
 	
-	if (strlen(password) == 0) {
-		printf("Enter password on stdin:\n");
-		scanf("%32s", password);
-		password[32] = 0;
-	}
+	if (strlen(password) == 0) 
+		read_password(password, sizeof(password));
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup1;
