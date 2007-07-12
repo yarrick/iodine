@@ -50,4 +50,6 @@ void close_dns(int);
 void do_chroot(char *);
 void do_detach();
 
+void read_password(char*, size_t);
+
 #endif

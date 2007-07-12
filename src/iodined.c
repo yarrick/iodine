@@ -514,7 +514,7 @@ main(int argc, char **argv)
 	argv += optind;
 
 	if (geteuid() != 0) {
-		printf("Run as root and you'll be happy.\n");
+		warnx("Run as root and you'll be happy.\n");
 		usage();
 	}
 
@@ -523,33 +523,29 @@ main(int argc, char **argv)
 
 	topdomain = strdup(argv[1]);
 	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
-		printf("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
+		warnx("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
 		usage();
 	}
 
-	if (username) {
-		pw = getpwnam(username);
-		if (!pw) {
-			printf("User %s does not exist!\n", username);
+	if (username != NULL) {
+		if ((pw = getpwnam(username)) == NULL) {
+			warnx("User %s does not exist!\n", username);
 			usage();
 		}
 	}
 
 	if (mtu == 0) {
-		printf("Bad MTU given.\n");
+		warnx("Bad MTU given.\n");
 		usage();
 	}
 
 	if (listen_ip == INADDR_NONE) {
-		printf("Bad IP address to listen on.\n");
+		warnx("Bad IP address to listen on.\n");
 		usage();
 	}
 
-	if (strlen(password) == 0) {
-		printf("Enter password on stdin:\n");
-		scanf("%32s", password);
-		password[32] = 0;
-	}
+	if (strlen(password) == 0)
+		read_password(password, sizeof(password));
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup0;
@@ -562,22 +558,21 @@ main(int argc, char **argv)
 	my_mtu = mtu;
 	init_users(my_ip);
 
-	printf("Listening to dns for domain %s\n", argv[1]);
+	printf("Listening to dns for domain %s\n", topdomain);
 
 	if (newroot != NULL)
 		do_chroot(newroot);
 
 	signal(SIGINT, sigint);
-	if (username) {
+	if (username != NULL) {
 		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
-			printf("Could not switch to user %s!\n", username);
+			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}
 	}
 	
-	if (!foreground) {
+	if (foreground == 0) 
 		do_detach();
-	}
 	
 	tunnel(tun_fd, dnsd_fd);
 
