@@ -717,7 +717,7 @@ main(int argc, char **argv)
 	if(handshake(dns_fd))
 		goto cleanup2;
 	
-	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
+	printf("Sending queries for %s to %s\n", topdomain, nameserv_addr);
 
 	do_chroot(newroot);
 	
