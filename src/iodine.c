@@ -53,7 +53,7 @@ static int build_hostname(char *buf, size_t buflen,
 static int running = 1;
 static char password[33];
 
-static struct sockaddr_in peer;
+static struct sockaddr_in nameserv;
 static char *topdomain;
 
 static uint16_t rand_seed;
@@ -95,7 +95,7 @@ send_query(int fd, char *hostname)
 
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
 }
 
 static void
@@ -564,10 +564,10 @@ set_nameserver(const char *cp)
 	if (inet_aton(cp, &addr) != 1)
 		errx(1, "error parsing nameserver address: '%s'", cp);
 
-	memset(&peer, 0, sizeof(peer));
-	peer.sin_family = AF_INET;
-	peer.sin_port = htons(53);
-	peer.sin_addr = addr;
+	memset(&nameserv, 0, sizeof(nameserv));
+	nameserv.sin_family = AF_INET;
+	nameserv.sin_port = htons(53);
+	nameserv.sin_addr = addr;
 }
 
 static void
