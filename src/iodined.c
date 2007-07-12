@@ -163,29 +163,26 @@ tunnel_dns(int tun_fd, int dns_fd)
 		/* Version greeting, compare and send ack/nak */
 		if (read > 4) { 
 			/* Received V + 32bits version */
-
 			version = (((unpacked[0] & 0xff) << 24) |
 					   ((unpacked[1] & 0xff) << 16) |
 					   ((unpacked[2] & 0xff) << 8) |
 					   ((unpacked[3] & 0xff)));
+		}
 
-			if (version == VERSION) {
-				userid = find_available_user();
-				if (userid >= 0) {
-					users[userid].seed = rand();
-					/* Store remote IP number */
-					tempin = (struct sockaddr_in *) &(dummy.q.from);
-					memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
-					memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-					users[userid].encoder = get_base32_encoder();
-					send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
-					users[userid].q.id = 0;
-				} else {
-					/* No space for another user */
-					send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
-				}
+		if (version == VERSION) {
+			userid = find_available_user();
+			if (userid >= 0) {
+				users[userid].seed = rand();
+				/* Store remote IP number */
+				tempin = (struct sockaddr_in *) &(dummy.q.from);
+				memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+				memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
+				users[userid].encoder = get_base32_encoder();
+				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
+				users[userid].q.id = 0;
 			} else {
-				send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
+				/* No space for another user */
+				send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
 			}
 		} else {
 			send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
