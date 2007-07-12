@@ -34,7 +34,6 @@
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
 #endif
-#include <termios.h>
 
 #include "common.h"
 #include "encoding.h"
@@ -568,30 +567,6 @@ set_nameserver(const char *cp)
 	nameserv.sin_family = AF_INET;
 	nameserv.sin_port = htons(53);
 	nameserv.sin_addr = addr;
-}
-
-static void
-read_password(char *buf, size_t len)
-{
-	struct termios old;
-	struct termios tp;
-	char pwd[80];
-
-	tcgetattr(0, &tp);
-	old = tp;
-	
-	tp.c_lflag &= (~ECHO);
-	tcsetattr(0, TCSANOW, &tp);
-
-	printf("Enter password: ");
-	fflush(stdout);
-	scanf("%79s", pwd);
-	printf("\n");
-
-	tcsetattr(0, TCSANOW, &old);	
-
-	strncpy(buf, pwd, len);
-	buf[len-1] = '\0';
 }
 
 static void
