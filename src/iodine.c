@@ -49,24 +49,32 @@ static int build_hostname(char *buf, size_t buflen,
 	const char *data, const size_t datalen, 
 	const char *topdomain, struct encoder *encoder);
 
-int running = 1;
-char password[33];
+static int running = 1;
+static char password[33];
 
-struct sockaddr_in peer;
+static struct sockaddr_in peer;
 static char *topdomain;
 
-uint16_t rand_seed;
+static uint16_t rand_seed;
 
 /* Current IP packet */
 static struct packet packet;
+
+/* My userid at the server */
 static char userid;
+
+/* DNS id for next packet */
 static uint16_t chunkid;
 
 /* Base32 encoder used for non-data packets */
 static struct encoder *b32;
+
 /* The encoder used for data packets
  * Defaults to Base32, can be changed after handshake */
 static struct encoder *dataenc;
+
+/* result of case preservation check done after login */
+static int case_preserved;
 
 static void
 sighandler(int sig) 
@@ -349,6 +357,15 @@ send_version(int fd, uint32_t version)
 	send_packet(fd, 'V', data, sizeof(data));
 }
 
+void
+send_case_check(int fd)
+{
+	char buf[512] = "zZaAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyY123-4560789.";
+
+	strcat(buf, topdomain);
+	send_query(fd, buf);
+}
+
 static int
 handshake(int dns_fd)
 {
@@ -386,9 +403,9 @@ handshake(int dns_fd)
 
 			if (read >= 9) {
 				payload =  (((in[4] & 0xff) << 24) |
-							((in[5] & 0xff) << 16) |
-							((in[6] & 0xff) << 8) |
-							((in[7] & 0xff)));
+						((in[5] & 0xff) << 16) |
+						((in[6] & 0xff) << 8) |
+						((in[7] & 0xff)));
 
 				if (strncmp("VACK", in, 4) == 0) {
 					seed = payload;
@@ -446,7 +463,7 @@ perform_login:
 					client[64] = 0;
 					if (tun_setip(client) == 0 && 
 						tun_setmtu(mtu) == 0) {
-						return 0;
+						goto perform_case_check;
 					} else {
 						warnx("Received handshake with bad data");
 					}
@@ -458,11 +475,60 @@ perform_login:
 
 		printf("Retrying login...\n");
 	}
+	errx(1, "couldn't login to server");
+	/* NOTREACHED */
 
-	return 1;
+perform_case_check:
+	case_preserved = 0;
+	for (i=0; running && i<5 ;i++) {
+		tv.tv_sec = i + 1;
+		tv.tv_usec = 0;
+
+		send_case_check(dns_fd);
+		
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = read_dns(dns_fd, in, sizeof(in));
+			
+			if(read <= 0) {
+				warn("read");
+				continue;
+			}
+
+			if (read > 0) {
+				if (in[0] == 'z' || in[0] == 'Z') {
+					if (read < (26 * 2)) {
+						printf("Received short case reply...\n");
+					} else {
+						int k;
+
+						case_preserved = 1;
+						for (k = 0; k < 26 && case_preserved; k += 2) {
+							if (in[k] == in[k+1]) {
+								/* test string: zZaAbBcCdD... */
+								case_preserved = 0;
+							}
+						}
+						return 0;
+					}
+				} else {
+					printf("Received bad case check reply\n");
+				}
+			}
+		}
+
+		printf("Retrying case check...\n");
+	}
+
+	printf("No reply on case check, continuing\n");
+	return 0;
 }
 
-static void 
+static void
 set_target(const char *host) 
 {
 	struct hostent *h;

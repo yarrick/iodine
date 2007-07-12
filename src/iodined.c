@@ -236,6 +236,12 @@ tunnel_dns(int tun_fd, int dns_fd)
 			memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
 			users[userid].last_pkt = time(NULL);
 		}
+	} else if(in[0] == 'Z' || in[0] == 'z') {
+		/* Case conservation check */
+
+		/* Reply with received hostname as data */
+		write_dns(dns_fd, &(dummy.q), in, read);
+		return 0;
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {

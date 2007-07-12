@@ -12,6 +12,8 @@ CHANGES:
 	- Refined 'install' make target
 	- Fixed bug denying access if relay uses varying source ports
 	- All received error messages (RCODE field) are echoed
+	- Top domain limited to 128 chars
+	- Case preservation check sent after login to decide codec
 
 2007-03-25: 0.4.0 "Run Home"
 	- Added multiuser support (up to 8 users simultaneously)
