@@ -681,6 +681,9 @@ main(int argc, char **argv)
 		case 'P':
 			strncpy(password, optarg, 32);
 			password[32] = 0;
+			
+			/* XXX: find better way of cleaning up ps(1) */
+			memset(optarg, 0, strlen(optarg)); 
 			break;
 		default:
 			usage();
@@ -689,7 +692,7 @@ main(int argc, char **argv)
 	}
 	
 	if (geteuid() != 0) {
-		printf("Run as root and you'll be happy.\n");
+		warnx("Run as root and you'll be happy.\n");
 		usage();
 	}
 
@@ -713,14 +716,13 @@ main(int argc, char **argv)
 	set_nameserver(nameserv_addr);
 
 	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
-		printf("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
+		warnx("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
 		usage();
 	}
 
-	if(username) {
-		pw = getpwnam(username);
-		if (!pw) {
-			printf("User %s does not exist!\n", username);
+	if (username != NULL) {
+		if ((pw = getpwnam(username)) == NULL) {
+			warnx("User %s does not exist!\n", username);
 			usage();
 		}
 	}
@@ -739,20 +741,20 @@ main(int argc, char **argv)
 	if(handshake(dns_fd))
 		goto cleanup2;
 	
-	printf("Sending queries for %s to %s\n", topdomain, nameserv_addr);
+	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
 
-	do_chroot(newroot);
+	if (newroot != NULL)
+		do_chroot(newroot);
 	
-	if (username) {
+	if (username != NULL) {
 		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
-			printf("Could not switch to user %s!\n", username);
+			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}
 	}
 	
-	if (!foreground) {
+	if (foreground == 0) 
 		do_detach();
-	}
 
 	tunnel(tun_fd, dns_fd);
 
