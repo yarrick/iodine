@@ -41,6 +41,7 @@ START_TEST(test_inline_dotify)
 	char temp[1024];
 	char *b;
 
+	i = 0;
 	while (dottests[i].a) {
 		memset(temp, 0, sizeof(temp));
 		strcpy(temp, dottests[i].a);
@@ -60,6 +61,7 @@ START_TEST(test_inline_undotify)
 	char temp[1024];
 	char *b;
 
+	i = 0;
 	while (dottests[i].a) {
 		memset(temp, 0, sizeof(temp));
 		strcpy(temp, dottests[i].b);
