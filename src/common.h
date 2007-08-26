@@ -28,6 +28,8 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
 
+#define QUERY_NAME_SIZE 256
+
 struct packet 
 {
 	int len;		/* Total packet length */
@@ -37,7 +39,7 @@ struct packet
 };
 
 struct query {
-	char name[258];
+	char name[QUERY_NAME_SIZE];
 	short type;
 	short id;
 	struct sockaddr from;

@@ -495,8 +495,8 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'P':
-			strncpy(password, optarg, 32);
-			password[32] = 0;
+			strncpy(password, optarg, sizeof(password));
+			password[sizeof(password)-1] = 0;
 			
 			/* XXX: find better way of cleaning up ps(1) */
 			memset(optarg, 0, strlen(optarg)); 
