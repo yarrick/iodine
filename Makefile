@@ -15,7 +15,7 @@ RM=rm
 RM_FLAGS=-f
 
 all: 
-	@(cd src; make all)
+	@(cd src; $(MAKE) all)
 
 install: all
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(sbindir)
@@ -39,7 +39,7 @@ test: all
 
 clean:
 	@echo "Cleaning..."
-	@(cd src; make clean)
-	@(cd tests; make clean)
+	@(cd src; $(MAKE) clean)
+	@(cd tests; $(MAKE) clean)
 	@rm -rf bin
 
