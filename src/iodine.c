@@ -718,6 +718,9 @@ main(int argc, char **argv)
 	
 	printf("Sending queries for %s to %s\n", topdomain, nameserv_addr);
 
+	if (foreground == 0) 
+		do_detach();
+
 	if (newroot != NULL)
 		do_chroot(newroot);
 	
@@ -728,9 +731,6 @@ main(int argc, char **argv)
 		}
 	}
 	
-	if (foreground == 0) 
-		do_detach();
-
 	tunnel(tun_fd, dns_fd);
 
 cleanup2:

@@ -557,6 +557,9 @@ main(int argc, char **argv)
 
 	printf("Listening to dns for domain %s\n", topdomain);
 
+	if (foreground == 0) 
+		do_detach();
+	
 	if (newroot != NULL)
 		do_chroot(newroot);
 
@@ -567,9 +570,6 @@ main(int argc, char **argv)
 			usage();
 		}
 	}
-	
-	if (foreground == 0) 
-		do_detach();
 	
 	tunnel(tun_fd, dnsd_fd);
 
