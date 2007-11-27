@@ -8,14 +8,14 @@ CHANGES:
 2007-xx-xx: 0.x.x
 	- Introduced encoding API
 	- Switched to new Base32 implementation
-	- Added Base64 implementation that only uses 63 chars
-	- Refined 'install' make target
-	- Fixed bug denying access if relay uses varying source ports
+	- Added Base64 implementation that only uses 63 chars (not used yet)
+	- Refined 'install' make target and use $(MAKE) for recursive calls
 	- All received error messages (RCODE field) are echoed
 	- Top domain limited to 128 chars
 	- Case preservation check sent after login to decide codec
 	- Fixed crash on incoming NULL query in server with bad top domain
 	- /etc/resolv.conf is consulted if no nameserver is given on commandline
+	- Applied patch from Matthew W. S. Bell (Detach before chroot/dropping priv)
 
 2007-03-25: 0.4.0 "Run Home"
 	- Added multiuser support (up to 8 users simultaneously)
