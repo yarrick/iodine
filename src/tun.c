@@ -222,14 +222,14 @@ tun_setmtu(const size_t mtu)
 
 	if (mtu > 200 && mtu < 1500) {
 		snprintf(cmdline, sizeof(cmdline), 
-				"/sbin/ifconfig %s mtu %ld",
+				"/sbin/ifconfig %s mtu %u",
 				if_name,
 				mtu);
 		
-		printf("Setting MTU of %s to %ld\n", if_name, mtu);
+		printf("Setting MTU of %s to %u\n", if_name, mtu);
 		return system(cmdline);
 	} else {
-		warn("MTU out of range: %ld\n", mtu);
+		warn("MTU out of range: %u\n", mtu);
 	}
 
 	return 1;
