@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2007 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,14 +20,16 @@
 #include <string.h>
 #include <errno.h>
 
+#include "encoding.h"
 #include "base32.h"
 #include "test.h"
 
-struct touple
+static struct tuple
 {
 	char *a;
 	char *b;
 } testpairs[] = {
+	{ "iodinetestingtesting", "nfxwi0lomv0gk21unfxgo3dfon0gs1th" },
 	{ "abc123", "mfrggmjsgm" },
 	{ NULL, NULL }	
 };
@@ -35,46 +37,37 @@ struct touple
 START_TEST(test_base32_encode)
 {
 	size_t len;
-	char *buf;
+	char buf[4096];
 	int val;
 	int i;
 
-	len = 0;
-	buf = NULL;
-
 	for (i = 0; testpairs[i].a != NULL; i++) {
-		val = base32_encode(&buf, &len, testpairs[i].a, strlen(testpairs[i].a));
+		len = sizeof(buf);
+		val = base32_encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
 
 		fail_unless(val > 0, strerror(errno));
-		fail_unless(buf != NULL, "buf == NULL");
 		fail_unless(strcmp(buf, testpairs[i].b) == 0, 
 				va_str("'%s' != '%s'", buf, testpairs[i].b));
 	}
-
-	free(buf);
 }
 END_TEST
 
 START_TEST(test_base32_decode)
 {
 	size_t len;
-	void *buf;
+	char buf[4096];
 	int val;
 	int i;
 
-	len = 0;
-	buf = NULL;
-
 	for (i = 0; testpairs[i].a != NULL; i++) {
-		val = base32_decode(&buf, &len, testpairs[i].b);
+		len = sizeof(buf);
+		val = base32_decode(buf, &len, testpairs[i].b, strlen(testpairs[i].b));
 
 		fail_unless(val > 0, strerror(errno));
 		fail_unless(buf != NULL, "buf == NULL");
 		fail_unless(strcmp(buf, testpairs[i].a) == 0, 
 				va_str("'%s' != '%s'", buf, testpairs[i].a));
 	}
-
-	free(buf);
 }
 END_TEST
 

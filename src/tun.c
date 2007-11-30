@@ -58,7 +58,9 @@ open_tun(const char *tun_device)
 
 	if (tun_device != NULL) {
 		strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
+		ifreq.ifr_name[IFNAMSIZ-1] = '\0';
 		strncpy(if_name, tun_device, sizeof(if_name));
+		if_name[sizeof(if_name)-1] = '\0';
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			printf("Opened %s\n", ifreq.ifr_name);
@@ -102,6 +104,7 @@ open_tun(const char *tun_device)
 	if (tun_device != NULL) {
 		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
 		strncpy(if_name, tun_device, sizeof(if_name));
+		if_name[sizeof(if_name)-1] = '\0';
 
 		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
 			warn("open_tun: %s: %s", tun_name, strerror(errno));
@@ -140,7 +143,7 @@ close_tun(int tun_fd)
 }
 
 int 
-write_tun(int tun_fd, char *data, int len) 
+write_tun(int tun_fd, char *data, size_t len) 
 {
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
 	data += 4;
@@ -166,8 +169,8 @@ write_tun(int tun_fd, char *data, int len)
 	return 0;
 }
 
-int 
-read_tun(int tun_fd, char *buf, int len) 
+ssize_t
+read_tun(int tun_fd, char *buf, size_t len) 
 {
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
 	/* FreeBSD/Darwin/NetBSD has no header */
@@ -181,6 +184,9 @@ int
 tun_setip(const char *ip)
 {
 	char cmdline[512];
+#ifndef LINUX
+		int r;
+#endif
 
 	if (inet_addr(ip) != INADDR_NONE) {
 		snprintf(cmdline, sizeof(cmdline), 
@@ -191,8 +197,6 @@ tun_setip(const char *ip)
 		
 		printf("Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
-		int r;
-
 		r = system(cmdline);
 		if(r != 0) {
 			return r;
@@ -212,20 +216,20 @@ tun_setip(const char *ip)
 }
 
 int 
-tun_setmtu(const int mtu)
+tun_setmtu(const size_t mtu)
 {
 	char cmdline[512];
 
 	if (mtu > 200 && mtu < 1500) {
 		snprintf(cmdline, sizeof(cmdline), 
-				"/sbin/ifconfig %s mtu %d",
+				"/sbin/ifconfig %s mtu %u",
 				if_name,
 				mtu);
 		
-		printf("Setting MTU of %s to %d\n", if_name, mtu);
+		printf("Setting MTU of %s to %u\n", if_name, mtu);
 		return system(cmdline);
 	} else {
-		warn("MTU out of range: %d\n", mtu);
+		warn("MTU out of range: %u\n", mtu);
 	}
 
 	return 1;

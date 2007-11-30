@@ -1,11 +1,21 @@
 
-iodine - IP over DNS is now easy
+iodine - http://code.kryo.se/iodine
 
-   http://code.kryo.se/iodine
-
-********************************
+***********************************
 
 CHANGES:
+
+2007-11-30: 0.4.1 "Tea Online"
+	- Introduced encoding API
+	- Switched to new Base32 implementation
+	- Added Base64 implementation that only uses 63 chars (not used yet)
+	- Refined 'install' make target and use $(MAKE) for recursive calls
+	- All received error messages (RCODE field) are echoed
+	- Top domain limited to 128 chars
+	- Case preservation check sent after login to decide codec
+	- Fixed crash on incoming NULL query in server with bad top domain
+	- /etc/resolv.conf is consulted if no nameserver is given on commandline
+	- Applied patch from Matthew W. S. Bell (Detach before chroot/dropping priv)
 
 2007-03-25: 0.4.0 "Run Home"
 	- Added multiuser support (up to 8 users simultaneously)

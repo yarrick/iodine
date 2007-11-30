@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2007 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,17 +28,17 @@
 #include "common.h"
 #include "dns.h"
 #include "encoding.h"
+#include "base32.h"
 #include "test.h"
 
 static void dump_packet(char *, size_t);
 
 static char queryPacket[] = 
-	"\x05\x39\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01\x32\x41\x4A\x42\x43"
-	"\x55\x59\x54\x43\x50\x45\x42\x39\x47\x51\x39\x4C\x54\x45\x42\x55\x58"
-	"\x47\x49\x44\x55\x4E\x42\x53\x53\x41\x36\x44\x46\x4F\x4E\x39\x43\x41"
-	"\x5A\x44\x42\x32\x41\x41\x41\x41\x41\x36\x44\x42\x04\x6B\x72\x79\x6F"
-	"\x02\x73\x65\x00\x00\x0A\x00\x01\x00\x00\x29\x10\x00\x00\x00\x80\x00"
-	"\x00\x00";
+	"\x05\x39\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01\x2D\x41\x6A\x62\x63"
+	"\x75\x79\x74\x63\x70\x65\x62\x30\x67\x71\x30\x6C\x74\x65\x62\x75\x78"
+	"\x67\x69\x64\x75\x6E\x62\x73\x73\x61\x33\x64\x66\x6F\x6E\x30\x63\x61"
+	"\x7A\x64\x62\x6F\x72\x71\x71\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00"
+	"\x0A\x00\x01\x00\x00\x29\x10\x00\x00\x00\x80\x00\x00\x00";
 
 static char answerPacket[] = 
 	"\x05\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00\x05\x73\x69\x6C\x6C"
@@ -51,16 +51,16 @@ static char answerPacket[] =
 static char *msgData = "this is the message to be delivered";
 static char *topdomain = "kryo.se";
 	
-static char *queryData = "HELLO this is the test data";
-static char *recData = "AHELLO this is the test data";	/* The A flag is added */
+static char *innerData = "HELLO this is the test data";
 
 START_TEST(test_encode_query)
 {
 	char buf[512];
 	char resolv[512];
 	struct query q;
+	struct encoder *enc;
 	char *d;
-	int len;
+	size_t len;
 	int ret;
 
 	len = sizeof(buf);
@@ -70,9 +70,10 @@ START_TEST(test_encode_query)
 	q.type = T_NULL;
 	q.id = 1337;
 	d = resolv;
+	enc = get_base32_encoder();
 
 	*d++ = 'A';
-	encode_data(queryData, strlen(queryData), 100, d);
+	enc->encode(d, &len, innerData, strlen(innerData));
 	d = resolv + strlen(resolv);
 	if (*d != '.') {
 		*d++ = '.';
@@ -96,20 +97,22 @@ START_TEST(test_decode_query)
 	char buf[512];
 	char *domain;
 	struct query q;
-	int len;
-	int ret;
+	struct encoder *enc;
+	size_t len;
 
 	memset(&q, 0, sizeof(struct query));
 	memset(&buf, 0, sizeof(buf));
 	q.id = 0;
 	len = sizeof(queryPacket) - 1;
+	enc = get_base32_encoder();
 
 	dns_decode(buf, sizeof(buf), &q, QR_QUERY, queryPacket, len);
 	domain = strstr(q.name, topdomain);
-	ret = decode_data(buf, sizeof(buf), q.name, domain);
+	len = sizeof(buf);
+	unpack_data(buf, len, &(q.name[1]), (int) (domain - q.name) - 1, enc);
 
-	fail_unless(strncmp(buf, recData, ret) == 0, "Did not extract expected host: '%s'", buf);
-	fail_unless(strlen(buf) == strlen(recData), va_str("Bad host length: %d, expected %d", strlen(q.name), strlen(recData)));
+	fail_unless(strncmp(buf, innerData, strlen(innerData)) == 0, "Did not extract expected host: '%s'", buf);
+	fail_unless(strlen(buf) == strlen(innerData), va_str("Bad host length: %d, expected %d: '%s'", strlen(buf), strlen(innerData), buf));
 }
 END_TEST
 

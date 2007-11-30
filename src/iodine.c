@@ -23,6 +23,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <err.h>
@@ -35,6 +36,8 @@
 #endif
 
 #include "common.h"
+#include "encoding.h"
+#include "base32.h"
 #include "dns.h"
 #include "login.h"
 #include "tun.h"
@@ -42,22 +45,36 @@
 
 static void send_ping(int fd);
 static void send_chunk(int fd);
+static int build_hostname(char *buf, size_t buflen, 
+	const char *data, const size_t datalen, 
+	const char *topdomain, struct encoder *encoder);
 
-int running = 1;
-char password[33];
+static int running = 1;
+static char password[33];
 
-struct sockaddr_in peer;
+static struct sockaddr_in nameserv;
 static char *topdomain;
 
-uint16_t rand_seed;
+static uint16_t rand_seed;
 
 /* Current IP packet */
-static char activepacket[4096];
+static struct packet packet;
+
+/* My userid at the server */
 static char userid;
-static int lastlen;
-static int packetpos;
-static int packetlen;
+
+/* DNS id for next packet */
 static uint16_t chunkid;
+
+/* Base32 encoder used for non-data packets */
+static struct encoder *b32;
+
+/* The encoder used for data packets
+ * Defaults to Base32, can be changed after handshake */
+static struct encoder *dataenc;
+
+/* result of case preservation check done after login */
+static int case_preserved;
 
 static void
 sighandler(int sig) 
@@ -66,57 +83,96 @@ sighandler(int sig)
 }
 
 static void
-send_packet(int fd, char cmd, const char *data, const size_t datalen)
+send_query(int fd, char *hostname)
 {
 	char packet[4096];
 	struct query q;
-	char buf[4096];
 	size_t len;
 
 	q.id = ++chunkid;
 	q.type = T_NULL;
 
+	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
+
+	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
+}
+
+static void
+send_packet(int fd, char cmd, const char *data, const size_t datalen)
+{
+	char buf[4096];
+
 	buf[0] = cmd;
 	
-	len = dns_build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain);
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
+	build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain, b32);
+	send_query(fd, buf);
+}
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+static int
+build_hostname(char *buf, size_t buflen, 
+		const char *data, const size_t datalen, 
+		const char *topdomain, struct encoder *encoder)
+{
+	int encsize;
+	size_t space;
+	char *b;
+
+
+	space = MIN(0xFF, buflen) - strlen(topdomain) - 2;
+	if (!encoder->places_dots())
+		space -= (space / 62); /* space for dots */
+
+	memset(buf, 0, buflen);
+	
+	encsize = encoder->encode(buf, &space, data, datalen);
+
+	if (!encoder->places_dots())
+		inline_dotify(buf, buflen);
+
+	b = buf;
+	b += strlen(buf);
+
+	if (*b != '.') 
+		*b++ = '.';
+
+	strncpy(b, topdomain, strlen(topdomain)+1);
+
+	return space;
 }
 
 int
 is_sending()
 {
-	return (packetlen != 0);
+	return (packet.len != 0);
 }
 
 int
 read_dns(int fd, char *buf, int buflen)
 {
 	struct sockaddr_in from;
-	char packet[64*1024];
+	char data[64*1024];
 	socklen_t addrlen;
 	struct query q;
 	int rv;
 	int r;
 
 	addrlen = sizeof(struct sockaddr);
-	if ((r = recvfrom(fd, packet, sizeof(packet), 0, 
-					  (struct sockaddr*)&from, &addrlen)) == -1) {
+	if ((r = recvfrom(fd, data, sizeof(data), 0, 
+			  (struct sockaddr*)&from, &addrlen)) == -1) {
 		warn("recvfrom");
 		return 0;
 	}
 
-	rv = dns_decode(buf, buflen, &q, QR_ANSWER, packet, r);
+	rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
 
 	if (is_sending() && chunkid == q.id) {
 		/* Got ACK on sent packet */
-		packetpos += lastlen;
-		if (packetpos == packetlen) {
+		packet.offset += packet.sentlen;
+		if (packet.offset == packet.len) {
 			/* Packet completed */
-			packetpos = 0;
-			packetlen = 0;
-			lastlen = 0;
+			packet.offset = 0;
+			packet.len = 0;
+			packet.sentlen = 0;
 		} else {
 			/* More to send */
 			send_chunk(fd);
@@ -142,10 +198,10 @@ tunnel_tun(int tun_fd, int dns_fd)
 	inlen = read;
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, inlen, 9);
 
-	memcpy(activepacket, out, MIN(outlen, sizeof(activepacket)));
-	lastlen = 0;
-	packetpos = 0;
-	packetlen = outlen;
+	memcpy(packet.data, out, MIN(outlen, sizeof(packet.data)));
+	packet.sentlen = 0;
+	packet.offset = 0;
+	packet.len = outlen;
 
 	send_chunk(dns_fd);
 
@@ -224,33 +280,26 @@ static void
 send_chunk(int fd)
 {
 	char hex[] = "0123456789ABCDEF";
-	char packet[4096];
-	struct query q;
 	char buf[4096];
 	int avail;
 	int code;
 	char *p;
-	int len;
 
-	q.id = ++chunkid;
-	q.type = T_NULL;
+	p = packet.data;
+	p += packet.offset;
+	avail = packet.len - packet.offset;
 
-	p = activepacket;
-	p += packetpos;
-	avail = packetlen - packetpos;
+	packet.sentlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
 
-	lastlen = dns_build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain);
-
-	if (lastlen == avail)
+	if (packet.sentlen == avail)
 		code = 1;
 	else
 		code = 0;
 		
 	code |= (userid << 1);
 	buf[0] = hex[code];
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, buf, strlen(buf));
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&peer, sizeof(peer));
+	send_query(fd, buf);
 }
 
 void
@@ -276,9 +325,9 @@ send_ping(int fd)
 	char data[3];
 	
 	if (is_sending()) {
-		lastlen = 0;
-		packetpos = 0;
-		packetlen = 0;
+		packet.sentlen = 0;
+		packet.offset = 0;
+		packet.len = 0;
 	}
 
 	data[0] = userid;
@@ -306,6 +355,15 @@ send_version(int fd, uint32_t version)
 	rand_seed++;
 
 	send_packet(fd, 'V', data, sizeof(data));
+}
+
+void
+send_case_check(int fd)
+{
+	char buf[512] = "zZaAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyY123-4560789.";
+
+	strncat(buf, topdomain, 512 - strlen(buf));
+	send_query(fd, buf);
 }
 
 static int
@@ -339,15 +397,15 @@ handshake(int dns_fd)
 			read = read_dns(dns_fd, in, sizeof(in));
 			
 			if(read < 0) {
-				perror("read");
+				warn("handshake read");
 				continue;
 			}
 
 			if (read >= 9) {
 				payload =  (((in[4] & 0xff) << 24) |
-							((in[5] & 0xff) << 16) |
-							((in[6] & 0xff) << 8) |
-							((in[7] & 0xff)));
+						((in[5] & 0xff) << 16) |
+						((in[6] & 0xff) << 8) |
+						((in[7] & 0xff)));
 
 				if (strncmp("VACK", in, 4) == 0) {
 					seed = payload;
@@ -405,7 +463,7 @@ perform_login:
 					client[64] = 0;
 					if (tun_setip(client) == 0 && 
 						tun_setmtu(mtu) == 0) {
-						return 0;
+						goto perform_case_check;
 					} else {
 						warnx("Received handshake with bad data");
 					}
@@ -417,23 +475,98 @@ perform_login:
 
 		printf("Retrying login...\n");
 	}
+	errx(1, "couldn't login to server");
+	/* NOTREACHED */
 
-	return 1;
+perform_case_check:
+	case_preserved = 0;
+	for (i=0; running && i<5 ;i++) {
+		tv.tv_sec = i + 1;
+		tv.tv_usec = 0;
+
+		send_case_check(dns_fd);
+		
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = read_dns(dns_fd, in, sizeof(in));
+			
+			if(read <= 0) {
+				warn("read");
+				continue;
+			}
+
+			if (read > 0) {
+				if (in[0] == 'z' || in[0] == 'Z') {
+					if (read < (26 * 2)) {
+						printf("Received short case reply...\n");
+					} else {
+						int k;
+
+						case_preserved = 1;
+						for (k = 0; k < 26 && case_preserved; k += 2) {
+							if (in[k] == in[k+1]) {
+								/* test string: zZaAbBcCdD... */
+								case_preserved = 0;
+							}
+						}
+						return 0;
+					}
+				} else {
+					printf("Received bad case check reply\n");
+				}
+			}
+		}
+
+		printf("Retrying case check...\n");
+	}
+
+	printf("No reply on case check, continuing\n");
+	return 0;
+}
+		
+static char *
+get_resolvconf_addr()
+{
+	static char addr[16];
+	char buf[80];
+	char *rv;
+	FILE *fp;
+	
+	rv = NULL;
+
+	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL) 
+		err(1, "/etc/resolve.conf");
+	
+	while (feof(fp) == 0) {
+		fgets(buf, sizeof(buf), fp);
+
+		if (sscanf(buf, "nameserver %15s", addr) == 1) {
+			rv = addr;
+			break;
+		}
+	}
+	
+	fclose(fp);
+
+	return rv;
 }
 
-static void 
-set_target(const char *host) 
+static void
+set_nameserver(const char *cp) 
 {
-	struct hostent *h;
+	struct in_addr addr;
 
-	h = gethostbyname(host);
-	if (!h)
-		err(1, "couldn't resolve name %s", host);
+	if (inet_aton(cp, &addr) != 1)
+		errx(1, "error parsing nameserver address: '%s'", cp);
 
-	memset(&peer, 0, sizeof(peer));
-	peer.sin_family = AF_INET;
-	peer.sin_port = htons(53);
-	peer.sin_addr = *((struct in_addr *) h->h_addr);
+	memset(&nameserv, 0, sizeof(nameserv));
+	nameserv.sin_family = AF_INET;
+	nameserv.sin_port = htons(53);
+	nameserv.sin_addr = addr;
 }
 
 static void
@@ -441,7 +574,7 @@ usage() {
 	extern char *__progname;
 
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"nameserver topdomain\n", __progname);
+			"[nameserver] topdomain\n", __progname);
 	exit(2);
 }
 
@@ -451,7 +584,7 @@ help() {
 
 	printf("iodine IP over DNS tunneling client\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] nameserver topdomain\n", __progname);
+			"[-P password] [nameserver] topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
@@ -459,7 +592,7 @@ help() {
 	printf("  -t dir to chroot to directory dir\n");
 	printf("  -d device to set tunnel device name\n");
 	printf("  -P password used for authentication (max 32 chars will be used)\n");
-	printf("nameserver is the IP number of the relaying nameserver\n");
+	printf("nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
 	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
@@ -469,7 +602,7 @@ static void
 version() {
 
 	printf("iodine IP over DNS tunneling client\n");
-	printf("version: 0.4.0 from 2007-03-25\n");
+	printf("version: 0.4.1 from 2007-11-30\n");
 
 	exit(0);
 }
@@ -477,6 +610,7 @@ version() {
 int
 main(int argc, char **argv)
 {
+	char *nameserv_addr;
 	struct passwd *pw;
 	char *username;
 	int foreground;
@@ -492,6 +626,9 @@ main(int argc, char **argv)
 	newroot = NULL;
 	device = NULL;
 	chunkid = 0;
+
+	b32 = get_base32_encoder();
+	dataenc = get_base32_encoder();
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:P:")) != -1) {
 		switch(choice) {
@@ -514,8 +651,11 @@ main(int argc, char **argv)
 			device = optarg;
 			break;
 		case 'P':
-			strncpy(password, optarg, 32);
-			password[32] = 0;
+			strncpy(password, optarg, sizeof(password));
+			password[sizeof(password)-1] = 0;
+			
+			/* XXX: find better way of cleaning up ps(1) */
+			memset(optarg, 0, strlen(optarg)); 
 			break;
 		default:
 			usage();
@@ -524,37 +664,48 @@ main(int argc, char **argv)
 	}
 	
 	if (geteuid() != 0) {
-		printf("Run as root and you'll be happy.\n");
+		warnx("Run as root and you'll be happy.\n");
 		usage();
 	}
 
 	argc -= optind;
 	argv += optind;
-	
-	if (argc != 2) 
+
+	switch (argc) {
+	case 1:
+		nameserv_addr = get_resolvconf_addr();
+		topdomain = strdup(argv[0]);
+		break;
+	case 2:
+		nameserv_addr = argv[0];
+		topdomain = strdup(argv[1]);
+		break;
+	default:
 		usage();
+		/* NOTREACHED */
+	}
 
-	topdomain = strdup(argv[1]);
+	set_nameserver(nameserv_addr);
 
-	if(username) {
-		pw = getpwnam(username);
-		if (!pw) {
-			printf("User %s does not exist!\n", username);
+	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
+		warnx("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
+		usage();
+	}
+
+	if (username != NULL) {
+		if ((pw = getpwnam(username)) == NULL) {
+			warnx("User %s does not exist!\n", username);
 			usage();
 		}
 	}
 	
-	if (strlen(password) == 0) {
-		printf("Enter password on stdin:\n");
-		scanf("%32s", password);
-		password[32] = 0;
-	}
+	if (strlen(password) == 0) 
+		read_password(password, sizeof(password));
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup1;
 	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1)
 		goto cleanup2;
-	set_target(argv[0]);
 
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
@@ -562,21 +713,21 @@ main(int argc, char **argv)
 	if(handshake(dns_fd))
 		goto cleanup2;
 	
-	printf("Sending queries for %s to %s\n", argv[1], argv[0]);
+	printf("Sending queries for %s to %s\n", topdomain, nameserv_addr);
 
-	do_chroot(newroot);
+	if (foreground == 0) 
+		do_detach();
+
+	if (newroot != NULL)
+		do_chroot(newroot);
 	
-	if (username) {
+	if (username != NULL) {
 		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
-			printf("Could not switch to user %s!\n", username);
+			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}
 	}
 	
-	if (!foreground) {
-		do_detach();
-	}
-
 	tunnel(tun_fd, dns_fd);
 
 cleanup2:

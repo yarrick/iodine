@@ -1,5 +1,5 @@
 .\" groff -man -Tascii iodine.8
-.TH IODINE 8 "FEB 2007" "User Manuals"
+.TH IODINE 8 "JUN 2007" "User Manuals"
 .SH NAME
 iodine, iodined \- tunnel IPv4 over DNS
 .SH SYNOPSIS
@@ -16,7 +16,9 @@ iodine, iodined \- tunnel IPv4 over DNS
 .B ] [-d
 .I device
 .B ]
+.B [
 .I nameserver
+.B ]
 .I topdomain
 
 .B iodined [-v]
@@ -93,7 +95,8 @@ You must make sure the dns requests are forwarded to this port yourself.
 .B nameserver
 The nameserver to use to relay the dns traffic. This can be any relaying
 nameserver  or the ip number of the server running iodined if reachable.
-Normally, you should specify a nameserver from your 
+This argument is optional, and if not specified a nameserver will be read
+from the
 .I /etc/resolv.conf
 file.
 .TP
@@ -179,6 +182,12 @@ The normal case is to route all traffic through the DNS tunnel. To do this, firs
 add a route to the nameserver you use with the default gateway as gateway. Then
 replace the default gateway with the servers IP address within the DNS tunnel,
 and configure the server to do NAT.
+.TP
+.B MTU issues:
+Some relaying DNS servers enforce a 512 byte packet limit. All larger packets are
+simply dropped. If you can ping through the tunnel but not login via SSH, this is
+most likely the case. Set the MTU on the server to 220 to ensure that all packets
+are less than 512 bytes. This will however greatly affect performance.
 .SH BUGS
 File bugs at http://dev.kryo.se/iodine/
 .SH AUTHORS

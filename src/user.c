@@ -14,15 +14,23 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <time.h>
+#include <stdlib.h>
+#include <string.h>
+#include <signal.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <fcntl.h>
+#include <err.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
 
 #include "common.h"
+#include "encoding.h"
 #include "user.h"
 
 struct user users[USERS];

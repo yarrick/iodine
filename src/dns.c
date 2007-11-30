@@ -61,7 +61,7 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 	
 		name = 0xc000 | ((p - buf) & 0x3fff);
 
-		putname(&p, 256, q->name);
+		putname(&p, sizeof(q->name), q->name);
 
 		putshort(&p, q->type);
 		putshort(&p, C_IN);
@@ -78,7 +78,7 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		header->qdcount = htons(1);
 		header->arcount = htons(1);
 	
-		putname(&p, 256, data);
+		putname(&p, datalen, data);
 
 		putshort(&p, q->type);
 		putshort(&p, C_IN);
@@ -101,11 +101,11 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 int
 dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, size_t packetlen)
 {
+	char name[QUERY_NAME_SIZE];
 	char rdata[4*1024];
 	HEADER *header;
 	short qdcount;
 	short ancount;
-	char name[255];
 	uint32_t ttl;
 	short class;
 	short type;
@@ -137,7 +137,29 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	switch (qr) {
 	case QR_ANSWER:
 		if(qdcount != 1 || ancount != 1) {
-			warnx("no query or answer in answer");
+			switch (header->rcode) {
+			case REFUSED:
+				warnx("Got REFUSED as reply");
+				break;
+
+			case NOTIMP:
+				warnx("Got NOTIMP as reply");
+				break;
+
+			case NXDOMAIN:
+				warnx("Got NXDOMAIN as reply");
+				break;
+
+
+			case SERVFAIL:
+				warnx("Got SERVFAIL as reply");
+				break;
+
+			case NOERROR:
+			default:
+				warnx("no query or answer in answer");
+				break;
+			}
 			return -1;
 		}
 
@@ -167,8 +189,8 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			return -1;
 		}
 
-		readname(packet, packetlen, &data, name, sizeof(name) -1);
-		name[256] = 0;
+		readname(packet, packetlen, &data, name, sizeof(name) - 1);
+		name[sizeof(name)-1] = '\0';
 		readshort(packet, &data, &type);
 		readshort(packet, &data, &class);
 
@@ -177,7 +199,8 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			break;
 		}
 
-		strncpy(q->name, name, 257);
+		strncpy(q->name, name, sizeof(q->name));
+		q->name[sizeof(q->name) - 1] = '\0';
 		q->type = type;
 		q->id = id;
 
@@ -186,29 +209,5 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	}
 
 	return rv;
-}
-
-int
-dns_build_hostname(char *buf, size_t buflen, 
-				   const char *data, const size_t datalen, 
-				   const char *topdomain)
-{
-	int consumed;
-	int avail;
-	char *b;
-
-	avail = MIN(0xFF, buflen) - strlen(topdomain) - 2;
-	memset(buf, 0, buflen);
-	b = buf;
-	
-	consumed = encode_data(data, datalen, avail, b);
-
-	b += strlen(buf);
-	if (*b != '.') 
-		*b++ = '.';
-
-	strncpy(b, topdomain, strlen(topdomain)+1);
-	
-	return consumed;
 }
 

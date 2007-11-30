@@ -30,6 +30,7 @@ struct user {
 	struct query q;
 	struct packet inpacket;
 	struct packet outpacket;
+	struct encoder *encoder;
 };
 
 extern struct user users[USERS];

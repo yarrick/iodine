@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <err.h>
@@ -34,20 +35,20 @@
 
 #include "common.h"
 #include "dns.h"
+#include "encoding.h"
+#include "base32.h"
 #include "user.h"
 #include "login.h"
 #include "tun.h"
-#include "encoding.h"
 #include "version.h"
 
-int running = 1;
+static int running = 1;
+static char *topdomain;
+static char password[33];
+static struct encoder *b32;
 
-char *topdomain;
-
-char password[33];
-
-int my_mtu;
-in_addr_t my_ip;
+static int my_mtu;
+static in_addr_t my_ip;
 
 static int read_dns(int, struct query *, char *, int);
 static void write_dns(int, struct query *, char *, int);
@@ -133,6 +134,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	char logindata[16];
 	char out[64*1024];
 	char in[64*1024];
+	char unpacked[64*1024];
 	char *tmp[2];
 	int userid;
 	int touser;
@@ -145,37 +147,37 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return 0;
 				
 	if(in[0] == 'V' || in[0] == 'v') {
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Version greeting, compare and send ack/nak */
 		if (read > 4) { 
 			/* Received V + 32bits version */
+			version = (((unpacked[0] & 0xff) << 24) |
+					   ((unpacked[1] & 0xff) << 16) |
+					   ((unpacked[2] & 0xff) << 8) |
+					   ((unpacked[3] & 0xff)));
+		}
 
-			version = (((in[1] & 0xff) << 24) |
-					   ((in[2] & 0xff) << 16) |
-					   ((in[3] & 0xff) << 8) |
-					   ((in[4] & 0xff)));
-
-			if (version == VERSION) {
-				userid = find_available_user();
-				if (userid >= 0) {
-					users[userid].seed = rand();
-					memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
-					memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-					users[userid].addrlen = dummy.q.fromlen;
-					send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
-					users[userid].q.id = 0;
-				} else {
-					/* No space for another user */
-					send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
-				}
+		if (version == VERSION) {
+			userid = find_available_user();
+			if (userid >= 0) {
+				users[userid].seed = rand();
+				memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
+				memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
+				users[userid].addrlen = dummy.q.fromlen;
+				users[userid].encoder = get_base32_encoder();
+				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
+				users[userid].q.id = 0;
 			} else {
-				send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
+				/* No space for another user */
+				send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
 			}
 		} else {
 			send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
 		}
 	} else if(in[0] == 'L' || in[0] == 'l') {
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Login phase, handle auth */
-		userid = in[1];
+		userid = unpacked[0];
 		if (userid < 0 || userid >= USERS) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
@@ -187,7 +189,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
-			if (read >= 18 && (memcmp(logindata, in+2, 16) == 0)) {
+			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
 				/* Login ok, send ip/mtu info */
 
 				tempip.s_addr = my_ip;
@@ -208,14 +210,21 @@ tunnel_dns(int tun_fd, int dns_fd)
 			}
 		}
 	} else if(in[0] == 'P' || in[0] == 'p') {
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Ping packet, store userid */
-		userid = in[1];
+		userid = unpacked[0];
 		if (userid < 0 || userid >= USERS) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 			return 0; /* illegal id */
 		}
 		memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
 		users[userid].last_pkt = time(NULL);
+	} else if(in[0] == 'Z' || in[0] == 'z') {
+		/* Case conservation check */
+
+		/* Reply with received hostname as data */
+		write_dns(dns_fd, &(dummy.q), in, read);
+		return 0;
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -237,12 +246,16 @@ tunnel_dns(int tun_fd, int dns_fd)
 				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
+			/* decode with this users encoding */
+			read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, 
+					   users[userid].encoder);
+
 			users[userid].last_pkt = time(NULL);
 			memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
 			users[userid].addrlen = dummy.q.fromlen;
-			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, in + 1, read - 1);
-			users[userid].inpacket.len += read - 1;
-			users[userid].inpacket.offset += read - 1;
+			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, unpacked, read);
+			users[userid].inpacket.len += read;
+			users[userid].inpacket.offset += read;
 
 			if (code & 1) {
 				outlen = sizeof(out);
@@ -351,12 +364,17 @@ read_dns(int fd, struct query *q, char *buf, int buflen)
 	if (r > 0) {
 		dns_decode(buf, buflen, q, QR_QUERY, packet, r);
 		domain = strstr(q->name, topdomain);
-		rv = decode_data(buf, buflen, q->name, domain);
-		q->fromlen = addrlen;
-		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
-	} else if (r < 0) { 	
+		if (domain) {
+			rv = (int) (domain - q->name); 
+			memcpy(buf, q->name, MIN(rv, buflen));
+			q->fromlen = addrlen;
+			memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
+		} else {
+			rv = 0;
+		}
+	} else if (r < 0) { 
 		/* Error */
-		perror("recvfrom");
+		warn("read dns");
 		rv = 0;
 	}
 
@@ -410,24 +428,24 @@ help() {
 static void
 version() {
 	printf("iodine IP over DNS tunneling server\n");
-	printf("version: 0.4.0 from 2007-03-25\n");
+	printf("version: 0.4.1 from 2007-11-30\n");
 	exit(0);
 }
 
 int
 main(int argc, char **argv)
 {
-	int choice;
-	int tun_fd;
-	int dnsd_fd;
-	char *newroot;
-	char *username;
-	char *device;
-	int foreground;
-	int mtu;
-	struct passwd *pw;
 	in_addr_t listen_ip;
+	struct passwd *pw;
+	int foreground;
+	char *username;
+	char *newroot;
+	char *device;
+	int dnsd_fd;
+	int tun_fd;
+	int choice;
 	int port;
+	int mtu;
 
 	username = NULL;
 	newroot = NULL;
@@ -437,7 +455,9 @@ main(int argc, char **argv)
 	listen_ip = INADDR_ANY;
 	port = 53;
 
-	memset(password, 0, 33);
+	b32 = get_base32_encoder();
+
+	memset(password, 0, sizeof(password));
 	srand(time(NULL));
 	
 	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:p:P:")) != -1) {
@@ -474,8 +494,11 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'P':
-			strncpy(password, optarg, 32);
-			password[32] = 0;
+			strncpy(password, optarg, sizeof(password));
+			password[sizeof(password)-1] = 0;
+			
+			/* XXX: find better way of cleaning up ps(1) */
+			memset(optarg, 0, strlen(optarg)); 
 			break;
 		default:
 			usage();
@@ -487,7 +510,7 @@ main(int argc, char **argv)
 	argv += optind;
 
 	if (geteuid() != 0) {
-		printf("Run as root and you'll be happy.\n");
+		warnx("Run as root and you'll be happy.\n");
 		usage();
 	}
 
@@ -495,30 +518,30 @@ main(int argc, char **argv)
 		usage();
 
 	topdomain = strdup(argv[1]);
+	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
+		warnx("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
+		usage();
+	}
 
-	if (username) {
-		pw = getpwnam(username);
-		if (!pw) {
-			printf("User %s does not exist!\n", username);
+	if (username != NULL) {
+		if ((pw = getpwnam(username)) == NULL) {
+			warnx("User %s does not exist!\n", username);
 			usage();
 		}
 	}
 
 	if (mtu == 0) {
-		printf("Bad MTU given.\n");
+		warnx("Bad MTU given.\n");
 		usage();
 	}
 
 	if (listen_ip == INADDR_NONE) {
-		printf("Bad IP address to listen on.\n");
+		warnx("Bad IP address to listen on.\n");
 		usage();
 	}
 
-	if (strlen(password) == 0) {
-		printf("Enter password on stdin:\n");
-		scanf("%32s", password);
-		password[32] = 0;
-	}
+	if (strlen(password) == 0)
+		read_password(password, sizeof(password));
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup0;
@@ -531,20 +554,20 @@ main(int argc, char **argv)
 	my_mtu = mtu;
 	init_users(my_ip);
 
-	printf("Listening to dns for domain %s\n", argv[1]);
+	printf("Listening to dns for domain %s\n", topdomain);
 
-	do_chroot(newroot);
+	if (foreground == 0) 
+		do_detach();
+	
+	if (newroot != NULL)
+		do_chroot(newroot);
 
 	signal(SIGINT, sigint);
-	if (username) {
+	if (username != NULL) {
 		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
-			printf("Could not switch to user %s!\n", username);
+			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}
-	}
-	
-	if (!foreground) {
-		do_detach();
 	}
 	
 	tunnel(tun_fd, dnsd_fd);

@@ -14,17 +14,12 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __DNS_H__
-#define __DNS_H__
+#ifndef __BASE64_H__
+#define __BASE64_H__
 
-#include "common.h"
+struct encoder *get_base64_encoder(void);
+int base64_handles_dots();
+int base64_encode(char *, size_t *, const void *, size_t);
+int base64_decode(void *, size_t *, const char *, size_t);
 
-typedef enum {
-	QR_QUERY = 0,
-	QR_ANSWER = 1
-} qr_t;
-
-int dns_encode(char *, size_t, struct query *, qr_t, char *, size_t);
-int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);
-
-#endif /* _DNS_H_ */
+#endif

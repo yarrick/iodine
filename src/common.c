@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <termios.h>
 
 #include "common.h"
 
@@ -71,13 +72,11 @@ close_dns(int fd)
 void
 do_chroot(char *newroot)
 {
-	if (newroot) {
-		if (chroot(newroot) != 0 || chdir("/") != 0)
-			err(1, "%s", newroot);
+	if (chroot(newroot) != 0 || chdir("/") != 0)
+		err(1, "%s", newroot);
 
-		seteuid(geteuid());
-		setuid(getuid());
-	}
+	seteuid(geteuid());
+	setuid(getuid());
 }
 
 void
@@ -87,4 +86,28 @@ do_detach()
 	daemon(0, 0);
 	umask(0);
 	alarm(0);
+}
+
+void
+read_password(char *buf, size_t len)
+{
+	struct termios old;
+	struct termios tp;
+	char pwd[80];
+
+	tcgetattr(0, &tp);
+	old = tp;
+	
+	tp.c_lflag &= (~ECHO);
+	tcsetattr(0, TCSANOW, &tp);
+
+	printf("Enter password: ");
+	fflush(stdout);
+	scanf("%79s", pwd);
+	printf("\n");
+
+	tcsetattr(0, TCSANOW, &old);	
+
+	strncpy(buf, pwd, len);
+	buf[len-1] = '\0';
 }

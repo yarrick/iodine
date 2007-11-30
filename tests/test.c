@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2007 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -47,6 +47,9 @@ main()
 	iodine = suite_create("iodine");
 
 	test = test_base32_create_tests();
+	suite_add_tcase(iodine, test);
+
+	test = test_base64_create_tests();
 	suite_add_tcase(iodine, test);
 
 	test = test_dns_create_tests();

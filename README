@@ -1,9 +1,7 @@
 
-iodine - IP over DNS is now easy
+iodine - http://code.kryo.se/iodine
 
-   http://code.kryo.se/iodine
-
-********************************
+***********************************
 
 This is a piece of software that lets you tunnel IPv4 data through a DNS
 server. This can be usable in different situations where internet access is
@@ -30,12 +28,17 @@ HOW TO USE:
 
 Server side:
 To use this tunnel, you need control over a real domain (like mytunnel.com),
-and a server with a static public IP number that does not yet run a DNS
-server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the server.
-If you use BIND for the domain, add these lines to the zone file:
+and a server with a public IP number (not behind NAT) that does not yet run 
+a DNS server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the 
+server. If you use BIND for the domain, add these lines to the zone file:
 
 tunnel1host	IN	A	10.15.213.99
 tunnel1		IN	NS	tunnel1host.mytunnel.com.
+
+Do not use CNAME instead of A above.
+If your server has a dynamic IP, use a dynamic dns provider:
+
+tunnel1         IN      NS      tunnel1host.mydyndnsprovider.com
 
 Now any DNS querys for domains ending with tunnel1.mytunnnel.com will be sent
 to your server. Start iodined on the server. The first argument is the tunnel
@@ -60,13 +63,11 @@ either side.
 
 MISC. INFO:
 
-Note that you can have only one client per server at the same time. This is
-because of the fragmentation of big packets going upstream, and will be fixed
-in future versions. 
-
 Try experimenting with the MTU size (-m option) to get maximum bandwidth. It is
 set to 1024 by default, which seems to work with most DNS servers. If you have
-problems, try setting it to below 512.
+problems, try setting it to 220 as this ensures all packets to be < 512 bytes.
+Some DNS servers enforce a 512 byte packet limit, and this is probably the case
+if you can ping through the tunnel but not login via SSH.
 
 If you have problems, try inspecting the traffic with network monitoring tools
 and make sure that the relaying DNS server has not cached the response. A
@@ -90,7 +91,7 @@ iptables -t nat -A PREROUTING -i eth0 -p udp --dport 53 -j DNAT --to :5353
 PORTABILITY:
 
 iodine has been tested on Linux (arm, ia64, x86, AMD64 and SPARC64), FreeBSD 
-(ia64, x86), OpenBSD (x86), NetBSD (x86) and MacOS X (10.3, ppc, with 
+(ia64, x86), OpenBSD (x86), NetBSD (x86) and MacOS X (ppc and x86, with 
 http://www-user.rhrk.uni-kl.de/~nissler/tuntap/). It should work on other 
 unix-like systems as well that has TUN/TAP tunneling support (after some 
 patching). Let us know if you get it to run on other platforms. 

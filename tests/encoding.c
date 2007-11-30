@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2007 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,24 +22,56 @@
 #include "encoding.h"
 #include "test.h"
 
-START_TEST(test_encoding_base32)
+struct tuple
 {
-	char temp[256];
-	char *start = "HELLOTEST";
-	char *out = "1HELLOTEST";
-	char end[256];
-	char *tempend;
-	int codedlength;
+	char *a;
+	char *b;
+} dottests[] = {
+	{ "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 
+	  "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.a"},
+	{ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 
+	  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa."},
+	{ "abc123", "abc123" },
+	{ NULL, NULL }
+};
 
-	memset(temp, 0, sizeof(temp));
-	memset(end, 0, sizeof(end));
+START_TEST(test_inline_dotify)
+{
+	unsigned i;
+	char temp[1024];
+	char *b;
 
-	codedlength = encode_data(start, strlen(start), sizeof(temp) - 1, temp + 1);
-	temp[0] = '1';
-	tempend = temp + strlen(temp);
-	decode_data(end, sizeof(end), temp, tempend);
+	i = 0;
+	while (dottests[i].a) {
+		memset(temp, 0, sizeof(temp));
+		strcpy(temp, dottests[i].a);
+		b = temp;
+		inline_dotify(b, sizeof(temp));
 
-	fail_unless(strcmp(out, end) == 0, NULL);
+		fail_unless(strcmp(dottests[i].b, temp) == 0,
+				va_str("'%s' != '%s'", temp, dottests[i].b));
+		i++;
+	}
+}
+END_TEST
+
+START_TEST(test_inline_undotify)
+{
+	unsigned i;
+	char temp[1024];
+	char *b;
+
+	i = 0;
+	while (dottests[i].a) {
+		memset(temp, 0, sizeof(temp));
+		strcpy(temp, dottests[i].b);
+		b = temp;
+		inline_undotify(b, sizeof(temp));
+
+		fail_unless(strcmp(dottests[i].a, temp) == 0,
+				va_str("'%s' != '%s'", temp, dottests[i].a));
+		i++;
+	}
 }
 END_TEST
 
@@ -49,7 +81,8 @@ test_encoding_create_tests()
 	TCase *tc;
 
 	tc = tcase_create("Encoding");
-	tcase_add_test(tc, test_encoding_base32);
+	tcase_add_test(tc, test_inline_dotify);
+	tcase_add_test(tc, test_inline_undotify);
 
 	return tc;
 }
