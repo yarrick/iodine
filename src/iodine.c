@@ -36,6 +36,7 @@
 #endif
 
 #include "common.h"
+#include "packet.h"
 #include "encoding.h"
 #include "base32.h"
 #include "dns.h"
@@ -85,16 +86,16 @@ sighandler(int sig)
 static void
 send_query(int fd, char *hostname)
 {
-	char packet[4096];
+	char pkt[4096];
 	struct query q;
 	size_t len;
 
 	q.id = ++chunkid;
 	q.type = T_NULL;
 
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
+	len = dns_encode(pkt, sizeof(pkt), &q, QR_QUERY, hostname, strlen(hostname));
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
+	sendto(fd, pkt, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
 }
 
 static void
