@@ -27,6 +27,7 @@ struct packet
 	char data[PKTSIZE];	/* The data */
 };
 
+void packet_init(struct packet *);
 int packet_sending(struct packet *);
 void packet_advance(struct packet *);
 int packet_len_to_send(struct packet *);

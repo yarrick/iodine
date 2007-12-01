@@ -68,6 +68,17 @@ packet_fill(struct packet *packet, char *data, unsigned long datalen)
 }
 
 /**
+ *	Clear packet stuct, mark empty
+ */
+void
+packet_init(struct packet *packet)
+{
+	packet->sentlen = 0;
+	packet->offset = 0;
+	packet->len = 0;
+}
+
+/**
  *	Mark len number of bytes as being sent
  */
 void
