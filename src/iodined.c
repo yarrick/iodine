@@ -82,10 +82,8 @@ tunnel_tun(int tun_fd, int dns_fd)
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, read, 9);
 
 	/* if another packet is queued, throw away this one. TODO build queue */
-	if (users[userid].outpacket.len == 0) {
-		memcpy(users[userid].outpacket.data, out, outlen);
-		users[userid].outpacket.len = outlen;
-		return outlen;
+	if (packet_empty(&(users[userid].outpacket)) == 0) {
+		return packet_fill(&(users[userid].outpacket), out, outlen);
 	} else {
 		return 0;
 	}
