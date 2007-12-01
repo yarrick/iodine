@@ -122,6 +122,16 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *
 	write_dns(fd, &u->q, out, sizeof(out));
 }
 
+static void
+send_chunk(int dns_fd, struct query *q, int userid)
+{
+	/* XXX: check MTU and only send part of packet if needed */
+	write_dns(dns_fd, q, users[userid].outpacket.data, users[userid].outpacket.len);
+	/* move this reset to after receiving ack */
+	users[userid].outpacket.len = 0;
+	users[userid].q.id = 0;
+}
+
 static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
@@ -257,8 +267,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 			if (code & 1) {
 				outlen = sizeof(out);
-				uncompress((uint8_t*)out, &outlen, 
-						   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
+				uncompress((uint8_t*)out, &outlen, (uint8_t*)users[userid].inpacket.data, 
+					users[userid].inpacket.len);
 
 				hdr = (struct ip*) (out + 4);
 				touser = find_user_by_ip(hdr->ip_dst.s_addr);
@@ -269,23 +279,21 @@ tunnel_dns(int tun_fd, int dns_fd)
 				} else {
 					/* send the compressed packet to other client
 					 * if another packet is queued, throw away this one. TODO build queue */
-					if (users[touser].outpacket.len == 0) {
-						memcpy(users[touser].outpacket.data, users[userid].inpacket.data, users[userid].inpacket.len);
-						users[touser].outpacket.len = users[userid].inpacket.len;
+					if (packet_empty(&(users[touser].outpacket))) {
+						packet_fill(&(users[touser].outpacket), users[userid].inpacket.data,
+							users[userid].inpacket.len);
 					}
 				}
-				users[userid].inpacket.len = users[userid].inpacket.offset = 0;
+				packet_init(&(users[userid].inpacket)); /* clear inpacket */
 			}
 		}
 	}
 	/* userid must be set for a reply to be sent */
 	if (userid >= 0 && userid < USERS && dummy.q.fromlen == users[userid].addrlen &&
 			memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) == 0 &&
-			users[userid].outpacket.len > 0) {
+			packet_empty(&(users[userid].outpacket)) == 0) {
 
-		write_dns(dns_fd, &(dummy.q), users[userid].outpacket.data, users[userid].outpacket.len);
-		users[userid].outpacket.len = 0;
-		users[userid].q.id = 0;
+		send_chunk(dns_fd, &(dummy.q), userid);
 	}
 
 	return 0;
@@ -326,9 +334,7 @@ tunnel(int tun_fd, int dns_fd)
 		if (i==0) {	
 			for (j = 0; j < USERS; j++) {
 				if (users[j].q.id != 0) {
-					write_dns(dns_fd, &(users[j].q), users[j].outpacket.data, users[j].outpacket.len);
-					users[j].outpacket.len = 0;
-					users[j].q.id = 0;
+					send_chunk(dns_fd, &(users[j].q), j);
 				}
 			}
 		} else {
