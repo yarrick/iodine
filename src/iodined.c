@@ -163,17 +163,62 @@ handle_version(int dns_fd, char *in, int len)
 }
 
 static int
+handle_login(int dns_fd, char *in, int len)
+{
+	char data[64*1024];
+	char logindata[16];
+	struct in_addr tempip;
+	char *tmp[2];
+	struct user dummy;
+	int read;
+	int userid;
+
+	read = unpack_data(data, sizeof(data), &(in[1]), len - 1, b32);
+	/* Login phase, handle auth */
+	userid = data[0];
+	if (userid < 0 || userid >= USERS) {
+		write_dns(dns_fd, &(dummy.q), "BADIP", 5);
+		return -1; /* illegal id */
+	}
+	users[userid].last_pkt = time(NULL);
+	login_calculate(logindata, 16, password, users[userid].seed);
+
+	if (dummy.q.fromlen != users[userid].addrlen ||
+			memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
+		write_dns(dns_fd, &(dummy.q), "BADIP", 5);
+	} else {
+		if (read >= 18 && (memcmp(logindata, data+1, 16) == 0)) {
+			/* Login ok, send ip/mtu info */
+
+			tempip.s_addr = my_ip;
+			tmp[0] = strdup(inet_ntoa(tempip));
+			tempip.s_addr = users[userid].tun_ip;
+			tmp[1] = strdup(inet_ntoa(tempip));
+
+			read = snprintf(data, sizeof(data), "%s-%s-%d", 
+					tmp[0], tmp[1], my_mtu);
+
+			write_dns(dns_fd, &(dummy.q), data, read);
+			dummy.q.id = 0;
+
+			free(tmp[1]);
+			free(tmp[0]);
+		} else {
+			write_dns(dns_fd, &(dummy.q), "LNAK", 4);
+		}
+	}
+	return userid;
+}
+
+static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
-	struct in_addr tempip;
 	struct user dummy;
 	struct ip *hdr;
 	unsigned long outlen;
-	char logindata[16];
 	char out[64*1024];
 	char in[64*1024];
 	char unpacked[64*1024];
-	char *tmp[2];
 	int userid;
 	int touser;
 	int read;
@@ -186,40 +231,9 @@ tunnel_dns(int tun_fd, int dns_fd)
 	if(in[0] == 'V' || in[0] == 'v') {
 		handle_version(dns_fd, in, read);
 	} else if(in[0] == 'L' || in[0] == 'l') {
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
-		/* Login phase, handle auth */
-		userid = unpacked[0];
-		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
-			return 0; /* illegal id */
-		}
-		users[userid].last_pkt = time(NULL);
-		login_calculate(logindata, 16, password, users[userid].seed);
-
-		if (dummy.q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
-			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
-		} else {
-			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
-				/* Login ok, send ip/mtu info */
-
-				tempip.s_addr = my_ip;
-				tmp[0] = strdup(inet_ntoa(tempip));
-				tempip.s_addr = users[userid].tun_ip;
-				tmp[1] = strdup(inet_ntoa(tempip));
-
-				read = snprintf(out, sizeof(out), "%s-%s-%d", 
-						tmp[0], tmp[1], my_mtu);
-
-				write_dns(dns_fd, &(dummy.q), out, read);
-				dummy.q.id = 0;
-
-				free(tmp[1]);
-				free(tmp[0]);
-			} else {
-				write_dns(dns_fd, &(dummy.q), "LNAK", 4);
-			}
-		}
+		userid = handle_login(dns_fd, in, read);
+		if (userid == -1)
+			return 0; /* illegal user id */
 	} else if(in[0] == 'P' || in[0] == 'p') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Ping packet, store userid */
