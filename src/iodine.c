@@ -160,10 +160,10 @@ read_dns(int fd, char *buf, int buflen)
 
 	rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
 
-	if (packet_sending(&packet) && chunkid == q.id) {
+	if (packet_empty(&packet) == 0 && chunkid == q.id) {
 		/* Got ACK on sent packet */
 		packet_advance(&packet);
-		if (packet_sending(&packet)) {
+		if (!packet_empty(&packet)) {
 			/* More to send */
 			send_chunk(fd);
 		}
@@ -213,7 +213,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return -1;
 
 	write_tun(tun_fd, out, outlen);
-	if (!packet_sending(&packet)) 
+	if (packet_empty(&packet)) 
 		send_ping(dns_fd);
 	
 	return read;
@@ -234,7 +234,7 @@ tunnel(int tun_fd, int dns_fd)
 		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
-		if (!packet_sending(&packet)) 
+		if (packet_empty(&packet)) 
 			FD_SET(tun_fd, &fds);
 		FD_SET(dns_fd, &fds);
 
@@ -314,11 +314,8 @@ send_ping(int fd)
 {
 	char data[3];
 	
-	if (packet_sending(&packet)) {
-		packet.sentlen = 0;
-		packet.offset = 0;
-		packet.len = 0;
-	}
+	/* clear any packet not sent */
+	packet_init(&packet);
 
 	data[0] = userid;
 	data[1] = (rand_seed >> 8) & 0xff;

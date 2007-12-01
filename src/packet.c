@@ -23,7 +23,7 @@
  *	Is some part of this packet sent?
  */
 int
-packet_sending(struct packet *packet)
+packet_empty(struct packet *packet)
 {
 	return (packet->len != 0);
 }

@@ -28,10 +28,13 @@ struct packet
 };
 
 void packet_init(struct packet *);
-int packet_sending(struct packet *);
+
+int packet_empty(struct packet *);
+
 void packet_advance(struct packet *);
-int packet_len_to_send(struct packet *);
-int packet_fill(struct packet *, char *, unsigned long);
 void packet_send_len(struct packet *, int);
+int packet_len_to_send(struct packet *);
+
+int packet_fill(struct packet *, char *, unsigned long);
 
 #endif
