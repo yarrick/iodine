@@ -45,7 +45,7 @@ packet_advance(struct packet *packet)
 
 
 /**
- *	The length to left to send
+ *	The length left to send
  */
 int
 packet_len_to_send(struct packet *packet)
@@ -68,7 +68,7 @@ packet_fill(struct packet *packet, char *data, unsigned long datalen)
 }
 
 /**
- *	Clear packet stuct, mark empty
+ *	Clear packet struct, mark empty
  */
 void
 packet_init(struct packet *packet)
