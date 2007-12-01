@@ -25,7 +25,7 @@
 int
 packet_empty(struct packet *packet)
 {
-	return (packet->len != 0);
+	return (packet->len == 0);
 }
 
 /**
