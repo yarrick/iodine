@@ -434,7 +434,7 @@ perform_login:
 		if(r > 0) {
 			read = read_dns(dns_fd, in, sizeof(in));
 			
-			if(read <= 0) {
+			if(read < 0) {
 				warn("read");
 				continue;
 			}
