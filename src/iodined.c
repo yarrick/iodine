@@ -124,6 +124,44 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *
 	write_dns(fd, &u->q, out, sizeof(out));
 }
 
+static void
+handle_version(int dns_fd, char *in, int len)
+{
+	char unpacked[64*1024];
+	struct user dummy;
+	int read;
+	int version;
+	int userid;
+
+	read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), len - 1, b32);
+	/* Version greeting, compare and send ack/nak */
+	if (read > 4) { 
+		/* Received V + 32bits version */
+		version = (((unpacked[0] & 0xff) << 24) |
+				((unpacked[1] & 0xff) << 16) |
+				((unpacked[2] & 0xff) << 8) |
+				((unpacked[3] & 0xff)));
+	}
+
+	if (version == VERSION) {
+		userid = find_available_user();
+		if (userid >= 0) {
+			users[userid].seed = rand();
+			memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
+			memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
+			users[userid].addrlen = dummy.q.fromlen;
+			users[userid].encoder = get_base32_encoder();
+			send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
+			users[userid].q.id = 0;
+		} else {
+			/* No space for another user */
+			send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
+		}
+	} else {
+		send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
+	}
+}
+
 static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
@@ -138,7 +176,6 @@ tunnel_dns(int tun_fd, int dns_fd)
 	char *tmp[2];
 	int userid;
 	int touser;
-	int version;
 	int read;
 	int code;
 
@@ -147,33 +184,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return 0;
 				
 	if(in[0] == 'V' || in[0] == 'v') {
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
-		/* Version greeting, compare and send ack/nak */
-		if (read > 4) { 
-			/* Received V + 32bits version */
-			version = (((unpacked[0] & 0xff) << 24) |
-					   ((unpacked[1] & 0xff) << 16) |
-					   ((unpacked[2] & 0xff) << 8) |
-					   ((unpacked[3] & 0xff)));
-		}
-
-		if (version == VERSION) {
-			userid = find_available_user();
-			if (userid >= 0) {
-				users[userid].seed = rand();
-				memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
-				memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-				users[userid].addrlen = dummy.q.fromlen;
-				users[userid].encoder = get_base32_encoder();
-				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
-				users[userid].q.id = 0;
-			} else {
-				/* No space for another user */
-				send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
-			}
-		} else {
-			send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
-		}
+		handle_version(dns_fd, in, read);
 	} else if(in[0] == 'L' || in[0] == 'l') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Login phase, handle auth */
