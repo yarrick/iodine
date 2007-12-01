@@ -46,9 +46,8 @@ init_users(in_addr_t my_ip)
 		users[i].id = i;
 		snprintf(newip, sizeof(newip), "0.0.0.%d", i + 1);
 		users[i].tun_ip = my_ip + inet_addr(newip);;
-		users[i].inpacket.len = 0;
-		users[i].inpacket.offset = 0;
-		users[i].outpacket.len = 0;
+		packet_init(&(users[i].inpacket));
+		packet_init(&(users[i].outpacket));
 		users[i].q.id = 0;
 	}
 }
