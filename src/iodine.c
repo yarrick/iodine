@@ -142,12 +142,6 @@ build_hostname(char *buf, size_t buflen,
 }
 
 int
-is_sending()
-{
-	return (packet.len != 0);
-}
-
-int
 read_dns(int fd, char *buf, int buflen)
 {
 	struct sockaddr_in from;
@@ -166,15 +160,10 @@ read_dns(int fd, char *buf, int buflen)
 
 	rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
 
-	if (is_sending() && chunkid == q.id) {
+	if (packet_sending(&packet) && chunkid == q.id) {
 		/* Got ACK on sent packet */
-		packet.offset += packet.sentlen;
-		if (packet.offset == packet.len) {
-			/* Packet completed */
-			packet.offset = 0;
-			packet.len = 0;
-			packet.sentlen = 0;
-		} else {
+		packet_advance(&packet);
+		if (packet_sending(&packet)) {
 			/* More to send */
 			send_chunk(fd);
 		}
@@ -199,11 +188,8 @@ tunnel_tun(int tun_fd, int dns_fd)
 	inlen = read;
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, inlen, 9);
 
-	memcpy(packet.data, out, MIN(outlen, sizeof(packet.data)));
-	packet.sentlen = 0;
-	packet.offset = 0;
-	packet.len = outlen;
-
+	packet_fill(&packet, out, outlen);
+	
 	send_chunk(dns_fd);
 
 	return read;
@@ -227,7 +213,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return -1;
 
 	write_tun(tun_fd, out, outlen);
-	if (!is_sending()) 
+	if (!packet_sending(&packet)) 
 		send_ping(dns_fd);
 	
 	return read;
@@ -248,7 +234,7 @@ tunnel(int tun_fd, int dns_fd)
 		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
-		if (!is_sending()) 
+		if (!packet_sending(&packet)) 
 			FD_SET(tun_fd, &fds);
 		FD_SET(dns_fd, &fds);
 
@@ -284,15 +270,18 @@ send_chunk(int fd)
 	char buf[4096];
 	int avail;
 	int code;
+	int sentlen;
 	char *p;
 
 	p = packet.data;
 	p += packet.offset;
-	avail = packet.len - packet.offset;
+	avail = packet_len_to_send(&packet);
 
-	packet.sentlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
+	sentlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
 
-	if (packet.sentlen == avail)
+	packet_send_len(&packet, sentlen);
+
+	if (sentlen == avail)
 		code = 1;
 	else
 		code = 0;
@@ -325,7 +314,7 @@ send_ping(int fd)
 {
 	char data[3];
 	
-	if (is_sending()) {
+	if (packet_sending(&packet)) {
 		packet.sentlen = 0;
 		packet.offset = 0;
 		packet.len = 0;

@@ -14,36 +14,23 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __COMMON_H__
-#define __COMMON_H__
+#ifndef __PACKET_H__
+#define __PACKET_H__
 
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+#define PKTSIZE (64*1024)
 
-#ifndef MIN
-#define MIN(a,b) ((a)<(b)?(a):(b))
-#endif
-#ifndef MAX
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#endif
-
-#define QUERY_NAME_SIZE 256
-
-struct query {
-	char name[QUERY_NAME_SIZE];
-	short type;
-	short id;
-	struct sockaddr from;
-	int fromlen;
+struct packet 
+{
+	int len;		/* Total packet length */
+	int sentlen;		/* Length of chunk currently transmitted */
+	int offset;		/* Current offset */
+	char data[PKTSIZE];	/* The data */
 };
 
-int open_dns(int, in_addr_t);
-void close_dns(int);
-
-void do_chroot(char *);
-void do_detach();
-
-void read_password(char*, size_t);
+int packet_sending(struct packet *);
+void packet_advance(struct packet *);
+int packet_len_to_send(struct packet *);
+int packet_fill(struct packet *, char *, unsigned long);
+void packet_send_len(struct packet *, int);
 
 #endif
