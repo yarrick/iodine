@@ -157,7 +157,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 
 			case NOERROR:
 			default:
-				warnx("no query or answer in answer");
+				warnx("no query or answer in reply packet");
 				break;
 			}
 			return -1;
