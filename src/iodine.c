@@ -637,12 +637,14 @@ main(int argc, char **argv)
 		switch(choice) {
 		case 'v':
 			version();
+			/* NOTREACHED */
 			break;
 		case 'f':
 			foreground = 1;
 			break;
 		case 'h':
 			help();
+			/* NOTREACHED */
 			break;
 		case 'u':
 			username = optarg;
