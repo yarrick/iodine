@@ -35,7 +35,7 @@ uninstall:
 test: all
 	@echo "!! The check library is required for compiling and running the tests"
 	@echo "!! Get it at http://check.sf.net"
-	@(cd tests; make all)
+	@(cd tests; $(MAKE) all)
 
 clean:
 	@echo "Cleaning..."
