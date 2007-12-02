@@ -35,11 +35,11 @@ void
 packet_advance(struct packet *packet)
 {
 	packet->offset += packet->sentlen;
+	packet->sentlen = 0;
 	if (packet->offset == packet->len) {
 		/* Packet completed */
 		packet->offset = 0;
 		packet->len = 0;
-		packet->sentlen = 0;
 	}
 }
 
