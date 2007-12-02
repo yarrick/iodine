@@ -167,6 +167,10 @@ read_dns(int fd, char *buf, int buflen)
 	}
 
 	rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
+	
+	if (rv > 0) {
+		server_id = q.id;
+	}
 
 	if (packet_empty(&packet) == 0 && chunkid == q.id) {
 		/* Got ACK on sent packet */
@@ -214,7 +218,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 	if ((read = read_dns(dns_fd, in, sizeof(in))) <= 0) 
 		return -1;
-		
+
 	outlen = sizeof(out);
 	inlen = read;
 	if (uncompress((uint8_t*)out, &outlen, (uint8_t*)in, inlen) != Z_OK)
