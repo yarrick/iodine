@@ -297,13 +297,8 @@ send_chunk(int fd)
 	buf[0] = hex[code];
 
 	/* tell server we received reply */
-	if (server_id != 0) {
-		buf[1] = hex[(server_id >> 4) & 0xf];
-		buf[2] = hex[(server_id >> 0) & 0xf];
-	} else {
-		buf[1] = 'N';
-		buf[2] = 'A';
-	}
+	buf[1] = hex[(server_id >> 4) & 0xf];
+	buf[2] = hex[(server_id >> 0) & 0xf];
 	send_query(fd, buf);
 }
 
@@ -334,13 +329,8 @@ send_ping(int fd)
 
 	data[0] = userid;
 	/* tell server we received reply */
-	if (server_id != 0) {
-		data[1] = hex[(server_id >> 4) & 0xf];
-		data[2] = hex[(server_id >> 0) & 0xf];
-	} else {
-		data[1] = '1';
-		data[2] = '1';
-	}
+	data[1] = hex[(server_id >> 4) & 0xf];
+	data[2] = hex[(server_id >> 0) & 0xf];
 	data[3] = (rand_seed >> 8) & 0xff;
 	data[4] = (rand_seed >> 0) & 0xff;
 	
