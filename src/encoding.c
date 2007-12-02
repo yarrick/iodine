@@ -49,7 +49,7 @@ inline_dotify(char *buf, size_t buflen)
 	}
 
 	reader = writer - dots;
-	pos = (unsigned) (reader - buf) + 1;
+	pos = (unsigned) (reader - buf);
 
 	while (dots) {
 		if (pos % 62 == 0) {

@@ -46,7 +46,7 @@
 
 static void send_ping(int fd);
 static void send_chunk(int fd);
-static int build_hostname(char *buf, size_t buflen, 
+static int build_hostname(char *buf, size_t buflen, size_t offset,
 	const char *data, const size_t datalen, 
 	const char *topdomain, struct encoder *encoder);
 
@@ -67,6 +67,9 @@ static char userid;
 /* DNS id for next packet */
 static uint16_t chunkid;
 
+/* DNS id for last packet with payload from server */
+static uint16_t server_id;
+
 /* Base32 encoder used for non-data packets */
 static struct encoder *b32;
 
@@ -76,6 +79,9 @@ static struct encoder *dataenc;
 
 /* result of case preservation check done after login */
 static int case_preserved;
+	
+/* For easy conversion 0-F to ascii digit */	
+static char hex[] = "0123456789ABCDEF";
 
 static void
 sighandler(int sig) 
@@ -103,14 +109,15 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 {
 	char buf[4096];
 
+	build_hostname(buf, sizeof(buf), 1, data, datalen, topdomain, b32);
+	/* build_hostname clears buf, write command afterwards */
 	buf[0] = cmd;
-	
-	build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain, b32);
+
 	send_query(fd, buf);
 }
 
 static int
-build_hostname(char *buf, size_t buflen, 
+build_hostname(char *buf, size_t buflen, size_t offset,
 		const char *data, const size_t datalen, 
 		const char *topdomain, struct encoder *encoder)
 {
@@ -118,14 +125,15 @@ build_hostname(char *buf, size_t buflen,
 	size_t space;
 	char *b;
 
-
 	space = MIN(0xFF, buflen) - strlen(topdomain) - 2;
 	if (!encoder->places_dots())
 		space -= (space / 62); /* space for dots */
 
 	memset(buf, 0, buflen);
+	memset(buf, 'A', offset);
 	
-	encsize = encoder->encode(buf, &space, data, datalen);
+	b = buf + offset;
+	encsize = encoder->encode(b, &space, data, datalen);
 
 	if (!encoder->places_dots())
 		inline_dotify(buf, buflen);
@@ -266,7 +274,6 @@ tunnel(int tun_fd, int dns_fd)
 static void
 send_chunk(int fd)
 {
-	char hex[] = "0123456789ABCDEF";
 	char buf[4096];
 	int avail;
 	int code;
@@ -277,7 +284,7 @@ send_chunk(int fd)
 	p += packet.offset;
 	avail = packet_len_to_send(&packet);
 
-	sentlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
+	sentlen = build_hostname(buf, sizeof(buf), 3, p, avail, topdomain, dataenc);
 
 	packet_send_len(&packet, sentlen);
 
@@ -289,6 +296,14 @@ send_chunk(int fd)
 	code |= (userid << 1);
 	buf[0] = hex[code];
 
+	/* tell server we received reply */
+	if (server_id != 0) {
+		buf[1] = hex[(server_id >> 4) & 0xf];
+		buf[2] = hex[(server_id >> 0) & 0xf];
+	} else {
+		buf[1] = 'N';
+		buf[2] = 'A';
+	}
 	send_query(fd, buf);
 }
 
@@ -312,14 +327,22 @@ send_login(int fd, char *login, int len)
 static void
 send_ping(int fd)
 {
-	char data[3];
+	char data[5];
 	
 	/* clear any packet not sent */
 	packet_init(&packet);
 
 	data[0] = userid;
-	data[1] = (rand_seed >> 8) & 0xff;
-	data[2] = (rand_seed >> 0) & 0xff;
+	/* tell server we received reply */
+	if (server_id != 0) {
+		data[1] = hex[(server_id >> 4) & 0xf];
+		data[2] = hex[(server_id >> 0) & 0xf];
+	} else {
+		data[1] = '1';
+		data[2] = '1';
+	}
+	data[3] = (rand_seed >> 8) & 0xff;
+	data[4] = (rand_seed >> 0) & 0xff;
 	
 	rand_seed++;
 
@@ -616,6 +639,7 @@ main(int argc, char **argv)
 	newroot = NULL;
 	device = NULL;
 	chunkid = 0;
+	server_id = 0;
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();

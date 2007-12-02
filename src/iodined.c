@@ -255,7 +255,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
 			/* decode with this users encoding */
-			read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, 
+			read = unpack_data(unpacked, sizeof(unpacked), &(in[3]), read - 3, 
 					   users[userid].encoder);
 
 			users[userid].last_pkt = time(NULL);
