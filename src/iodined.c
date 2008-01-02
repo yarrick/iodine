@@ -538,7 +538,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (mtu == 0) {
+	if (mtu <= 0) {
 		warnx("Bad MTU given.\n");
 		usage();
 	}
