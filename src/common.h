@@ -30,6 +30,14 @@
 
 #define QUERY_NAME_SIZE 256
 
+struct packet 
+{
+	int len;		/* Total packet length */
+	int sentlen;		/* Length of chunk currently transmitted */
+	int offset;		/* Current offset */
+	char data[64*1024];	/* The data */
+};
+
 struct query {
 	char name[QUERY_NAME_SIZE];
 	short type;
@@ -45,7 +53,5 @@ void do_chroot(char *);
 void do_detach();
 
 void read_password(char*, size_t);
-
-int check_topdomain(char *);
 
 #endif

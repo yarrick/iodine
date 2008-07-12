@@ -17,8 +17,6 @@
 #ifndef __USER_H__
 #define __USER_H__
 
-#include "packet.h"
-
 #define USERS 8
 
 struct user {
