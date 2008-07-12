@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -50,6 +51,10 @@ static struct encoder *b32;
 
 static int my_mtu;
 static in_addr_t my_ip;
+
+#if !defined(BSD) && !defined(__GLIBC__)
+static char *__progname;
+#endif
 
 static int read_dns(int, struct query *, char *, int);
 static void write_dns(int, struct query *, char *, int);
@@ -461,6 +466,14 @@ main(int argc, char **argv)
 	skipipconfig = 0;
 
 	b32 = get_base32_encoder();
+
+#if !defined(BSD) && !defined(__GLIBC__)
+	__progname = strrchr(argv[0], '/');
+	if (__progname == NULL)
+		__progname = argv[0];
+	else
+		__progname++;
+#endif
 
 	memset(password, 0, sizeof(password));
 	srand(time(NULL));
