@@ -82,8 +82,10 @@ tunnel_tun(int tun_fd, int dns_fd)
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, read, 9);
 
 	/* if another packet is queued, throw away this one. TODO build queue */
-	if (packet_empty(&(users[userid].outpacket))) {
-		return packet_fill(&(users[userid].outpacket), out, outlen);
+	if (users[userid].outpacket.len == 0) {
+		memcpy(users[userid].outpacket.data, out, outlen);
+		users[userid].outpacket.len = outlen;
+		return outlen;
 	} else {
 		return 0;
 	}
@@ -120,16 +122,6 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *
 
 
 	write_dns(fd, &u->q, out, sizeof(out));
-}
-
-static void
-send_chunk(int dns_fd, struct query *q, int userid)
-{
-	/* XXX: check MTU and only send part of packet if needed */
-	write_dns(dns_fd, q, users[userid].outpacket.data, users[userid].outpacket.len);
-	/* move this reset to after receiving ack */
-	users[userid].outpacket.len = 0;
-	users[userid].q.id = 0;
 }
 
 static int
@@ -255,7 +247,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
 			/* decode with this users encoding */
-			read = unpack_data(unpacked, sizeof(unpacked), &(in[3]), read - 3, 
+			read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, 
 					   users[userid].encoder);
 
 			users[userid].last_pkt = time(NULL);
@@ -267,8 +259,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 			if (code & 1) {
 				outlen = sizeof(out);
-				uncompress((uint8_t*)out, &outlen, (uint8_t*)users[userid].inpacket.data, 
-					users[userid].inpacket.len);
+				uncompress((uint8_t*)out, &outlen, 
+						   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
 
 				hdr = (struct ip*) (out + 4);
 				touser = find_user_by_ip(hdr->ip_dst.s_addr);
@@ -279,21 +271,23 @@ tunnel_dns(int tun_fd, int dns_fd)
 				} else {
 					/* send the compressed packet to other client
 					 * if another packet is queued, throw away this one. TODO build queue */
-					if (packet_empty(&(users[touser].outpacket))) {
-						packet_fill(&(users[touser].outpacket), users[userid].inpacket.data,
-							users[userid].inpacket.len);
+					if (users[touser].outpacket.len == 0) {
+						memcpy(users[touser].outpacket.data, users[userid].inpacket.data, users[userid].inpacket.len);
+						users[touser].outpacket.len = users[userid].inpacket.len;
 					}
 				}
-				packet_init(&(users[userid].inpacket)); /* clear inpacket */
+				users[userid].inpacket.len = users[userid].inpacket.offset = 0;
 			}
 		}
 	}
 	/* userid must be set for a reply to be sent */
 	if (userid >= 0 && userid < USERS && dummy.q.fromlen == users[userid].addrlen &&
 			memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) == 0 &&
-			packet_empty(&(users[userid].outpacket)) == 0) {
+			users[userid].outpacket.len > 0) {
 
-		send_chunk(dns_fd, &(dummy.q), userid);
+		write_dns(dns_fd, &(dummy.q), users[userid].outpacket.data, users[userid].outpacket.len);
+		users[userid].outpacket.len = 0;
+		users[userid].q.id = 0;
 	}
 
 	return 0;
@@ -334,7 +328,9 @@ tunnel(int tun_fd, int dns_fd)
 		if (i==0) {	
 			for (j = 0; j < USERS; j++) {
 				if (users[j].q.id != 0) {
-					send_chunk(dns_fd, &(users[j].q), j);
+					write_dns(dns_fd, &(users[j].q), users[j].outpacket.data, users[j].outpacket.len);
+					users[j].outpacket.len = 0;
+					users[j].q.id = 0;
 				}
 			}
 		} else {
@@ -431,7 +427,8 @@ help() {
 
 static void
 version() {
-	char *svnver = "$Rev$ from $Date$";
+	char *svnver;
+	svnver = "$Rev$ from $Date$";
 	printf("iodine IP over DNS tunneling server\n");
 	printf("SVN version: %s\n", svnver);
 	exit(0);
@@ -469,14 +466,12 @@ main(int argc, char **argv)
 		switch(choice) {
 		case 'v':
 			version();
-			/* NOTREACHED */
 			break;
 		case 'f':
 			foreground = 1;
 			break;
 		case 'h':
 			help();
-			/* NOTREACHED */
 			break;
 		case 'u':
 			username = optarg;
@@ -495,6 +490,10 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			port = atoi(optarg);
+			if (port) {
+				printf("ALERT! Other dns servers expect you to run on port 53.\n");
+				printf("You must manually forward port 53 to port %d for things to work.\n", port);
+			}
 			break;
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
@@ -505,7 +504,6 @@ main(int argc, char **argv)
 			break;
 		default:
 			usage();
-			/* NOTREACHED */
 			break;
 		}
 	}
@@ -522,13 +520,8 @@ main(int argc, char **argv)
 		usage();
 
 	topdomain = strdup(argv[1]);
-	if(strlen(topdomain) <= 128) {
-		if(check_topdomain(topdomain)) {
-			warnx("Topdomain contains invalid characters.\n");
-			usage();
-		}
-	} else {
-		warnx("Use a topdomain max 128 chars long.\n");
+	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
+		warnx("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
 		usage();
 	}
 
@@ -539,19 +532,9 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (mtu <= 0) {
+	if (mtu == 0) {
 		warnx("Bad MTU given.\n");
 		usage();
-	}
-	
-	if(port < 1 || port > 65535) {
-		warnx("Bad port number given.\n");
-		usage();
-	}
-	
-	if (port != 53) {
-		printf("ALERT! Other dns servers expect you to run on port 53.\n");
-		printf("You must manually forward port 53 to port %d for things to work.\n", port);
 	}
 
 	if (listen_ip == INADDR_NONE) {

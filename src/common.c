@@ -111,20 +111,3 @@ read_password(char *buf, size_t len)
 	strncpy(buf, pwd, len);
 	buf[len-1] = '\0';
 }
-
-int
-check_topdomain(char *str)
-{
-       int i;
-
-       if(str[0] == '.') /* special case */
-               return 1;
-
-       for( i = 0; i < strlen(str); i++) {
-               if( isalpha(str[i]) || isdigit(str[i]) || str[i] == '-' || str[i] == '.' )
-                       continue;
-               else 
-		       return 1;
-       }
-       return 0;
-}

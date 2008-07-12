@@ -1,5 +1,5 @@
 CC = gcc
-COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o md5.o common.o packet.o
+COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o md5.o common.o
 CLIENTOBJS = iodine.o
 CLIENT = ../bin/iodine
 SERVEROBJS = iodined.o user.o
