@@ -490,10 +490,6 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			port = atoi(optarg);
-			if (port) {
-				printf("ALERT! Other dns servers expect you to run on port 53.\n");
-				printf("You must manually forward port 53 to port %d for things to work.\n", port);
-			}
 			break;
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
@@ -520,8 +516,13 @@ main(int argc, char **argv)
 		usage();
 
 	topdomain = strdup(argv[1]);
-	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
-		warnx("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
+	if(strlen(topdomain) <= 128) {
+		if(check_topdomain(topdomain)) {
+			warnx("Topdomain contains invalid characters.\n");
+			usage();
+		}
+	} else {
+		warnx("Use a topdomain max 128 chars long.\n");
 		usage();
 	}
 
@@ -532,9 +533,19 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (mtu == 0) {
+	if (mtu <= 0) {
 		warnx("Bad MTU given.\n");
 		usage();
+	}
+	
+	if(port < 1 || port > 65535) {
+		warnx("Bad port number given.\n");
+		usage();
+	}
+	
+	if (port != 53) {
+		printf("ALERT! Other dns servers expect you to run on port 53.\n");
+		printf("You must manually forward port 53 to port %d for things to work.\n", port);
 	}
 
 	if (listen_ip == INADDR_NONE) {
