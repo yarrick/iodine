@@ -1,5 +1,5 @@
 .\" groff -man -Tascii iodine.8
-.TH IODINE 8 "JUN 2007" "User Manuals"
+.TH IODINE 8 "JUL 2008" "User Manuals"
 .SH NAME
 iodine, iodined \- tunnel IPv4 over DNS
 .SH SYNOPSIS
@@ -25,7 +25,7 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodined [-h]
 
-.B iodined [-f] [-s] [-u
+.B iodined [-c] [-s] [-f] [-u
 .I user
 .B ] [-P
 .I password
@@ -62,10 +62,6 @@ Print usage info and exit.
 .B -f
 Keep running in foreground.
 .TP
-.B -s
-Don't try to configure IP address or MTU. This should only be used if
-you have already configured the device that will be used.
-.TP
 .B -u user
 Drop privileges and run as user 'user' after setting up tunnel.
 .TP
@@ -81,6 +77,14 @@ will be used as input. Only the first 32 characters will be used.
 Use the TUN device 'device' instead of the normal one, which is dnsX on Linux
 and otherwise tunX.
 .SS Server Options:
+.TP
+.B -c
+Disable checks on client IP and port on all incoming requests.
+This might help if server is behind a NAT firewall.
+.TP
+.B -s
+Don't try to configure IP address or MTU. This should only be used if
+you have already configured the device that will be used.
 .TP
 .B -m mtu
 Set 'mtu' as mtu size for the tunnel device. This will be sent to the client

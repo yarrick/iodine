@@ -49,6 +49,7 @@ static char *topdomain;
 static char password[33];
 static struct encoder *b32;
 
+static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
 
@@ -191,8 +192,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 		users[userid].last_pkt = time(NULL);
 		login_calculate(logindata, 16, password, users[userid].seed);
 
-		if (dummy.q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
+		if (check_ip && (dummy.q.fromlen != users[userid].addrlen ||
+				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0)) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
 			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
@@ -248,8 +249,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 		}
 
 		/* Check sending ip number */
-		if (dummy.q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
+		if (check_ip && (dummy.q.fromlen != users[userid].addrlen ||
+				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0)) {
 			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
 		} else {
 			/* decode with this users encoding */
@@ -402,7 +403,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	exit(2);
@@ -413,11 +414,13 @@ help() {
 	extern char *__progname;
 
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
+	printf("  -c to disable check of client IP/port on each request\n");
+	printf("  -s to skip creating and configuring the tun device which then has to be created manually\n");
 	printf("  -f to keep running in foreground\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
@@ -463,6 +466,7 @@ main(int argc, char **argv)
 	mtu = 1024;
 	listen_ip = INADDR_ANY;
 	port = 53;
+	check_ip = 1;
 	skipipconfig = 0;
 
 	b32 = get_base32_encoder();
@@ -478,10 +482,13 @@ main(int argc, char **argv)
 	memset(password, 0, sizeof(password));
 	srand(time(NULL));
 	
-	while ((choice = getopt(argc, argv, "vsfhu:t:d:m:l:p:P:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhu:t:d:m:l:p:P:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
+			break;
+		case 'c':
+			check_ip = 0;
 			break;
 		case 's':
 			skipipconfig = 1;
