@@ -31,7 +31,7 @@ static struct tuple
 } testpairs[] = {
 	{ "iodinetestingtesting", "nfxwi0lomv0gk21unfxgo3dfon0gs1th" },
 	{ "abc123", "mfrggmjsgm" },
-	{ NULL, NULL }	
+	{ NULL, NULL }
 };
 
 START_TEST(test_base32_encode)
@@ -46,8 +46,8 @@ START_TEST(test_base32_encode)
 		val = base32_encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
 
 		fail_unless(val > 0, strerror(errno));
-		fail_unless(strcmp(buf, testpairs[i].b) == 0, 
-				va_str("'%s' != '%s'", buf, testpairs[i].b));
+		fail_unless(strcmp(buf, testpairs[i].b) == 0,
+				"'%s' != '%s'", buf, testpairs[i].b);
 	}
 }
 END_TEST
@@ -65,8 +65,8 @@ START_TEST(test_base32_decode)
 
 		fail_unless(val > 0, strerror(errno));
 		fail_unless(buf != NULL, "buf == NULL");
-		fail_unless(strcmp(buf, testpairs[i].a) == 0, 
-				va_str("'%s' != '%s'", buf, testpairs[i].a));
+		fail_unless(strcmp(buf, testpairs[i].a) == 0,
+				"'%s' != '%s'", buf, testpairs[i].a);
 	}
 }
 END_TEST

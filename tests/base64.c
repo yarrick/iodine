@@ -31,7 +31,7 @@ static struct tuple
 } testpairs[] = {
 	{ "iodinetestingtesting", "Aw8KAw4LDgvZDgLUz2rLC2rPBMC" },
 	{ "abc123", "ywjJmtiZ" },
-	{ 
+	{
 	  "\xFF\xEF\x7C\xEF\xAE\x78\xDF\x6D\x74\xCF\x2C\x70\xBE\xEB\x6C\xAE\xAA\x68"
 	  "\x9E\x69\x64\x8E\x28\x60\x7D\xE7\x5C\x6D\xA6\x58\x5D\x65\x54\x4D\x24\x50"
 	  "\x3C\xE3\x4C\x2C\xA2\x48\x1C\x61\x44\x0C\x20\x40\x3F\x3F\x3C\xEF\xAE\x78"
@@ -45,7 +45,7 @@ static struct tuple
 	  "776543210-ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba9abba87654"
 	  "3210-ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfe999dcba"
 	},
-	{ 
+	{
 	  "\xFF\xEF\x7C\xEF\xAE\x78\xDF\x6D\x74\xCF\x2C\x70\xBE\xEB\x6C\xAE\xAA\x68"
 	  "\x9E\x69\x64\x8E\x28\x60\x7D\xE7\x5C\x6D\xA6\x58\x5D\x65\x54\x4D\x24\x50"
 	  "\x3C\xE3\x4C\x2C\xA2\x48\x1C\x61\x44\x0C\x20\x40\x3F\x3F\x3C\xEF\xAE\x78"
@@ -59,7 +59,7 @@ static struct tuple
 	  "776543210-ZYXWVUTSRQfHKwfHGsHGFEDCBAzyxwvutsrqponmlkjihgfedcbaML87654321"
 	  "0-ZYXWVUTSRQfHKwfHGsHGFEDCBAzyxwvutsrqponmlkjihgfedcba"
 	},
-	{ NULL, NULL }	
+	{ NULL, NULL }
 };
 
 START_TEST(test_base64_encode)
@@ -74,8 +74,8 @@ START_TEST(test_base64_encode)
 		val = base64_encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
 
 		fail_unless(val > 0, strerror(errno));
-		fail_unless(strcmp(buf, testpairs[i].b) == 0, 
-				va_str("'%s' != '%s'", buf, testpairs[i].b));
+		fail_unless(strcmp(buf, testpairs[i].b) == 0,
+				"'%s' != '%s'", buf, testpairs[i].b);
 	}
 }
 END_TEST
@@ -93,8 +93,8 @@ START_TEST(test_base64_decode)
 
 		fail_unless(val > 0, strerror(errno));
 		fail_unless(buf != NULL, "buf == NULL");
-		fail_unless(strcmp(buf, testpairs[i].a) == 0, 
-				va_str("'%s' != '%s'", buf, testpairs[i].a));
+		fail_unless(strcmp(buf, testpairs[i].a) == 0,
+				"'%s' != '%s'", buf, testpairs[i].a);
 	}
 }
 END_TEST

@@ -22,20 +22,6 @@
 
 #include "test.h"
 
-char *
-va_str(const char *fmt, ...)
-{
-	static char buf[512];
-	va_list ap;
-
-	memset(buf, 0, sizeof(buf));
-	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);	
-	va_end(ap);
-
-	return buf;
-}
-
 int
 main()
 {
@@ -68,7 +54,7 @@ main()
 	suite_add_tcase(iodine, test);
 
 	runner = srunner_create(iodine);
-	srunner_run_all(runner, CK_VERBOSE);
+	srunner_run_all(runner, CK_MINIMAL);
 	failed = srunner_ntests_failed(runner);
 
 	srunner_free(runner);
