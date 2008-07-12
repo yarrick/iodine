@@ -25,7 +25,7 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodined [-h]
 
-.B iodined [-f] [-u
+.B iodined [-f] [-s] [-u
 .I user
 .B ] [-P
 .I password
@@ -61,6 +61,10 @@ Print usage info and exit.
 .TP
 .B -f
 Keep running in foreground.
+.TP
+.B -s
+Don't try to configure IP address or MTU. This should only be used if
+you have already configured the device that will be used.
 .TP
 .B -u user
 Drop privileges and run as user 'user' after setting up tunnel.
