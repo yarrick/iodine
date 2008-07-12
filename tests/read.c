@@ -33,7 +33,7 @@
 #include "dns.h"
 #include "read.h"
 #include "test.h"
-	
+
 START_TEST(test_read_putshort)
 {
 	unsigned short k;
@@ -44,15 +44,15 @@ START_TEST(test_read_putshort)
 	for (i = 0; i < 65536; i++) {
 		p = (char*)&k;
 		putshort(&p, i);
-		fail_unless(ntohs(k) == i, 
-				va_str("Bad value on putshort for %d: %d != %d", 
-					i, ntohs(k), i));
+		fail_unless(ntohs(k) == i,
+				"Bad value on putshort for %d: %d != %d",
+					i, ntohs(k), i);
 
 		p = (char*)&k;
 		readshort(NULL, &p, (short *) &l);
 		fail_unless(l == i,
-				va_str("Bad value on readshort for %d: %d != %d", 
-					i, l, i));
+				"Bad value on readshort for %d: %d != %d",
+					i, l, i);
 	}
 }
 END_TEST
@@ -71,14 +71,14 @@ START_TEST(test_read_putlong)
 
 		putlong(&p, j);
 
-		fail_unless(ntohl(k) == j, 
-				va_str("Bad value on putlong for %d: %d != %d", i, ntohl(j), j));
-		
+		fail_unless(ntohl(k) == j,
+				"Bad value on putlong for %d: %d != %d", i, ntohl(j), j);
+
 		p = (char*)&k;
 		readlong(NULL, &p, &l);
 
 		fail_unless(l == j,
-				va_str("Bad value on readlong for %d: %d != %d", i, l, j));
+				"Bad value on readlong for %d: %d != %d", i, l, j);
 	}
 }
 END_TEST
@@ -87,11 +87,11 @@ START_TEST(test_read_name)
 {
 	unsigned char emptyloop[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 }; 
+		0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 };
 	unsigned char infloop[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x01, 'A', 0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 }; 
-	unsigned char longname[] = 
+		0x01, 'A', 0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01 };
+	unsigned char longname[] =
 		"AA\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
@@ -100,15 +100,15 @@ START_TEST(test_read_name)
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
 		"\x3FzBCDEFGHIJKLMNOPQURSTUVXYZ0123456789abcdefghijklmnopqrstuvxyzAA"
 		"\x00\x00\x01\x00\x01";
-	unsigned char onejump[] = 
+	unsigned char onejump[] =
 		"AA\x81\x80\x00\x01\x00\x00\x00\x00\x00\x00"
 		"\x02hh\xc0\x15\x00\x01\x00\x01\x05zBCDE\x00";
 	unsigned char badjump[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 }; 
+		0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 };
 	unsigned char badjump2[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x02, 'B', 'A', 0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 }; 
+		0x02, 'B', 'A', 0xfe, 0xcc, 0x00, 0x01, 0x00, 0x01 };
 	unsigned char *jumper;
 	char buf[1024];
 	char *data;
@@ -119,13 +119,13 @@ START_TEST(test_read_name)
 	buf[1023] = 'A';
 	rv = readname((char *) emptyloop, sizeof(emptyloop), &data, buf, 1023);
 	fail_unless(buf[1023] == 'A', NULL);
-	
+
 	memset(buf, 0, sizeof(buf));
 	data = (char*) infloop + sizeof(HEADER);
 	buf[4] = '\a';
 	rv = readname((char*) infloop, sizeof(infloop), &data, buf, 4);
 	fail_unless(buf[4] == '\a', NULL);
-	
+
 	memset(buf, 0, sizeof(buf));
 	data = (char*) longname + sizeof(HEADER);
 	buf[256] = '\a';
@@ -136,7 +136,7 @@ START_TEST(test_read_name)
 	data = (char*) onejump + sizeof(HEADER);
 	rv = readname((char*) onejump, sizeof(onejump), &data, buf, 256);
 	fail_unless(rv == 9, NULL);
-	
+
 	/* These two tests use malloc to cause segfault if jump is executed */
 	memset(buf, 0, sizeof(buf));
 	jumper = malloc(sizeof(badjump));
@@ -149,7 +149,7 @@ START_TEST(test_read_name)
 		fail_unless(buf[0] == 0, NULL);
 	}
 	free(jumper);
-	
+
 	memset(buf, 0, sizeof(buf));
 	jumper = malloc(sizeof(badjump2));
 	if (jumper) {
@@ -158,8 +158,8 @@ START_TEST(test_read_name)
 		rv = readname((char*) jumper, sizeof(badjump2), &data, buf, 256);
 
 		fail_unless(rv == 4, NULL);
-		fail_unless(strcmp("BA.", buf) == 0, 
-				va_str("buf is not BA: %s", buf));
+		fail_unless(strcmp("BA.", buf) == 0,
+				"buf is not BA: %s", buf);
 	}
 	free(jumper);
 }
@@ -184,11 +184,11 @@ START_TEST(test_putname)
 	fail_unless(strncmp(buf, out, ret) == 0, "Happy flow failed");
 }
 END_TEST
-	
+
 START_TEST(test_putname_nodot)
 {
 	char buf[256];
-	char *nodot = 
+	char *nodot =
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	char *b;
@@ -205,11 +205,11 @@ START_TEST(test_putname_nodot)
 	fail_unless(b == buf, NULL);
 }
 END_TEST
-	
+
 START_TEST(test_putname_toolong)
 {
 	char buf[256];
-	char *toolong = 
+	char *toolong =
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
