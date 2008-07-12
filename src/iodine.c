@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <err.h>
+#include <grp.h>
 #include <pwd.h>
 #include <arpa/inet.h>
 #include <zlib.h>
