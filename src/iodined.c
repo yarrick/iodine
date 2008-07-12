@@ -448,6 +448,7 @@ main(int argc, char **argv)
 	int choice;
 	int port;
 	int mtu;
+	int skipipconfig;
 
 	username = NULL;
 	newroot = NULL;
@@ -456,16 +457,20 @@ main(int argc, char **argv)
 	mtu = 1024;
 	listen_ip = INADDR_ANY;
 	port = 53;
+	skipipconfig = 0;
 
 	b32 = get_base32_encoder();
 
 	memset(password, 0, sizeof(password));
 	srand(time(NULL));
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:p:P:")) != -1) {
+	while ((choice = getopt(argc, argv, "vsfhu:t:d:m:l:p:P:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
+			break;
+		case 's':
+			skipipconfig = 1;
 			break;
 		case 'f':
 			foreground = 1;
@@ -558,8 +563,9 @@ main(int argc, char **argv)
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup0;
-	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
-		goto cleanup1;
+	if (!skipipconfig)
+		if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
+			goto cleanup1;
 	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) 
 		goto cleanup2;
 
