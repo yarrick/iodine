@@ -8,7 +8,7 @@ SERVER = ../bin/iodined
 OS = `uname | tr "a-z" "A-Z"`
 ARCH = `uname -m`
 
-LDFLAGS =  -lz
+LDFLAGS =  -lz `sh osflags link`
 CFLAGS = -c -g -Wall -D$(OS) -pedantic
 
 all: stateos $(CLIENT) $(SERVER)
