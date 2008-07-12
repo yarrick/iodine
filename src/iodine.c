@@ -402,8 +402,11 @@ handshake(int dns_fd)
 		if(r > 0) {
 			read = read_dns(dns_fd, in, sizeof(in));
 			
-			if(read < 0) {
-				warn("handshake read");
+			if(read <= 0) {
+				if (read == 0) {
+					warn("handshake read");
+				}
+				/* if read < 0 then warning has been printed already */
 				continue;
 			}
 
