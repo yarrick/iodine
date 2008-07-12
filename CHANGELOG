@@ -9,6 +9,8 @@ CHANGES:
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
 	- Applied a patch for not creating and configuring the tun interface,
 		Debian bug #477692 by Vincent Bernat, controlled by -s switch
+	- Applied a security patch from Andrew Griffiths, use setgroups() to
+		limit the groups of the user
 
 2007-11-30: 0.4.1 "Tea Online"
 	- Introduced encoding API
