@@ -12,6 +12,8 @@ CHANGES:
 	- Applied a security patch from Andrew Griffiths, use setgroups() to
 		limit the groups of the user
 	- Applied a patch to make iodine work on (Open)Solaris, from Albert Lee
+	- Added option in server (-c) to disable IP/port checking on each packet,
+		will hopefully help when server is behind NAT
 
 2007-11-30: 0.4.1 "Tea Online"
 	- Introduced encoding API
