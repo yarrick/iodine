@@ -730,7 +730,9 @@ main(int argc, char **argv)
 		do_chroot(newroot);
 	
 	if (username != NULL) {
-		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
+		gid_t gids[1];
+		gids[0] = pw->pw_gid;
+		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
 			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}
