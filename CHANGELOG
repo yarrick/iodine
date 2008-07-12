@@ -11,6 +11,7 @@ CHANGES:
 		Debian bug #477692 by Vincent Bernat, controlled by -s switch
 	- Applied a security patch from Andrew Griffiths, use setgroups() to
 		limit the groups of the user
+	- Applied a patch to make iodine work on (Open)Solaris, from Albert Lee
 
 2007-11-30: 0.4.1 "Tea Online"
 	- Introduced encoding API

@@ -23,6 +23,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -76,6 +77,10 @@ static struct encoder *dataenc;
 
 /* result of case preservation check done after login */
 static int case_preserved;
+
+#if !defined(BSD) && !defined(__GLIBC__)
+static char *__progname;
+#endif
 
 static void
 sighandler(int sig) 
@@ -634,6 +639,14 @@ main(int argc, char **argv)
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
 	
+#if !defined(BSD) && !defined(__GLIBC__)
+	__progname = strrchr(argv[0], '/');
+	if (__progname == NULL)
+		__progname = argv[0];
+	else
+		__progname++;
+#endif
+
 	while ((choice = getopt(argc, argv, "vfhu:t:d:P:")) != -1) {
 		switch(choice) {
 		case 'v':

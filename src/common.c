@@ -1,4 +1,5 @@
 /* Copyright (c) 2006-2007 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2007 Albert Lee <trisk@acm.jhu.edu>.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +22,8 @@
 #endif
 #include <time.h>
 #include <err.h>
+#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -29,9 +32,47 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <termios.h>
 
 #include "common.h"
+
+/* daemon(3) exists only in 4.4BSD or later, and in GNU libc */
+#if !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
+static int daemon(int nochdir, int noclose)
+{
+ 	int fd, i;
+ 
+ 	switch (fork()) {
+ 		case 0:
+ 			break;
+ 		case -1:
+ 			return -1;
+ 		default:
+ 			_exit(0);
+ 	}
+ 
+ 	if (!nochdir) {
+ 		chdir("/");
+ 	}
+ 
+ 	if (setsid() < 0) {
+ 		return -1;
+ 	}
+ 	
+ 	if (!noclose) {
+ 		if (fd = open("/dev/null", O_RDWR) >= 0) {
+ 			for (i = 0; i < 3; i++) {
+ 				dup2(fd, i);
+ 			}
+ 			if (fd > 2) {
+ 				close(fd);
+ 			}
+ 		}
+ 	}
+	return 0;
+}
+#endif
 
 int 
 open_dns(int localport, in_addr_t listen_ip) 
