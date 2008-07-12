@@ -54,4 +54,6 @@ void do_detach();
 
 void read_password(char*, size_t);
 
+int check_topdomain(char *);
+
 #endif
