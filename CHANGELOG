@@ -5,7 +5,7 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
-2008-xx-xx: 0.4.2 "?"
+2008-xx-xx: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
 	- Applied a patch for not creating and configuring the tun interface,
 		Debian bug #477692 by Vincent Bernat, controlled by -s switch
