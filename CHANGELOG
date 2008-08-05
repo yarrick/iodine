@@ -14,6 +14,9 @@ CHANGES:
 	- Applied a patch to make iodine work on (Open)Solaris, from Albert Lee
 	- Added option in server (-c) to disable IP/port checking on each packet,
 		will hopefully help when server is behind NAT
+	- Fixed bug #21, now only IP address part of each packet is checked.
+		Should remove the need for the -c option and also work with
+		bugfixed DNS servers worldwide.
 
 2007-11-30: 0.4.1 "Tea Online"
 	- Introduced encoding API
