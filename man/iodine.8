@@ -25,7 +25,7 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodined [-h]
 
-.B iodined [-c] [-s] [-f] [-u
+.B iodined [-c] [-s] [-f] [-D] [-u
 .I user
 .B ] [-P
 .I password
@@ -79,12 +79,14 @@ and otherwise tunX.
 .SS Server Options:
 .TP
 .B -c
-Disable checks on client IP and port on all incoming requests.
-This might help if server is behind a NAT firewall.
+Disable checks on client IP on all incoming requests.
 .TP
 .B -s
 Don't try to configure IP address or MTU. This should only be used if
 you have already configured the device that will be used.
+.TP
+.B -D
+Increase debug level. Level 1 prints info about each RX/TX packet.
 .TP
 .B -m mtu
 Set 'mtu' as mtu size for the tunnel device. This will be sent to the client

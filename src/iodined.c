@@ -57,6 +57,8 @@ static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
 
+static int debug;
+
 #if !defined(BSD) && !defined(__GLIBC__)
 static char *__progname;
 #endif
@@ -327,6 +329,12 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 	if ((read = read_dns(dns_fd, &q)) <= 0)
 		return 0;
+
+	if (debug >= 1) {
+		struct sockaddr_in *tempin;
+		tempin = (struct sockaddr_in *) &(q.from);
+		printf("RX: client %s, type %d, name %s\n", inet_ntoa(tempin->sin_addr), q.type, q.name);
+	}
 	
 	switch (q.type) {
 	case T_NULL:
@@ -427,6 +435,13 @@ write_dns(int fd, struct query *q, char *data, int datalen)
 
 	len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
 	
+	if (debug >= 1) {
+		struct sockaddr_in *tempin;
+		tempin = (struct sockaddr_in *) &(q->from);
+		printf("TX: client %s, type %d, name %s, %d bytes data\n", 
+			inet_ntoa(tempin->sin_addr), q->type, q->name, datalen);
+	}
+
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
 
@@ -499,6 +514,7 @@ main(int argc, char **argv)
 	port = 53;
 	check_ip = 1;
 	skipipconfig = 0;
+	debug = 0;
 
 	b32 = get_base32_encoder();
 
@@ -513,7 +529,7 @@ main(int argc, char **argv)
 	memset(password, 0, sizeof(password));
 	srand(time(NULL));
 	
-	while ((choice = getopt(argc, argv, "vcsfhu:t:d:m:l:p:P:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:P:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -529,6 +545,9 @@ main(int argc, char **argv)
 			break;
 		case 'h':
 			help();
+			break;
+		case 'D':
+			debug++;
 			break;
 		case 'u':
 			username = optarg;
@@ -603,6 +622,12 @@ main(int argc, char **argv)
 	if (port != 53) {
 		printf("ALERT! Other dns servers expect you to run on port 53.\n");
 		printf("You must manually forward port 53 to port %d for things to work.\n", port);
+	}
+
+	if (debug) {
+		printf("Debug level %d enabled, will stay in foreground.\n", debug);
+		printf("Add more -D switches to set higher debug level.\n");
+		foreground = 1;
 	}
 
 	if (listen_ip == INADDR_NONE) {
