@@ -3,7 +3,7 @@
 case $1 in
 link)
 
-	case $OSTYPE in
+	case `uname` in
 		SunOS | solaris)
 			echo '-lsocket -lnsl';
 		;;

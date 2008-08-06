@@ -11,7 +11,9 @@ CHANGES:
 		Debian bug #477692 by Vincent Bernat, controlled by -s switch
 	- Applied a security patch from Andrew Griffiths, use setgroups() to
 		limit the groups of the user
-	- Applied a patch to make iodine work on (Open)Solaris, from Albert Lee
+	- Applied a patch to make iodine build on (Open)Solaris, from Albert Lee
+		Needs TUN/TAP driver: http://www.whiteboard.ne.jp/~admin2/tuntap/
+		Still needs some more code in tun.c for opening/closing the device
 	- Added option in server (-c) to disable IP/port checking on each packet,
 		will hopefully help when server is behind NAT
 	- Fixed bug #21, now only IP address part of each packet is checked.
