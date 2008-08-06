@@ -449,7 +449,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] [-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	exit(2);
@@ -460,7 +460,7 @@ help() {
 	extern char *__progname;
 
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] [-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
@@ -468,6 +468,7 @@ help() {
 	printf("  -c to disable check of client IP/port on each request\n");
 	printf("  -s to skip creating and configuring the tun device which then has to be created manually\n");
 	printf("  -f to keep running in foreground\n");
+	printf("  -D to increase debug level\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
 	printf("  -d device to set tunnel device name\n");
