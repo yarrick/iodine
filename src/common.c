@@ -61,7 +61,7 @@ static int daemon(int nochdir, int noclose)
  	}
  	
  	if (!noclose) {
- 		if (fd = open("/dev/null", O_RDWR) >= 0) {
+ 		if ((fd = open("/dev/null", O_RDWR)) >= 0) {
  			for (i = 0; i < 3; i++) {
  				dup2(fd, i);
  			}
