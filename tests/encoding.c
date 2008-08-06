@@ -27,9 +27,9 @@ struct tuple
 	char *a;
 	char *b;
 } dottests[] = {
-	{ "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 
+	{ "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	  "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.a"},
-	{ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 
+	{ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa."},
 	{ "abc123", "abc123" },
 	{ NULL, NULL }
@@ -49,7 +49,7 @@ START_TEST(test_inline_dotify)
 		inline_dotify(b, sizeof(temp));
 
 		fail_unless(strcmp(dottests[i].b, temp) == 0,
-				va_str("'%s' != '%s'", temp, dottests[i].b));
+				"'%s' != '%s'", temp, dottests[i].b);
 		i++;
 	}
 }
@@ -69,7 +69,7 @@ START_TEST(test_inline_undotify)
 		inline_undotify(b, sizeof(temp));
 
 		fail_unless(strcmp(dottests[i].a, temp) == 0,
-				va_str("'%s' != '%s'", temp, dottests[i].a));
+				"'%s' != '%s'", temp, dottests[i].a);
 		i++;
 	}
 }

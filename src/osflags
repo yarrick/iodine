@@ -1,0 +1,14 @@
+#!/bin/sh
+
+case $1 in
+link)
+
+	case `uname` in
+		SunOS | solaris)
+			echo '-lsocket -lnsl';
+		;;
+	esac
+	;;
+*)
+;;
+esac

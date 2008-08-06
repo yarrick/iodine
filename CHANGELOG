@@ -5,6 +5,23 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
+2008-08-06: 0.4.2 "Opened Zone"
+	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
+	- Applied a patch for not creating and configuring the tun interface,
+		Debian bug #477692 by Vincent Bernat, controlled by -s switch
+	- Applied a security patch from Andrew Griffiths, use setgroups() to
+		limit the groups of the user
+	- Applied a patch to make iodine build on (Open)Solaris, from Albert Lee
+		Needs TUN/TAP driver: http://www.whiteboard.ne.jp/~admin2/tuntap/
+		Still needs some more code in tun.c for opening/closing the device
+	- Added option in server (-c) to disable IP/port checking on each packet,
+		will hopefully help when server is behind NAT
+	- Fixed bug #21, now only IP address part of each packet is checked.
+		Should remove the need for the -c option and also work with
+		bugfixed DNS servers worldwide.
+	- Added -D option on server to enable debugging. Debug level 1 now prints
+		info about each RX/TX datagram.
+
 2007-11-30: 0.4.1 "Tea Online"
 	- Introduced encoding API
 	- Switched to new Base32 implementation

@@ -150,14 +150,13 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 				warnx("Got NXDOMAIN as reply");
 				break;
 
-
 			case SERVFAIL:
 				warnx("Got SERVFAIL as reply");
 				break;
 
 			case NOERROR:
 			default:
-				warnx("no query or answer in answer");
+				warnx("no query or answer in reply packet");
 				break;
 			}
 			return -1;
@@ -178,7 +177,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		rv = MIN(rlen, sizeof(rdata));
 		rv = readdata(packet, &data, rdata, rv);
 
-		if(type == T_NULL && rv > 2) {
+		if(type == T_NULL && rv > 2 && buf) {
 			rv = MIN(rv, buflen);
 			memcpy(buf, rdata, rv);
 		}
@@ -193,11 +192,6 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		name[sizeof(name)-1] = '\0';
 		readshort(packet, &data, &type);
 		readshort(packet, &data, &class);
-
-		if(type != T_NULL) {
-			rv = 0;
-			break;
-		}
 
 		strncpy(q->name, name, sizeof(q->name));
 		q->name[sizeof(q->name) - 1] = '\0';

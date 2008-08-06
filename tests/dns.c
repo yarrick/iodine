@@ -33,24 +33,24 @@
 
 static void dump_packet(char *, size_t);
 
-static char queryPacket[] = 
+static char queryPacket[] =
 	"\x05\x39\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01\x2D\x41\x6A\x62\x63"
 	"\x75\x79\x74\x63\x70\x65\x62\x30\x67\x71\x30\x6C\x74\x65\x62\x75\x78"
 	"\x67\x69\x64\x75\x6E\x62\x73\x73\x61\x33\x64\x66\x6F\x6E\x30\x63\x61"
 	"\x7A\x64\x62\x6F\x72\x71\x71\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00"
 	"\x0A\x00\x01\x00\x00\x29\x10\x00\x00\x00\x80\x00\x00\x00";
 
-static char answerPacket[] = 
+static char answerPacket[] =
 	"\x05\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00\x05\x73\x69\x6C\x6C"
 	"\x79\x04\x68\x6F\x73\x74\x02\x6F\x66\x06\x69\x6F\x64\x69\x6E\x65\x04"
 	"\x63\x6F\x64\x65\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00\x0A\x00\x01"
 	"\xC0\x0C\x00\x0A\x00\x01\x00\x00\x00\x00\x00\x23\x74\x68\x69\x73\x20"
 	"\x69\x73\x20\x74\x68\x65\x20\x6D\x65\x73\x73\x61\x67\x65\x20\x74\x6F"
 	"\x20\x62\x65\x20\x64\x65\x6C\x69\x76\x65\x72\x65\x64";
-	
+
 static char *msgData = "this is the message to be delivered";
 static char *topdomain = "kryo.se";
-	
+
 static char *innerData = "HELLO this is the test data";
 
 START_TEST(test_encode_query)
@@ -88,7 +88,7 @@ START_TEST(test_encode_query)
 		dump_packet(buf, ret);
 	}
 	fail_unless(strncmp(queryPacket, buf, sizeof(queryPacket)) == 0, "Did not compile expected packet");
-	fail_unless(ret == len, va_str("Bad packet length: %d, expected %d", ret, len));
+	fail_unless(ret == len, "Bad packet length: %d, expected %d", ret, len);
 }
 END_TEST
 
@@ -112,7 +112,7 @@ START_TEST(test_decode_query)
 	unpack_data(buf, len, &(q.name[1]), (int) (domain - q.name) - 1, enc);
 
 	fail_unless(strncmp(buf, innerData, strlen(innerData)) == 0, "Did not extract expected host: '%s'", buf);
-	fail_unless(strlen(buf) == strlen(innerData), va_str("Bad host length: %d, expected %d: '%s'", strlen(buf), strlen(innerData), buf));
+	fail_unless(strlen(buf) == strlen(innerData), "Bad host length: %d, expected %d: '%s'", strlen(buf), strlen(innerData), buf);
 }
 END_TEST
 
@@ -135,7 +135,7 @@ START_TEST(test_encode_response)
 	len = sizeof(answerPacket) - 1; /* Skip extra null character */
 
 	fail_unless(strncmp(answerPacket, buf, sizeof(answerPacket)) == 0, "Did not compile expected packet");
-	fail_unless(ret == len, va_str("Bad packet length: %d, expected %d", ret, len));
+	fail_unless(ret == len, "Bad packet length: %d, expected %d", ret, len);
 }
 END_TEST
 
@@ -150,7 +150,7 @@ START_TEST(test_decode_response)
 
 	ret = dns_decode(buf, len, NULL, QR_ANSWER, answerPacket, sizeof(answerPacket)-1);
 	fail_unless(strncmp(msgData, buf, sizeof(msgData)) == 0, "Did not extract expected data");
-	fail_unless(ret == strlen(msgData), va_str("Bad data length: %d, expected %d", ret, strlen(msgData)));
+	fail_unless(ret == strlen(msgData), "Bad data length: %d, expected %d", ret, strlen(msgData));
 }
 END_TEST
 

@@ -23,10 +23,12 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <err.h>
+#include <grp.h>
 #include <pwd.h>
 #include <arpa/inet.h>
 #include <zlib.h>
@@ -75,6 +77,10 @@ static struct encoder *dataenc;
 
 /* result of case preservation check done after login */
 static int case_preserved;
+
+#if !defined(BSD) && !defined(__GLIBC__)
+static char *__progname;
+#endif
 
 static void
 sighandler(int sig) 
@@ -396,8 +402,11 @@ handshake(int dns_fd)
 		if(r > 0) {
 			read = read_dns(dns_fd, in, sizeof(in));
 			
-			if(read < 0) {
-				warn("handshake read");
+			if(read <= 0) {
+				if (read == 0) {
+					warn("handshake read");
+				}
+				/* if read < 0 then warning has been printed already */
 				continue;
 			}
 
@@ -602,7 +611,7 @@ static void
 version() {
 
 	printf("iodine IP over DNS tunneling client\n");
-	printf("version: 0.4.1 from 2007-11-30\n");
+	printf("version: 0.4.2 from 2008-08-06\n");
 
 	exit(0);
 }
@@ -630,6 +639,14 @@ main(int argc, char **argv)
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
 	
+#if !defined(BSD) && !defined(__GLIBC__)
+	__progname = strrchr(argv[0], '/');
+	if (__progname == NULL)
+		__progname = argv[0];
+	else
+		__progname++;
+#endif
+
 	while ((choice = getopt(argc, argv, "vfhu:t:d:P:")) != -1) {
 		switch(choice) {
 		case 'v':
@@ -687,8 +704,13 @@ main(int argc, char **argv)
 
 	set_nameserver(nameserv_addr);
 
-	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
-		warnx("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
+	if(strlen(topdomain) <= 128) {
+		if(check_topdomain(topdomain)) {
+			warnx("Topdomain contains invalid characters.\n");
+			usage();
+		}
+	} else {
+		warnx("Use a topdomain max 128 chars long.\n");
 		usage();
 	}
 
@@ -722,7 +744,9 @@ main(int argc, char **argv)
 		do_chroot(newroot);
 	
 	if (username != NULL) {
-		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
+		gid_t gids[1];
+		gids[0] = pw->pw_gid;
+		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
 			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}

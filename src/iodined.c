@@ -21,10 +21,12 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <err.h>
+#include <grp.h>
 #include <time.h>
 #include <pwd.h>
 #include <arpa/inet.h>
@@ -32,6 +34,10 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <zlib.h>
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser8_compat.h>
+#endif
 
 #include "common.h"
 #include "dns.h"
@@ -47,16 +53,32 @@ static char *topdomain;
 static char password[33];
 static struct encoder *b32;
 
+static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
 
-static int read_dns(int, struct query *, char *, int);
+static int debug;
+
+#if !defined(BSD) && !defined(__GLIBC__)
+static char *__progname;
+#endif
+
+static int read_dns(int, struct query *);
 static void write_dns(int, struct query *, char *, int);
 
 static void
 sigint(int sig) 
 {
 	running = 0;
+}
+
+static int
+ip_cmp(int userid, struct query *q)
+{
+	struct sockaddr_in *tempin;
+
+	tempin = (struct sockaddr_in *) &(q->from);
+	return memcmp(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
 }
 
 static int
@@ -118,34 +140,44 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *
 	out[5] = ((payload >> 16) & 0xff);
 	out[6] = ((payload >> 8) & 0xff);
 	out[7] = ((payload) & 0xff);
-	out[8] = u->id;
+	if (u) {
+		out[8] = u->id;
+	} else {
+		out[8] = 0;
+	}
 
 
 	write_dns(fd, &u->q, out, sizeof(out));
 }
 
-static int
-tunnel_dns(int tun_fd, int dns_fd)
+static void
+handle_null_request(int tun_fd, int dns_fd, struct query *q)
 {
 	struct in_addr tempip;
-	struct user dummy;
 	struct ip *hdr;
 	unsigned long outlen;
+	char in[64*1024];
 	char logindata[16];
 	char out[64*1024];
-	char in[64*1024];
 	char unpacked[64*1024];
 	char *tmp[2];
+	char *domain;
 	int userid;
 	int touser;
 	int version;
-	int read;
 	int code;
+	int read;
 
 	userid = -1;
-	if ((read = read_dns(dns_fd, &(dummy.q), in, sizeof(in))) <= 0)
-		return 0;
-				
+	domain = strstr(q->name, topdomain);
+	if (!domain) {
+		/* Not for us, discard */
+		return;
+	}
+	
+	read = (int) (domain - q->name); 
+	memcpy(in, q->name, MIN(read, sizeof(in)));
+
 	if(in[0] == 'V' || in[0] == 'v') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Version greeting, compare and send ack/nak */
@@ -160,34 +192,37 @@ tunnel_dns(int tun_fd, int dns_fd)
 		if (version == VERSION) {
 			userid = find_available_user();
 			if (userid >= 0) {
+				struct sockaddr_in *tempin;
+
 				users[userid].seed = rand();
-				memcpy(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen);
-				memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-				users[userid].addrlen = dummy.q.fromlen;
+				/* Store remote IP number */
+				tempin = (struct sockaddr_in *) &(q->from);
+				memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+				
+				memcpy(&(users[userid].q), q, sizeof(struct query));
 				users[userid].encoder = get_base32_encoder();
 				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
 				users[userid].q.id = 0;
 			} else {
 				/* No space for another user */
-				send_version_response(dns_fd, VERSION_FULL, USERS, &dummy);
+				send_version_response(dns_fd, VERSION_FULL, USERS, NULL);
 			}
 		} else {
-			send_version_response(dns_fd, VERSION_NACK, VERSION, &dummy);
+			send_version_response(dns_fd, VERSION_NACK, VERSION, NULL);
 		}
 	} else if(in[0] == 'L' || in[0] == 'l') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Login phase, handle auth */
 		userid = unpacked[0];
 		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
-			return 0; /* illegal id */
+			write_dns(dns_fd, q, "BADIP", 5);
+			return; /* illegal id */
 		}
 		users[userid].last_pkt = time(NULL);
 		login_calculate(logindata, 16, password, users[userid].seed);
 
-		if (dummy.q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
-			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
+		if (check_ip && ip_cmp(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5);
 		} else {
 			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
 				/* Login ok, send ip/mtu info */
@@ -200,31 +235,31 @@ tunnel_dns(int tun_fd, int dns_fd)
 				read = snprintf(out, sizeof(out), "%s-%s-%d", 
 						tmp[0], tmp[1], my_mtu);
 
-				write_dns(dns_fd, &(dummy.q), out, read);
-				dummy.q.id = 0;
+				write_dns(dns_fd, q, out, read);
+				q->id = 0;
 
 				free(tmp[1]);
 				free(tmp[0]);
 			} else {
-				write_dns(dns_fd, &(dummy.q), "LNAK", 4);
+				write_dns(dns_fd, q, "LNAK", 4);
 			}
 		}
 	} else if(in[0] == 'P' || in[0] == 'p') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
 		/* Ping packet, store userid */
 		userid = unpacked[0];
-		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
-			return 0; /* illegal id */
+		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5);
+			return; /* illegal id */
 		}
-		memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
+		memcpy(&(users[userid].q), q, sizeof(struct query));
 		users[userid].last_pkt = time(NULL);
 	} else if(in[0] == 'Z' || in[0] == 'z') {
 		/* Case conservation check */
 
 		/* Reply with received hostname as data */
-		write_dns(dns_fd, &(dummy.q), in, read);
-		return 0;
+		write_dns(dns_fd, q, in, read);
+		return;
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -237,22 +272,20 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 		userid = code >> 1;
 		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
-			return 0; /* illegal id */
+			write_dns(dns_fd, q, "BADIP", 5);
+			return; /* illegal id */
 		}
 
 		/* Check sending ip number */
-		if (dummy.q.fromlen != users[userid].addrlen ||
-				memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) != 0) {
-			write_dns(dns_fd, &(dummy.q), "BADIP", 5);
+		if (check_ip && ip_cmp(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5);
 		} else {
 			/* decode with this users encoding */
 			read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, 
 					   users[userid].encoder);
 
 			users[userid].last_pkt = time(NULL);
-			memcpy(&(users[userid].q), &(dummy.q), sizeof(struct query));
-			users[userid].addrlen = dummy.q.fromlen;
+			memcpy(&(users[userid].q), q, sizeof(struct query));
 			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, unpacked, read);
 			users[userid].inpacket.len += read;
 			users[userid].inpacket.offset += read;
@@ -281,13 +314,34 @@ tunnel_dns(int tun_fd, int dns_fd)
 		}
 	}
 	/* userid must be set for a reply to be sent */
-	if (userid >= 0 && userid < USERS && dummy.q.fromlen == users[userid].addrlen &&
-			memcmp(&(users[userid].host), &(dummy.q.from), dummy.q.fromlen) == 0 &&
-			users[userid].outpacket.len > 0) {
-
-		write_dns(dns_fd, &(dummy.q), users[userid].outpacket.data, users[userid].outpacket.len);
+	if (userid >= 0 && userid < USERS && ip_cmp(userid, q) == 0 && users[userid].outpacket.len > 0) {
+		write_dns(dns_fd, q, users[userid].outpacket.data, users[userid].outpacket.len);
 		users[userid].outpacket.len = 0;
 		users[userid].q.id = 0;
+	}
+}
+
+static int
+tunnel_dns(int tun_fd, int dns_fd)
+{
+	struct query q;
+	int read;
+
+	if ((read = read_dns(dns_fd, &q)) <= 0)
+		return 0;
+
+	if (debug >= 1) {
+		struct sockaddr_in *tempin;
+		tempin = (struct sockaddr_in *) &(q.from);
+		printf("RX: client %s, type %d, name %s\n", inet_ntoa(tempin->sin_addr), q.type, q.name);
+	}
+	
+	switch (q.type) {
+	case T_NULL:
+		handle_null_request(tun_fd, dns_fd, &q);
+		break;
+	default:
+		break;
 	}
 
 	return 0;
@@ -349,36 +403,28 @@ tunnel(int tun_fd, int dns_fd)
 }
 
 static int
-read_dns(int fd, struct query *q, char *buf, int buflen)
+read_dns(int fd, struct query *q)
 {
 	struct sockaddr_in from;
 	char packet[64*1024];
-	char *domain;
 	socklen_t addrlen;
-	int rv;
 	int r;
 
 	addrlen = sizeof(struct sockaddr);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 
 	if (r > 0) {
-		dns_decode(buf, buflen, q, QR_QUERY, packet, r);
-		domain = strstr(q->name, topdomain);
-		if (domain) {
-			rv = (int) (domain - q->name); 
-			memcpy(buf, q->name, MIN(rv, buflen));
-			q->fromlen = addrlen;
-			memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
-		} else {
-			rv = 0;
-		}
+		dns_decode(NULL, 0, q, QR_QUERY, packet, r);
+		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
+		q->fromlen = addrlen;
+
+		return strlen(q->name);
 	} else if (r < 0) { 
 		/* Error */
 		warn("read dns");
-		rv = 0;
 	}
 
-	return rv;
+	return 0;
 }
 
 static void
@@ -389,6 +435,13 @@ write_dns(int fd, struct query *q, char *data, int datalen)
 
 	len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
 	
+	if (debug >= 1) {
+		struct sockaddr_in *tempin;
+		tempin = (struct sockaddr_in *) &(q->from);
+		printf("TX: client %s, type %d, name %s, %d bytes data\n", 
+			inet_ntoa(tempin->sin_addr), q->type, q->name, datalen);
+	}
+
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
 
@@ -396,7 +449,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] [-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	exit(2);
@@ -407,12 +460,15 @@ help() {
 	extern char *__progname;
 
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] [-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
+	printf("  -c to disable check of client IP/port on each request\n");
+	printf("  -s to skip creating and configuring the tun device which then has to be created manually\n");
 	printf("  -f to keep running in foreground\n");
+	printf("  -D to increase debug level\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
 	printf("  -d device to set tunnel device name\n");
@@ -428,7 +484,7 @@ help() {
 static void
 version() {
 	printf("iodine IP over DNS tunneling server\n");
-	printf("version: 0.4.1 from 2007-11-30\n");
+	printf("version: 0.4.2 from 2008-08-06\n");
 	exit(0);
 }
 
@@ -446,6 +502,7 @@ main(int argc, char **argv)
 	int choice;
 	int port;
 	int mtu;
+	int skipipconfig;
 
 	username = NULL;
 	newroot = NULL;
@@ -454,22 +511,42 @@ main(int argc, char **argv)
 	mtu = 1024;
 	listen_ip = INADDR_ANY;
 	port = 53;
+	check_ip = 1;
+	skipipconfig = 0;
+	debug = 0;
 
 	b32 = get_base32_encoder();
+
+#if !defined(BSD) && !defined(__GLIBC__)
+	__progname = strrchr(argv[0], '/');
+	if (__progname == NULL)
+		__progname = argv[0];
+	else
+		__progname++;
+#endif
 
 	memset(password, 0, sizeof(password));
 	srand(time(NULL));
 	
-	while ((choice = getopt(argc, argv, "vfhu:t:d:m:l:p:P:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:P:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
+			break;
+		case 'c':
+			check_ip = 0;
+			break;
+		case 's':
+			skipipconfig = 1;
 			break;
 		case 'f':
 			foreground = 1;
 			break;
 		case 'h':
 			help();
+			break;
+		case 'D':
+			debug++;
 			break;
 		case 'u':
 			username = optarg;
@@ -488,10 +565,6 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			port = atoi(optarg);
-			if (port) {
-				printf("ALERT! Other dns servers expect you to run on port 53.\n");
-				printf("You must manually forward port 53 to port %d for things to work.\n", port);
-			}
 			break;
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
@@ -518,8 +591,13 @@ main(int argc, char **argv)
 		usage();
 
 	topdomain = strdup(argv[1]);
-	if (strlen(topdomain) > 128 || topdomain[0] == '.') {
-		warnx("Use a topdomain max 128 chars long. Do not start it with a dot.\n");
+	if(strlen(topdomain) <= 128) {
+		if(check_topdomain(topdomain)) {
+			warnx("Topdomain contains invalid characters.\n");
+			usage();
+		}
+	} else {
+		warnx("Use a topdomain max 128 chars long.\n");
 		usage();
 	}
 
@@ -530,9 +608,25 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (mtu == 0) {
+	if (mtu <= 0) {
 		warnx("Bad MTU given.\n");
 		usage();
+	}
+	
+	if(port < 1 || port > 65535) {
+		warnx("Bad port number given.\n");
+		usage();
+	}
+	
+	if (port != 53) {
+		printf("ALERT! Other dns servers expect you to run on port 53.\n");
+		printf("You must manually forward port 53 to port %d for things to work.\n", port);
+	}
+
+	if (debug) {
+		printf("Debug level %d enabled, will stay in foreground.\n", debug);
+		printf("Add more -D switches to set higher debug level.\n");
+		foreground = 1;
 	}
 
 	if (listen_ip == INADDR_NONE) {
@@ -545,8 +639,9 @@ main(int argc, char **argv)
 
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup0;
-	if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
-		goto cleanup1;
+	if (!skipipconfig)
+		if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
+			goto cleanup1;
 	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) 
 		goto cleanup2;
 
@@ -564,7 +659,9 @@ main(int argc, char **argv)
 
 	signal(SIGINT, sigint);
 	if (username != NULL) {
-		if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
+		gid_t gids[1];
+		gids[0] = pw->pw_gid;
+		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
 			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}
