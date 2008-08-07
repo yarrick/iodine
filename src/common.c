@@ -74,6 +74,14 @@ static int daemon(int nochdir, int noclose)
 }
 #endif
 
+#if defined(__BEOS__) && !defined(__HAIKU__)
+int setgroups(int count, int *groups)
+{
+	/* errno = ENOSYS; */
+	return -1;
+}
+#endif
+
 int 
 open_dns(int localport, in_addr_t listen_ip) 
 {
@@ -113,11 +121,15 @@ close_dns(int fd)
 void
 do_chroot(char *newroot)
 {
+#if !defined(__BEOS__) || defined(__HAIKU__)
 	if (chroot(newroot) != 0 || chdir("/") != 0)
 		err(1, "%s", newroot);
 
 	seteuid(geteuid());
 	setuid(getuid());
+#else
+	warnx("chroot not available");
+#endif
 }
 
 void
