@@ -12,6 +12,8 @@ CHANGES:
 	- The server now replies to all received queries.
 	- Fixed segfault in server when sending version reject.
 	- The interval between "pings" from clients is now 5 seconds.
+	- Eliminited extra "ping" messages from client to server when server
+		sends data and gets data back directly.
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
