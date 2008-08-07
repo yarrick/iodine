@@ -107,6 +107,13 @@ tunnel_tun(int tun_fd, int dns_fd)
 	if (users[userid].outpacket.len == 0) {
 		memcpy(users[userid].outpacket.data, out, outlen);
 		users[userid].outpacket.len = outlen;
+		if (users[userid].q.id != 0) {
+			/* If delayed response is kept, send reply immediately */
+			write_dns(dns_fd, &(users[userid].q), users[userid].outpacket.data, users[userid].outpacket.len);
+			users[userid].outpacket.len = 0;
+			users[userid].q.id = 0;
+			return 0;
+		}
 		return outlen;
 	} else {
 		return 0;
@@ -252,6 +259,12 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q)
 			write_dns(dns_fd, q, "BADIP", 5);
 			return; /* illegal id */
 		}
+		if (users[userid].q.id != 0) {
+			/* If delayed response is kept, send empty reply before overwriting */
+			write_dns(dns_fd, &(users[userid].q), users[userid].outpacket.data, users[userid].outpacket.len);
+			users[userid].outpacket.len = 0;
+			users[userid].q.id = 0;
+		}
 		memcpy(&(users[userid].q), q, sizeof(struct query));
 		users[userid].last_pkt = time(NULL);
 	} else if(in[0] == 'Z' || in[0] == 'z') {
@@ -285,6 +298,12 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q)
 					   users[userid].encoder);
 
 			users[userid].last_pkt = time(NULL);
+			if (users[userid].q.id != 0) {
+				/* If delayed response is kept, send empty reply before overwriting */
+				write_dns(dns_fd, &(users[userid].q), users[userid].outpacket.data, users[userid].outpacket.len);
+				users[userid].outpacket.len = 0;
+				users[userid].q.id = 0;
+			}
 			memcpy(&(users[userid].q), q, sizeof(struct query));
 			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, unpacked, read);
 			users[userid].inpacket.len += read;
@@ -353,16 +372,10 @@ tunnel(int tun_fd, int dns_fd)
 	struct timeval tv;
 	fd_set fds;
 	int i;
-	int j;
 
 	while (running) {
-		if (users_waiting_on_reply()) {
-			tv.tv_sec = 0;
-			tv.tv_usec = 5000;
-		} else {
-			tv.tv_sec = 1;
-			tv.tv_usec = 0;
-		}
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
 		/* TODO : use some kind of packet queue */
@@ -379,24 +392,14 @@ tunnel(int tun_fd, int dns_fd)
 			return 1;
 		}
 	
-		if (i==0) {	
-			for (j = 0; j < USERS; j++) {
-				if (users[j].q.id != 0) {
-					write_dns(dns_fd, &(users[j].q), users[j].outpacket.data, users[j].outpacket.len);
-					users[j].outpacket.len = 0;
-					users[j].q.id = 0;
-				}
-			}
-		} else {
-			if(FD_ISSET(tun_fd, &fds)) {
-				tunnel_tun(tun_fd, dns_fd);
-				continue;
-			}
-			if(FD_ISSET(dns_fd, &fds)) {
-				tunnel_dns(tun_fd, dns_fd);
-				continue;
-			} 
+		if(FD_ISSET(tun_fd, &fds)) {
+			tunnel_tun(tun_fd, dns_fd);
+			continue;
 		}
+		if(FD_ISSET(dns_fd, &fds)) {
+			tunnel_dns(tun_fd, dns_fd);
+			continue;
+		} 
 	}
 
 	return 0;
