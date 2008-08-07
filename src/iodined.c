@@ -127,7 +127,7 @@ typedef enum {
 } version_ack_t;
 
 static void
-send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *u)
+send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, struct query *q)
 {
 	char out[9];
 	
@@ -147,14 +147,9 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, struct user *
 	out[5] = ((payload >> 16) & 0xff);
 	out[6] = ((payload >> 8) & 0xff);
 	out[7] = ((payload) & 0xff);
-	if (u) {
-		out[8] = u->id;
-	} else {
-		out[8] = 0;
-	}
+	out[8] = userid & 0xff;
 
-
-	write_dns(fd, &u->q, out, sizeof(out));
+	write_dns(fd, q, out, sizeof(out));
 }
 
 static void
@@ -208,14 +203,14 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q)
 				
 				memcpy(&(users[userid].q), q, sizeof(struct query));
 				users[userid].encoder = get_base32_encoder();
-				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, &users[userid]);
+				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
 				users[userid].q.id = 0;
 			} else {
 				/* No space for another user */
-				send_version_response(dns_fd, VERSION_FULL, USERS, NULL);
+				send_version_response(dns_fd, VERSION_FULL, USERS, 0, q);
 			}
 		} else {
-			send_version_response(dns_fd, VERSION_NACK, VERSION, NULL);
+			send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
 		}
 	} else if(in[0] == 'L' || in[0] == 'l') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);

@@ -10,6 +10,7 @@ CHANGES:
 		server to client are now always fast instead of cycling from
 		fast to 1000 ms.
 	- The server now replies to all received queries.
+	- Fixed segfault in server when sending version reject.
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
