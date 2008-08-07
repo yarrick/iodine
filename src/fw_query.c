@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2008 Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,18 +14,36 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __DNS_H__
-#define __DNS_H__
+#include <string.h>
+#include "fw_query.h"
 
-#include "common.h"
+static struct fw_query fwq[FW_QUERY_CACHE_SIZE];
+static int fwq_ix;
 
-typedef enum {
-	QR_QUERY = 0,
-	QR_ANSWER = 1
-} qr_t;
+void fw_query_init()
+{
+	memset(fwq, 0, sizeof(struct fw_query) * FW_QUERY_CACHE_SIZE);
+	fwq_ix = 0;
+}
 
-int dns_encode(char *, size_t, struct query *, qr_t, char *, size_t);
-short dns_get_id(char *packet, size_t packetlen);
-int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);
+void fw_query_put(struct fw_query *fw_query)
+{
+	memcpy(&(fwq[fwq_ix]), fw_query, sizeof(struct fw_query));
+	
+	++fwq_ix;
+	if (fwq_ix >= FW_QUERY_CACHE_SIZE) 
+		fwq_ix = 0;
+}
 
-#endif /* _DNS_H_ */
+void fw_query_get(short query_id, struct fw_query **fw_query)
+{
+	int i;
+
+	*fw_query = NULL;
+	for (i = 0; i < FW_QUERY_CACHE_SIZE; i++) {
+		if (fwq[i].id == query_id) {
+			*fw_query = &(fwq[i]);
+			return;
+		}
+	}
+}

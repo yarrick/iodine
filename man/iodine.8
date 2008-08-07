@@ -157,10 +157,11 @@ To actually use it through a relaying nameserver, see below.
 .TP
 .B Server side:
 To use this tunnel, you need control over a real domain (like mytunnel.com),
-and a server with a static public IP number that does not yet run a DNS
-server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the server.
-If you use BIND for the domain, add these lines to the zone file (replace
-10.15.213.99 with your server ip):
+and a server with a public IP number. If the server already runs a DNS
+server, change the listening port and then use the \-b option to let
+iodined forward the DNS requests. Then, delegate a subdomain 
+(say, tunnel1.mytunnel.com) to the server. If you use BIND for the domain, 
+add these lines to the zone file (replace 10.15.213.99 with your server ip):
 
 .nf
 tunnel1host	IN	A	10.15.213.99

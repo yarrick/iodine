@@ -46,6 +46,7 @@
 #include "user.h"
 #include "login.h"
 #include "tun.h"
+#include "fw_query.h"
 #include "version.h"
 
 static int running = 1;
@@ -57,6 +58,7 @@ static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
 
+static int bind_port;
 static int debug;
 
 #if !defined(BSD) && !defined(__GLIBC__)
@@ -330,8 +332,82 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 	}
 }
 
+static void
+forward_query(int bind_fd, struct query *q)
+{
+	char buf[64*1024];
+	int len;
+	struct fw_query fwq;
+	struct sockaddr_in *myaddr;
+	in_addr_t newaddr;
+
+	len = dns_encode(buf, sizeof(buf), q, QR_QUERY, q->name, strlen(q->name));
+
+	/* Store sockaddr for q->id */
+	memcpy(&(fwq.addr), &(q->from), q->fromlen);
+	fwq.addrlen = q->fromlen;
+	fwq.id = q->id;
+	fw_query_put(&fwq);
+
+	newaddr = inet_addr("127.0.0.1");
+	myaddr = (struct sockaddr_in *) &(q->from);
+	memcpy(&(myaddr->sin_addr), &newaddr, sizeof(in_addr_t));
+	myaddr->sin_port = htons(bind_port);
+	
+	if (debug >= 1) {
+		printf("TX: send query %u to DNS (port %d)\n", (q->id & 0xffff), bind_port);
+	}
+
+	if (sendto(bind_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
+		warn("forward query error");
+	}
+}
+  
 static int
-tunnel_dns(int tun_fd, int dns_fd)
+tunnel_bind(int bind_fd, int dns_fd)
+{
+	char packet[64*1024];
+	struct sockaddr_in from;
+	socklen_t fromlen;
+	struct fw_query *query;
+	short id;
+	int r;
+
+	fromlen = sizeof(struct sockaddr);
+	r = recvfrom(bind_fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &fromlen);
+
+	if (r <= 0)
+		return 0;
+
+	id = dns_get_id(packet, r);
+	
+	if (debug >= 1) {
+		printf("RX: Got response on query %u from DNS\n", (id & 0xFFFF));
+	}
+
+	/* Get sockaddr from id */
+	fw_query_get(id, &query);
+	if (!query && debug >= 1) {
+		printf("Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
+		return 0;
+	}
+
+	if (debug >= 1) {
+		struct sockaddr_in *in;
+		in = (struct sockaddr_in *) &(query->addr);
+		printf("TX: client %s id %u, %d bytes\n",
+			inet_ntoa(in->sin_addr), (id & 0xffff), r);
+	}
+	
+	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr), query->addrlen) <= 0) {
+		warn("forward reply error");
+	}
+
+	return 0;
+}
+
+static int
+tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 {
 	struct query q;
 	int read;
@@ -368,29 +444,44 @@ tunnel_dns(int tun_fd, int dns_fd)
 		}
 	} else {
 		/* Forward query to other port ? */
+		if (bind_fd) {
+			forward_query(bind_fd, &q);
+		}
 	}
 	return 0;
 }
 
 static int
-tunnel(int tun_fd, int dns_fd)
+tunnel(int tun_fd, int dns_fd, int bind_fd)
 {
 	struct timeval tv;
 	fd_set fds;
 	int i;
 
 	while (running) {
+		int maxfd;
+
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
+
+		FD_SET(dns_fd, &fds);
+		maxfd = dns_fd;
+
+		if (bind_fd) {
+			/* wait for replies from real DNS */
+			FD_SET(bind_fd, &fds);
+			maxfd = MAX(bind_fd, maxfd);
+		}
+
 		/* TODO : use some kind of packet queue */
 		if(!all_users_waiting_to_send()) {
 			FD_SET(tun_fd, &fds);
+			maxfd = MAX(tun_fd, maxfd);
 		}
-		FD_SET(dns_fd, &fds);
 
-		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
+		i = select(maxfd + 1, &fds, NULL, NULL, &tv);
 		
 		if(i < 0) {
 			if (running) 
@@ -403,9 +494,13 @@ tunnel(int tun_fd, int dns_fd)
 			continue;
 		}
 		if(FD_ISSET(dns_fd, &fds)) {
-			tunnel_dns(tun_fd, dns_fd);
+			tunnel_dns(tun_fd, dns_fd, bind_fd);
 			continue;
 		} 
+		if(FD_ISSET(bind_fd, &fds)) {
+			tunnel_bind(bind_fd, dns_fd);
+			continue;
+		}
 	}
 
 	return 0;
@@ -459,7 +554,7 @@ usage() {
 	extern char *__progname;
 
 	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] [-t chrootdir] [-d device] [-m mtu] "
-		"[-l ip address to listen on] [-p port] [-P password]"
+		"[-l ip address to listen on] [-p port] [-b port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	exit(2);
 }
@@ -470,7 +565,7 @@ help() {
 
 	printf("iodine IP over DNS tunneling server\n");
 	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] [-t chrootdir] [-d device] [-m mtu] "
-		"[-l ip address to listen on] [-p port] [-P password]"
+		"[-l ip address to listen on] [-p port] [-b port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
@@ -484,6 +579,7 @@ help() {
 	printf("  -m mtu to set tunnel device mtu\n");
 	printf("  -l ip address to listen on for incoming dns traffic (default 0.0.0.0)\n");
 	printf("  -p port to listen on for incoming dns traffic (default 53)\n");
+	printf("  -b port to forward normal DNS queries to (on localhost)\n");
 	printf("  -P password used for authentication (max 32 chars will be used)\n");
 	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
 	printf("topdomain is the FQDN that is delegated to this server.\n");
@@ -510,6 +606,12 @@ main(int argc, char **argv)
 	char *device;
 	int dnsd_fd;
 	int tun_fd;
+
+	/* settings for forwarding normal DNS to 
+	 * local real DNS server */
+	int bind_fd;
+	int bind_enable;
+	
 	int choice;
 	int port;
 	int mtu;
@@ -519,6 +621,8 @@ main(int argc, char **argv)
 	newroot = NULL;
 	device = NULL;
 	foreground = 0;
+	bind_enable = 0;
+	bind_fd = 0;
 	mtu = 1024;
 	listen_ip = INADDR_ANY;
 	port = 53;
@@ -538,8 +642,9 @@ main(int argc, char **argv)
 
 	memset(password, 0, sizeof(password));
 	srand(time(NULL));
+	fw_query_init();
 	
-	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:P:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:b:P:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -576,6 +681,10 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			port = atoi(optarg);
+			break;
+		case 'b':
+			bind_enable = 1;
+			bind_port = atoi(optarg);
 			break;
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
@@ -629,6 +738,16 @@ main(int argc, char **argv)
 		usage();
 	}
 	
+	if(bind_enable) {
+		if (bind_port < 1 || bind_port > 65535 || bind_port == port) {
+			warnx("Bad DNS server port number given.\n");
+			usage();
+			/* NOTREACHED */
+		}
+		printf("Requests for domains outside of %s will be forwarded to port %d\n",
+			topdomain, bind_port);
+	}
+	
 	if (port != 53) {
 		printf("ALERT! Other dns servers expect you to run on port 53.\n");
 		printf("You must manually forward port 53 to port %d for things to work.\n", port);
@@ -655,6 +774,9 @@ main(int argc, char **argv)
 			goto cleanup1;
 	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) 
 		goto cleanup2;
+	if (bind_enable)
+		if ((bind_fd = open_dns(0, INADDR_ANY)) == -1)
+			goto cleanup3;
 
 	my_ip = inet_addr(argv[0]);
 	my_mtu = mtu;
@@ -678,8 +800,10 @@ main(int argc, char **argv)
 		}
 	}
 	
-	tunnel(tun_fd, dnsd_fd);
+	tunnel(tun_fd, dnsd_fd, bind_fd);
 
+cleanup3:
+	close_dns(bind_fd);
 cleanup2:
 	close_dns(dnsd_fd);
 cleanup1:
