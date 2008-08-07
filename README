@@ -28,9 +28,9 @@ HOW TO USE:
 
 Server side:
 To use this tunnel, you need control over a real domain (like mytunnel.com),
-and a server with a public IP number (not behind NAT) that does not yet run 
-a DNS server. Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the 
-server. If you use BIND for the domain, add these lines to the zone file:
+and a server with a public IP number that does not yet run a DNS server. 
+Then, delegate a subdomain (say, tunnel1.mytunnel.com) to the server. 
+If you use BIND for the domain, add these lines to the zone file:
 
 tunnel1host	IN	A	10.15.213.99
 tunnel1		IN	NS	tunnel1host.mytunnel.com.
