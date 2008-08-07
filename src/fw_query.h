@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2008 Erik Ekman <yarrick@kryo.se>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,18 +14,23 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __DNS_H__
-#define __DNS_H__
+#ifndef __FW_QUERY_H__
+#define __FW_QUERY_H__
 
-#include "common.h"
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
 
-typedef enum {
-	QR_QUERY = 0,
-	QR_ANSWER = 1
-} qr_t;
+#define FW_QUERY_CACHE_SIZE 16
 
-int dns_encode(char *, size_t, struct query *, qr_t, char *, size_t);
-short dns_get_id(char *packet, size_t packetlen);
-int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);
+struct fw_query {
+	struct sockaddr addr;
+	int addrlen;
+	short id;
+};
 
-#endif /* _DNS_H_ */
+void fw_query_init();
+void fw_query_put(struct fw_query *fw_query);
+void fw_query_get(short query_id, struct fw_query **fw_query);
+
+#endif /*__FW_QUERY_H__*/
+

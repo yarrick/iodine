@@ -98,6 +98,18 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 	return len;
 }
 
+short
+dns_get_id(char *packet, size_t packetlen)
+{
+	HEADER *header;
+	header = (HEADER*)packet;
+
+	if (packetlen < sizeof(HEADER))
+		return 0;
+
+	return ntohs(header->id);
+}
+
 int
 dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, size_t packetlen)
 {
