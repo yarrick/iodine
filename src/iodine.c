@@ -233,10 +233,6 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 	write_tun(tun_fd, out, outlen);
 
-	/* Server may have more data to send me, ask for it */
-	if (!is_sending()) 
-		send_ping(dns_fd);
-	
 	return read;
 }
 
@@ -247,12 +243,20 @@ tunnel(int tun_fd, int dns_fd)
 	fd_set fds;
 	int rv;
 	int i;
+	int short_ping;
 
 	rv = 0;
+	short_ping = 0;
 
 	while (running) {
-		tv.tv_sec = 5;
-		tv.tv_usec = 0;
+		if (short_ping) {
+			tv.tv_sec = 0;
+			tv.tv_usec = 5000;
+			short_ping = 0;
+		} else {
+			tv.tv_sec = 5;
+			tv.tv_usec = 0;
+		}
 
 		FD_ZERO(&fds);
 		if (!is_sending()) 
@@ -267,9 +271,9 @@ tunnel(int tun_fd, int dns_fd)
 		if (i < 0) 
 			err(1, "select");
 
-		if (i == 0) /* timeout */
+		if (i == 0) { /* timeout */
 			send_ping(dns_fd);
-		else {
+		} else {
 			if (FD_ISSET(tun_fd, &fds)) {
 				if (tunnel_tun(tun_fd, dns_fd) <= 0)
 					continue;
@@ -277,6 +281,10 @@ tunnel(int tun_fd, int dns_fd)
 			if (FD_ISSET(dns_fd, &fds)) {
 				if (tunnel_dns(tun_fd, dns_fd) <= 0)
 					continue;
+				/* If we have nothing to send within x ms, send a ping
+				 * to get more data from server */
+				if (!is_sending())
+					short_ping = 1;
 			} 
 		}
 	}
