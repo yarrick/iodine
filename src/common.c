@@ -104,6 +104,9 @@ open_dns(int localport, in_addr_t listen_ip)
 #endif
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
 
+	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
+	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, &flag, sizeof(flag));
+
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
 		err(1, "bind");
 
