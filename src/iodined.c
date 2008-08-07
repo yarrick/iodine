@@ -24,6 +24,7 @@
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <fcntl.h>
 #include <err.h>
 #include <grp.h>
