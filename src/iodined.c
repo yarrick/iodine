@@ -153,17 +153,16 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 }
 
 static void
-handle_null_request(int tun_fd, int dns_fd, struct query *q)
+handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 {
 	struct in_addr tempip;
 	struct ip *hdr;
 	unsigned long outlen;
-	char in[64*1024];
+	char in[512];
 	char logindata[16];
 	char out[64*1024];
 	char unpacked[64*1024];
 	char *tmp[2];
-	char *domain;
 	int userid;
 	int touser;
 	int version;
@@ -171,17 +170,11 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q)
 	int read;
 
 	userid = -1;
-	domain = strstr(q->name, topdomain);
-	if (!domain) {
-		/* Not for us, discard */
-		return;
-	}
-	
-	read = (int) (domain - q->name); 
-	memcpy(in, q->name, MIN(read, sizeof(in)));
+
+	memcpy(in, q->name, MIN(domain_len, sizeof(in)));
 
 	if(in[0] == 'V' || in[0] == 'v') {
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		/* Version greeting, compare and send ack/nak */
 		if (read > 4) { 
 			/* Received V + 32bits version */
@@ -212,8 +205,9 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q)
 		} else {
 			send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
 		}
+		return;
 	} else if(in[0] == 'L' || in[0] == 'l') {
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		/* Login phase, handle auth */
 		userid = unpacked[0];
 		if (userid < 0 || userid >= USERS) {
@@ -246,8 +240,9 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q)
 				write_dns(dns_fd, q, "LNAK", 4);
 			}
 		}
+		return;
 	} else if(in[0] == 'P' || in[0] == 'p') {
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, b32);
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		/* Ping packet, store userid */
 		userid = unpacked[0];
 		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
@@ -266,7 +261,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q)
 		/* Case conservation check */
 
 		/* Reply with received hostname as data */
-		write_dns(dns_fd, q, in, read);
+		write_dns(dns_fd, q, in, domain_len);
 		return;
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
@@ -289,7 +284,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q)
 			write_dns(dns_fd, q, "BADIP", 5);
 		} else {
 			/* decode with this users encoding */
-			read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), read - 1, 
+			read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, 
 					   users[userid].encoder);
 
 			users[userid].last_pkt = time(NULL);
@@ -340,6 +335,9 @@ tunnel_dns(int tun_fd, int dns_fd)
 {
 	struct query q;
 	int read;
+	char *domain;
+	int domain_len;
+	int inside_topdomain;
 
 	if ((read = read_dns(dns_fd, &q)) <= 0)
 		return 0;
@@ -350,14 +348,27 @@ tunnel_dns(int tun_fd, int dns_fd)
 		printf("RX: client %s, type %d, name %s\n", inet_ntoa(tempin->sin_addr), q.type, q.name);
 	}
 	
-	switch (q.type) {
-	case T_NULL:
-		handle_null_request(tun_fd, dns_fd, &q);
-		break;
-	default:
-		break;
+	domain = strstr(q.name, topdomain);
+	inside_topdomain = 0;
+	if (domain) {
+		domain_len = (int) (domain - q.name); 
+		if (domain_len + strlen(topdomain) == strlen(q.name)) {
+			inside_topdomain = 1;
+		}
 	}
-
+	
+	if (inside_topdomain) {
+		/* This is a query we can handle */
+		switch (q.type) {
+		case T_NULL:
+			handle_null_request(tun_fd, dns_fd, &q, domain_len);
+			break;
+		default:
+			break;
+		}
+	} else {
+		/* Forward query to other port ? */
+	}
 	return 0;
 }
 
