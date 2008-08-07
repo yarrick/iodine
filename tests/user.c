@@ -46,29 +46,6 @@ START_TEST(test_init_users)
 }
 END_TEST
 
-START_TEST(test_users_waiting)
-{
-	in_addr_t ip;
-
-	ip = inet_addr("127.0.0.1");
-	init_users(ip);
-
-	fail_unless(users_waiting_on_reply() == 0);
-
-	users[3].active = 1;
-
-	fail_unless(users_waiting_on_reply() == 0);
-
-	users[3].last_pkt = time(NULL);
-	
-	fail_unless(users_waiting_on_reply() == 0);
-	
-	users[3].q.id = 1;
-	
-	fail_unless(users_waiting_on_reply() == 1);
-}
-END_TEST
-
 START_TEST(test_find_user_by_ip)
 {
 	in_addr_t ip;
@@ -153,7 +130,6 @@ test_user_create_tests()
 
 	tc = tcase_create("User");
 	tcase_add_test(tc, test_init_users);
-	tcase_add_test(tc, test_users_waiting);
 	tcase_add_test(tc, test_find_user_by_ip);
 	tcase_add_test(tc, test_all_users_waiting_to_send);
 	tcase_add_test(tc, test_find_available_user);

@@ -35,7 +35,6 @@ struct user {
 extern struct user users[USERS];
 
 void init_users(in_addr_t);
-int users_waiting_on_reply();
 int find_user_by_ip(uint32_t);
 int all_users_waiting_to_send();
 int find_available_user();
