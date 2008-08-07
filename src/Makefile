@@ -9,7 +9,7 @@ OS = `uname | tr "a-z" "A-Z"`
 ARCH = `uname -m`
 
 LDFLAGS =  -lz `sh osflags link`
-CFLAGS = -c -g -Wall -D$(OS) -pedantic
+CFLAGS = -c -g -Wall -D$(OS) -pedantic `sh osflags cflags`
 
 all: stateos $(CLIENT) $(SERVER)
 

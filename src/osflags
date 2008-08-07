@@ -7,8 +7,21 @@ link)
 		SunOS | solaris)
 			echo '-lsocket -lnsl';
 		;;
+		BeOS)
+			echo '-lsocket -lbind -lbsd';
+		;;
+		Haiku)
+			echo '-lnetwork';
+		;;
 	esac
 	;;
+cflags)
+	case `uname` in
+		BeOS)
+			echo '-Dsocklen_t=int';
+		;;
+	esac
+;;
 *)
 ;;
 esac
