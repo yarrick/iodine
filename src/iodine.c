@@ -232,6 +232,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return -1;
 
 	write_tun(tun_fd, out, outlen);
+
+	/* Server may have more data to send me, ask for it */
 	if (!is_sending()) 
 		send_ping(dns_fd);
 	
@@ -249,7 +251,7 @@ tunnel(int tun_fd, int dns_fd)
 	rv = 0;
 
 	while (running) {
-		tv.tv_sec = 1;
+		tv.tv_sec = 5;
 		tv.tv_usec = 0;
 
 		FD_ZERO(&fds);
