@@ -420,18 +420,18 @@ handshake(int dns_fd)
 					seed = payload;
 					userid = in[8];
 
-					printf("Version ok, both running 0x%08x. You are user #%d\n", VERSION, userid);
+					printf("Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
 					goto perform_login;
 				} else if (strncmp("VNAK", in, 4) == 0) {
-					errx(1, "you run 0x%08x, server runs 0x%08x. giving up\n", 
+					errx(1, "You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
 							VERSION, payload);
 					/* NOTREACHED */
 				} else if (strncmp("VFUL", in, 4) == 0) {
-					errx(1, "server full, all %d slots are taken. try again later\n", payload);
+					errx(1, "Server full, all %d slots are taken. Try again later", payload);
 					/* NOTREACHED */
 				}
 			} else 
-				warnx("did not receive proper login challenge\n");
+				warnx("did not receive proper login challenge");
 		}
 		
 		printf("Retrying version check...\n");
