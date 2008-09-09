@@ -18,6 +18,7 @@ CHANGES:
 		from Francois Revol. Still work to do to get tun device working.
 	- Added capability to forward DNS queries outside tunnel domain to
 		a nameserver on localhost. Use -b port to enable.
+	- iodine client now shuts down if it detects a server restart.
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
