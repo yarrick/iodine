@@ -98,6 +98,85 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 	return len;
 }
 
+int
+dns_encode_ns_response(char *buf, size_t buflen, struct query *q, char *topdomain)
+{
+	HEADER *header;
+	int len;
+	short name;
+	short topname;
+	short nsname;
+	char *domain;
+	int domain_len;
+	char *p;
+
+	memset(buf, 0, buflen);
+	
+	header = (HEADER*)buf;
+	
+	header->id = htons(q->id);
+	header->qr = 1;
+	header->opcode = 0;
+	header->aa = 1;
+	header->tc = 0;
+	header->rd = 0;
+	header->ra = 0;
+
+	p = buf + sizeof(HEADER);
+
+	header->qdcount = htons(1);
+	header->ancount = htons(1);
+	header->arcount = htons(1);
+
+	/* pointer to start of name */
+	name = 0xc000 | ((p - buf) & 0x3fff);
+
+	domain = strstr(q->name, topdomain);
+	if (domain) {
+		domain_len = (int) (domain - q->name); 
+	} else {
+		return -1;
+	}
+	/* pointer to start of topdomain */
+	topname = 0xc000 | ((p - buf + domain_len) & 0x3fff);
+
+	/* Query section */
+	putname(&p, sizeof(q->name), q->name);	/* Name */
+	putshort(&p, q->type);			/* Type */
+	putshort(&p, C_IN);			/* Class */
+
+	/* Answer section */
+	putshort(&p, name);			/* Name */
+	putshort(&p, q->type);			/* Type */
+	putshort(&p, C_IN);			/* Class */
+	putlong(&p, 0x3ea7d011);		/* TTL */
+	putshort(&p, 5);			/* Data length */
+
+	/* pointer to ns.topdomain */
+	nsname = 0xc000 | ((p - buf) & 0x3fff);
+	putbyte(&p, 2);
+	putbyte(&p, 'n');
+	putbyte(&p, 's');
+	putshort(&p, topname);			/* Name Server */
+
+	/* Additional data (A-record of NS server) */
+	putshort(&p, nsname);			/* Name Server */
+	putshort(&p, T_A);			/* Type */
+	putshort(&p, C_IN);			/* Class */
+	putlong(&p, 0x3ea7d011);		/* TTL */
+	putshort(&p, 4);			/* Data length */
+
+	/* ugly hack to output IP address */
+	domain = (char *) &q->destination;
+	putbyte(&p, *domain++);
+	putbyte(&p, *domain++);
+	putbyte(&p, *domain++);
+	putbyte(&p, *domain);
+
+	len = p - buf;
+	return len;
+}
+
 short
 dns_get_id(char *packet, size_t packetlen)
 {
