@@ -334,6 +334,19 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 }
 
 static void
+handle_ns_request(int dns_fd, struct query *q)
+{
+	char buf[64*1024];
+	int len;
+
+	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
+	
+	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
+		warn("ns reply send error");
+	}
+}
+
+static void
 forward_query(int bind_fd, struct query *q)
 {
 	char buf[64*1024];
@@ -442,6 +455,9 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 		switch (q.type) {
 		case T_NULL:
 			handle_null_request(tun_fd, dns_fd, &q, domain_len);
+			break;
+		case T_NS:
+			handle_ns_request(dns_fd, &q);
 			break;
 		default:
 			break;
