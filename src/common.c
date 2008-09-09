@@ -1,4 +1,4 @@
-/* Copyright (c) 2006-2007 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+/* Copyright (c) 2006-2008 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
  * Copyright (c) 2007 Albert Lee <trisk@acm.jhu.edu>.
  *
  * Permission to use, copy, modify, and distribute this software for any
