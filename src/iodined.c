@@ -375,7 +375,8 @@ tunnel_bind(int bind_fd, int dns_fd)
 	int r;
 
 	fromlen = sizeof(struct sockaddr);
-	r = recvfrom(bind_fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &fromlen);
+	r = recvfrom(bind_fd, packet, sizeof(packet), 0, 
+		(struct sockaddr*)&from, &fromlen);
 
 	if (r <= 0)
 		return 0;
@@ -400,7 +401,8 @@ tunnel_bind(int bind_fd, int dns_fd)
 			inet_ntoa(in->sin_addr), (id & 0xffff), r);
 	}
 	
-	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr), query->addrlen) <= 0) {
+	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr), 
+		query->addrlen) <= 0) {
 		warn("forward reply error");
 	}
 
@@ -539,8 +541,12 @@ read_dns(int fd, struct query *q)
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 		q->fromlen = addrlen;
 		
-		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg)) { 
-			if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == DSTADDR_SOCKOPT) { 
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; 
+			cmsg = CMSG_NXTHDR(&msg, cmsg)) { 
+			
+			if (cmsg->cmsg_level == IPPROTO_IP && 
+				cmsg->cmsg_type == DSTADDR_SOCKOPT) { 
+				
 				q->destination = *dstaddr(cmsg); 
 				break;
 			} 
@@ -577,7 +583,8 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+		"[-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-b port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	exit(2);
@@ -588,20 +595,23 @@ help() {
 	extern char *__progname;
 
 	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] [-t chrootdir] [-d device] [-m mtu] "
+	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+		"[-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-b port] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -c to disable check of client IP/port on each request\n");
-	printf("  -s to skip creating and configuring the tun device which then has to be created manually\n");
+	printf("  -s to skip creating and configuring the tun device, "
+		"which then has to be created manually\n");
 	printf("  -f to keep running in foreground\n");
 	printf("  -D to increase debug level\n");
 	printf("  -u name to drop privileges and run as user 'name'\n");
 	printf("  -t dir to chroot to directory dir\n");
 	printf("  -d device to set tunnel device name\n");
 	printf("  -m mtu to set tunnel device mtu\n");
-	printf("  -l ip address to listen on for incoming dns traffic (default 0.0.0.0)\n");
+	printf("  -l ip address to listen on for incoming dns traffic "
+		"(default 0.0.0.0)\n");
 	printf("  -p port to listen on for incoming dns traffic (default 53)\n");
 	printf("  -b port to forward normal DNS queries to (on localhost)\n");
 	printf("  -P password used for authentication (max 32 chars will be used)\n");
