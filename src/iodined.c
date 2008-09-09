@@ -341,6 +341,12 @@ handle_ns_request(int dns_fd, struct query *q)
 
 	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
 	
+	if (debug >= 1) {
+		struct sockaddr_in *tempin;
+		tempin = (struct sockaddr_in *) &(q->from);
+		printf("TX: client %s, type %d, name %s, %d bytes NS reply\n", 
+			inet_ntoa(tempin->sin_addr), q->type, q->name, len);
+	}
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("ns reply send error");
 	}
@@ -369,7 +375,7 @@ forward_query(int bind_fd, struct query *q)
 	myaddr->sin_port = htons(bind_port);
 	
 	if (debug >= 1) {
-		printf("TX: send query %u to DNS (port %d)\n", (q->id & 0xffff), bind_port);
+		printf("TX: NS reply \n");
 	}
 
 	if (sendto(bind_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
