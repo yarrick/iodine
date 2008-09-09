@@ -422,7 +422,8 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	if (debug >= 1) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q.from);
-		printf("RX: client %s, type %d, name %s\n", inet_ntoa(tempin->sin_addr), q.type, q.name);
+		printf("RX: client %s, type %d, name %s\n", 
+			inet_ntoa(tempin->sin_addr), q.type, q.name);
 	}
 	
 	domain = strstr(q.name, topdomain);
