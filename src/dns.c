@@ -275,7 +275,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		break;
 	case QR_QUERY:
 		if (qdcount != 1) {
-			warnx("no query on query");
+			warnx("no question section in name query");
 			return -1;
 		}
 
