@@ -13,7 +13,8 @@ CHANGES:
 		a nameserver on localhost. Use -b port to enable.
 	- iodine client now shuts down if it detects a server restart.
 	- iodined now replies to NS request on its own domain, fixes issue #33.
-		The destination IP address is sent as reply.
+		The destination IP address is sent as reply. Use -n to specify
+		a specific IP address to return (if behind NAT etc).
 	- Upstream data is now Base64 encoded if relay server preserves case and
 		supports the plus (+) character in domain names, fixes #16.
 

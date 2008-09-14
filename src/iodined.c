@@ -60,6 +60,8 @@ static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
 
+static in_addr_t ns_ip;
+
 static int bind_port;
 static int debug;
 
@@ -353,6 +355,10 @@ handle_ns_request(int dns_fd, struct query *q)
 	char buf[64*1024];
 	int len;
 
+	if (ns_ip != INADDR_ANY) {
+		memcpy(&q->destination.s_addr, &ns_ip, sizeof(in_addr_t));
+	}
+
 	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
 	
 	if (debug >= 1) {
@@ -636,7 +642,7 @@ usage() {
 
 	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] "
-		"[-l ip address to listen on] [-p port] [-b port] [-P password]"
+		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	exit(2);
 }
@@ -648,7 +654,7 @@ help() {
 	printf("iodine IP over DNS tunneling server\n");
 	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] "
-		"[-l ip address to listen on] [-p port] [-b port] [-P password]"
+		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
 		" tunnel_ip topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
@@ -664,6 +670,7 @@ help() {
 	printf("  -l ip address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n");
 	printf("  -p port to listen on for incoming dns traffic (default 53)\n");
+	printf("  -n ip to respond with to NS queries\n");
 	printf("  -b port to forward normal DNS queries to (on localhost)\n");
 	printf("  -P password used for authentication (max 32 chars will be used)\n");
 	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
@@ -711,6 +718,7 @@ main(int argc, char **argv)
 	mtu = 1024;
 	listen_ip = INADDR_ANY;
 	port = 53;
+	ns_ip = INADDR_ANY;
 	check_ip = 1;
 	skipipconfig = 0;
 	debug = 0;
@@ -729,7 +737,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 	
-	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:b:P:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -767,6 +775,9 @@ main(int argc, char **argv)
 		case 'p':
 			port = atoi(optarg);
 			break;
+		case 'n':
+			ns_ip = inet_addr(optarg);
+			break;
 		case 'b':
 			bind_enable = 1;
 			bind_port = atoi(optarg);
@@ -794,6 +805,13 @@ main(int argc, char **argv)
 
 	if (argc != 2) 
 		usage();
+	
+	my_ip = inet_addr(argv[0]);
+	
+	if (my_ip == INADDR_NONE) {
+		warnx("Bad IP address to use inside tunnel.\n");
+		usage();
+	}
 
 	topdomain = strdup(argv[1]);
 	if(strlen(topdomain) <= 128) {
@@ -848,7 +866,12 @@ main(int argc, char **argv)
 		warnx("Bad IP address to listen on.\n");
 		usage();
 	}
-
+	
+	if (ns_ip == INADDR_NONE) {
+		warnx("Bad IP address to return as nameserver.\n");
+		usage();
+	}
+	
 	if (strlen(password) == 0)
 		read_password(password, sizeof(password));
 
@@ -863,7 +886,6 @@ main(int argc, char **argv)
 		if ((bind_fd = open_dns(0, INADDR_ANY)) == -1)
 			goto cleanup3;
 
-	my_ip = inet_addr(argv[0]);
 	my_mtu = mtu;
 	init_users(my_ip);
 
