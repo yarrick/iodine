@@ -27,17 +27,23 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodined [-c] [-s] [-f] [-D] [-u
 .I user
-.B ] [-P
-.I password
 .B ] [-t
 .I chrootdir
+.B ] [-d
+.I device
 .B ] [-m
 .I mtu
 .B ] [-l
 .I listen_ip
-.B ] [-d
-.I device
-.B ]
+.B ] [-p
+.I port
+.B ] [-n
+.I external ip
+.B ] [-b
+.I dnsport
+.B ] [-P
+.I password
+.B ] 
 .I tunnel_ip
 .I topdomain
 .SH DESCRIPTION
@@ -68,14 +74,14 @@ Drop privileges and run as user 'user' after setting up tunnel.
 .B -t chrootdir
 Chroot to 'chrootdir' after setting up tunnel.
 .TP
+.B -d device
+Use the TUN device 'device' instead of the normal one, which is dnsX on Linux
+and otherwise tunX.
+.TP
 .B -P password
 Use 'password' to authenticate. If not used, 
 .B stdin
 will be used as input. Only the first 32 characters will be used.
-.TP
-.B -d device
-Use the TUN device 'device' instead of the normal one, which is dnsX on Linux
-and otherwise tunX.
 .SS Server Options:
 .TP
 .B -c
@@ -100,6 +106,14 @@ connections.
 Make the server listen on 'port' instead of 53 for traffic. 
 .B Note:
 You must make sure the dns requests are forwarded to this port yourself.
+.TP
+.B -n external ip
+The IP address to return in NS responses. Default is to return the address used
+as destination in the query.
+.TP
+.B -b dnsport
+If this port is specified, all incoming requests not inside the tunnel domain
+will be forwarded to this port on localhost, to be handled by a real dns.
 .SS Client Arguments:
 .TP
 .B nameserver
