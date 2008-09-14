@@ -10,7 +10,7 @@ CHANGES:
 	- Applied patch to make iodine build on BeOS R5-BONE and Haiku,
 		from Francois Revol. Still work to do to get tun device working.
 	- Added capability to forward DNS queries outside tunnel domain to
-		a nameserver on localhost. Use -b port to enable.
+		a nameserver on localhost. Use -b port to enable, fixes #31.
 	- iodine client now shuts down if it detects a server restart.
 	- iodined now replies to NS request on its own domain, fixes issue #33.
 		The destination IP address is sent as reply. Use -n to specify
@@ -25,15 +25,15 @@ CHANGES:
 	- Applied a security patch from Andrew Griffiths, use setgroups() to
 		limit the groups of the user
 	- Applied a patch to make iodine build on (Open)Solaris, from Albert Lee
-		Needs TUN/TAP driver: http://www.whiteboard.ne.jp/~admin2/tuntap/
-		Still needs some more code in tun.c for opening/closing the device
-	- Added option in server (-c) to disable IP/port checking on each packet,
+		Needs TUN/TAP driver http://www.whiteboard.ne.jp/~admin2/tuntap/
+		Still needs more code in tun.c for opening/closing the device
+	- Added option in server (-c) to disable IP/port checking on packets,
 		will hopefully help when server is behind NAT
 	- Fixed bug #21, now only IP address part of each packet is checked.
 		Should remove the need for the -c option and also work with
 		bugfixed DNS servers worldwide.
-	- Added -D option on server to enable debugging. Debug level 1 now prints
-		info about each RX/TX datagram.
+	- Added -D option on server to enable debugging. Debug level 1 now 
+		prints info about each RX/TX datagram.
 
 2007-11-30: 0.4.1 "Tea Online"
 	- Introduced encoding API
