@@ -106,3 +106,11 @@ find_available_user()
 	return ret;
 }
 
+void
+user_switch_codec(int userid, struct encoder *enc)
+{
+	if (userid < 0 || userid >= USERS)
+		return;
+	
+	users[userid].encoder = enc;
+}

@@ -40,6 +40,7 @@
 #include "common.h"
 #include "encoding.h"
 #include "base32.h"
+#include "base64.h"
 #include "dns.h"
 #include "login.h"
 #include "tun.h"
@@ -146,13 +147,13 @@ build_hostname(char *buf, size_t buflen,
 	return space;
 }
 
-int
+static int
 is_sending()
 {
 	return (packet.len != 0);
 }
 
-int
+static int
 read_dns(int fd, char *buf, int buflen)
 {
 	struct sockaddr_in from;
@@ -324,7 +325,7 @@ send_chunk(int fd)
 	send_query(fd, buf);
 }
 
-void
+static void
 send_login(int fd, char *login, int len)
 {
 	char data[19];
@@ -361,7 +362,7 @@ send_ping(int fd)
 	send_packet(fd, 'P', data, sizeof(data));
 }
 
-void 
+static void 
 send_version(int fd, uint32_t version)
 {
 	char data[6];
@@ -379,11 +380,29 @@ send_version(int fd, uint32_t version)
 	send_packet(fd, 'V', data, sizeof(data));
 }
 
-void
+static void
 send_case_check(int fd)
 {
-	char buf[512] = "zZaAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyY123-4560789.";
+	/* The '+' plus character is not allowed according to RFC. 
+	 * Expect to get SERVFAIL or similar if it is rejected.
+	 */
+	char buf[512] = "zZ+-aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyY1234.";
 
+	strncat(buf, topdomain, 512 - strlen(buf));
+	send_query(fd, buf);
+}
+
+static void
+send_codec_switch(int fd, int userid, int bits)
+{
+	char buf[512] = "S00.";
+	if (userid >= 0 && userid < 9) {
+		buf[1] += userid;
+	}
+	if (bits >= 0 && bits < 9) {
+		buf[2] += bits;
+	}
+	
 	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, buf);
 }
@@ -519,30 +538,30 @@ perform_case_check:
 		if(r > 0) {
 			read = read_dns(dns_fd, in, sizeof(in));
 			
-			if(read <= 0) {
-				warn("read");
-				continue;
-			}
-
 			if (read > 0) {
 				if (in[0] == 'z' || in[0] == 'Z') {
-					if (read < (26 * 2)) {
-						printf("Received short case reply...\n");
+					if (read < (27 * 2)) {
+						printf("Received short case check reply. Will use base32 encoder\n");
+						goto switch_codec;
 					} else {
 						int k;
 
+						/* TODO enhance this, base128 is probably also possible */
 						case_preserved = 1;
-						for (k = 0; k < 26 && case_preserved; k += 2) {
+						for (k = 0; k < 27 && case_preserved; k += 2) {
 							if (in[k] == in[k+1]) {
-								/* test string: zZaAbBcCdD... */
+								/* test string: zZ+-aAbBcCdDeE... */
 								case_preserved = 0;
 							}
 						}
-						return 0;
+						goto switch_codec;
 					}
 				} else {
 					printf("Received bad case check reply\n");
 				}
+			} else {
+				printf("Got error on case check, will use base32\n");
+				goto switch_codec;
 			}
 		}
 
@@ -550,6 +569,52 @@ perform_case_check:
 	}
 
 	printf("No reply on case check, continuing\n");
+switch_codec:
+	if (!case_preserved)
+		return 0;
+
+	dataenc = get_base64_encoder();
+	printf("Switching to %s codec\n", dataenc->name);
+	/* Send to server that this user will use base64 from now on */
+	for (i=0; running && i<5 ;i++) {
+		int bits;
+		tv.tv_sec = i + 1;
+		tv.tv_usec = 0;
+
+		bits = 6; /* base64 = 6 bits per byte */
+
+		send_codec_switch(dns_fd, userid, bits);
+		
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = read_dns(dns_fd, in, sizeof(in));
+			
+			if (read > 0) {
+				if (strncmp("BADLEN", in, 6) == 0) {
+					printf("Server got bad message length. ");
+					goto codec_revert;
+				} else if (strncmp("BADIP", in, 5) == 0) {
+					printf("Server rejected sender IP address. ");
+					goto codec_revert;
+				} else if (strncmp("BADCODEC", in, 8) == 0) {
+					printf("Server rejected the selected codec. ");
+					goto codec_revert;
+				}
+				in[read] = 0; /* zero terminate */
+				printf("Server switched to codec %s\n", in);
+				return 0;
+			}
+		}
+		printf("Retrying codec switch...\n");
+	}
+	printf("No reply from server on codec switch. ");
+codec_revert: 
+	printf("Falling back to base32\n");
+	dataenc = get_base32_encoder();
 	return 0;
 }
 		
