@@ -28,7 +28,7 @@ static int reverse_init = 0;
 
 static struct encoder base32_encoder =
 {
-	"BASE32",
+	"Base32",
 	base32_encode,
 	base32_decode,
 	base32_handles_dots,
