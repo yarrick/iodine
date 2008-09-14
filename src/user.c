@@ -54,6 +54,23 @@ init_users(in_addr_t my_ip)
 }
 
 int
+users_waiting_on_reply()
+{
+	int ret;
+	int i;
+
+	ret = 0;
+	for (i = 0; i < USERS; i++) {
+		if (users[i].active && users[i].last_pkt + 60 > time(NULL) &&
+			users[i].q.id != 0) {
+			ret++;
+		}
+	}
+	
+	return ret;
+}
+
+int
 find_user_by_ip(uint32_t ip)
 {
 	int ret;
