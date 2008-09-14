@@ -6,14 +6,7 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 2008-xx-xx: 0.x.x
-	- Delayed sending responses in server to improve latency. Pings from
-		server to client are now always fast instead of cycling from
-		fast to 1000 ms.
-	- The server now replies to all received queries.
 	- Fixed segfault in server when sending version reject.
-	- The interval between "pings" from clients is now 5 seconds.
-	- Eliminited extra "ping" messages from client to server when server
-		sends data and gets data back directly.
 	- Applied patch to make iodine build on BeOS R5-BONE and Haiku,
 		from Francois Revol. Still work to do to get tun device working.
 	- Added capability to forward DNS queries outside tunnel domain to
