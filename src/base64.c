@@ -31,7 +31,7 @@ static int reverse_init = 0;
 
 static struct encoder base64_encoder =
 {
-	"BASE64",
+	"Base64",
 	base64_encode,
 	base64_decode,
 	base64_handles_dots,
