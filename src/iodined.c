@@ -44,6 +44,7 @@
 #include "dns.h"
 #include "encoding.h"
 #include "base32.h"
+#include "base64.h"
 #include "user.h"
 #include "login.h"
 #include "tun.h"
@@ -261,10 +262,42 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		memcpy(&(users[userid].q), q, sizeof(struct query));
 		users[userid].last_pkt = time(NULL);
 	} else if(in[0] == 'Z' || in[0] == 'z') {
-		/* Case conservation check */
+		/* Check for case conservation and chars not allowed according to RFC */
 
 		/* Reply with received hostname as data */
 		write_dns(dns_fd, q, in, domain_len);
+		return;
+	} else if(in[0] == 'S' || in[0] == 's') {
+		int codec;
+		struct encoder *enc;
+		if (domain_len != 4) { /* len = 4, example: "S15." */
+			write_dns(dns_fd, q, "BADLEN", 6);
+			return;
+		}
+
+		userid = in[1] & 0x7;
+		
+		if (ip_cmp(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5);
+			return; /* illegal id */
+		}
+		
+		codec = in[2] & 0xF;
+		switch (codec) {
+		case 5: /* 5 bits per byte = base32 */
+			enc = get_base32_encoder();
+			user_switch_codec(userid, enc);
+			write_dns(dns_fd, q, enc->name, strlen(enc->name));
+			break;
+		case 6: /* 6 bits per byte = base64 */
+			enc = get_base64_encoder();
+			user_switch_codec(userid, enc);
+			write_dns(dns_fd, q, enc->name, strlen(enc->name));
+			break;
+		default:
+			write_dns(dns_fd, q, "BADCODEC", 8);
+			break;
+		}
 		return;
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')

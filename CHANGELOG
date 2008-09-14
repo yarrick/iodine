@@ -21,6 +21,8 @@ CHANGES:
 	- iodine client now shuts down if it detects a server restart.
 	- iodined now replies to NS request on its own domain, fixes issue #33.
 		The destination IP address is sent as reply.
+	- Upstream data is now Base64 encoded if relay server preserves case and
+		supports the plus (+) character in domain names, fixes #16.
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
