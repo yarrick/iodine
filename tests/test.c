@@ -54,7 +54,7 @@ main()
 	suite_add_tcase(iodine, test);
 
 	runner = srunner_create(iodine);
-	srunner_run_all(runner, CK_MINIMAL);
+	srunner_run_all(runner, CK_NORMAL);
 	failed = srunner_ntests_failed(runner);
 
 	srunner_free(runner);
