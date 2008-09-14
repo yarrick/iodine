@@ -23,14 +23,11 @@
 #include "base64.h"
 
 static const char cb64[] = 
-	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789.";
+	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789+";
 static unsigned char rev64[128];
 static int reverse_init = 0;
 
 #define REV64(x) rev64[(int) (x)]
-#define MODE 	(cb64[62])
-#define P62	(cb64[62])
-#define P63	(cb64[63])
 
 static struct encoder base64_encoder =
 {
@@ -51,140 +48,6 @@ int
 base64_handles_dots()
 {
 	return 0;
-}
-
-static void
-findesc(int *count, unsigned char *esc, char c1, char c2, char c3, char c4)
-{
-	int min1 = 0;
-	int min2 = 0;
-
-	int num1 = 0xFF; /* a very big number */
-	int num2 = 0xFE; /* a nearly as big number */
-
-	int i;
-
-	/* check if no more escapes needed */
-	if (count[62] == 0 && count[63] == 0) {
-		esc[0] = MODE;
-		esc[1] = MODE;
-		return;
-	}
-
-	for (i = 0; i < 62; i++) {
-		if (i == c1 || i == c2 || i == c3 || i == c4) {
-			continue;
-		}
-
-		if (count[i] < num1) {
-			min2 = min1;
-			num2 = num1;
-			min1 = i;
-			num1 = count[i];
-		} else if (count[i] < num2) {
-			min2 = i;
-			num2 = count[i];
-		}
-	}
-
-	esc[0] = cb64[min1];
-	esc[1] = cb64[min2];
-}
-	
-static void
-escape_chars(char *buf, size_t buflen)
-{
-	int counter[64];
-	int escapes;
-	int reset;
-	int i;
-	unsigned char temp[4096];
-	unsigned char *r;
-	unsigned char *w;
-	unsigned char *e;
-	unsigned char esc[2];
-
-	memset(counter, 0, sizeof(counter));
-	esc[0] = P62;
-	esc[1] = P63;
-
-	/* first, find the number of times each token is used */
-	r = (unsigned char *) buf;
-	w = temp;
-	while (*r) {
-		counter[REV64(*r)]++;
-		*w++ = *r++;
-	}
-
-	/* check if work needed */
-	if (counter[62] == 0 && counter[63] == 0)
-		return;
-	
-	r = temp;
-	w = (unsigned char *) buf;
-	reset = 1;
-	escapes = 0;
-	/* check a block for esc chars */
-	while (*r) {
-		if (reset == 0 && escapes == 0 && (
-		    r[0] == esc[0] || r[1] == esc[0] ||r[2] == esc[0] ||r[2] == esc[0] ||
-		    r[0] == esc[1] || r[1] == esc[1] ||r[2] == esc[1] ||r[2] == esc[1])) {
-			/* last set of escape chars were unused.
-			 * if we reset last escape switch then maybe we dont have to switch now */
-
-			/* change the latest escape switch to 999 (RESET) */
-			e[1] = MODE;
-			e[2] = MODE;
-			 
-			/* store default esc chars */
-			esc[0] = P62;
-			esc[1] = P63;
-
-			reset = 1;
-		}
-		/* these two if blocks can not be combined because a block can contain both
-		 * char 9 and/or . and the current escape chars. */
-		if (r[0] == esc[0] || r[1] == esc[0] ||r[2] == esc[0] ||r[2] == esc[0] ||
-		    r[0] == esc[1] || r[1] == esc[1] ||r[2] == esc[1] ||r[2] == esc[1]) {
-			/* switch escape chars */
-			escapes = 0;
-			reset = 0;
-
-			/* find 2 suitable escape chars */
-			findesc(counter, esc, REV64(r[0]), REV64(r[1]), REV64(r[2]), REV64(r[3]));
-
-			/* store escape switch position */
-			e = w;
-
-			/* write new escape chars */
-			*w++ = MODE;
-			*w++ = esc[0];
-			*w++ = esc[1];
-		}
-		
-		/* update counter on remaining chars */
-		for (i = 0; i < 4; i++) {
-			if (r[i])
-				counter[REV64(r[i])]--;
-		}
-
-		/* do the escaping */
-		for (i = 0; i < 4; i++) {
-			if (r[i] == P62) {
-				r[i] = esc[0];
-				escapes++;
-			} else if (r[i] == P63) {
-				r[i] = esc[1];
-				escapes++;
-			}
-		}	
-		
-		/* copy back to buf */
-		*w++ = *r++;
-		*w++ = *r++;
-		*w++ = *r++;
-		*w++ = *r++;
-	}
 }
 
 int 
@@ -231,8 +94,6 @@ base64_encode(char *buf, size_t *buflen, const void *data, size_t size)
 	}	
 	*p = 0;
 
-	escape_chars(buf, *buflen);
-
 	/* store number of bytes from data that was used */
 	*buflen = size;
 
@@ -274,8 +135,6 @@ base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 	const char *p;
 	unsigned char c;
 	unsigned char block[4];
-	unsigned char prot62;
-	unsigned char prot63;
 	int len;
 	int i;
 
@@ -296,33 +155,12 @@ base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 		slen = maxsize;
 	}
 	
-	prot62 = P62;
-	prot63 = P63;
 
 	q = buf;
 	for (p = str; *p; p += 4) {
-		/* handle escape instructions */
-		if (*p == MODE) {
-			p++;
-			if (p[0] == MODE && p[1] == MODE) {
-				/* reset escape chars */
-				prot62 = P62;
-				prot63 = P63;
-				
-				p += 2;
-			} else {
-				prot62 = *p++;
-				prot63 = *p++;
-			}
-		}
 		/* since the str is const, we unescape in another buf */
 		for (i = 0; i < 4; i++) {
 			block[i] = p[i];
-			if (prot62 == block[i]) {
-				block[i] = P62;
-			} else if (prot63 == block[i]) {
-				block[i] = P63;
-			}
 		}
 		len = decode_token(block, (unsigned char *) q, slen);	
 		q += len;
