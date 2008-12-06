@@ -1,0 +1,98 @@
+Detailed specification of protocol in version 00000403
+======================================================
+
+This protocol varies a lot from earlier ones and will
+hopefully give cleaner code and enable more features.
+
+Common header:
+
+ 7654 3210
++----+----+
+|CCCC|UUUU|
++----+----+
+
+CCCC = Command
+UUUU = User id
+
+Commands:
+0: Version
+1: Login
+2: Case check
+3: Codec switch
+4: Data
+5: Ping
+6: -
+7: -
+8: -
+9: -
+A: -Reserved- (So header byte will never encode to a v)
+B: -
+C: -
+D: - 
+E: -
+F: -
+
+CMC = 2 byte Cache Miss Counter, increased every time it is used
+
+Version:
+Client sends:
+	Command = 0x0, User = 0xF
+	Data is 4 bytes big endian protocol version
+	Ends with CMC
+Server replies:
+	Command = 0x0, User = userid
+	Then 4 chars, followed by big endian int:
+		VACK (version ok), followed by login challenge
+		VNAK (version differs), followed by server protocol version
+		VFUL (server has no free slots), followed by max users
+	
+Login:
+Command = 0x1, User = userid from version reply
+Client sends:
+	16 bytes MD5 hash of: (first 32 bytes of password) xor (8 repetitions of login challenge)
+	Ends with CMC
+Server replies:
+	4 chars, then maybe three ints
+	LACK serverip clientip mtu means login accepted
+	LNAK means not accepted
+
+Case check:
+Command = 0x2, User = userid from version reply
+Client sends: 
+	Lots of data that should not be decoded
+Server replies:
+	The requested domain copied raw
+
+Switch codec:
+Command = 0x03, User = userid
+Client sends:
+	One byte, with value 5 or 6, representing number of bits per byte in encoding
+Server sends:
+	Name of codec if accepted. After this all upstream packets must be encoded with the new codec.
+	BADCODEC if not accepted. Client must then revert to Base64
+
+Data:
+Command = 0x04, User = userid
+Data header:
+	 76543210 7 6 543210
+	+--------+-+-+------+
+	|SSSSSSSS|L|C|FFFFFF|
+	+--------+-+-+------+
+
+SSSSSSSS = Packet sequence number
+L = Last fragment in packet flag
+C = Compression used flag
+FFFFFF = Fragment index in packet
+
+The data header is used both by the server and the client, followed by a fragment.
+Packet and fragment numbers are used to detect retransmits by dns relay.
+When a fragment arrives with L bit set, the packet should be pushed to the tun device.
+If the C bit is set, it should be decompressed before sent to tun device.
+
+Ping:
+Command = 0x04, User = userid
+Client sends:
+	Only a CMC
+Server replies:
+	With a Data packet or 0 bytes.
+
