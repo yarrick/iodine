@@ -30,20 +30,7 @@
 
 #define QUERY_NAME_SIZE 256
 
-#define MAKE_HEADER(c,u) ((((c) & 0xf) << 4) | ((u) & 0xf))
-#define HEADER_GET_COMMAND(h) (((h) & 0xf0) >> 4)
-#define HEADER_GET_USERID(h) ((h) & 0x0f)
-
-enum header_command {
-	CMD_VERSION = 0,
-	CMD_LOGIN,
-	CMD_CASE_CHECK,
-	CMD_CODEC_SWITCH,
-	CMD_DATA,
-	CMD_PING
-};
-
-#define DATAHEADER_TOTLEN 3
+#define DATAHEADER_TOTLEN 2
 #define MAKE_DATAHEADER(last,compressed,fragno) \
 	((((last) & 0x1) << 7) | (((compressed) & 0x1) << 6) | ((fragno) & 0x3f))
 
