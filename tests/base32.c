@@ -38,12 +38,15 @@ START_TEST(test_base32_encode)
 {
 	size_t len;
 	char buf[4096];
+	struct encoder *b32;
 	int val;
 	int i;
 
+	b32 = get_base32_encoder();
+
 	for (i = 0; testpairs[i].a != NULL; i++) {
 		len = sizeof(buf);
-		val = base32_encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
+		val = b32->encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
 
 		fail_unless(val > 0, strerror(errno));
 		fail_unless(strcmp(buf, testpairs[i].b) == 0,
@@ -56,12 +59,15 @@ START_TEST(test_base32_decode)
 {
 	size_t len;
 	char buf[4096];
+	struct encoder *b32;
 	int val;
 	int i;
+	
+	b32 = get_base32_encoder();
 
 	for (i = 0; testpairs[i].a != NULL; i++) {
 		len = sizeof(buf);
-		val = base32_decode(buf, &len, testpairs[i].b, strlen(testpairs[i].b));
+		val = b32->decode(buf, &len, testpairs[i].b, strlen(testpairs[i].b));
 
 		fail_unless(val > 0, strerror(errno));
 		fail_unless(buf != NULL, "buf == NULL");

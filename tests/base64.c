@@ -66,12 +66,15 @@ START_TEST(test_base64_encode)
 {
 	size_t len;
 	char buf[4096];
+	struct encoder *b64;
 	int val;
 	int i;
 
+	b64 = get_base64_encoder();
+
 	for (i = 0; testpairs[i].a != NULL; i++) {
 		len = sizeof(buf);
-		val = base64_encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
+		val = b64->encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
 
 		fail_unless(val > 0, strerror(errno));
 		fail_unless(strcmp(buf, testpairs[i].b) == 0,
@@ -84,12 +87,15 @@ START_TEST(test_base64_decode)
 {
 	size_t len;
 	char buf[4096];
+	struct encoder *b64;
 	int val;
 	int i;
 
+	b64 = get_base64_encoder();
+
 	for (i = 0; testpairs[i].a != NULL; i++) {
 		len = sizeof(buf);
-		val = base64_decode(buf, &len, testpairs[i].b, strlen(testpairs[i].b));
+		val = b64->decode(buf, &len, testpairs[i].b, strlen(testpairs[i].b));
 
 		fail_unless(val > 0, strerror(errno));
 		fail_unless(buf != NULL, "buf == NULL");
