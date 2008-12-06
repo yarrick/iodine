@@ -11,7 +11,6 @@ CHANGES:
 		from Francois Revol. Still work to do to get tun device working.
 	- Added capability to forward DNS queries outside tunnel domain to
 		a nameserver on localhost. Use -b port to enable, fixes #31.
-	- iodine client now shuts down if it detects a server restart.
 	- iodined now replies to NS request on its own domain, fixes issue #33.
 		The destination IP address is sent as reply. Use -n to specify
 		a specific IP address to return (if behind NAT etc).

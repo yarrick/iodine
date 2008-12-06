@@ -227,12 +227,6 @@ tunnel_dns(int tun_fd, int dns_fd)
 	if ((read = read_dns(dns_fd, in, sizeof(in))) <= 0) 
 		return -1;
 		
-	if (read == 5 && strncmp("BADIP", in, 5) == 0) {
-		errx(3, "Not recognized by server. "
-			"Has it been restarted? Aborting");
-		/* NOTREACHED */
-	}
-
 	outlen = sizeof(out);
 	inlen = read;
 	if (uncompress((uint8_t*)out, &outlen, (uint8_t*)in, inlen) != Z_OK) {
