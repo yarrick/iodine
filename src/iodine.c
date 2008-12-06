@@ -69,7 +69,10 @@ static char userid;
 /* DNS id for next packet */
 static uint16_t chunkid;
 
-/* The encoder used for packets
+/* Base32 encoder used for non-data packets */
+static struct encoder *b32;
+
+/* The encoder used for data packets
  * Defaults to Base32, can be changed after handshake */
 static struct encoder *dataenc;
 
@@ -102,11 +105,13 @@ send_query(int fd, char *hostname)
 }
 
 static void
-send_packet(int fd, const char *data, const size_t datalen)
+send_packet(int fd, char cmd, const char *data, const size_t datalen)
 {
 	char buf[4096];
-	/* Encode the data and add the topdomain */
-	build_hostname(buf, sizeof(buf), data, datalen, topdomain, dataenc);
+
+	buf[0] = cmd;
+	
+	build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain, b32);
 	send_query(fd, buf);
 }
 
@@ -115,6 +120,7 @@ build_hostname(char *buf, size_t buflen,
 		const char *data, const size_t datalen, 
 		const char *topdomain, struct encoder *encoder)
 {
+	int encsize;
 	size_t space;
 	char *b;
 
@@ -125,7 +131,7 @@ build_hostname(char *buf, size_t buflen,
 
 	memset(buf, 0, buflen);
 	
-	encoder->encode(buf, &space, data, datalen);
+	encsize = encoder->encode(buf, &space, data, datalen);
 
 	if (!encoder->places_dots())
 		inline_dotify(buf, buflen);
@@ -203,8 +209,6 @@ tunnel_tun(int tun_fd, int dns_fd)
 	packet.sentlen = 0;
 	packet.offset = 0;
 	packet.len = outlen;
-	packet.seqno++;
-	packet.fragment = 0;
 
 	send_chunk(dns_fd);
 
@@ -283,51 +287,26 @@ tunnel(int tun_fd, int dns_fd)
 static void
 send_chunk(int fd)
 {
-	char buf[2048];
-	char header[64];
-	char headerenc[64];
+	char hex[] = "0123456789ABCDEF";
+	char buf[4096];
 	int avail;
+	int code;
 	char *p;
-	int rawblock;
-	int headerblocks;
-	int pkt_encoffset;
-	int buf_encoffset;
-	int sentlen;
-	int i;
-	size_t enclen;
 
-	rawblock = dataenc->blocksize_raw();
-
-	headerblocks = 1;
-	while (headerblocks * rawblock < DATAHEADER_TOTLEN) {
-		headerblocks++;
-	}
-	rawblock *= headerblocks;
-
-	pkt_encoffset = rawblock - DATAHEADER_TOTLEN;
-	buf_encoffset = dataenc->blocksize_encoded() * headerblocks;
-
-	/* Encode all of the message except the first headerblocks block */
 	p = packet.data;
 	p += packet.offset;
-	avail = packet.len - packet.offset + pkt_encoffset;
-	sentlen = build_hostname(buf + buf_encoffset, sizeof(buf) - buf_encoffset, 
-		&p[pkt_encoffset], avail, topdomain, dataenc);
+	avail = packet.len - packet.offset;
 
-	packet.sentlen = sentlen + pkt_encoffset;
+	packet.sentlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
 
-	/* Then encode the header and maybe some pkt data */
-	header[0] = MAKE_HEADER(CMD_DATA, userid);
-	header[1] = packet.seqno;
-	header[2] = MAKE_DATAHEADER(avail == sentlen, 1, packet.fragment++);
-	for (i = 0; i < pkt_encoffset; i++) {
-		header[i + DATAHEADER_TOTLEN] = p[i];
-	}
-	/* Encode the first part, copy it into the buffer */
-	dataenc->encode(headerenc, &enclen, header, DATAHEADER_TOTLEN + pkt_encoffset);
-	for (i = 0; i < enclen; i++) {
-		buf[i] = headerenc[i];
-	}
+	if (packet.sentlen == avail)
+		code = 1;
+	else
+		code = 0;
+		
+	code |= (userid << 1);
+	buf[0] = hex[code];
+
 	send_query(fd, buf);
 }
 
@@ -337,7 +316,7 @@ send_login(int fd, char *login, int len)
 	char data[19];
 
 	memset(data, 0, sizeof(data));
-	data[0] = MAKE_HEADER(CMD_LOGIN, userid);
+	data[0] = userid;
 	memcpy(&data[1], login, MIN(len, 16));
 
 	data[17] = (rand_seed >> 8) & 0xff;
@@ -345,7 +324,7 @@ send_login(int fd, char *login, int len)
 	
 	rand_seed++;
 
-	send_packet(fd, data, sizeof(data));
+	send_packet(fd, 'L', data, sizeof(data));
 }
 
 static void
@@ -359,32 +338,31 @@ send_ping(int fd)
 		packet.len = 0;
 	}
 
-	data[0] = MAKE_HEADER(CMD_PING, userid);
+	data[0] = userid;
 	data[1] = (rand_seed >> 8) & 0xff;
 	data[2] = (rand_seed >> 0) & 0xff;
 	
 	rand_seed++;
 
-	send_packet(fd, data, sizeof(data));
+	send_packet(fd, 'P', data, sizeof(data));
 }
 
 static void 
 send_version(int fd, uint32_t version)
 {
-	char data[7];
+	char data[6];
 
-	data[0] = MAKE_HEADER(CMD_VERSION, 0xf);
-	data[1] = (version >> 24) & 0xff;
-	data[2] = (version >> 16) & 0xff;
-	data[3] = (version >> 8) & 0xff;
-	data[4] = (version >> 0) & 0xff;
+	data[0] = (version >> 24) & 0xff;
+	data[1] = (version >> 16) & 0xff;
+	data[2] = (version >> 8) & 0xff;
+	data[3] = (version >> 0) & 0xff;
 
-	data[5] = (rand_seed >> 8) & 0xff;
-	data[6] = (rand_seed >> 0) & 0xff;
+	data[4] = (rand_seed >> 8) & 0xff;
+	data[5] = (rand_seed >> 0) & 0xff;
 	
 	rand_seed++;
 
-	send_packet(fd, data, sizeof(data));
+	send_packet(fd, 'V', data, sizeof(data));
 }
 
 static void
@@ -393,15 +371,7 @@ send_case_check(int fd)
 	/* The '+' plus character is not allowed according to RFC. 
 	 * Expect to get SERVFAIL or similar if it is rejected.
 	 */
-	char buf[512] = "__zZ+-aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyY1234.";
-	char header = MAKE_HEADER(CMD_CASE_CHECK, userid);
-	char enc[5];
-	unsigned enclen;
-
-	dataenc->encode(enc, &enclen, &header, 1);
-	/* Encode header into start of message */
-	buf[0] = enc[0];
-	buf[1] = enc[1];
+	char buf[512] = "zZ+-aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyY1234.";
 
 	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, buf);
@@ -410,12 +380,16 @@ send_case_check(int fd)
 static void
 send_codec_switch(int fd, int userid, int bits)
 {
-	char data[2];
-
-	data[0] = MAKE_HEADER(CMD_VERSION, 0xf);
-	data[1] = bits & 0xff;
-
-	send_packet(fd, data, sizeof(data));
+	char buf[512] = "S00.";
+	if (userid >= 0 && userid < 9) {
+		buf[1] += userid;
+	}
+	if (bits >= 0 && bits < 9) {
+		buf[2] += bits;
+	}
+	
+	strncat(buf, topdomain, 512 - strlen(buf));
+	send_query(fd, buf);
 }
 
 static int
@@ -731,10 +705,8 @@ main(int argc, char **argv)
 	device = NULL;
 	chunkid = 0;
 
+	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
-
-	packet.seqno = 0;
-	packet.fragment = 0;
 	
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
