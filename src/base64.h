@@ -18,8 +18,5 @@
 #define __BASE64_H__
 
 struct encoder *get_base64_encoder(void);
-int base64_handles_dots();
-int base64_encode(char *, size_t *, const void *, size_t);
-int base64_decode(void *, size_t *, const char *, size_t);
 
 #endif

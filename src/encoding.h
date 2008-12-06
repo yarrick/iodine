@@ -23,6 +23,8 @@ struct encoder {
 	int (*decode) (void *, size_t *, const char *, size_t);
 	int (*places_dots) (void);
 	int (*eats_dots) (void);
+	int (*blocksize_raw)(void);
+	int (*blocksize_encoded)(void);
 };
 
 int unpack_data(char *, size_t, char *, size_t, struct encoder *);
