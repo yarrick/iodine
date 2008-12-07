@@ -1,4 +1,4 @@
-Detailed specification of protocol in version 00000403
+Detailed specification of protocol in version 00000402
 ======================================================
 
 CMC = 2 byte Cache Miss Counter, increased every time it is used
