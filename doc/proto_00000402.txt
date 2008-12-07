@@ -35,15 +35,6 @@ Client sends:
 Server replies:
 	The requested domain copied raw
 
-Switch codec:
-Client sends:
-	First byte s or S
-	One byte ASCII digit, meaning userid
-	One byte ASCII digit, with value 5 or 6, representing number of bits per byte in encoding
-Server sends:
-	Name of codec if accepted. After this all upstream data packets must be encoded with the new codec.
-	BADCODEC if not accepted. Client must then revert to Base32
-
 Data:
 Data header:
 	 321 0 
@@ -55,7 +46,7 @@ UUU = Userid
 L = Last fragment in packet flag
 
 First 4 bits coded as hex in ASCII. 
-Followed by data encoded with the chosen codec.
+Followed by data encoded with Base32.
 
 Ping:
 Command = 0x04, User = userid
