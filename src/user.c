@@ -50,6 +50,8 @@ init_users(in_addr_t my_ip)
 		users[i].inpacket.offset = 0;
 		users[i].outpacket.len = 0;
 		users[i].q.id = 0;
+		users[i].out_acked_seqno = 0;
+		users[i].out_acked_fragment = 0;
 	}
 }
 

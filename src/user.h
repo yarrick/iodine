@@ -17,7 +17,7 @@
 #ifndef __USER_H__
 #define __USER_H__
 
-#define USERS 8
+#define USERS 16
 
 struct user {
 	char id;
@@ -30,6 +30,8 @@ struct user {
 	struct packet inpacket;
 	struct packet outpacket;
 	struct encoder *encoder;
+	int out_acked_seqno;
+	int out_acked_fragment;
 };
 
 extern struct user users[USERS];

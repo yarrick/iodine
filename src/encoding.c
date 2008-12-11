@@ -35,7 +35,7 @@ inline_dotify(char *buf, size_t buflen)
 	char *reader, *writer;
 
 	total = strlen(buf);
-	dots = total / 62;
+	dots = total / 57;
 
 	writer = buf;
 	writer += total;
@@ -52,7 +52,7 @@ inline_dotify(char *buf, size_t buflen)
 	pos = (unsigned) (reader - buf) + 1;
 
 	while (dots) {
-		if (pos % 62 == 0) {
+		if (pos % 57 == 0) {
 			*writer-- = '.';
 			dots--;
 		}

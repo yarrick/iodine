@@ -152,6 +152,33 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 }
 
 static void
+update_downstream_seqno(int dns_fd, int userid, int down_seq, int down_frag)
+{
+	/* update outgoing seqno/frag */
+	if (down_seq != users[userid].out_acked_seqno) {
+		/* First ack on new outgoing packet */
+		users[userid].out_acked_seqno = down_seq;
+		users[userid].out_acked_fragment = down_frag;
+	} else {
+		if (down_frag > users[userid].out_acked_fragment) {
+			/* Ack on later fragment */
+			users[userid].out_acked_fragment = down_frag;
+		}
+	}
+
+	/* Send reply if waiting */
+	if (users[userid].outpacket.len > 0) {
+		if (debug >= 1) {
+			printf("OUT pkt seq# %d, frag %d (last=%d), fragsize %d of total %d, to user %d\n",
+				0, 0, 1, users[userid].outpacket.len, users[userid].outpacket.len, userid);
+		}
+		write_dns(dns_fd, &users[userid].q, users[userid].outpacket.data, users[userid].outpacket.len);
+		users[userid].outpacket.len = 0;
+		users[userid].q.id = 0;
+	}
+}
+
+static void
 handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 {
 	struct in_addr tempip;
@@ -240,16 +267,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			}
 		}
 		return;
-	} else if(in[0] == 'P' || in[0] == 'p') {
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
-		/* Ping packet, store userid */
-		userid = unpacked[0];
-		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5);
-			return; /* illegal id */
-		}
-		memcpy(&(users[userid].q), q, sizeof(struct query));
-		users[userid].last_pkt = time(NULL);
 	} else if(in[0] == 'Z' || in[0] == 'z') {
 		/* Check for case conservation and chars not allowed according to RFC */
 
@@ -264,14 +281,15 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			return;
 		}
 
-		userid = in[1] & 0x7;
+		userid = b32_8to5(in[1]);
 		
 		if (ip_cmp(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
 			return; /* illegal id */
 		}
 		
-		codec = in[2] & 0xF;
+		codec = b32_8to5(in[2]);
+
 		switch (codec) {
 		case 5: /* 5 bits per byte = base32 */
 			enc = get_base32_encoder();
@@ -288,6 +306,25 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			break;
 		}
 		return;
+	} else if(in[0] == 'P' || in[0] == 'p') {
+		int dn_seq;
+		int dn_frag;
+		
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
+		/* Ping packet, store userid */
+		userid = unpacked[0];
+		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5);
+			return; /* illegal id */
+		}
+
+		dn_seq = unpacked[1] >> 4;
+		dn_frag = unpacked[1] & 15;
+		memcpy(&(users[userid].q), q, sizeof(struct query));
+		users[userid].last_pkt = time(NULL);
+
+		/* Update seqno and maybe send immediate response packet */
+		update_downstream_seqno(dns_fd, userid, dn_seq, dn_frag);
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {
@@ -298,7 +335,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		if ((in[0] >= 'A' && in[0] <= 'F'))
 			code = in[0] - 'A' + 10;
 
-		userid = code >> 1;
+		userid = code;
 		if (userid < 0 || userid >= USERS) {
 			write_dns(dns_fd, q, "BADIP", 5);
 			return; /* illegal id */
@@ -308,44 +345,68 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		if (check_ip && ip_cmp(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
 		} else {
-			/* decode with this users encoding */
-			read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, 
-					   users[userid].encoder);
+			/* Decode data header */
+			int up_seq = (b32_8to5(in[1]) >> 2) & 7;
+			int up_frag = ((b32_8to5(in[1]) & 3) << 2) | ((b32_8to5(in[2]) >> 3) & 3);
+			int dn_seq = (b32_8to5(in[2]) & 7);
+			int dn_frag = b32_8to5(in[3]) >> 1;
+			int lastfrag = b32_8to5(in[3]) & 1;
 
+			/* Update query and time info for user */
 			users[userid].last_pkt = time(NULL);
 			memcpy(&(users[userid].q), q, sizeof(struct query));
+
+			if (up_seq != users[userid].inpacket.seqno) {
+				/* New packet has arrived */
+				users[userid].inpacket.seqno = up_seq;
+				users[userid].inpacket.len = 0;
+				users[userid].inpacket.offset = 0;
+			}
+			users[userid].inpacket.fragment = up_frag;
+
+			/* decode with this users encoding */
+			read = unpack_data(unpacked, sizeof(unpacked), &(in[4]), domain_len - 4, 
+					   users[userid].encoder);
+
+			/* copy to packet buffer, update length */
 			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, unpacked, read);
 			users[userid].inpacket.len += read;
 			users[userid].inpacket.offset += read;
 
-			if (code & 1) {
+			if (debug >= 1) {
+				printf("IN  pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
+					up_seq, up_frag, lastfrag, read, users[userid].inpacket.len, userid);
+			}
+
+			if (lastfrag & 1) { /* packet is complete */
+				int ret;
 				outlen = sizeof(out);
-				uncompress((uint8_t*)out, &outlen, 
-						   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
+				ret = uncompress((uint8_t*)out, &outlen, 
+					   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
 
-				hdr = (struct ip*) (out + 4);
-				touser = find_user_by_ip(hdr->ip_dst.s_addr);
+				if (ret == Z_OK) {
+					hdr = (struct ip*) (out + 4);
+					touser = find_user_by_ip(hdr->ip_dst.s_addr);
 
-				if (touser == -1) {
-					/* send the uncompressed packet to tun device */
-					write_tun(tun_fd, out, outlen);
-				} else {
-					/* send the compressed packet to other client
-					 * if another packet is queued, throw away this one. TODO build queue */
-					if (users[touser].outpacket.len == 0) {
-						memcpy(users[touser].outpacket.data, users[userid].inpacket.data, users[userid].inpacket.len);
-						users[touser].outpacket.len = users[userid].inpacket.len;
+					if (touser == -1) {
+						/* send the uncompressed packet to tun device */
+						write_tun(tun_fd, out, outlen);
+					} else {
+						/* send the compressed packet to other client
+						 * if another packet is queued, throw away this one. TODO build queue */
+						if (users[touser].outpacket.len == 0) {
+							memcpy(users[touser].outpacket.data, users[userid].inpacket.data, users[userid].inpacket.len);
+							users[touser].outpacket.len = users[userid].inpacket.len;
+						}
 					}
+				} else {
+					printf("Discarded data, uncompress() result: %d\n", ret);
 				}
 				users[userid].inpacket.len = users[userid].inpacket.offset = 0;
 			}
+			/* Update seqno and maybe send immediate response packet */
+			update_downstream_seqno(dns_fd, userid, dn_seq, dn_frag);
 		}
-	}
-	/* userid must be set for a reply to be sent */
-	if (userid >= 0 && userid < USERS && ip_cmp(userid, q) == 0 && users[userid].outpacket.len > 0) {
-		write_dns(dns_fd, q, users[userid].outpacket.data, users[userid].outpacket.len);
-		users[userid].outpacket.len = 0;
-		users[userid].q.id = 0;
 	}
 }
 
@@ -361,7 +422,7 @@ handle_ns_request(int dns_fd, struct query *q)
 
 	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
 	
-	if (debug >= 1) {
+	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q->from);
 		printf("TX: client %s, type %d, name %s, %d bytes NS reply\n", 
@@ -394,7 +455,7 @@ forward_query(int bind_fd, struct query *q)
 	memcpy(&(myaddr->sin_addr), &newaddr, sizeof(in_addr_t));
 	myaddr->sin_port = htons(bind_port);
 	
-	if (debug >= 1) {
+	if (debug >= 2) {
 		printf("TX: NS reply \n");
 	}
 
@@ -422,18 +483,18 @@ tunnel_bind(int bind_fd, int dns_fd)
 
 	id = dns_get_id(packet, r);
 	
-	if (debug >= 1) {
+	if (debug >= 2) {
 		printf("RX: Got response on query %u from DNS\n", (id & 0xFFFF));
 	}
 
 	/* Get sockaddr from id */
 	fw_query_get(id, &query);
-	if (!query && debug >= 1) {
+	if (!query && debug >= 2) {
 		printf("Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
 		return 0;
 	}
 
-	if (debug >= 1) {
+	if (debug >= 2) {
 		struct sockaddr_in *in;
 		in = (struct sockaddr_in *) &(query->addr);
 		printf("TX: client %s id %u, %d bytes\n",
@@ -460,7 +521,7 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	if ((read = read_dns(dns_fd, &q)) <= 0)
 		return 0;
 
-	if (debug >= 1) {
+	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q.from);
 		printf("RX: client %s, type %d, name %s\n", 
@@ -543,6 +604,10 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
 			int j;
  			for (j = 0; j < USERS; j++) {
  				if (users[j].q.id != 0) {
+					if (debug >= 1) {
+						printf("OUT pkt seq# %d, frag %d (last=%d), fragsize %d of total %d, to user %d\n",
+							0, 0, 1, users[j].outpacket.len, users[j].outpacket.len, j);
+					}
  					write_dns(dns_fd, &(users[j].q), users[j].outpacket.data, users[j].outpacket.len);
  					users[j].outpacket.len = 0;
  					users[j].q.id = 0;
@@ -626,7 +691,7 @@ write_dns(int fd, struct query *q, char *data, int datalen)
 
 	len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
 	
-	if (debug >= 1) {
+	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q->from);
 		printf("TX: client %s, type %d, name %s, %d bytes data\n", 

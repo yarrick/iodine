@@ -124,10 +124,9 @@ build_hostname(char *buf, size_t buflen,
 	size_t space;
 	char *b;
 
-
-	space = MIN(0xFF, buflen) - strlen(topdomain) - 2;
+	space = MIN(0xFF, buflen) - strlen(topdomain) - 5;
 	if (!encoder->places_dots())
-		space -= (space / 62); /* space for dots */
+		space -= (space / 57); /* space for dots */
 
 	memset(buf, 0, buflen);
 	
@@ -209,6 +208,8 @@ tunnel_tun(int tun_fd, int dns_fd)
 	packet.sentlen = 0;
 	packet.offset = 0;
 	packet.len = outlen;
+	packet.seqno++;
+	packet.fragment = 0;
 
 	send_chunk(dns_fd);
 
@@ -254,9 +255,11 @@ tunnel(int tun_fd, int dns_fd)
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
 
+
 		FD_ZERO(&fds);
-		if (!is_sending()) 
+		if (!is_sending()) {
 			FD_SET(tun_fd, &fds);
+		}
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
@@ -297,15 +300,21 @@ send_chunk(int fd)
 	p += packet.offset;
 	avail = packet.len - packet.offset;
 
-	packet.sentlen = build_hostname(buf + 1, sizeof(buf) - 1, p, avail, topdomain, dataenc);
+	packet.sentlen = build_hostname(buf + 4, sizeof(buf) - 4, p, avail, topdomain, dataenc);
+	packet.fragment++;
 
-	if (packet.sentlen == avail)
-		code = 1;
-	else
-		code = 0;
-		
-	code |= (userid << 1);
-	buf[0] = hex[code];
+	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
+
+	buf[0] = hex[userid & 15]; /* First byte is 4 bits userid */
+
+	code = ((packet.seqno & 7) << 2) | ((packet.fragment & 15) >> 2);
+	buf[1] = b32_5to8(code); /* Second byte is 3 bits seqno, 2 upper bits fragment count */
+
+	code = ((packet.fragment & 3) << 3) | (0);
+	buf[2] = b32_5to8(code); /* Third byte is 2 bits lower fragment count, 3 bits downstream packet seqno */
+
+	code = (0 << 1) | (packet.sentlen == avail);
+	buf[3] = b32_5to8(code); /* Fourth byte is 4 bits downstream fragment count, 1 bit compression flag */
 
 	send_query(fd, buf);
 }
@@ -330,7 +339,7 @@ send_login(int fd, char *login, int len)
 static void
 send_ping(int fd)
 {
-	char data[3];
+	char data[4];
 	
 	if (is_sending()) {
 		packet.sentlen = 0;
@@ -339,8 +348,9 @@ send_ping(int fd)
 	}
 
 	data[0] = userid;
-	data[1] = (rand_seed >> 8) & 0xff;
-	data[2] = (rand_seed >> 0) & 0xff;
+	data[1] = 0;
+	data[2] = (rand_seed >> 8) & 0xff;
+	data[3] = (rand_seed >> 0) & 0xff;
 	
 	rand_seed++;
 
@@ -380,13 +390,9 @@ send_case_check(int fd)
 static void
 send_codec_switch(int fd, int userid, int bits)
 {
-	char buf[512] = "S00.";
-	if (userid >= 0 && userid < 9) {
-		buf[1] += userid;
-	}
-	if (bits >= 0 && bits < 9) {
-		buf[2] += bits;
-	}
+	char buf[512] = "S__.";
+	buf[1] = b32_5to8(userid);
+	buf[2] = b32_5to8(bits);
 	
 	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, buf);
@@ -704,6 +710,8 @@ main(int argc, char **argv)
 	newroot = NULL;
 	device = NULL;
 	chunkid = 0;
+
+	packet.seqno = 0;
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
