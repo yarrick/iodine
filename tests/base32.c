@@ -77,6 +77,18 @@ START_TEST(test_base32_decode)
 }
 END_TEST
 
+START_TEST(test_base32_5to8_8to5)
+{
+	int i;
+	int c;
+
+	for (i = 0; i < 32; i++) {
+		c = b32_5to8(i);	
+		fail_unless(b32_8to5(c) == i);
+	}
+}
+END_TEST
+
 TCase *
 test_base32_create_tests()
 {
@@ -85,6 +97,7 @@ test_base32_create_tests()
 	tc = tcase_create("Base32");
 	tcase_add_test(tc, test_base32_encode);
 	tcase_add_test(tc, test_base32_decode);
+	tcase_add_test(tc, test_base32_5to8_8to5);
 
 	return tc;
 }
