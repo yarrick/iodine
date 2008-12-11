@@ -720,12 +720,14 @@ main(int argc, char **argv)
 		switch(choice) {
 		case 'v':
 			version();
+			/* NOTREACHED */
 			break;
 		case 'f':
 			foreground = 1;
 			break;
 		case 'h':
 			help();
+			/* NOTREACHED */
 			break;
 		case 'u':
 			username = optarg;
@@ -752,6 +754,7 @@ main(int argc, char **argv)
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.\n");
 		usage();
+		/* NOTREACHED */
 	}
 
 	argc -= optind;
@@ -777,16 +780,19 @@ main(int argc, char **argv)
 		if(check_topdomain(topdomain)) {
 			warnx("Topdomain contains invalid characters.\n");
 			usage();
+			/* NOTREACHED */
 		}
 	} else {
 		warnx("Use a topdomain max 128 chars long.\n");
 		usage();
+		/* NOTREACHED */
 	}
 
 	if (username != NULL) {
 		if ((pw = getpwnam(username)) == NULL) {
 			warnx("User %s does not exist!\n", username);
 			usage();
+			/* NOTREACHED */
 		}
 	}
 	
@@ -818,6 +824,7 @@ main(int argc, char **argv)
 		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
 			warnx("Could not switch to user %s!\n", username);
 			usage();
+			/* NOTREACHED */
 		}
 	}
 	
