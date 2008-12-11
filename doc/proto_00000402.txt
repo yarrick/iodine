@@ -45,15 +45,17 @@ Data header:
 UUU = Userid
 L = Last fragment in packet flag
 
-First 4 bits coded as hex in ASCII. 
+First byte is the header, 4 bits coded as hex in ASCII. 
 Followed by data encoded with Base32.
 
 Ping:
-Command = 0x04, User = userid
 Client sends:
-	Only a CMC
+	First byte p or P
+	Rest encoded with Base32:
+	1 byte userid
+	CMC
 
-The server responses to Ping and Data packets is a DNS NULL type response:
+The server response to Ping and Data packets is a DNS NULL type response:
 If server has nothing to send, data length is 0 bytes.
 If server has a packet to send, data length is set and the data is a full raw
 unencoded ip packet, prefixed with 32 bits tun data.
