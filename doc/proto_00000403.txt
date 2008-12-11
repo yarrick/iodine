@@ -38,8 +38,8 @@ Server replies:
 Switch codec:
 Client sends:
 	First byte s or S
-	One byte ASCII digit, meaning userid
-	One byte ASCII digit, with value 5 or 6, representing number of raw
+	5 bits coded as Base32 char, meaning userid
+	5 bits coded as Base32 char, with value 5 or 6, representing number of raw
 	bits per encoded byte
 Server sends:
 	Name of codec if accepted. After this all upstream data packets must 
@@ -47,28 +47,28 @@ Server sends:
 	BADCODEC if not accepted. Client must then revert to Base32
 
 Data:
-Upstream data header (encoded as 4 bytes Base32):
-	 4321 0 432 10 43 210 4321 0
-	+----+-+---+--+--+---+----+-+
-	|UUUU|L|SSS|FF|FF|DDD|GGGG|C|
-	+----+-+---+--+--+---+----+-+
+Upstream data header:
+	 3210 432 10 43 210 4321 0
+	+----+---+--+--+---+----+-+
+	|UUUU|SSS|FF|FF|DDD|GGGG|L|
+	+----+---+--+--+---+----+-+
 
 Downstream data header:
 	 7 654 3210 765 4321 0
 	+-+---+----+---+----+-+
-	|L|SSS|FFFF|DDD|GGGG|C|
+	|C|SSS|FFFF|DDD|GGGG|L|
 	+-+---+----+---+----+-+
 
 UUUU = Userid
 L = Last fragment in packet flag
-SSS = Upstream packet sequence number
+SS = Upstream packet sequence number
 FFFF = Upstream fragment number
 DDD = Downstream packet sequence number
 GGGG = Downstream fragment number
-C = Compression enabled for this packet
+C = Compression enabled for downstream packet
 
-Upstream data packet starts with 4 bytes Base32 encoded header, then comes 
-the payload data, encoded with chosen codec.
+Upstream data packet starts with 1 byte ASCII hex coded user byte, then 3 bytes 
+Base32 encoded header, then comes the payload data, encoded with chosen codec.
 
 Downstream data starts with 2 byte header. Then payload data, which may be
 compressed.
@@ -77,7 +77,10 @@ Ping:
 Client sends:
 	First byte p or P
 	Rest encoded with Base32:
-	1 byte userid
+	1 byte with 4 bits userid
+	1 byte with:
+		3 bits downstream seqno
+		4 bits downstream fragment
 	CMC
 
 The server response to Ping and Data packets is a DNS NULL type response:
