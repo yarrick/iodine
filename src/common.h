@@ -30,10 +30,6 @@
 
 #define QUERY_NAME_SIZE 256
 
-#define DATAHEADER_TOTLEN 2
-#define MAKE_DATAHEADER(last,compressed,fragno) \
-	((((last) & 0x1) << 7) | (((compressed) & 0x1) << 6) | ((fragno) & 0x3f))
-
 #if defined IP_RECVDSTADDR 
 # define DSTADDR_SOCKOPT IP_RECVDSTADDR 
 # define dstaddr(x) (CMSG_DATA(x)) 
