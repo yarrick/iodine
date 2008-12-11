@@ -70,6 +70,27 @@ base32_blksize_enc()
 	return BLKSIZE_ENC;
 }
 
+int
+b32_5to8(int in)
+{
+	return cb32[in & 31];
+}
+
+int
+b32_8to5(int in)
+{
+	int i;
+	int c;
+	if (!reverse_init) {
+		for (i = 0; i < 32; i++) {
+			c = cb32[i];
+			rev32[(int) c] = i;
+		}
+		reverse_init = 1;
+	}
+	return rev32[in];
+}
+
 static int 
 base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
 {

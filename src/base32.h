@@ -19,4 +19,6 @@
 
 struct encoder *get_base32_encoder(void);
 
+int b32_5to8(int);
+int b32_8to5(int);
 #endif
