@@ -39,30 +39,48 @@ Switch codec:
 Client sends:
 	First byte s or S
 	One byte ASCII digit, meaning userid
-	One byte ASCII digit, with value 5 or 6, representing number of bits per byte in encoding
+	One byte ASCII digit, with value 5 or 6, representing number of raw
+	bits per encoded byte
 Server sends:
-	Name of codec if accepted. After this all upstream data packets must be encoded with the new codec.
+	Name of codec if accepted. After this all upstream data packets must 
+	be encoded with the new codec.
 	BADCODEC if not accepted. Client must then revert to Base32
 
 Data:
-Data header:
-	 321 0 
-	+---+-+
-	|UUU|L|
-	+---+-+
+Upstream data header (encoded as 4 bytes Base32):
+	 4321 0 432 10 43 210 4321 0
+	+----+-+---+--+--+---+----+-+
+	|UUUU|L|SSS|FF|FF|DDD|GGGG|C|
+	+----+-+---+--+--+---+----+-+
 
-UUU = Userid
+Downstream data header:
+	 7 654 3210 765 4321 0
+	+-+---+----+---+----+-+
+	|L|SSS|FFFF|DDD|GGGG|C|
+	+-+---+----+---+----+-+
+
+UUUU = Userid
 L = Last fragment in packet flag
+SSS = Upstream packet sequence number
+FFFF = Upstream fragment number
+DDD = Downstream packet sequence number
+GGGG = Downstream fragment number
+C = Compression enabled for this packet
 
-First 4 bits coded as hex in ASCII. 
-Followed by data encoded with the chosen codec.
+Upstream data packet starts with 4 bytes Base32 encoded header, then comes 
+the payload data, encoded with chosen codec.
+
+Downstream data starts with 2 byte header. Then payload data, which may be
+compressed.
 
 Ping:
-Command = 0x04, User = userid
 Client sends:
-	Only a CMC
+	First byte p or P
+	Rest encoded with Base32:
+	1 byte userid
+	CMC
 
-The server responses to Ping and Data packets is a DNS NULL type response:
+The server response to Ping and Data packets is a DNS NULL type response:
 If server has nothing to send, data length is 0 bytes.
-If server has a packet to send, data length is set and the data is a full raw
-unencoded ip packet, prefixed with 32 bits tun data.
+If server has something to send, it will send a downstream data packet, 
+prefixed with 2 bytes header as shown above.
