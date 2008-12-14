@@ -301,7 +301,6 @@ send_chunk(int fd)
 	avail = packet.len - packet.offset;
 
 	packet.sentlen = build_hostname(buf + 4, sizeof(buf) - 4, p, avail, topdomain, dataenc);
-	packet.fragment++;
 
 	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
 
@@ -316,6 +315,7 @@ send_chunk(int fd)
 	code = (0 << 1) | (packet.sentlen == avail);
 	buf[3] = b32_5to8(code); /* Fourth byte is 4 bits downstream fragment count, 1 bit compression flag */
 
+	packet.fragment++;
 	send_query(fd, buf);
 }
 
