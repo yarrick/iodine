@@ -113,6 +113,8 @@ tunnel_tun(int tun_fd, int dns_fd)
 	if (users[userid].outpacket.len == 0) {
 		memcpy(users[userid].outpacket.data, out, outlen);
 		users[userid].outpacket.len = outlen;
+		users[userid].outpacket.seqno++;
+		users[userid].outpacket.fragment = 0;
 		return outlen;
 	} else {
 		return 0;
@@ -170,7 +172,8 @@ update_downstream_seqno(int dns_fd, int userid, int down_seq, int down_frag)
 	if (users[userid].outpacket.len > 0) {
 		if (debug >= 1) {
 			printf("OUT pkt seq# %d, frag %d (last=%d), fragsize %d of total %d, to user %d\n",
-				0, 0, 1, users[userid].outpacket.len, users[userid].outpacket.len, userid);
+				users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15, 
+				1, users[userid].outpacket.len, users[userid].outpacket.len, userid);
 		}
 		write_dns(dns_fd, &users[userid].q, users[userid].outpacket.data, users[userid].outpacket.len);
 		users[userid].outpacket.len = 0;
@@ -356,6 +359,17 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			users[userid].last_pkt = time(NULL);
 			memcpy(&(users[userid].q), q, sizeof(struct query));
 
+			if (up_seq == users[userid].inpacket.seqno && 
+				up_frag <= users[userid].inpacket.fragment) {
+				/* Got repeated old packet, skip it */
+				if (debug >= 1) {
+					printf("IN  pkt seq# %d, frag %d, dropped duplicate\n",
+						up_seq, up_frag);
+				}
+				/* Update seqno and maybe send immediate response packet */
+				update_downstream_seqno(dns_fd, userid, dn_seq, dn_frag);
+				return;
+			}
 			if (up_seq != users[userid].inpacket.seqno) {
 				/* New packet has arrived */
 				users[userid].inpacket.seqno = up_seq;
@@ -604,9 +618,12 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
 			int j;
  			for (j = 0; j < USERS; j++) {
  				if (users[j].q.id != 0) {
-					if (debug >= 1) {
-						printf("OUT pkt seq# %d, frag %d (last=%d), fragsize %d of total %d, to user %d\n",
-							0, 0, 1, users[j].outpacket.len, users[j].outpacket.len, j);
+					if (debug >= 1 && users[j].outpacket.len > 0) {
+						printf("OUT pkt seq# %d, frag %d (last=%d), "
+							"fragsize %d of total %d, to user %d\n",
+							users[j].outpacket.seqno & 7, 
+							users[j].outpacket.fragment & 15, 1, 
+							users[j].outpacket.len, users[j].outpacket.len, j);
 					}
  					write_dns(dns_fd, &(users[j].q), users[j].outpacket.data, users[j].outpacket.len);
  					users[j].outpacket.len = 0;
