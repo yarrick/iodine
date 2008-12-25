@@ -32,7 +32,7 @@
 
 #if defined IP_RECVDSTADDR 
 # define DSTADDR_SOCKOPT IP_RECVDSTADDR 
-# define dstaddr(x) (CMSG_DATA(x)) 
+# define dstaddr(x) ((struct in_addr *) CMSG_DATA(x)) 
 #elif defined IP_PKTINFO 
 # define DSTADDR_SOCKOPT IP_PKTINFO 
 # define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr)) 

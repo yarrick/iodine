@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
+#define _XPG4_2
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <fcntl.h>
