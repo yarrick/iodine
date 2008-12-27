@@ -17,8 +17,7 @@
 #ifndef __FW_QUERY_H__
 #define __FW_QUERY_H__
 
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
+#include <sys/socket.h>
 
 #define FW_QUERY_CACHE_SIZE 16
 
