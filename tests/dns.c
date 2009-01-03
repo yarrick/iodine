@@ -48,6 +48,13 @@ static char answerPacket[] =
 	"\x69\x73\x20\x74\x68\x65\x20\x6D\x65\x73\x73\x61\x67\x65\x20\x74\x6F"
 	"\x20\x62\x65\x20\x64\x65\x6C\x69\x76\x65\x72\x65\x64";
 
+static char answerPacketHighTransId[] =
+	"\x85\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00\x05\x73\x69\x6C\x6C"
+	"\x79\x04\x68\x6F\x73\x74\x02\x6F\x66\x06\x69\x6F\x64\x69\x6E\x65\x04"
+	"\x63\x6F\x64\x65\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00\x0A\x00\x01"
+	"\xC0\x0C\x00\x0A\x00\x01\x00\x00\x00\x00\x00\x23\x74\x68\x69\x73\x20"
+	"\x69\x73\x20\x74\x68\x65\x20\x6D\x65\x73\x73\x61\x67\x65\x20\x74\x6F"
+	"\x20\x62\x65\x20\x64\x65\x6C\x69\x76\x65\x72\x65\x64";
 static char *msgData = "this is the message to be delivered";
 static char *topdomain = "kryo.se";
 
@@ -142,18 +149,36 @@ END_TEST
 START_TEST(test_decode_response)
 {
 	char buf[512];
+	struct query q;
 	int len;
 	int ret;
 
 	len = sizeof(buf);
 	memset(&buf, 0, sizeof(buf));
 
-	ret = dns_decode(buf, len, NULL, QR_ANSWER, answerPacket, sizeof(answerPacket)-1);
+	ret = dns_decode(buf, len, &q, QR_ANSWER, answerPacket, sizeof(answerPacket)-1);
 	fail_unless(strncmp(msgData, buf, sizeof(msgData)) == 0, "Did not extract expected data");
 	fail_unless(ret == strlen(msgData), "Bad data length: %d, expected %d", ret, strlen(msgData));
+	fail_unless(q.id == 0x0539);
 }
 END_TEST
 
+START_TEST(test_decode_response_with_high_trans_id)
+{
+	char buf[512];
+	struct query q;
+	int len;
+	int ret;
+
+	len = sizeof(buf);
+	memset(&buf, 0, sizeof(buf));
+
+	ret = dns_decode(buf, len, &q, QR_ANSWER, answerPacketHighTransId, sizeof(answerPacketHighTransId)-1);
+	fail_unless(strncmp(msgData, buf, sizeof(msgData)) == 0, "Did not extract expected data");
+	fail_unless(ret == strlen(msgData), "Bad data length: %d, expected %d", ret, strlen(msgData));
+	fail_unless(q.id == 0x8539, "q.id was %08X instead of %08X!", q.id, 0x8539);
+}
+END_TEST
 static void
 dump_packet(char *buf, size_t len)
 {
@@ -183,6 +208,7 @@ test_dns_create_tests()
 	tcase_add_test(tc, test_decode_query);
 	tcase_add_test(tc, test_encode_response);
 	tcase_add_test(tc, test_decode_response);
+	tcase_add_test(tc, test_decode_response_with_high_trans_id);
 
 	return tc;
 }

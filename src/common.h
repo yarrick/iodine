@@ -50,8 +50,8 @@ struct packet
 
 struct query {
 	char name[QUERY_NAME_SIZE];
-	short type;
-	short id;
+	unsigned short type;
+	unsigned short id;
 	struct in_addr destination;
 	struct sockaddr from;
 	int fromlen;
