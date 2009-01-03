@@ -5,7 +5,7 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
-2008-xx-xx: 0.x.x
+2009-xx-xx: 0.x.x
 	- Fixed segfault in server when sending version reject.
 	- Applied patch to make iodine build on BeOS R5-BONE and Haiku,
 		from Francois Revol. Still work to do to get tun device working.
@@ -16,6 +16,7 @@ CHANGES:
 		a specific IP address to return (if behind NAT etc).
 	- Upstream data is now Base64 encoded if relay server preserves case and
 		supports the plus (+) character in domain names, fixes #16.
+	- Fixed problem in client when DNS trans. ID has highest bit set (#37)
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
