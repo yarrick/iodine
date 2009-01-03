@@ -172,7 +172,7 @@ update_downstream_seqno(int dns_fd, int userid, int down_seq, int down_frag)
 	/* Send reply if waiting */
 	if (users[userid].outpacket.len > 0) {
 		if (debug >= 1) {
-			printf("OUT pkt seq# %d, frag %d (last=%d), fragsize %d of total %d, to user %d\n",
+			printf("OUT pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, to user %d\n",
 				users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15, 
 				1, users[userid].outpacket.len, users[userid].outpacket.len, userid);
 		}
