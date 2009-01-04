@@ -59,6 +59,8 @@ static struct sockaddr_in nameserv;
 static char *topdomain;
 
 static uint16_t rand_seed;
+static int downstream_seqno;
+static int downstream_fragment;
 
 /* Current IP packet */
 static struct packet packet;
@@ -171,6 +173,12 @@ read_dns(int fd, char *buf, int buflen)
 
 	rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
 
+	/* decode the data header, update seqno and frag before next request */
+	if (rv > 2) {
+		downstream_seqno = (buf[1] >> 5) & 7;
+		downstream_fragment = (buf[1] >> 1) & 15;
+	}
+
 	if (is_sending() && chunkid == q.id) {
 		/* Got ACK on sent packet */
 		packet.offset += packet.sentlen;
@@ -230,7 +238,9 @@ tunnel_dns(int tun_fd, int dns_fd)
 		
 	outlen = sizeof(out);
 	inlen = read;
-	if (uncompress((uint8_t*)out, &outlen, (uint8_t*)in, inlen) != Z_OK) {
+
+	/* Skip 2 byte data header and uncompress */
+	if (uncompress((uint8_t*)out, &outlen, (uint8_t*) &in[2], inlen - 2) != Z_OK) {
 		return -1;
 	}
 
@@ -309,10 +319,10 @@ send_chunk(int fd)
 	code = ((packet.seqno & 7) << 2) | ((packet.fragment & 15) >> 2);
 	buf[1] = b32_5to8(code); /* Second byte is 3 bits seqno, 2 upper bits fragment count */
 
-	code = ((packet.fragment & 3) << 3) | (0);
+	code = ((packet.fragment & 3) << 3) | (downstream_seqno & 7);
 	buf[2] = b32_5to8(code); /* Third byte is 2 bits lower fragment count, 3 bits downstream packet seqno */
 
-	code = (0 << 1) | (packet.sentlen == avail);
+	code = ((downstream_fragment & 15) << 1) | (packet.sentlen == avail);
 	buf[3] = b32_5to8(code); /* Fourth byte is 4 bits downstream fragment count, 1 bit compression flag */
 
 	packet.fragment++;
@@ -836,6 +846,9 @@ main(int argc, char **argv)
 			/* NOTREACHED */
 		}
 	}
+	
+	downstream_seqno = 0;
+	downstream_fragment = 0;
 	
 	tunnel(tun_fd, dns_fd);
 
