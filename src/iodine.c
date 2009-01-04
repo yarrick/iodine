@@ -233,7 +233,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	char in[64*1024];
 	size_t read;
 
-	if ((read = read_dns(dns_fd, in, sizeof(in))) <= 0) 
+	if ((read = read_dns(dns_fd, in, sizeof(in))) <= 2) 
 		return -1;
 		
 	outlen = sizeof(out);
