@@ -791,6 +791,8 @@ main(int argc, char **argv)
 	int port;
 	int mtu;
 	int skipipconfig;
+	int netmask;
+	int created_users;
 
 	username = NULL;
 	newroot = NULL;
@@ -805,6 +807,7 @@ main(int argc, char **argv)
 	check_ip = 1;
 	skipipconfig = 0;
 	debug = 0;
+	netmask = 27;
 
 	b32 = get_base32_encoder();
 
@@ -954,6 +957,10 @@ main(int argc, char **argv)
 		warnx("Bad IP address to return as nameserver.\n");
 		usage();
 	}
+	if (netmask > 30 || netmask < 8) {
+		warnx("Bad netmask (%d bits). Use 8-30 bits.\n", netmask);
+		usage();
+	}
 	
 	if (strlen(password) == 0)
 		read_password(password, sizeof(password));
@@ -970,8 +977,13 @@ main(int argc, char **argv)
 			goto cleanup3;
 
 	my_mtu = mtu;
-	init_users(my_ip);
 
+	created_users = init_users(my_ip, netmask);
+	
+	if (created_users < USERS) {
+		printf("Limiting to %d simultaneous users because of netmask /%d\n",
+			created_users, netmask);
+	}
 	printf("Listening to dns for domain %s\n", topdomain);
 
 	if (foreground == 0) 
