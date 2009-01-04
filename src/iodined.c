@@ -160,12 +160,26 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 
 static void
 send_chunk(int dns_fd, int userid) {
+	char pkt[4096];
+	int datalen;
+
+	datalen = MIN(sizeof(pkt) - 2, users[userid].outpacket.len);
+	memcpy(&pkt[2], users[userid].outpacket.data, datalen);
+
+	/* Build downstream data header (see doc/proto_xxxxxxxx.txt) */
+
+	/* First byte is 1 bit compression flag, 3 bits upstream seqno, 4 bits upstream fragment */
+	pkt[0] = (1<<7) | ((users[userid].inpacket.seqno & 7) << 4) | (users[userid].inpacket.fragment & 15);
+	/* Second byte is 3 bits downstream seqno, 4 bits downstream fragment, 1 bit last flag */
+	pkt[1] = ((users[userid].outpacket.seqno & 7) << 5) | ((users[userid].outpacket.fragment & 15) << 1) | 1;
+
+
 	if (debug >= 1) {
 		printf("OUT pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, to user %d\n",
 			users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15, 
-			1, users[userid].outpacket.len, users[userid].outpacket.len, userid);
+			1, users[userid].outpacket.len, datalen, userid);
 	}
-	write_dns(dns_fd, &users[userid].q, users[userid].outpacket.data, users[userid].outpacket.len);
+	write_dns(dns_fd, &users[userid].q, pkt, datalen + 2);
 	users[userid].outpacket.len = 0;
 	users[userid].q.id = 0;
 }
