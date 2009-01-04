@@ -26,7 +26,7 @@ Client sends:
 	CMC
 Server replies:
 	LNAK means not accepted
-	x.x.x.x-y.y.y.y-mtu means accepted (server ip, client ip, mtu)
+	x.x.x.x-y.y.y.y-mtu-netmask means accepted (server ip, client ip, mtu, netmask bits)
 
 Case check:
 Client sends: 

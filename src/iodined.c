@@ -56,10 +56,12 @@ static int running = 1;
 static char *topdomain;
 static char password[33];
 static struct encoder *b32;
+static int created_users;
 
 static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
+static int netmask;
 
 static in_addr_t ns_ip;
 
@@ -230,7 +232,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				users[userid].q.id = 0;
 			} else {
 				/* No space for another user */
-				send_version_response(dns_fd, VERSION_FULL, USERS, 0, q);
+				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
 			}
 		} else {
 			send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
@@ -251,15 +253,15 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			write_dns(dns_fd, q, "BADIP", 5);
 		} else {
 			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
-				/* Login ok, send ip/mtu info */
+				/* Login ok, send ip/mtu/netmask info */
 
 				tempip.s_addr = my_ip;
 				tmp[0] = strdup(inet_ntoa(tempip));
 				tempip.s_addr = users[userid].tun_ip;
 				tmp[1] = strdup(inet_ntoa(tempip));
 
-				read = snprintf(out, sizeof(out), "%s-%s-%d", 
-						tmp[0], tmp[1], my_mtu);
+				read = snprintf(out, sizeof(out), "%s-%s-%d-%d", 
+						tmp[0], tmp[1], my_mtu, netmask);
 
 				write_dns(dns_fd, q, out, read);
 				q->id = 0;
@@ -726,7 +728,7 @@ usage() {
 	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
-		" tunnel_ip topdomain\n", __progname);
+		" tunnel_ip[/netmask] topdomain\n", __progname);
 	exit(2);
 }
 
@@ -738,7 +740,7 @@ help() {
 	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
-		" tunnel_ip topdomain\n", __progname);
+		" tunnel_ip[/netmask] topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -c to disable check of client IP/port on each request\n");
@@ -757,6 +759,7 @@ help() {
 	printf("  -b port to forward normal DNS queries to (on localhost)\n");
 	printf("  -P password used for authentication (max 32 chars will be used)\n");
 	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
+	printf("   /netmask sets the size of the tunnel network.\n");
 	printf("topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
 }
@@ -791,8 +794,7 @@ main(int argc, char **argv)
 	int port;
 	int mtu;
 	int skipipconfig;
-	int netmask;
-	int created_users;
+	char *netsize;
 
 	username = NULL;
 	newroot = NULL;
@@ -892,6 +894,13 @@ main(int argc, char **argv)
 	if (argc != 2) 
 		usage();
 	
+	netsize = strchr(argv[0], '/');
+	if (netsize) {
+		*netsize = 0;
+		netsize++;
+		netmask = atoi(netsize);
+	}
+
 	my_ip = inet_addr(argv[0]);
 	
 	if (my_ip == INADDR_NONE) {
@@ -968,7 +977,7 @@ main(int argc, char **argv)
 	if ((tun_fd = open_tun(device)) == -1)
 		goto cleanup0;
 	if (!skipipconfig)
-		if (tun_setip(argv[0]) != 0 || tun_setmtu(mtu) != 0)
+		if (tun_setip(argv[0], netmask) != 0 || tun_setmtu(mtu) != 0)
 			goto cleanup1;
 	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) 
 		goto cleanup2;
