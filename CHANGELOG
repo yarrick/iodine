@@ -17,6 +17,11 @@ CHANGES:
 	- Upstream data is now Base64 encoded if relay server preserves case and
 		supports the plus (+) character in domain names, fixes #16.
 	- Fixed problem in client when DNS trans. ID has highest bit set (#37)
+	- IP addresses are now assigned within the netmask, so iodined can
+		use any address for itself, fixes #28.
+	- Netmask size is now adjustable. Setting a small net will reduce the
+		number of users. Use x.x.x.x/n notation on iodined tunnel ip.
+		This fixes #27.
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann

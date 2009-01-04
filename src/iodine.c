@@ -488,15 +488,16 @@ perform_login:
 			}
 
 			if (read > 0) {
+				int netmask;
 				if (strncmp("LNAK", in, 4) == 0) {
 					printf("Bad password\n");
 					return 1;
-				} else if (sscanf(in, "%64[^-]-%64[^-]-%d", 
-					server, client, &mtu) == 3) {
+				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d", 
+					server, client, &mtu, &netmask) == 4) {
 					
 					server[64] = 0;
 					client[64] = 0;
-					if (tun_setip(client) == 0 && 
+					if (tun_setip(client, netmask) == 0 && 
 						tun_setmtu(mtu) == 0) {
 						goto perform_case_check;
 					} else {
