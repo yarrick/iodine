@@ -22,6 +22,7 @@
 struct user {
 	char id;
 	int active;
+	int disabled;
 	time_t last_pkt;
 	int seed;
 	in_addr_t tun_ip;
@@ -36,7 +37,7 @@ struct user {
 
 extern struct user users[USERS];
 
-void init_users(in_addr_t);
+int init_users(in_addr_t, int);
 int users_waiting_on_reply();
 int find_user_by_ip(uint32_t);
 int all_users_waiting_to_send();

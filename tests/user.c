@@ -34,7 +34,7 @@ START_TEST(test_init_users)
 	int i;
 
 	ip = inet_addr("127.0.0.1");
-	init_users(ip);
+	init_users(ip, 27);
 	for (i = 0; i < USERS; i++) {
 		fail_unless(users[i].id == i);
 		fail_unless(users[i].q.id == 0);
@@ -51,7 +51,7 @@ START_TEST(test_users_waiting)
 	in_addr_t ip;
 
 	ip = inet_addr("127.0.0.1");
-	init_users(ip);
+	init_users(ip, 27);
 
 	fail_unless(users_waiting_on_reply() == 0);
 
@@ -75,7 +75,7 @@ START_TEST(test_find_user_by_ip)
 	unsigned int testip;
 
 	ip = inet_addr("127.0.0.1");
-	init_users(ip);
+	init_users(ip, 27);
 
 	testip = (unsigned int) inet_addr("10.0.0.1");
 	fail_unless(find_user_by_ip(testip) == -1);
@@ -100,7 +100,7 @@ START_TEST(test_all_users_waiting_to_send)
 	in_addr_t ip;
 
 	ip = inet_addr("127.0.0.1");
-	init_users(ip);
+	init_users(ip, 27);
 
 	fail_unless(all_users_waiting_to_send() == 1);
 	
@@ -124,9 +124,37 @@ START_TEST(test_find_available_user)
 	int i;
 
 	ip = inet_addr("127.0.0.1");
-	init_users(ip);
+	init_users(ip, 27);
 
 	for (i = 0; i < USERS; i++) {
+		fail_unless(find_available_user() == i);
+	}
+
+	for (i = 0; i < USERS; i++) {
+		fail_unless(find_available_user() == -1);
+	}
+
+	users[3].active = 0;
+
+	fail_unless(find_available_user() == 3);
+	fail_unless(find_available_user() == -1);
+
+	users[3].last_pkt = 55;
+	
+	fail_unless(find_available_user() == 3);
+	fail_unless(find_available_user() == -1);
+}
+END_TEST
+
+START_TEST(test_find_available_user_small_net)
+{
+	in_addr_t ip;
+	int i;
+
+	ip = inet_addr("127.0.0.1");
+	init_users(ip, 29); /* this should result in 5 enabled users */
+
+	for (i = 0; i < 5; i++) {
 		fail_unless(find_available_user() == i);
 	}
 
@@ -157,6 +185,7 @@ test_user_create_tests()
 	tcase_add_test(tc, test_find_user_by_ip);
 	tcase_add_test(tc, test_all_users_waiting_to_send);
 	tcase_add_test(tc, test_find_available_user);
+	tcase_add_test(tc, test_find_available_user_small_net);
 
 	return tc;
 }
