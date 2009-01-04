@@ -52,15 +52,14 @@ password on the commandline (-P pass) or after the server has started. Now
 everything is ready for the client.
 
 Client side: 
-All the setup is done, just start iodine. It also takes two
-arguments, the first is the local relaying DNS server and the second is the
-domain used (tunnel1.mytunnnel.com). If DNS queries are allowed to any
-computer, you can use the tunnel endpoint (example: 10.15.213.99 or
-tunnel1host.mytunnel.com) as the first argument. The tunnel interface will get
-an IP close to the servers (in this case 192.168.99.2) and a suitable MTU. 
-Enter the same password as on the server either by argument or after the client
-has started. Now you should be able to ping the other end of the tunnel from 
-either side.  
+All the setup is done, just start iodine. It takes up to two arguments, the
+first is the local relaying DNS server (optional) and the second is the domain
+used (tunnel1.mytunnnel.com). If DNS queries are allowed to any computer, you
+can use the tunnel endpoint (example: 10.15.213.99 or tunnel1host.mytunnel.com)
+as the first argument. The tunnel interface will get an IP close to the servers
+(in this case 192.168.99.2) and a suitable MTU.  Enter the same password as on
+the server either by argument or after the client has started. Now you should
+be able to ping the other end of the tunnel from either side.  
 
 
 MISC. INFO:
@@ -75,10 +74,11 @@ If you have problems, try inspecting the traffic with network monitoring tools
 and make sure that the relaying DNS server has not cached the response. A
 cached error message could mean that you started the client before the server.
 
-The upstream data is sent gzipped encoded with Base32. DNS protocol allows
-one query per packet, and one query can be max 256 chars. Each domain name part
-can be max 63 chars. So your domain name and subdomain should be as short as
-possible to allow maximum throughput.
+The upstream data is sent gzipped encoded with Base32, or Base64 if the relay
+server support '+' in domain names. DNS protocol allows one query per packet,
+and one query can be max 256 chars. Each domain name part can be max 63 chars.
+So your domain name and subdomain should be as short as possible to allow
+maximum upstream throughput.
 
 
 TIPS & TRICKS:
