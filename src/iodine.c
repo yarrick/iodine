@@ -631,7 +631,7 @@ perform_case_check:
 	printf("No reply on case check, continuing\n");
 switch_codec:
 	if (!case_preserved)
-		goto set_downstream_fragment_size;
+		goto autodetect_max_fragsize;
 
 	dataenc = get_base64_encoder();
 	printf("Switching to %s codec\n", dataenc->name);
@@ -680,7 +680,6 @@ autodetect_max_fragsize:
 		printf("Autoprobing max downstream fragment size...\n");
 		/* TODO */
 	}
-set_downstream_fragment_size:
 	printf("Setting downstream fragment size to max %d...\n", max_downstream_frag_size);
 	for (i=0; running && i<5 ;i++) {
 		tv.tv_sec = i + 1;
