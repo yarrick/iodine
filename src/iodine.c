@@ -61,6 +61,8 @@ static char *topdomain;
 static uint16_t rand_seed;
 static int downstream_seqno;
 static int downstream_fragment;
+static int down_ack_seqno;
+static int down_ack_fragment;
 
 /* Current IP packet */
 static struct packet outpkt;
@@ -175,22 +177,36 @@ read_dns(int fd, char *buf, int buflen)
 	rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
 
 	/* decode the data header, update seqno and frag before next request */
-	if (rv > 2) {
+	if (rv >= 2) {
 		downstream_seqno = (buf[1] >> 5) & 7;
 		downstream_fragment = (buf[1] >> 1) & 15;
 	}
 
-	if (is_sending() && chunkid == q.id) {
-		/* Got ACK on sent packet */
-		outpkt.offset += outpkt.sentlen;
-		if (outpkt.offset == outpkt.len) {
-			/* Packet completed */
-			outpkt.offset = 0;
-			outpkt.len = 0;
-			outpkt.sentlen = 0;
-		} else {
-			/* More to send */
-			send_chunk(fd);
+
+	if (is_sending()) {
+		if (chunkid == q.id) {
+			/* Got ACK on sent packet */
+			outpkt.offset += outpkt.sentlen;
+			if (outpkt.offset == outpkt.len) {
+				/* Packet completed */
+				outpkt.offset = 0;
+				outpkt.len = 0;
+				outpkt.sentlen = 0;
+
+				/* If the ack contains unacked frag number but no data, 
+				 * send a ping to ack the frag number and get more data*/
+				if (rv == 2 && (
+					downstream_seqno != down_ack_seqno ||
+					downstream_fragment != down_ack_fragment
+					)) {
+					
+					send_ping(fd);
+				}
+			} else {
+				/* More to send */
+				send_chunk(fd);
+			}
+
 		}
 	}
 	return rv;
@@ -340,7 +356,10 @@ send_chunk(int fd)
 	buf[2] = b32_5to8(code); /* Third byte is 2 bits lower fragment count, 3 bits downstream packet seqno */
 
 	code = ((downstream_fragment & 15) << 1) | (outpkt.sentlen == avail);
-	buf[3] = b32_5to8(code); /* Fourth byte is 4 bits downstream fragment count, 1 bit compression flag */
+	buf[3] = b32_5to8(code); /* Fourth byte is 4 bits downstream fragment count, 1 bit last frag flag */
+
+	down_ack_seqno = downstream_seqno;
+	down_ack_fragment = downstream_fragment;
 
 	outpkt.fragment++;
 	send_query(fd, buf);
@@ -378,6 +397,9 @@ send_ping(int fd)
 	data[1] = ((downstream_seqno & 7) << 4) | (downstream_fragment & 15);
 	data[2] = (rand_seed >> 8) & 0xff;
 	data[3] = (rand_seed >> 0) & 0xff;
+	
+	down_ack_seqno = downstream_seqno;
+	down_ack_fragment = downstream_fragment;
 	
 	rand_seed++;
 
@@ -867,6 +889,8 @@ main(int argc, char **argv)
 	
 	downstream_seqno = 0;
 	downstream_fragment = 0;
+	down_ack_seqno = 0;
+	down_ack_fragment = 0;
 	
 	tunnel(tun_fd, dns_fd);
 
