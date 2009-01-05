@@ -164,8 +164,7 @@ send_chunk(int dns_fd, int userid) {
 	int datalen;
 	int last;
 
-	/* TODO change this 1200b value to dynamic */
-	datalen = MIN(1200, users[userid].outpacket.len - users[userid].outpacket.offset);
+	datalen = MIN(users[userid].fragsize, users[userid].outpacket.len - users[userid].outpacket.offset);
 
 	if (datalen && users[userid].outpacket.sentlen > 0 && 
 			(

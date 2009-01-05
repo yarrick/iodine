@@ -33,6 +33,7 @@ struct user {
 	struct encoder *encoder;
 	int out_acked_seqno;
 	int out_acked_fragment;
+	int fragsize;
 };
 
 extern struct user users[USERS];

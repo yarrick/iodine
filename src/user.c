@@ -84,6 +84,7 @@ init_users(in_addr_t my_ip, int netbits)
 		users[i].q.id = 0;
 		users[i].out_acked_seqno = 0;
 		users[i].out_acked_fragment = 0;
+		users[i].fragsize = 4096;
 	}
 
 	return created_users;
