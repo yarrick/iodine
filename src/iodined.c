@@ -118,7 +118,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 		users[userid].outpacket.len = outlen;
 		users[userid].outpacket.offset = 0;
 		users[userid].outpacket.sentlen = 0;
-		users[userid].outpacket.seqno++;
+		users[userid].outpacket.seqno = (++users[userid].outpacket.seqno & 7);
 		users[userid].outpacket.fragment = 0;
 		return outlen;
 	} else {
@@ -162,46 +162,91 @@ static void
 send_chunk(int dns_fd, int userid) {
 	char pkt[4096];
 	int datalen;
+	int last;
 
-	datalen = MIN(sizeof(pkt) - 2, users[userid].outpacket.len);
-	memcpy(&pkt[2], users[userid].outpacket.data, datalen);
+	/* TODO change this 1200b value to dynamic */
+	datalen = MIN(1200, users[userid].outpacket.len - users[userid].outpacket.offset);
+
+	if (datalen && users[userid].outpacket.sentlen > 0 && 
+			(
+			users[userid].outpacket.seqno != users[userid].out_acked_seqno ||
+			users[userid].outpacket.fragment != users[userid].out_acked_fragment
+			)
+		) {
+
+		/* Still waiting on latest ack, send nothing */
+		datalen = 0;
+		last = 0;
+		/* TODO : count down and discard packet if no acks arrive within X queries */
+	} else {
+		memcpy(&pkt[2], &users[userid].outpacket.data[users[userid].outpacket.offset], datalen);
+		users[userid].outpacket.sentlen = datalen;
+		last = (users[userid].outpacket.len == users[userid].outpacket.offset + users[userid].outpacket.sentlen);
+
+		/* Increase fragment# when sending data with offset */
+		if (users[userid].outpacket.offset && datalen)
+			users[userid].outpacket.fragment++;
+	}
 
 	/* Build downstream data header (see doc/proto_xxxxxxxx.txt) */
 
 	/* First byte is 1 bit compression flag, 3 bits upstream seqno, 4 bits upstream fragment */
 	pkt[0] = (1<<7) | ((users[userid].inpacket.seqno & 7) << 4) | (users[userid].inpacket.fragment & 15);
 	/* Second byte is 3 bits downstream seqno, 4 bits downstream fragment, 1 bit last flag */
-	pkt[1] = ((users[userid].outpacket.seqno & 7) << 5) | ((users[userid].outpacket.fragment & 15) << 1) | 1;
-
+	pkt[1] = ((users[userid].outpacket.seqno & 7) << 5) | 
+		((users[userid].outpacket.fragment & 15) << 1) | (last & 1);
 
 	if (debug >= 1) {
-		printf("OUT pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, to user %d\n",
+		printf("OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %d, total %d, to user %d\n",
 			users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15, 
-			1, users[userid].outpacket.len, datalen, userid);
+			last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
 	}
 	write_dns(dns_fd, &users[userid].q, pkt, datalen + 2);
-	users[userid].outpacket.len = 0;
 	users[userid].q.id = 0;
+
+	if (users[userid].outpacket.len > 0 && 
+		users[userid].outpacket.len == users[userid].outpacket.sentlen) {
+
+		/* Whole packet was sent in one chunk, dont wait for ack */
+		users[userid].outpacket.len = 0;
+		users[userid].outpacket.offset = 0;
+		users[userid].outpacket.sentlen = 0;
+	}
 }
 
 static void
 update_downstream_seqno(int dns_fd, int userid, int down_seq, int down_frag)
 {
-	/* update outgoing seqno/frag */
-	if (down_seq != users[userid].out_acked_seqno) {
-		/* First ack on new outgoing packet */
-		users[userid].out_acked_seqno = down_seq;
-		users[userid].out_acked_fragment = down_frag;
-	} else {
-		if (down_frag > users[userid].out_acked_fragment) {
-			/* Ack on later fragment */
-			users[userid].out_acked_fragment = down_frag;
-		}
+	/* If we just read a new packet from tun we have not sent a fragment of, just send it */
+	if (users[userid].outpacket.len > 0 && users[userid].outpacket.sentlen == 0) {
+		send_chunk(dns_fd, userid);
+		return;
 	}
 
-	/* Send reply if waiting */
-	if (users[userid].outpacket.len > 0) {
-		send_chunk(dns_fd, userid);
+	/* otherwise, check if we received ack on a fragment and can send next */
+	if (users[userid].outpacket.len > 0 &&
+		users[userid].outpacket.seqno == down_seq && users[userid].outpacket.fragment == down_frag) {
+
+		if (down_seq != users[userid].out_acked_seqno || down_frag != users[userid].out_acked_fragment) {
+			/* Received ACK on downstream fragment */
+			users[userid].outpacket.offset += users[userid].outpacket.sentlen;
+			users[userid].outpacket.sentlen = 0;
+
+			/* Is packet done? */
+			if (users[userid].outpacket.offset == users[userid].outpacket.len) {
+				users[userid].outpacket.len = 0;
+				users[userid].outpacket.offset = 0;
+				users[userid].outpacket.sentlen = 0;
+			}
+
+			users[userid].out_acked_seqno = down_seq;
+			users[userid].out_acked_fragment = down_frag;
+
+			/* Send reply if waiting */
+			if (users[userid].outpacket.len > 0) {
+				send_chunk(dns_fd, userid);
+			}
+		}
 	}
 }
 
@@ -344,6 +389,15 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			write_dns(dns_fd, q, "BADIP", 5);
 			return; /* illegal id */
 		}
+				
+		if (debug >= 1) {
+			printf("PING pkt from user %d\n", userid);
+		}
+
+		if (users[userid].q.id != 0) {
+			/* Send reply on earlier query before overwriting */
+			send_chunk(dns_fd, userid);
+		}
 
 		dn_seq = unpacked[1] >> 4;
 		dn_frag = unpacked[1] & 15;
@@ -379,6 +433,11 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			int dn_frag = b32_8to5(in[3]) >> 1;
 			int lastfrag = b32_8to5(in[3]) & 1;
 
+			if (users[userid].q.id != 0) {
+				/* Send reply on earlier query before overwriting */
+				send_chunk(dns_fd, userid);
+			}
+
 			/* Update query and time info for user */
 			users[userid].last_pkt = time(NULL);
 			memcpy(&(users[userid].q), q, sizeof(struct query));
@@ -387,7 +446,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				up_frag <= users[userid].inpacket.fragment) {
 				/* Got repeated old packet, skip it */
 				if (debug >= 1) {
-					printf("IN  pkt seq# %d, frag %d, dropped duplicate\n",
+					printf("IN   pkt seq# %d, frag %d, dropped duplicate\n",
 						up_seq, up_frag);
 				}
 				/* Update seqno and maybe send immediate response packet */
@@ -412,7 +471,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			users[userid].inpacket.offset += read;
 
 			if (debug >= 1) {
-				printf("IN  pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
+				printf("IN   pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
 					up_seq, up_frag, lastfrag, read, users[userid].inpacket.len, userid);
 			}
 
