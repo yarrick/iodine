@@ -64,7 +64,10 @@ static int downstream_fragment;
 static int down_ack_seqno;
 static int down_ack_fragment;
 
-/* Current IP packet */
+static int max_downstream_frag_size;
+static int autodetect_frag_size;
+
+/* Current up/downstream IP packet */
 static struct packet outpkt;
 static struct packet inpkt;
 
@@ -406,6 +409,22 @@ send_ping(int fd)
 	send_packet(fd, 'P', data, sizeof(data));
 }
 
+static void
+send_set_downstream_fragsize(int fd, int fragsize)
+{
+	char data[5];
+	
+	data[0] = userid;
+	data[1] = (fragsize & 0xff00) >> 8;
+	data[2] = (fragsize & 0x00ff);
+	data[3] = (rand_seed >> 8) & 0xff;
+	data[4] = (rand_seed >> 0) & 0xff;
+	
+	rand_seed++;
+
+	send_packet(fd, 'N', data, sizeof(data));
+}
+
 static void 
 send_version(int fd, uint32_t version)
 {
@@ -612,7 +631,7 @@ perform_case_check:
 	printf("No reply on case check, continuing\n");
 switch_codec:
 	if (!case_preserved)
-		return 0;
+		goto set_downstream_fragment_size;
 
 	dataenc = get_base64_encoder();
 	printf("Switching to %s codec\n", dataenc->name);
@@ -647,7 +666,7 @@ switch_codec:
 				}
 				in[read] = 0; /* zero terminate */
 				printf("Server switched to codec %s\n", in);
-				return 0;
+				goto autodetect_max_fragsize;
 			}
 		}
 		printf("Retrying codec switch...\n");
@@ -656,9 +675,49 @@ switch_codec:
 codec_revert: 
 	printf("Falling back to base32\n");
 	dataenc = get_base32_encoder();
+autodetect_max_fragsize:
+	if (autodetect_frag_size) {
+		printf("Autoprobing max downstream fragment size...\n");
+		/* TODO */
+	}
+set_downstream_fragment_size:
+	printf("Setting downstream fragment size to max %d...\n", max_downstream_frag_size);
+	for (i=0; running && i<5 ;i++) {
+		tv.tv_sec = i + 1;
+		tv.tv_usec = 0;
+
+		send_set_downstream_fragsize(dns_fd, max_downstream_frag_size);
+		
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = read_dns(dns_fd, in, sizeof(in));
+			
+			if (read > 0) {
+				int accepted_fragsize;
+
+				if (strncmp("BADFRAG", in, 7) == 0) {
+					printf("Server rejected fragsize. Keeping default.");
+					goto done;
+				} else if (strncmp("BADIP", in, 5) == 0) {
+					printf("Server rejected sender IP address.\n");
+					goto done;
+				}
+
+				accepted_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
+				goto done;
+			}
+		}
+		printf("Retrying set fragsize...\n");
+	}
+	printf("No reply from server when setting fragsize. Keeping default.\n");
+done:
 	return 0;
 }
-		
+
 static char *
 get_resolvconf_addr()
 {
@@ -705,7 +764,7 @@ usage() {
 	extern char *__progname;
 
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"[nameserver] topdomain\n", __progname);
+			"[-P password] [-m maxfragsize] [nameserver] topdomain\n", __progname);
 	exit(2);
 }
 
@@ -715,7 +774,7 @@ help() {
 
 	printf("iodine IP over DNS tunneling client\n");
 	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [nameserver] topdomain\n", __progname);
+			"[-P password] [-m maxfragsize] [nameserver] topdomain\n", __progname);
 	printf("  -v to print version info and exit\n");
 	printf("  -h to print this help and exit\n");
 	printf("  -f to keep running in foreground\n");
@@ -723,6 +782,7 @@ help() {
 	printf("  -t dir to chroot to directory dir\n");
 	printf("  -d device to set tunnel device name\n");
 	printf("  -P password used for authentication (max 32 chars will be used)\n");
+	printf("  -m maxfragsize, to limit size of downstream packets\n");
 	printf("nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
 	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
@@ -764,6 +824,9 @@ main(int argc, char **argv)
 	outpkt.seqno = 0;
 	inpkt.len = 0;
 
+	autodetect_frag_size = 1;
+	max_downstream_frag_size = 3072;
+
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
 	
@@ -775,7 +838,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhu:t:d:P:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhu:t:d:P:m:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -804,6 +867,10 @@ main(int argc, char **argv)
 			/* XXX: find better way of cleaning up ps(1) */
 			memset(optarg, 0, strlen(optarg)); 
 			break;
+		case 'm':
+			autodetect_frag_size = 0;
+			max_downstream_frag_size = atoi(optarg);
+			break;
 		default:
 			usage();
 			/* NOTREACHED */
@@ -829,6 +896,12 @@ main(int argc, char **argv)
 		topdomain = strdup(argv[1]);
 		break;
 	default:
+		usage();
+		/* NOTREACHED */
+	}
+
+	if (max_downstream_frag_size < 1 || max_downstream_frag_size > 0xffff) {
+		warnx("Use a max frag size between 1 and 65535 bytes.\n");
 		usage();
 		/* NOTREACHED */
 	}

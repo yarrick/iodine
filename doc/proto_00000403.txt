@@ -46,6 +46,18 @@ Server sends:
 	be encoded with the new codec.
 	BADCODEC if not accepted. Client must then revert to Base32
 
+Set downstream fragment size:
+Client sends:
+	First byte n or N
+	Rest encoded with base32:
+	1 byte userid
+	2 bytes new downstream fragment size
+	CMC
+Server sends:
+	2 bytes new downstream fragment size. After this all downstream
+	payloads will be max (fragsize + 2) bytes long.
+	BADFRAG if not accepted.
+
 Data:
 Upstream data header:
 	 3210 432 10 43 210 4321 0

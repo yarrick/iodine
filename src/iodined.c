@@ -377,6 +377,25 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			break;
 		}
 		return;
+	} else if(in[0] == 'N' || in[0] == 'n') {
+		int max_frag_size;
+
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
+		/* Downstream fragsize packet */
+		userid = unpacked[0];
+		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5);
+			return; /* illegal id */
+		}
+				
+		max_frag_size = ((unpacked[1] & 0xff) << 8) | (unpacked[2] & 0xff);
+		if (max_frag_size < 1) {	
+			write_dns(dns_fd, q, "BADFRAG", 7);
+		} else {
+			users[userid].fragsize = max_frag_size;
+			write_dns(dns_fd, q, &unpacked[1], 2);
+		}
+		return;
 	} else if(in[0] == 'P' || in[0] == 'p') {
 		int dn_seq;
 		int dn_frag;
