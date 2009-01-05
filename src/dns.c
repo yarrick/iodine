@@ -269,7 +269,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		rv = MIN(rlen, sizeof(rdata));
 		rv = readdata(packet, &data, rdata, rv);
 
-		if(type == T_NULL && rv > 2 && buf) {
+		if(type == T_NULL && rv >= 2 && buf) {
 			rv = MIN(rv, buflen);
 			memcpy(buf, rdata, rv);
 		}

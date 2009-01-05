@@ -63,7 +63,8 @@ static int downstream_seqno;
 static int downstream_fragment;
 
 /* Current IP packet */
-static struct packet packet;
+static struct packet outpkt;
+static struct packet inpkt;
 
 /* My userid at the server */
 static char userid;
@@ -151,7 +152,7 @@ build_hostname(char *buf, size_t buflen,
 static int
 is_sending()
 {
-	return (packet.len != 0);
+	return (outpkt.len != 0);
 }
 
 static int
@@ -181,12 +182,12 @@ read_dns(int fd, char *buf, int buflen)
 
 	if (is_sending() && chunkid == q.id) {
 		/* Got ACK on sent packet */
-		packet.offset += packet.sentlen;
-		if (packet.offset == packet.len) {
+		outpkt.offset += outpkt.sentlen;
+		if (outpkt.offset == outpkt.len) {
 			/* Packet completed */
-			packet.offset = 0;
-			packet.len = 0;
-			packet.sentlen = 0;
+			outpkt.offset = 0;
+			outpkt.len = 0;
+			outpkt.sentlen = 0;
 		} else {
 			/* More to send */
 			send_chunk(fd);
@@ -212,12 +213,12 @@ tunnel_tun(int tun_fd, int dns_fd)
 	inlen = read;
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, inlen, 9);
 
-	memcpy(packet.data, out, MIN(outlen, sizeof(packet.data)));
-	packet.sentlen = 0;
-	packet.offset = 0;
-	packet.len = outlen;
-	packet.seqno++;
-	packet.fragment = 0;
+	memcpy(outpkt.data, out, MIN(outlen, sizeof(outpkt.data)));
+	outpkt.sentlen = 0;
+	outpkt.offset = 0;
+	outpkt.len = outlen;
+	outpkt.seqno++;
+	outpkt.fragment = 0;
 
 	send_chunk(dns_fd);
 
@@ -227,24 +228,40 @@ tunnel_tun(int tun_fd, int dns_fd)
 static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
-	unsigned long outlen;
-	unsigned long inlen;
-	char out[64*1024];
-	char in[64*1024];
+	unsigned long datalen;
+	char buf[64*1024];
 	size_t read;
 
-	if ((read = read_dns(dns_fd, in, sizeof(in))) <= 2) 
+	if ((read = read_dns(dns_fd, buf, sizeof(buf))) <= 2) 
 		return -1;
-		
-	outlen = sizeof(out);
-	inlen = read;
 
-	/* Skip 2 byte data header and uncompress */
-	if (uncompress((uint8_t*)out, &outlen, (uint8_t*) &in[2], inlen - 2) != Z_OK) {
+	if (downstream_seqno != inpkt.seqno) {
+		/* New packet */
+		inpkt.seqno = downstream_seqno;
+		inpkt.fragment = downstream_fragment;
+		inpkt.len = 0;
+	} else if (downstream_fragment <= inpkt.fragment) {
+		/* Duplicate fragment */
 		return -1;
 	}
+	inpkt.fragment = downstream_fragment;
 
-	write_tun(tun_fd, out, outlen);
+	datalen = MIN(read - 2, sizeof(inpkt.data) - inpkt.len);
+
+	/* Skip 2 byte data header and append to packet */
+	memcpy(&inpkt.data[inpkt.len], &buf[2], datalen);
+	inpkt.len += datalen;
+
+	if (buf[1] & 1) { /* If last fragment flag is set */
+		/* Uncompress packet and send to tun */
+		datalen = sizeof(buf);
+		if (uncompress((uint8_t*)buf, &datalen, (uint8_t*) inpkt.data, inpkt.len) == Z_OK) {
+			write_tun(tun_fd, buf, datalen);
+		}
+		inpkt.len = 0;
+	}
+
+	/* If we have nothing to send, send a ping to get more data */
 	if (!is_sending()) 
 		send_ping(dns_fd);
 	
@@ -306,26 +323,26 @@ send_chunk(int fd)
 	int code;
 	char *p;
 
-	p = packet.data;
-	p += packet.offset;
-	avail = packet.len - packet.offset;
+	p = outpkt.data;
+	p += outpkt.offset;
+	avail = outpkt.len - outpkt.offset;
 
-	packet.sentlen = build_hostname(buf + 4, sizeof(buf) - 4, p, avail, topdomain, dataenc);
+	outpkt.sentlen = build_hostname(buf + 4, sizeof(buf) - 4, p, avail, topdomain, dataenc);
 
 	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
 
 	buf[0] = hex[userid & 15]; /* First byte is 4 bits userid */
 
-	code = ((packet.seqno & 7) << 2) | ((packet.fragment & 15) >> 2);
+	code = ((outpkt.seqno & 7) << 2) | ((outpkt.fragment & 15) >> 2);
 	buf[1] = b32_5to8(code); /* Second byte is 3 bits seqno, 2 upper bits fragment count */
 
-	code = ((packet.fragment & 3) << 3) | (downstream_seqno & 7);
+	code = ((outpkt.fragment & 3) << 3) | (downstream_seqno & 7);
 	buf[2] = b32_5to8(code); /* Third byte is 2 bits lower fragment count, 3 bits downstream packet seqno */
 
-	code = ((downstream_fragment & 15) << 1) | (packet.sentlen == avail);
+	code = ((downstream_fragment & 15) << 1) | (outpkt.sentlen == avail);
 	buf[3] = b32_5to8(code); /* Fourth byte is 4 bits downstream fragment count, 1 bit compression flag */
 
-	packet.fragment++;
+	outpkt.fragment++;
 	send_query(fd, buf);
 }
 
@@ -352,13 +369,13 @@ send_ping(int fd)
 	char data[4];
 	
 	if (is_sending()) {
-		packet.sentlen = 0;
-		packet.offset = 0;
-		packet.len = 0;
+		outpkt.sentlen = 0;
+		outpkt.offset = 0;
+		outpkt.len = 0;
 	}
 
 	data[0] = userid;
-	data[1] = 0;
+	data[1] = ((downstream_seqno & 7) << 4) | (downstream_fragment & 15);
 	data[2] = (rand_seed >> 8) & 0xff;
 	data[3] = (rand_seed >> 0) & 0xff;
 	
@@ -722,7 +739,8 @@ main(int argc, char **argv)
 	device = NULL;
 	chunkid = 0;
 
-	packet.seqno = 0;
+	outpkt.seqno = 0;
+	inpkt.len = 0;
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
