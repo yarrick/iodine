@@ -17,6 +17,7 @@
 #ifndef __FW_QUERY_H__
 #define __FW_QUERY_H__
 
+#include <sys/types.h>
 #include <sys/socket.h>
 
 #define FW_QUERY_CACHE_SIZE 16
