@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
