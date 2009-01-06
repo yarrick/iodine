@@ -5,11 +5,12 @@ SRCOBJS = ../src/base32.o  ../src/base64.o ../src/read.o ../src/dns.o ../src/enc
 
 OS = `uname | tr "a-z" "A-Z"`
 
-LDFLAGS =  -L/usr/local/lib -lcheck
-CFLAGS = -g -Wall -D$(OS) -I../src -I/usr/local/include -pedantic
+CHECK_PATH = /usr/local
+LDFLAGS +=  -L${CHECK_PATH}/lib -lcheck
+CFLAGS += -g -Wall -D$(OS) -I../src -I${CHECK_PATH}/include -pedantic
 
 all: $(TEST)
-	@./$(TEST)
+	@LD_LIBRARY_PATH=${CHECK_PATH}/lib ./$(TEST)
 
 $(TEST): $(OBJS) $(SRCOBJS)
 	@echo LD $(TEST)
