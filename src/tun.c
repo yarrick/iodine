@@ -227,7 +227,7 @@ tun_setip(const char *ip, int netbits)
 }
 
 int 
-tun_setmtu(const size_t mtu)
+tun_setmtu(const unsigned mtu)
 {
 	char cmdline[512];
 
