@@ -46,6 +46,17 @@ Server sends:
 	be encoded with the new codec.
 	BADCODEC if not accepted. Client must then revert to Base32
 
+Probe downstream fragment size:
+Client sends:
+	First byte r or R
+	15 bits coded as 3 Base32 chars: UUUUF FFFFF FFFFF
+		meaning 4 bits userid, 11 bits fragment size
+	Then follows a long random query which contents does not matter
+Server sends:
+	Requested number of bytes as a response. The first two bytes contains
+	the requested length. Rest of message can be any data.
+	BADFRAG if requested length not accepted.
+
 Set downstream fragment size:
 Client sends:
 	First byte n or N

@@ -377,6 +377,28 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			break;
 		}
 		return;
+	} else if(in[0] == 'R' || in[0] == 'r') {
+		int req_frag_size;
+
+		/* Downstream fragsize probe packet */
+		userid = (b32_8to5(in[1]) >> 1) & 15;
+		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5);
+			return; /* illegal id */
+		}
+				
+		req_frag_size = ((b32_8to5(in[1]) & 1) << 10) | ((b32_8to5(in[2]) & 31) << 5) | (b32_8to5(in[3]) & 31);
+		if (req_frag_size < 2 || req_frag_size > 2047) {	
+			write_dns(dns_fd, q, "BADFRAG", 7);
+		} else {
+			char buf[2048];
+
+			memset(buf, 0, sizeof(buf));
+			buf[0] = (req_frag_size >> 8) & 0xff;
+			buf[1] = req_frag_size & 0xff;
+			write_dns(dns_fd, q, buf, req_frag_size);
+		}
+		return;
 	} else if(in[0] == 'N' || in[0] == 'n') {
 		int max_frag_size;
 
@@ -389,7 +411,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		}
 				
 		max_frag_size = ((unpacked[1] & 0xff) << 8) | (unpacked[2] & 0xff);
-		if (max_frag_size < 1) {	
+		if (max_frag_size < 2) {	
 			write_dns(dns_fd, q, "BADFRAG", 7);
 		} else {
 			users[userid].fragsize = max_frag_size;
