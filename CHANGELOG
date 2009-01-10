@@ -22,6 +22,8 @@ CHANGES:
 	- Netmask size is now adjustable. Setting a small net will reduce the
 		number of users. Use x.x.x.x/n notation on iodined tunnel ip.
 		This fixes #27.
+	- Downstream data is now fragmented, and the fragment size is auto-
+		probed after login. Fixes #7. It only took a few years :)
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann

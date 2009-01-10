@@ -410,6 +410,28 @@ send_ping(int fd)
 }
 
 static void
+send_fragsize_probe(int fd, int fragsize)
+{
+	char probedata[256];
+	char buf[4096];
+
+	/* build a large query domain which is random and maximum size */
+	memset(probedata, MIN(1, rand_seed & 0xff), sizeof(probedata));
+	probedata[1] = MIN(1, (rand_seed >> 8) & 0xff);
+	rand_seed++;
+	build_hostname(buf + 4, sizeof(buf) - 4, probedata, sizeof(probedata), topdomain, dataenc);
+
+	fragsize &= 2047;
+
+	buf[0] = 'r'; /* Probe downstream fragsize packet */
+	buf[1] = b32_5to8((userid << 1) | (fragsize & 1024));
+	buf[2] = b32_5to8((fragsize >> 5) & 31);
+	buf[3] = b32_5to8(fragsize & 31);
+
+	send_query(fd, buf);
+}
+
+static void
 send_set_downstream_fragsize(int fd, int fragsize)
 {
 	char data[5];
@@ -677,8 +699,44 @@ codec_revert:
 	dataenc = get_base32_encoder();
 autodetect_max_fragsize:
 	if (autodetect_frag_size) {
-		printf("Autoprobing max downstream fragment size...\n");
-		/* TODO */
+		int proposed_fragsize = 768;
+		int range = 768;
+		max_downstream_frag_size = 0;
+		printf("Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
+		while (range >= 8 || !max_downstream_frag_size) {
+			for (i=0; running && i<3 ;i++) {
+				tv.tv_sec = 1;
+				tv.tv_usec = 0;
+				send_fragsize_probe(dns_fd, proposed_fragsize);
+
+				FD_ZERO(&fds);
+				FD_SET(dns_fd, &fds);
+
+				r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+				if(r > 0) {
+					read = read_dns(dns_fd, in, sizeof(in));
+					
+					if (read > 0) {
+						/* We got a reply */
+						int acked_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
+						if (acked_fragsize == proposed_fragsize) {
+							printf("%d ok.. ", acked_fragsize);
+							fflush(stdout);
+							max_downstream_frag_size = acked_fragsize;
+							range >>= 1;
+							proposed_fragsize += range;
+							continue;
+						}
+					}
+				}
+			}
+			printf("%d not ok.. ", proposed_fragsize);
+			fflush(stdout);
+			range >>= 1;
+			proposed_fragsize -= range;
+		}
+		printf("will use %d\n", max_downstream_frag_size);
 	}
 	printf("Setting downstream fragment size to max %d...\n", max_downstream_frag_size);
 	for (i=0; running && i<5 ;i++) {
