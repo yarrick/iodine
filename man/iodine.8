@@ -11,6 +11,8 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I user
 .B ] [-P
 .I password
+.B ] [-m
+.I fragsize
 .B ] [-t
 .I chrootdir
 .B ] [-d
@@ -85,6 +87,11 @@ and otherwise tunX.
 Use 'password' to authenticate. If not used, 
 .B stdin
 will be used as input. Only the first 32 characters will be used.
+.SS Client Options:
+.TP
+.B -m fragsize
+Maximum downstream fragsize. Not setting this will cause the client to probe
+the maximum accepted downstream packet size.
 .SS Server Options:
 .TP
 .B -c
@@ -214,10 +221,8 @@ replace the default gateway with the servers IP address within the DNS tunnel,
 and configure the server to do NAT.
 .TP
 .B MTU issues:
-Some relaying DNS servers enforce a 512 byte packet limit. All larger packets are
-simply dropped. If you can ping through the tunnel but not login via SSH, this is
-most likely the case. Set the MTU on the server to 220 to ensure that all packets
-are less than 512 bytes. This will however greatly affect performance.
+These issues should be solved now, with automatic fragmentation of downstream 
+packets. There should be no need to set the MTU explicitly on the server.
 .SH BUGS
 File bugs at http://dev.kryo.se/iodine/
 .SH AUTHORS
