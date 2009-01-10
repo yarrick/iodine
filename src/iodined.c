@@ -882,10 +882,8 @@ help() {
 
 static void
 version() {
-	char *svnver;
-	svnver = "$Rev$ from $Date$";
 	printf("iodine IP over DNS tunneling server\n");
-	printf("SVN version: %s\n", svnver);
+	printf("version: 0.5.0-rc1 from 2009-01-10\n");
 	exit(0);
 }
 
