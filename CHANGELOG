@@ -24,6 +24,7 @@ CHANGES:
 		This fixes #27.
 	- Downstream data is now fragmented, and the fragment size is auto-
 		probed after login. Fixes #7. It only took a few years :)
+	- Enhanced the checks that validates incoming packets
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann

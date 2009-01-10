@@ -82,9 +82,21 @@ sigint(int sig)
 }
 
 static int
-ip_cmp(int userid, struct query *q)
+check_user_and_ip(int userid, struct query *q)
 {
 	struct sockaddr_in *tempin;
+
+	if (userid < 0 || userid >= created_users ) {
+		return 1; 
+	}
+	if (!users[userid].active) {
+		return 1;
+	}
+
+	/* return early if IP checking is disabled */
+	if (!check_ip) {
+		return 0;
+	}
 
 	tempin = (struct sockaddr_in *) &(q->from);
 	return memcmp(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
@@ -307,16 +319,14 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		/* Login phase, handle auth */
 		userid = unpacked[0];
-		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, q, "BADIP", 5);
-			return; /* illegal id */
-		}
-		users[userid].last_pkt = time(NULL);
-		login_calculate(logindata, 16, password, users[userid].seed);
 
-		if (check_ip && ip_cmp(userid, q) != 0) {
+		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
+			return;
 		} else {
+			users[userid].last_pkt = time(NULL);
+			login_calculate(logindata, 16, password, users[userid].seed);
+
 			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
 				/* Login ok, send ip/mtu/netmask info */
 
@@ -354,7 +364,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		userid = b32_8to5(in[1]);
 		
-		if (ip_cmp(userid, q) != 0) {
+		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
 			return; /* illegal id */
 		}
@@ -382,7 +392,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		/* Downstream fragsize probe packet */
 		userid = (b32_8to5(in[1]) >> 1) & 15;
-		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
+		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
 			return; /* illegal id */
 		}
@@ -405,7 +415,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		/* Downstream fragsize packet */
 		userid = unpacked[0];
-		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
+		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
 			return; /* illegal id */
 		}
@@ -425,7 +435,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		/* Ping packet, store userid */
 		userid = unpacked[0];
-		if (userid < 0 || userid >= USERS || ip_cmp(userid, q) != 0) {
+		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
 			return; /* illegal id */
 		}
@@ -457,13 +467,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			code = in[0] - 'A' + 10;
 
 		userid = code;
-		if (userid < 0 || userid >= USERS) {
-			write_dns(dns_fd, q, "BADIP", 5);
-			return; /* illegal id */
-		}
-
-		/* Check sending ip number */
-		if (check_ip && ip_cmp(userid, q) != 0) {
+		/* Check user and sending ip number */
+		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
 		} else {
 			/* Decode data header */
