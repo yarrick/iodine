@@ -25,6 +25,8 @@ CHANGES:
 	- Downstream data is now fragmented, and the fragment size is auto-
 		probed after login. Fixes #7. It only took a few years :)
 	- Enhanced the checks that validates incoming packets
+	- Fixed endless loop in fragment size autodetection, #39.
+	- Fixed broken hostname dot placing with specific lengths, #40.
 
 2008-08-06: 0.4.2 "Opened Zone"
 	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
