@@ -539,12 +539,12 @@ handshake(int dns_fd)
 					printf("Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
 					goto perform_login;
 				} else if (strncmp("VNAK", in, 4) == 0) {
-					errx(1, "You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
+					warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
 							VERSION, payload);
-					/* NOTREACHED */
+					return 1;
 				} else if (strncmp("VFUL", in, 4) == 0) {
-					errx(1, "Server full, all %d slots are taken. Try again later", payload);
-					/* NOTREACHED */
+					warnx("Server full, all %d slots are taken. Try again later", payload);
+					return 1;
 				}
 			} else 
 				warnx("did not receive proper login challenge");
@@ -601,8 +601,8 @@ perform_login:
 
 		printf("Retrying login...\n");
 	}
-	errx(1, "couldn't login to server");
-	/* NOTREACHED */
+	warnx("couldn't login to server");
+	return 1;
 
 perform_case_check:
 	case_preserved = 0;
@@ -703,7 +703,7 @@ autodetect_max_fragsize:
 		int range = 768;
 		max_downstream_frag_size = 0;
 		printf("Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
-		while (range >= 8 || !max_downstream_frag_size) {
+		while (running && range > 0 && (range >= 8 || !max_downstream_frag_size)) {
 			for (i=0; running && i<3 ;i++) {
 				tv.tv_sec = 1;
 				tv.tv_usec = 0;
@@ -735,6 +735,17 @@ autodetect_max_fragsize:
 			fflush(stdout);
 			range >>= 1;
 			proposed_fragsize -= range;
+		}
+		if (!running) {
+			printf("\n");
+			warnx("stopped while autodetecting fragment size (Try probing manually with -m)");
+			return 1;
+		}
+		if (range == 0) {
+			/* Tried all the way down to 2 and found no good size */
+			printf("\n");
+			warnx("found no accepted fragment size. (Try probing manually with -m)");
+			return 1;
 		}
 		printf("will use %d\n", max_downstream_frag_size);
 	}

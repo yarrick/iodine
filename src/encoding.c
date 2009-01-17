@@ -52,12 +52,12 @@ inline_dotify(char *buf, size_t buflen)
 	pos = (unsigned) (reader - buf) + 1;
 
 	while (dots) {
+		*writer-- = *reader--;
+		pos--;
 		if (pos % 57 == 0) {
 			*writer-- = '.';
 			dots--;
 		}
-		*writer-- = *reader--;
-		pos--;
 	}
 
 	/* return new length of string */
