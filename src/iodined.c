@@ -883,7 +883,7 @@ help() {
 static void
 version() {
 	printf("iodine IP over DNS tunneling server\n");
-	printf("version: 0.5.0-rc1 from 2009-01-10\n");
+	printf("version: 0.5.0 from 2009-01-23\n");
 	exit(0);
 }
 
