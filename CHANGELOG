@@ -5,7 +5,7 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
-2009-xx-xx: 0.x.x
+2009-01-23: 0.5.0 "iPassed"
 	- Fixed segfault in server when sending version reject.
 	- Applied patch to make iodine build on BeOS R5-BONE and Haiku,
 		from Francois Revol. Still work to do to get tun device working.
