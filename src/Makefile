@@ -8,7 +8,8 @@ SERVER = ../bin/iodined
 OS = `uname | tr "a-z" "A-Z"`
 ARCH = `uname -m`
 
-LDFLAGS =  -lz `sh osflags link`
+LIBPATH = -L.
+LDFLAGS =  -lz `sh osflags link` $(LIBPATH)
 CFLAGS = -c -g -Wall -D$(OS) -pedantic `sh osflags cflags`
 
 all: stateos $(CLIENT) $(SERVER)
@@ -32,5 +33,5 @@ $(SERVER): $(COMMONOBJS) $(SERVEROBJS)
 
 clean:
 	@echo "Cleaning src/"
-	@rm -f $(CLIENT) $(SERVER) *~ *.o *.core
+	@rm -f $(CLIENT){,.exe} $(SERVER){,.exe} *~ *.o *.core
 

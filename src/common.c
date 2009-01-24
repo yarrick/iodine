@@ -14,14 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <arpa/inet.h>
-#include <arpa/nameser.h>
-#include <netinet/in.h>
-#ifdef DARWIN
-#include <arpa/nameser8_compat.h>
-#endif
 #include <time.h>
-#include <err.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -33,12 +26,25 @@
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
+
+#ifdef WINDOWS32
+#include <winsock.h>
+#else
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser8_compat.h>
+#endif
 #include <termios.h>
+#include <err.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#endif
 
 #include "common.h"
+#include "plibc.h"
 
 /* daemon(3) exists only in 4.4BSD or later, and in GNU libc */
-#if !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
+#if !defined(WINDOWS32) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
 static int daemon(int nochdir, int noclose)
 {
  	int fd, i;
@@ -86,18 +92,20 @@ int setgroups(int count, int *groups)
 void
 check_superuser(void (*usage_fn)(void))
 {
+#ifndef WINDOWS32
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.\n");
 		usage_fn();
 		/* NOTREACHED */
 	}
+#endif
 }
 
 int 
 open_dns(int localport, in_addr_t listen_ip) 
 {
 	struct sockaddr_in addr;
-	int flag;
+	int flag = 1;
 	int fd;
 
 	memset(&addr, 0, sizeof(addr));
@@ -106,17 +114,21 @@ open_dns(int localport, in_addr_t listen_ip)
 	/* listen_ip already in network byte order from inet_addr, or 0 */
 	addr.sin_addr.s_addr = listen_ip; 
 
-	if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+	if ((fd = SOCKET(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+		printf("got fd %d\n", fd);
 		err(1, "socket");
+	}
 
 	flag = 1;
 #ifdef SO_REUSEPORT
-	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
+	SETSOCKOPT(fd, SOL_SOCKET, SO_REUSEPORT, (const void*) &flag, sizeof(flag));
 #endif
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
+	SETSOCKOPT(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
 
+#ifndef WINDOWS32
 	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
-	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, &flag, sizeof(flag));
+	SETSOCKOPT(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+#endif
 
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
 		err(1, "bind");
@@ -135,7 +147,7 @@ close_dns(int fd)
 void
 do_chroot(char *newroot)
 {
-#if !defined(__BEOS__) || defined(__HAIKU__)
+#if !(defined(WINDOWS32) || defined(__BEOS__) || defined(__HAIKU__))
 	if (chroot(newroot) != 0 || chdir("/") != 0)
 		err(1, "%s", newroot);
 
@@ -149,31 +161,39 @@ do_chroot(char *newroot)
 void
 do_detach()
 {
+#ifndef WINDOWS32
 	printf("Detaching from terminal...\n");
 	daemon(0, 0);
 	umask(0);
 	alarm(0);
+#else
+	printf("Windows version does not support detaching\n");
+#endif
 }
 
 void
 read_password(char *buf, size_t len)
 {
+	char pwd[80];
+#ifndef WINDOWS32
 	struct termios old;
 	struct termios tp;
-	char pwd[80];
 
 	tcgetattr(0, &tp);
 	old = tp;
 	
 	tp.c_lflag &= (~ECHO);
 	tcsetattr(0, TCSANOW, &tp);
+#endif
 
 	printf("Enter password: ");
 	fflush(stdout);
 	scanf("%79s", pwd);
 	printf("\n");
 
+#ifndef WINDOWS32
 	tcsetattr(0, TCSANOW, &old);	
+#endif
 
 	strncpy(buf, pwd, len);
 	buf[len-1] = '\0';
@@ -195,3 +215,13 @@ check_topdomain(char *str)
        }
        return 0;
 }
+
+#ifdef WINDOWS32
+int
+inet_aton(const char *cp, struct in_addr *inp)
+{
+ inp->s_addr = inet_addr(cp);
+ return inp->s_addr != INADDR_ANY;
+}
+#endif
+

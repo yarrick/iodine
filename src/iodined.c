@@ -23,24 +23,32 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
-#define _XPG4_2
-#include <sys/socket.h>
-#include <sys/uio.h>
 #include <fcntl.h>
-#include <err.h>
-#include <grp.h>
 #include <time.h>
-#include <pwd.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
 #include <zlib.h>
+
+#ifdef WINDOWS32
+#include "windows.h"
+#include <winsock.h>
+#else
 #include <arpa/nameser.h>
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
 #endif
+#define _XPG4_2
+#include <sys/socket.h>
+#include <err.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <grp.h>
+#include <sys/uio.h>
+#include <pwd.h>
+#include <netdb.h>
+#endif
 
+#include "plibc.h"
 #include "common.h"
 #include "dns.h"
 #include "encoding.h"
@@ -611,7 +619,7 @@ tunnel_bind(int bind_fd, int dns_fd)
 {
 	char packet[64*1024];
 	struct sockaddr_in from;
-	socklen_t fromlen;
+	int fromlen;
 	struct fw_query *query;
 	short id;
 	int r;
@@ -772,13 +780,14 @@ static int
 read_dns(int fd, struct query *q)
 {
 	struct sockaddr_in from;
-	socklen_t addrlen;
+	int addrlen;
 	char packet[64*1024];
+	int r;
+#ifndef WINDOWS32
 	char address[96];
 	struct msghdr msg;
 	struct iovec iov;
 	struct cmsghdr *cmsg;
-	int r;
 
 	addrlen = sizeof(struct sockaddr);
 	iov.iov_base = packet;
@@ -793,12 +802,17 @@ read_dns(int fd, struct query *q)
 	msg.msg_flags = 0;
 	
 	r = recvmsg(fd, &msg, 0);
+#else
+	addrlen = sizeof(struct sockaddr);
+	r = RECVFROM(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+#endif /* !WINDOWS32 */
 
 	if (r > 0) {
 		dns_decode(NULL, 0, q, QR_QUERY, packet, r);
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 		q->fromlen = addrlen;
 		
+#ifndef WINDOWS32
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; 
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) { 
 			
@@ -809,6 +823,7 @@ read_dns(int fd, struct query *q)
 				break;
 			} 
 		}
+#endif
 
 		return strlen(q->name);
 	} else if (r < 0) { 
@@ -893,7 +908,9 @@ int
 main(int argc, char **argv)
 {
 	in_addr_t listen_ip;
+#ifndef WINDOWS32
 	struct passwd *pw;
+#endif
 	int foreground;
 	char *username;
 	char *newroot;
@@ -1033,10 +1050,12 @@ main(int argc, char **argv)
 	}
 
 	if (username != NULL) {
+#ifndef WINDOWS32
 		if ((pw = getpwnam(username)) == NULL) {
 			warnx("User %s does not exist!\n", username);
 			usage();
 		}
+#endif
 	}
 
 	if (mtu <= 0) {
@@ -1116,12 +1135,14 @@ main(int argc, char **argv)
 
 	signal(SIGINT, sigint);
 	if (username != NULL) {
+#ifndef WINDOWS32
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
 		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
 			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}
+#endif
 	}
 	
 	tunnel(tun_fd, dnsd_fd, bind_fd);
