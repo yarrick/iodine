@@ -15,7 +15,11 @@
  */
 
 #include <arpa/inet.h>
+#ifndef __CYGWIN__
 #include <arpa/nameser.h>
+#else
+#include "windows.h"
+#endif
 #include <netinet/in.h>
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
@@ -38,7 +42,7 @@
 #include "common.h"
 
 /* daemon(3) exists only in 4.4BSD or later, and in GNU libc */
-#if !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
+#if !(defined(__CYGWIN__)) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
 static int daemon(int nochdir, int noclose)
 {
  	int fd, i;
