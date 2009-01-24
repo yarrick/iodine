@@ -945,11 +945,7 @@ main(int argc, char **argv)
 		}
 	}
 	
-	if (geteuid() != 0) {
-		warnx("Run as root and you'll be happy.\n");
-		usage();
-		/* NOTREACHED */
-	}
+	check_superuser(usage);
 
 	argc -= optind;
 	argv += optind;
