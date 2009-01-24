@@ -15,11 +15,7 @@
  */
 
 #include <arpa/inet.h>
-#ifndef __CYGWIN__
 #include <arpa/nameser.h>
-#else
-#include "windows.h"
-#endif
 #include <netinet/in.h>
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
@@ -42,7 +38,7 @@
 #include "common.h"
 
 /* daemon(3) exists only in 4.4BSD or later, and in GNU libc */
-#if !(defined(__CYGWIN__)) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
+#if !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
 static int daemon(int nochdir, int noclose)
 {
  	int fd, i;
@@ -90,13 +86,11 @@ int setgroups(int count, int *groups)
 void
 check_superuser(void (*usage_fn)(void))
 {
-#ifndef __CYGWIN__
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.\n");
 		usage_fn();
 		/* NOTREACHED */
 	}
-#endif
 }
 
 int 

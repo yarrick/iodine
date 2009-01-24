@@ -15,11 +15,7 @@
  */
 
 #include <arpa/inet.h>
-#ifndef __CYGWIN__
 #include <arpa/nameser.h>
-#else
-#include "windows.h"
-#endif
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
 #endif
