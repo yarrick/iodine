@@ -1002,10 +1002,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (geteuid() != 0) {
-		warnx("Run as root and you'll be happy.\n");
-		usage();
-	}
+	check_superuser(usage);
 
 	if (argc != 2) 
 		usage();

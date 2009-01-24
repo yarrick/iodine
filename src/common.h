@@ -58,6 +58,7 @@ struct query {
 	int fromlen;
 };
 
+void check_superuser(void (*usage_fn)(void));
 int open_dns(int, in_addr_t);
 void close_dns(int);
 

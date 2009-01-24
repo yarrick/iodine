@@ -82,6 +82,17 @@ int setgroups(int count, int *groups)
 }
 #endif
 
+
+void
+check_superuser(void (*usage_fn)(void))
+{
+	if (geteuid() != 0) {
+		warnx("Run as root and you'll be happy.\n");
+		usage_fn();
+		/* NOTREACHED */
+	}
+}
+
 int 
 open_dns(int localport, in_addr_t listen_ip) 
 {
