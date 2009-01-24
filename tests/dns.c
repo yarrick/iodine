@@ -23,11 +23,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/stat.h>
-#ifndef __CYGWIN__
 #include <arpa/nameser.h>
-#else
-#include "windows.h"
-#endif
 
 #include "common.h"
 #include "dns.h"

@@ -32,11 +32,7 @@
 #include <pwd.h>
 #include <arpa/inet.h>
 #include <zlib.h>
-#ifndef __CYGWIN__
 #include <arpa/nameser.h>
-#else
-#include "windows.h"
-#endif
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
 #endif
