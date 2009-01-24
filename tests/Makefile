@@ -23,5 +23,5 @@ $(TEST): $(OBJS) $(SRCOBJS)
 
 clean:
 	@echo "Cleaning tests/"
-	@rm -f *~ *.core $(TEST) $(OBJS)
+	@rm -f *~ *.core $(TEST){,exe} $(OBJS)
 

@@ -36,7 +36,11 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <zlib.h>
+#ifndef __CYGWIN__
 #include <arpa/nameser.h>
+#else
+#include "windows.h"
+#endif
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
 #endif
@@ -799,6 +803,7 @@ read_dns(int fd, struct query *q)
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 		q->fromlen = addrlen;
 		
+#ifndef __CYGWIN__
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; 
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) { 
 			
@@ -809,7 +814,7 @@ read_dns(int fd, struct query *q)
 				break;
 			} 
 		}
-
+#endif
 		return strlen(q->name);
 	} else if (r < 0) { 
 		/* Error */
