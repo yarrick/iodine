@@ -90,11 +90,13 @@ int setgroups(int count, int *groups)
 void
 check_superuser(void (*usage_fn)(void))
 {
+#ifndef __CYGWIN__
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.\n");
 		usage_fn();
 		/* NOTREACHED */
 	}
+#endif
 }
 
 int 
