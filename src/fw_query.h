@@ -18,7 +18,12 @@
 #define __FW_QUERY_H__
 
 #include <sys/types.h>
+#ifdef WINDOWS32
+#include "windows.h"
+#include <winsock.h>
+#else
 #include <sys/socket.h>
+#endif
 
 #define FW_QUERY_CACHE_SIZE 16
 

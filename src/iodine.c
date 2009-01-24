@@ -20,23 +20,30 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
-#include <sys/socket.h>
 #include <fcntl.h>
-#include <err.h>
-#include <grp.h>
-#include <pwd.h>
-#include <arpa/inet.h>
 #include <zlib.h>
+
+#ifdef WINDOWS32
+#include "windows.h"
+#include <winsock.h>
+#else
 #include <arpa/nameser.h>
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
 #endif
+#include <sys/socket.h>
+#include <err.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <grp.h>
+#include <pwd.h>
+#include <netdb.h>
+#endif
 
+#include "plibc.h"
 #include "common.h"
 #include "encoding.h"
 #include "base32.h"
@@ -165,13 +172,13 @@ read_dns(int fd, char *buf, int buflen)
 {
 	struct sockaddr_in from;
 	char data[64*1024];
-	socklen_t addrlen;
+	int addrlen;
 	struct query q;
 	int rv;
 	int r;
 
 	addrlen = sizeof(struct sockaddr);
-	if ((r = recvfrom(fd, data, sizeof(data), 0, 
+	if ((r = RECVFROM(fd, data, sizeof(data), 0, 
 			  (struct sockaddr*)&from, &addrlen)) == -1) {
 		warn("recvfrom");
 		return 0;
@@ -308,7 +315,7 @@ tunnel(int tun_fd, int dns_fd)
 		}
 		FD_SET(dns_fd, &fds);
 
-		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
+		i = SELECT(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
 		
 		if (running == 0)
 			break;
@@ -873,7 +880,9 @@ int
 main(int argc, char **argv)
 {
 	char *nameserv_addr;
+#ifndef WINDOWS32
 	struct passwd *pw;
+#endif
 	char *username;
 	int foreground;
 	char *newroot;
@@ -897,6 +906,10 @@ main(int argc, char **argv)
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
+	
+#ifdef WINDOWS32
+	plibc_init("Kryo", "iodine");
+#endif
 	
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
@@ -985,11 +998,13 @@ main(int argc, char **argv)
 	}
 
 	if (username != NULL) {
+#ifndef WINDOWS32
 		if ((pw = getpwnam(username)) == NULL) {
 			warnx("User %s does not exist!\n", username);
 			usage();
 			/* NOTREACHED */
 		}
+#endif
 	}
 	
 	if (strlen(password) == 0) 
@@ -1015,6 +1030,7 @@ main(int argc, char **argv)
 		do_chroot(newroot);
 	
 	if (username != NULL) {
+#ifndef WINDOWS32
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
 		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
@@ -1022,6 +1038,7 @@ main(int argc, char **argv)
 			usage();
 			/* NOTREACHED */
 		}
+#endif
 	}
 	
 	downstream_seqno = 0;

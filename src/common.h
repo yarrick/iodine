@@ -17,10 +17,16 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-#include <arpa/inet.h>
-#include <sys/types.h>
+#ifdef WINDOWS32
+#include "windows.h"
+#include <winsock.h>
+#else
 #include <sys/socket.h>
+#include <err.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
+#endif
+
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -68,5 +74,9 @@ void do_detach();
 void read_password(char*, size_t);
 
 int check_topdomain(char *);
+
+#ifdef WINDOWS32
+int inet_aton(const char *cp, struct in_addr *inp);
+#endif
 
 #endif

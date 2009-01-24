@@ -23,16 +23,25 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#ifdef WINDOWS32
+#include <winsock.h>
+#include "windows.h"
+#else
 #include <err.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#endif
 
+#include "plibc.h"
 #include "tun.h"
+#include "common.h"
 
 #define TUN_MAX_TRY 50
 
 char if_name[50];
 
+#ifndef WINDOWS32
 #ifdef LINUX
 
 #include <sys/ioctl.h>
@@ -134,6 +143,13 @@ open_tun(const char *tun_device)
 }
 
 #endif /* !LINUX */
+#else /* WINDOWS32 */
+int 
+open_tun(const char *tun_device) 
+{
+	return 10;
+}
+#endif 
 
 void 
 close_tun(int tun_fd) 
@@ -183,6 +199,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 int
 tun_setip(const char *ip, int netbits)
 {
+#ifndef WINDOWS32
 	char cmdline[512];
 	int netmask;
 	struct in_addr net;
@@ -224,11 +241,16 @@ tun_setip(const char *ip, int netbits)
 	}
 
 	return 1;
+#else /* WINDOWS32 */
+
+	return 0;
+#endif
 }
 
 int 
 tun_setmtu(const unsigned mtu)
 {
+#ifndef WINDOWS32
 	char cmdline[512];
 
 	if (mtu > 200 && mtu < 1500) {
@@ -244,5 +266,9 @@ tun_setmtu(const unsigned mtu)
 	}
 
 	return 1;
+#else /* WINDOWS32 */
+
+	return 0;
+#endif
 }
 

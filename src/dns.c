@@ -14,19 +14,25 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <arpa/inet.h>
-#include <arpa/nameser.h>
-#ifdef DARWIN
-#include <arpa/nameser8_compat.h>
-#endif
 #include <time.h>
-#include <err.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h>
+
+#ifdef WINDOWS32
+#include "windows.h"
+#else
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser8_compat.h>
+#endif
+#include <arpa/inet.h>
+#include <err.h>
+#endif
+
 
 #include "dns.h"
 #include "encoding.h"

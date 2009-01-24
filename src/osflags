@@ -13,6 +13,9 @@ link)
 		Haiku)
 			echo '-lnetwork';
 		;;
+		windows32)
+			echo '-lplibc -lws2_32';
+		;;
 	esac
 	;;
 cflags)
