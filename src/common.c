@@ -222,5 +222,49 @@ inet_aton(const char *cp, struct in_addr *inp)
  inp->s_addr = inet_addr(cp);
  return inp->s_addr != INADDR_ANY;
 }
+
+void
+warn(const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	if (fmt) fprintf(stderr, fmt, list);
+	fprintf(stderr, "%s\n", strerror(errno));
+	va_end(list);
+}
+
+void
+warnx(const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	if (fmt) fprintf(stderr, fmt, list);
+	fprintf(stderr, "\n");
+	va_end(list);
+}
+
+void
+err(int eval, const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	warn(fmt, list);
+	va_end(list);
+	exit(eval);
+}
+
+void
+errx(int eval, const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	warnx(fmt, list);
+	va_end(list);
+	exit(eval);
+}
 #endif
 
