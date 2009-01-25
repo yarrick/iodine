@@ -48,7 +48,6 @@
 #include <netdb.h>
 #endif
 
-#include "plibc.h"
 #include "common.h"
 #include "dns.h"
 #include "encoding.h"
@@ -780,7 +779,7 @@ static int
 read_dns(int fd, struct query *q)
 {
 	struct sockaddr_in from;
-	int addrlen;
+	socklen_t addrlen;
 	char packet[64*1024];
 	int r;
 #ifndef WINDOWS32
@@ -804,7 +803,7 @@ read_dns(int fd, struct query *q)
 	r = recvmsg(fd, &msg, 0);
 #else
 	addrlen = sizeof(struct sockaddr);
-	r = RECVFROM(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 #endif /* !WINDOWS32 */
 
 	if (r > 0) {

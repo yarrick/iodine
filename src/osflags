@@ -14,13 +14,13 @@ link)
 			echo '-lnetwork';
 		;;
 		windows32)
-			echo '-lplibc -lws2_32';
+			echo '-lws2_32';
 		;;
 	esac
 	;;
 cflags)
 	case $1 in
-		BeOS)
+		BeOS | windows32)
 			echo '-Dsocklen_t=int';
 		;;
 	esac

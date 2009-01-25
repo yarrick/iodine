@@ -41,7 +41,6 @@
 #endif
 
 #include "common.h"
-#include "plibc.h"
 
 /* daemon(3) exists only in 4.4BSD or later, and in GNU libc */
 #if !defined(WINDOWS32) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
@@ -114,20 +113,20 @@ open_dns(int localport, in_addr_t listen_ip)
 	/* listen_ip already in network byte order from inet_addr, or 0 */
 	addr.sin_addr.s_addr = listen_ip; 
 
-	if ((fd = SOCKET(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+	if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		printf("got fd %d\n", fd);
 		err(1, "socket");
 	}
 
 	flag = 1;
 #ifdef SO_REUSEPORT
-	SETSOCKOPT(fd, SOL_SOCKET, SO_REUSEPORT, (const void*) &flag, sizeof(flag));
+	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (const void*) &flag, sizeof(flag));
 #endif
-	SETSOCKOPT(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
 
 #ifndef WINDOWS32
 	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
-	SETSOCKOPT(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
 #endif
 
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
