@@ -59,6 +59,11 @@
 #include "fw_query.h"
 #include "version.h"
 
+#ifdef WINDOWS32
+WORD req_version = MAKEWORD(1, 1);
+WSADATA wsa_data;
+#endif
+
 static int running = 1;
 static char *topdomain;
 static char password[33];
@@ -944,6 +949,10 @@ main(int argc, char **argv)
 	netmask = 27;
 
 	b32 = get_base32_encoder();
+	
+#ifdef WINDOWS32
+	WSAStartup(req_version, &wsa_data);
+#endif
 
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
