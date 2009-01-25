@@ -258,7 +258,7 @@ close_tun(int tun_fd)
 int 
 write_tun(int tun_fd, char *data, size_t len) 
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
+#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	data += 4;
 	len -= 4;
 #else /* !FREEBSD/DARWIN */
@@ -285,7 +285,7 @@ write_tun(int tun_fd, char *data, size_t len)
 ssize_t
 read_tun(int tun_fd, char *buf, size_t len) 
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
+#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	/* FreeBSD/Darwin/NetBSD has no header */
 	return read(tun_fd, buf + 4, len - 4) + 4;
 #else /* !FREEBSD */
@@ -340,11 +340,38 @@ tun_setip(const char *ip, int netbits)
 	return 1;
 #else /* WINDOWS32 */
 	DWORD status;
+	DWORD ipdata[3];
+	struct in_addr addr;
+	int i;
+	int netmask;
 	DWORD len;
+	BOOL res;
 
 	/* Set device as connected */
 	status = 1;
-	DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, sizeof(status), &status, sizeof(status), &len, NULL);
+	res =DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, 
+		sizeof(status), &status, sizeof(status), &len, NULL);
+	if (!res) {
+		return -1;
+	}
+	netmask = 0;
+	for (i = 0; i < netbits; i++) {
+		netmask = (netmask << 1) | 1;
+	}
+	netmask <<= (32 - netbits);
+	ipdata[2] = (DWORD) htonl(netmask);
+
+	if (inet_aton(ip, &addr)) {
+		ipdata[0] = (DWORD) addr.s_addr;
+		ipdata[1] = ipdata[2] & ipdata[0]; /* Get network bits */
+	} else {
+		return -1;
+	}
+	res = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata, 
+		sizeof(ipdata), &ipdata, sizeof(ipdata), &len, NULL);
+	if (!res) {
+		return -1;
+	}
 	return 0;
 #endif
 }
