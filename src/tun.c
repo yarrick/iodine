@@ -26,20 +26,32 @@
 
 #ifdef WINDOWS32
 #include <winsock.h>
+#include <winioctl.h>
 #include "windows.h"
+
+HANDLE dev_handle;
+
+#define TAP_CONTROL_CODE(request,method) CTL_CODE(FILE_DEVICE_UNKNOWN, request, method, FILE_ANY_ACCESS)
+#define TAP_IOCTL_CONFIG_TUN       TAP_CONTROL_CODE(10, METHOD_BUFFERED)
+#define TAP_IOCTL_SET_MEDIA_STATUS TAP_CONTROL_CODE(6, METHOD_BUFFERED)
+
+#define TAP_ADAPTER_KEY "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}"
+#define TAP_DEVICE_SPACE "\\\\.\\Global\\"
+#define TAP_COMPONENT_ID "tap0801"
+#define KEY_COMPONENT_ID "ComponentId"
+#define NET_CFG_INST_ID "NetCfgInstanceId"
 #else
 #include <err.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+
+#define TUN_MAX_TRY 50
+char if_name[50];
 #endif
 
 #include "plibc.h"
 #include "tun.h"
 #include "common.h"
-
-#define TUN_MAX_TRY 50
-
-char if_name[50];
 
 #ifndef WINDOWS32
 #ifdef LINUX
@@ -144,10 +156,95 @@ open_tun(const char *tun_device)
 
 #endif /* !LINUX */
 #else /* WINDOWS32 */
+static void
+get_device(char *device, int device_len)
+{
+	LONG status;
+	HKEY adapter_key;
+	int index;
+
+	index = 0;
+	status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, TAP_ADAPTER_KEY, 0, KEY_READ, &adapter_key);
+
+	if (status != ERROR_SUCCESS) {
+		warnx("Error opening registry key " TAP_ADAPTER_KEY );
+		return;
+	}
+	
+	while (TRUE) {
+		char name[256];
+		char unit[256];
+		char component[256];
+
+		char cid_string[256] = KEY_COMPONENT_ID;
+		HKEY device_key;
+		DWORD datatype;
+		DWORD len;
+
+		/* Iterate through all adapter of this kind */
+		len = sizeof(name);
+		status = RegEnumKeyEx(adapter_key, index, name, &len, NULL, NULL, NULL, NULL);
+		if (status == ERROR_NO_MORE_ITEMS) {
+			break;
+		} else if (status != ERROR_SUCCESS) {
+			warnx("Error enumerating subkeys of registry key " TAP_ADAPTER_KEY );
+			break;
+		}
+
+		snprintf(unit, sizeof(unit), TAP_ADAPTER_KEY "\\%s", name);
+		status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, unit, 0, KEY_READ, &device_key);
+		if (status != ERROR_SUCCESS) {
+			warnx("Error opening registry key %s", unit);
+			goto next;
+		}
+
+		/* Check component id */
+		len = sizeof(component);
+		status = RegQueryValueEx(device_key, cid_string, NULL, &datatype, (LPBYTE)component, &len);
+		if (status != ERROR_SUCCESS || datatype != REG_SZ) {
+			goto next;
+		}
+		if (strncmp(TAP_COMPONENT_ID, component, strlen(TAP_COMPONENT_ID)) == 0) {
+			/* We found a TAP32 device, get its NetCfgInstanceId */
+			char iid_string[256] = NET_CFG_INST_ID;
+			
+			status = RegQueryValueEx(device_key, iid_string, NULL, &datatype, (LPBYTE) device, (DWORD *) &device_len);
+			if (status != ERROR_SUCCESS || datatype != REG_SZ) {
+				warnx("Error reading registry key %s\\%s on TAP device", unit, iid_string);
+			} else {
+				/* Done getting name of TAP device */
+				RegCloseKey(device_key);
+				return;
+			}
+		}
+next:
+		RegCloseKey(device_key);
+		index++;
+	}
+	RegCloseKey(adapter_key);
+}
+
 int 
 open_tun(const char *tun_device) 
 {
-	return 10;
+	char adapter[256];
+	char tapfile[512];
+
+	memset(adapter, 0, sizeof(adapter));
+	get_device(adapter, sizeof(adapter));
+
+	if (strlen(adapter) == 0)
+		return -1;
+	
+	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
+	printf("Opening device %s\n", tapfile);
+	dev_handle = CreateFile(tapfile, GENERIC_WRITE | GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM, 0);
+	if (dev_handle == INVALID_HANDLE_VALUE) {
+		return -1;
+	}
+
+	printf("Opened handle: %p\n", dev_handle);
+	return (int) dev_handle;
 }
 #endif 
 
@@ -242,7 +339,12 @@ tun_setip(const char *ip, int netbits)
 
 	return 1;
 #else /* WINDOWS32 */
+	DWORD status;
+	DWORD len;
 
+	/* Set device as connected */
+	status = 1;
+	DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, sizeof(status), &status, sizeof(status), &len, NULL);
 	return 0;
 #endif
 }
