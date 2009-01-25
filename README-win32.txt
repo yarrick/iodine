@@ -29,6 +29,7 @@ The following fixable limitations apply:
 - DNS server IP can not be fetched automatically
 - Exactly one TAP32 interface must be installed
 - The TAP32 interface must be named "dns"
+- Server cannot read packet destination address
 
 The following (probably) un-fixable limitations apply:
 - Server must be run with /30 netmask = 1 user at a time
