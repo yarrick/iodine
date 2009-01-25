@@ -264,8 +264,10 @@ open_tun(const char *tun_device)
 	memset(adapter, 0, sizeof(adapter));
 	get_device(adapter, sizeof(adapter));
 
-	if (strlen(adapter) == 0)
+	if (strlen(adapter) == 0) {
+		warnx("No TAP adapters found. See README-win32.txt for help.\n");
 		return -1;
+	}
 	
 	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
 	printf("Opening device %s\n", tapfile);
