@@ -5,12 +5,12 @@ CLIENT = ../bin/iodine
 SERVEROBJS = iodined.o user.o fw_query.o
 SERVER = ../bin/iodined
 
-OS = `uname | tr "a-z" "A-Z"`
+OS = `echo $(TARGETOS) | tr "a-z" "A-Z"`
 ARCH = `uname -m`
 
 LIBPATH = -L.
-LDFLAGS =  -lz `sh osflags link` $(LIBPATH)
-CFLAGS = -c -g -Wall -D$(OS) -pedantic `sh osflags cflags`
+LDFLAGS =  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
+CFLAGS = -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags`
 
 all: stateos $(CLIENT) $(SERVER)
 
