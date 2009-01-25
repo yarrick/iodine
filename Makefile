@@ -14,8 +14,13 @@ MKDIR_FLAGS=-p
 RM=rm
 RM_FLAGS=-f
 
+TARGETOS = `uname`
+
 all: 
-	@(cd src; $(MAKE) all)
+	@(cd src; $(MAKE) TARGETOS=$(TARGETOS) all)
+
+cross-mingw: 
+	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-mingw32-gcc all)
 
 install: all
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(sbindir)
@@ -35,7 +40,7 @@ uninstall:
 test: all
 	@echo "!! The check library is required for compiling and running the tests"
 	@echo "!! Get it at http://check.sf.net"
-	@(cd tests; $(MAKE) all)
+	@(cd tests; $(MAKE) TARGETOS=$(TARGETOS) all)
 
 clean:
 	@echo "Cleaning..."

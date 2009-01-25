@@ -1,9 +1,9 @@
 #!/bin/sh
 
-case $1 in
+case $2 in
 link)
 
-	case `uname` in
+	case $1 in
 		SunOS | solaris)
 			echo '-lsocket -lnsl';
 		;;
@@ -19,7 +19,7 @@ link)
 	esac
 	;;
 cflags)
-	case `uname` in
+	case $1 in
 		BeOS)
 			echo '-Dsocklen_t=int';
 		;;
