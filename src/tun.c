@@ -275,10 +275,21 @@ write_tun(int tun_fd, char *data, size_t len)
 #endif /* !LINUX */
 #endif /* FREEBSD */
 
+#ifndef WINDOWS32
 	if (write(tun_fd, data, len) != len) {
 		warn("write_tun");
 		return 1;
 	}
+#else /* WINDOWS32 */
+	{
+		DWORD written;
+		WriteFile((HANDLE) tun_fd, data, len, &written, NULL);
+		if (written != len) {
+			warn("write_tun");
+			return 1;
+		}
+	}
+#endif
 	return 0;
 }
 
@@ -287,9 +298,9 @@ read_tun(int tun_fd, char *buf, size_t len)
 {
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	/* FreeBSD/Darwin/NetBSD has no header */
-	return read(tun_fd, buf + 4, len - 4) + 4;
+	return READ(tun_fd, buf + 4, len - 4) + 4;
 #else /* !FREEBSD */
-	return read(tun_fd, buf, len);
+	return READ(tun_fd, buf, len);
 #endif /* !FREEBSD */
 }
 
