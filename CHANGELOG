@@ -5,6 +5,9 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
+2009-xx-yy: x.y.z "Boringo"
+	- Added initial Windows support, fixes #43.
+
 2009-01-23: 0.5.0 "iPassed"
 	- Fixed segfault in server when sending version reject.
 	- Applied patch to make iodine build on BeOS R5-BONE and Haiku,
