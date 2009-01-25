@@ -58,5 +58,5 @@ clean:
 	@echo "Cleaning..."
 	@(cd src; $(MAKE) clean)
 	@(cd tests; $(MAKE) clean)
-	@rm -rf bin
+	@rm -rf bin iodine-latest-win32*
 
