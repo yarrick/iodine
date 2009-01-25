@@ -424,27 +424,31 @@ tun_setip(const char *ip, int netbits)
 	r = DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, 
 		sizeof(status), &status, sizeof(status), &len, NULL);
 	if (!r) {
+		printf("Failed to enable interface\n");
 		return -1;
 	}
 	
-	ipdata[2] = (DWORD) net.s_addr;
-
 	if (inet_aton(ip, &addr)) {
-		ipdata[0] = (DWORD) addr.s_addr;
-		ipdata[1] = ipdata[2] & ipdata[0]; /* Get network bits */
+		ipdata[0] = (DWORD) addr.s_addr;   /* local ip addr */
+		ipdata[1] = net.s_addr & ipdata[0]; /* network addr */
+		ipdata[2] = (DWORD) net.s_addr;    /* netmask */
 	} else {
 		return -1;
 	}
-	/* Tell ip/network addr/netmask to device for arp use */
+
+	/* Tell ip/networkaddr/netmask to device for arp use */
 	r = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata, 
 		sizeof(ipdata), &ipdata, sizeof(ipdata), &len, NULL);
 	if (!r) {
+		printf("Failed to set interface in TUN mode\n");
 		return -1;
 	}
 
-	/* TODO use netsh to set ip address */
-	cmdline[0] = 0;
-	return 0;
+	/* use netsh to set ip address */
+	printf("Setting IP of interface '%s' to %s (can take a few seconds)...\n", if_name, ip);
+	snprintf(cmdline, sizeof(cmdline), "netsh interface ip set address \"%s\" static %s %s",
+		if_name, ip, inet_ntoa(net));
+	return system(cmdline);
 #endif
 }
 

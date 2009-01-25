@@ -230,7 +230,11 @@ warn(const char *fmt, ...)
 
 	va_start(list, fmt);
 	if (fmt) fprintf(stderr, fmt, list);
-	fprintf(stderr, "%s\n", strerror(errno));
+	if (errno == 0) {
+		fprintf(stderr, ": WSA error %d\n", WSAGetLastError()); 
+	} else {
+		fprintf(stderr, ": %s\n", strerror(errno));
+	}
 	va_end(list);
 }
 
