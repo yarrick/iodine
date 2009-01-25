@@ -623,7 +623,7 @@ tunnel_bind(int bind_fd, int dns_fd)
 {
 	char packet[64*1024];
 	struct sockaddr_in from;
-	int fromlen;
+	socklen_t fromlen;
 	struct fw_query *query;
 	short id;
 	int r;
