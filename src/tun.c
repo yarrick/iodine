@@ -50,7 +50,6 @@ struct tun_data data;
 char if_name[50];
 #endif
 
-#include "plibc.h"
 #include "tun.h"
 #include "common.h"
 
@@ -354,11 +353,10 @@ write_tun(int tun_fd, char *data, size_t len)
 ssize_t
 read_tun(int tun_fd, char *buf, size_t len) 
 {
-#ifndef WINDOWS32
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
+#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	/* FreeBSD/Darwin/NetBSD has no header */
 	int bytes;
-	bytes = read(tun_fd, buf + 4, len - 4);
+	bytes = recv(tun_fd, buf + 4, len, 0);
 	if (bytes < 0) {
 		return bytes;
 	} else {
@@ -367,15 +365,6 @@ read_tun(int tun_fd, char *buf, size_t len)
 #else /* !FREEBSD */
 	return read(tun_fd, buf, len);
 #endif /* !FREEBSD */
-#else /* !WINDOWS32 */
-	int bytes;
-	bytes = RECV(tun_fd, buf + 4, len, 0);
-	if (bytes < 0) {
-		return bytes;
-	} else {
-		return bytes + 4;
-	}
-#endif
 }
 
 int
