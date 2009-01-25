@@ -77,6 +77,11 @@ int check_topdomain(char *);
 
 #ifdef WINDOWS32
 int inet_aton(const char *cp, struct in_addr *inp);
+
+void err(int eval, const char *fmt, ...);
+void warn(const char *fmt, ...);
+void errx(int eval, const char *fmt, ...);
+void warnx(const char *fmt, ...);
 #endif
 
 #endif

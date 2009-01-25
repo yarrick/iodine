@@ -19,13 +19,6 @@
 
 typedef unsigned int in_addr_t;
 
-/* Bad err.h fix */
-#define warn printf
-#define warnx printf
-#define err(a, b, ...) do{printf("%s ", strerror(errno)); \
-	printf(b, ## __VA_ARGS__); exit(a);}while(0)
-#define errx(a, b, ...) do{printf(b, ## __VA_ARGS__); exit(a);}while(0)
-
 #include <windows.h>
 #include <windns.h>
 #include <winsock.h>
