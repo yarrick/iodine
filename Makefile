@@ -22,6 +22,17 @@ all:
 cross-mingw: 
 	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-mingw32-gcc all)
 
+cross-mingw-dist: cross-mingw
+	@rm -rf iodine-latest-win32*
+	@mkdir -p iodine-latest-win32/bin
+	@cp bin/* iodine-latest-win32/bin
+	@cp README* CH* TO* iodine-latest-win32
+	@echo "Create date: " > iodine-latest-win32/VERSION
+	@date >> iodine-latest-win32/VERSION
+	@echo "SVN version: " >> iodine-latest-win32/VERSION
+	@svnversion >> iodine-latest-win32/VERSION
+	@zip -r iodine-latest-win32.zip iodine-latest-win32
+
 install: all
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(sbindir)
 	$(INSTALL) $(INSTALL_FLAGS) bin/iodine $(DESTDIR)$(sbindir)/iodine
