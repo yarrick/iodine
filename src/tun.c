@@ -47,11 +47,12 @@ struct tun_data data;
 #include <netinet/in.h>
 
 #define TUN_MAX_TRY 50
-char if_name[50];
 #endif
 
 #include "tun.h"
 #include "common.h"
+
+char if_name[50];
 
 #ifndef WINDOWS32
 #ifdef LINUX
@@ -244,10 +245,8 @@ DWORD WINAPI tun_reader(LPVOID arg)
 		if (!res) {
 			WaitForSingleObject(olpd.hEvent, INFINITE);
 			res = GetOverlappedResult(dev_handle, &olpd, (LPDWORD) &len, FALSE);
-			printf("Read %d bytes!\n", len);
 			res = sendto(sock, buf, len, 0, (struct sockaddr*) &(tun->addr), 
 				sizeof(struct sockaddr_in));
-			printf("send done %d, %02X %02X %02X\n", res, buf[0], buf[1], buf[2]);
 		}
 	}
 
@@ -275,7 +274,8 @@ open_tun(const char *tun_device)
 		return -1;
 	}
 
-	printf("Opened handle: %p\n", dev_handle);
+	/* TODO get name of interface */
+	strncpy(if_name, "dns", MIN(4, sizeof(if_name)));
 
 	/* Use a UDP connection to forward packets from tun,
 	 * so we can still use select() in main code.
@@ -370,15 +370,20 @@ read_tun(int tun_fd, char *buf, size_t len)
 int
 tun_setip(const char *ip, int netbits)
 {
-#ifndef WINDOWS32
 	char cmdline[512];
 	int netmask;
 	struct in_addr net;
 	int i;
-
 #ifndef LINUX
 	int r;
 #endif
+#ifdef WINDOWS32
+	DWORD status;
+	DWORD ipdata[3];
+	struct in_addr addr;
+	DWORD len;
+#endif
+
 	netmask = 0;
 	for (i = 0; i < netbits; i++) {
 		netmask = (netmask << 1) | 1;
@@ -386,56 +391,43 @@ tun_setip(const char *ip, int netbits)
 	netmask <<= (32 - netbits);
 	net.s_addr = htonl(netmask);
 
-	if (inet_addr(ip) != INADDR_NONE) {
-		snprintf(cmdline, sizeof(cmdline), 
-				"/sbin/ifconfig %s %s %s netmask %s",
-				if_name,
-				ip,
-				ip,
-				inet_ntoa(net));
-		
-		printf("Setting IP of %s to %s\n", if_name, ip);
-#ifndef LINUX
-		r = system(cmdline);
-		if(r != 0) {
-			return r;
-		} else {
-			snprintf(cmdline, sizeof(cmdline),
-					"/sbin/route add %s/%d %s",
-					ip, netbits, ip);
-		}
-		printf("Adding route %s/%d to %s\n", ip, netbits, ip);
-#endif
-		return system(cmdline);
-	} else {
+	if (inet_addr(ip) == INADDR_NONE) {
 		printf("Invalid IP: %s!\n", ip);
+		return 1;
 	}
-
-	return 1;
+#ifndef WINDOWS32
+	snprintf(cmdline, sizeof(cmdline), 
+			"/sbin/ifconfig %s %s %s netmask %s",
+			if_name,
+			ip,
+			ip,
+			inet_ntoa(net));
+	
+	printf("Setting IP of %s to %s\n", if_name, ip);
+#ifndef LINUX
+	r = system(cmdline);
+	if(r != 0) {
+		return r;
+	} else {
+		snprintf(cmdline, sizeof(cmdline),
+				"/sbin/route add %s/%d %s",
+				ip, netbits, ip);
+	}
+	printf("Adding route %s/%d to %s\n", ip, netbits, ip);
+#endif
+	return system(cmdline);
 #else /* WINDOWS32 */
-	DWORD status;
-	DWORD ipdata[3];
-	struct in_addr addr;
-	int i;
-	int netmask;
-	DWORD len;
-	BOOL res;
-
-	printf("Given IP %s\n", ip);
 
 	/* Set device as connected */
+	printf("Enabling interface '%s'\n", if_name);
 	status = 1;
-	res =DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, 
+	r = DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, 
 		sizeof(status), &status, sizeof(status), &len, NULL);
-	if (!res) {
+	if (!r) {
 		return -1;
 	}
-	netmask = 0;
-	for (i = 0; i < netbits; i++) {
-		netmask = (netmask << 1) | 1;
-	}
-	netmask <<= (32 - netbits);
-	ipdata[2] = (DWORD) htonl(netmask);
+	
+	ipdata[2] = (DWORD) net.s_addr;
 
 	if (inet_aton(ip, &addr)) {
 		ipdata[0] = (DWORD) addr.s_addr;
@@ -443,11 +435,15 @@ tun_setip(const char *ip, int netbits)
 	} else {
 		return -1;
 	}
-	res = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata, 
+	/* Tell ip/network addr/netmask to device for arp use */
+	r = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata, 
 		sizeof(ipdata), &ipdata, sizeof(ipdata), &len, NULL);
-	if (!res) {
+	if (!r) {
 		return -1;
 	}
+
+	/* TODO use netsh to set ip address */
+	cmdline[0] = 0;
 	return 0;
 #endif
 }
