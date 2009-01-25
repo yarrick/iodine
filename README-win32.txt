@@ -17,9 +17,11 @@ Extra README file for Win32 related stuff
 
 3. Name the interface "dns"
 
-4. Run iodine/iodined as normal.
+4. Make sure the interface does not have a default gateway set
 
-5. Enjoy!
+5. Run iodine/iodined as normal.
+
+6. Enjoy!
 
 
 == Building on Windows:
@@ -51,10 +53,11 @@ The following fixable limitations apply:
 - Exactly one TAP32 interface must be installed
 - The TAP32 interface must be named "dns" and be version 0801
 - Server cannot read packet destination address
-- Server must be run with /30 netmask (really?)
 
 The following (probably) un-fixable limitations apply:
 - Priviligies cannot be dropped
 - chroot() cannot be used
 - Detaching from terminal not possible
+- Server on windows must be run with /30 netmask
+- Client can only talk to server, not other clients
 
