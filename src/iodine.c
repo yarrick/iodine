@@ -52,6 +52,11 @@
 #include "tun.h"
 #include "version.h"
 
+#ifdef WINDOWS32
+WORD req_version = MAKEWORD(1, 1);
+WSADATA wsa_data;
+#endif
+
 static void send_ping(int fd);
 static void send_chunk(int fd);
 static int build_hostname(char *buf, size_t buflen, 
@@ -905,6 +910,10 @@ main(int argc, char **argv)
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
+
+#ifdef WINDOWS32
+	WSAStartup(req_version, &wsa_data);
+#endif
 	
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
