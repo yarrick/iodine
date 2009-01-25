@@ -80,5 +80,11 @@ struct ip
     struct in_addr ip_src, ip_dst;      /* source and dest address */
   };
 
+DWORD WINAPI tun_reader(LPVOID arg);
+struct tun_data {
+	HANDLE tun;
+	int sock;
+	struct sockaddr_in addr;
+};
 
 #endif

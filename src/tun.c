@@ -30,6 +30,7 @@
 #include "windows.h"
 
 HANDLE dev_handle;
+struct tun_data data;
 
 #define TAP_CONTROL_CODE(request,method) CTL_CODE(FILE_DEVICE_UNKNOWN, request, method, FILE_ANY_ACCESS)
 #define TAP_IOCTL_CONFIG_TUN       TAP_CONTROL_CODE(10, METHOD_BUFFERED)
@@ -224,11 +225,43 @@ next:
 	RegCloseKey(adapter_key);
 }
 
+DWORD WINAPI tun_reader(LPVOID arg)
+{
+	struct tun_data *tun = arg;
+	char buf[64*1024];
+	int len;
+	int res;
+	OVERLAPPED olpd;
+	int sock;
+
+	sock = open_dns(0, INADDR_ANY);
+
+	olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	while(TRUE) {
+		olpd.Offset = 0;
+		olpd.OffsetHigh = 0;
+		res = ReadFile(tun->tun, buf, sizeof(buf), (LPDWORD) &len, &olpd);
+		if (!res) {
+			WaitForSingleObject(olpd.hEvent, INFINITE);
+			res = GetOverlappedResult(dev_handle, &olpd, (LPDWORD) &len, FALSE);
+			printf("Read %d bytes!\n", len);
+			res = sendto(sock, buf, len, 0, (struct sockaddr*) &(tun->addr), 
+				sizeof(struct sockaddr_in));
+			printf("send done %d, %02X %02X %02X\n", res, buf[0], buf[1], buf[2]);
+		}
+	}
+
+	return 0;
+}
+
 int 
 open_tun(const char *tun_device) 
 {
 	char adapter[256];
 	char tapfile[512];
+	int tunfd;
+	in_addr_t local;
 
 	memset(adapter, 0, sizeof(adapter));
 	get_device(adapter, sizeof(adapter));
@@ -238,13 +271,29 @@ open_tun(const char *tun_device)
 	
 	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
 	printf("Opening device %s\n", tapfile);
-	dev_handle = CreateFile(tapfile, GENERIC_WRITE | GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM, 0);
+	dev_handle = CreateFile(tapfile, GENERIC_WRITE | GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM | FILE_FLAG_OVERLAPPED, NULL);
 	if (dev_handle == INVALID_HANDLE_VALUE) {
 		return -1;
 	}
 
 	printf("Opened handle: %p\n", dev_handle);
-	return (int) dev_handle;
+
+	/* Use a UDP connection to forward packets from tun,
+	 * so we can still use select() in main code.
+	 * A thread does blocking reads on tun device and 
+	 * sends data as udp to this socket */
+	
+	local = htonl(0x7f000001); /* 127.0.0.1 */
+	tunfd = open_dns(55353, local);
+
+	data.tun = dev_handle;
+	memset(&(data.addr), 0, sizeof(data.addr));
+	data.addr.sin_family = AF_INET;
+	data.addr.sin_port = htons(55353);
+	data.addr.sin_addr.s_addr = local;
+	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)tun_reader, &data, 0, NULL);
+	
+	return tunfd;
 }
 #endif 
 
@@ -283,10 +332,19 @@ write_tun(int tun_fd, char *data, size_t len)
 #else /* WINDOWS32 */
 	{
 		DWORD written;
-		WriteFile((HANDLE) tun_fd, data, len, &written, NULL);
-		if (written != len) {
-			warn("write_tun");
-			return 1;
+		DWORD res;
+		OVERLAPPED olpd;
+
+		olpd.Offset = 0;
+		olpd.OffsetHigh = 0;
+		olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+		res = WriteFile(dev_handle, data, len, &written, &olpd);
+		if (!res && GetLastError() == ERROR_IO_PENDING) {
+			WaitForSingleObject(olpd.hEvent, INFINITE);
+			res = GetOverlappedResult(dev_handle, &olpd, &written, FALSE);
+			if (written != len) {
+				return -1;
+			}
 		}
 	}
 #endif
@@ -296,12 +354,28 @@ write_tun(int tun_fd, char *data, size_t len)
 ssize_t
 read_tun(int tun_fd, char *buf, size_t len) 
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
+#ifndef WINDOWS32
+#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
 	/* FreeBSD/Darwin/NetBSD has no header */
-	return READ(tun_fd, buf + 4, len - 4) + 4;
+	int bytes;
+	bytes = read(tun_fd, buf + 4, len - 4);
+	if (bytes < 0) {
+		return bytes;
+	} else {
+		return bytes + 4;
+	}
 #else /* !FREEBSD */
-	return READ(tun_fd, buf, len);
+	return read(tun_fd, buf, len);
 #endif /* !FREEBSD */
+#else /* !WINDOWS32 */
+	int bytes;
+	bytes = RECV(tun_fd, buf + 4, len, 0);
+	if (bytes < 0) {
+		return bytes;
+	} else {
+		return bytes + 4;
+	}
+#endif
 }
 
 int
@@ -357,6 +431,8 @@ tun_setip(const char *ip, int netbits)
 	int netmask;
 	DWORD len;
 	BOOL res;
+
+	printf("Given IP %s\n", ip);
 
 	/* Set device as connected */
 	status = 1;
