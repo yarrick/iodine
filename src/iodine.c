@@ -732,16 +732,25 @@ autodetect_max_fragsize:
 						/* We got a reply */
 						int acked_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
 						if (acked_fragsize == proposed_fragsize) {
-							printf("%d ok.. ", acked_fragsize);
+							if (read == proposed_fragsize) {
+								printf("%d ok.. ", acked_fragsize);
+								fflush(stdout);
+								max_downstream_frag_size = acked_fragsize;
+								range >>= 1;
+								proposed_fragsize += range;
+								continue;
+							} else {
+								goto badlen;
+							}
+						}
+						if (strncmp("BADIP", in, 5) == 0) {
+							printf("got BADIP.. ");
 							fflush(stdout);
-							max_downstream_frag_size = acked_fragsize;
-							range >>= 1;
-							proposed_fragsize += range;
-							continue;
 						}
 					}
 				}
 			}
+badlen:
 			printf("%d not ok.. ", proposed_fragsize);
 			fflush(stdout);
 			range >>= 1;
