@@ -24,14 +24,18 @@
 #include "base32.h"
 #include "test.h"
 
+#define TUPLES 5
+
 static struct tuple
 {
 	char *a;
 	char *b;
-} testpairs[] = {
+} testpairs[TUPLES] = {
 	{ "iodinetestingtesting", "nfxwi0lomv0gk21unfxgo3dfon0gs1th" },
 	{ "abc123", "mfrggmjsgm" },
-	{ NULL, NULL }
+	{ "test", "orsxg3a" },
+	{ "tst", "orzxi" },
+	{ "", "" },
 };
 
 START_TEST(test_base32_encode)
@@ -40,18 +44,14 @@ START_TEST(test_base32_encode)
 	char buf[4096];
 	struct encoder *b32;
 	int val;
-	int i;
 
 	b32 = get_base32_encoder();
 
-	for (i = 0; testpairs[i].a != NULL; i++) {
-		len = sizeof(buf);
-		val = b32->encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
+	len = sizeof(buf);
+	val = b32->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
-		fail_unless(val > 0, strerror(errno));
-		fail_unless(strcmp(buf, testpairs[i].b) == 0,
-				"'%s' != '%s'", buf, testpairs[i].b);
-	}
+	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
+			"'%s' != '%s'", buf, testpairs[_i].b);
 }
 END_TEST
 
@@ -61,19 +61,15 @@ START_TEST(test_base32_decode)
 	char buf[4096];
 	struct encoder *b32;
 	int val;
-	int i;
 	
 	b32 = get_base32_encoder();
 
-	for (i = 0; testpairs[i].a != NULL; i++) {
-		len = sizeof(buf);
-		val = b32->decode(buf, &len, testpairs[i].b, strlen(testpairs[i].b));
+	len = sizeof(buf);
+	val = b32->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
-		fail_unless(val > 0, strerror(errno));
-		fail_unless(buf != NULL, "buf == NULL");
-		fail_unless(strcmp(buf, testpairs[i].a) == 0,
-				"'%s' != '%s'", buf, testpairs[i].a);
-	}
+	fail_unless(buf != NULL, "buf == NULL");
+	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
+			"'%s' != '%s'", buf, testpairs[_i].a);
 }
 END_TEST
 
@@ -95,8 +91,8 @@ test_base32_create_tests()
 	TCase *tc;
 
 	tc = tcase_create("Base32");
-	tcase_add_test(tc, test_base32_encode);
-	tcase_add_test(tc, test_base32_decode);
+	tcase_add_loop_test(tc, test_base32_encode, 0, TUPLES);
+	tcase_add_loop_test(tc, test_base32_decode, 0, TUPLES);
 	tcase_add_test(tc, test_base32_5to8_8to5);
 
 	return tc;
