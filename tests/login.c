@@ -28,12 +28,32 @@ START_TEST(test_login_hash)
 	int len;
 	int seed;
 
-	len = 16;
+	len = sizeof(ans);
 	seed = 15;
 
 	memset(ans, 0, sizeof(ans));
 	login_calculate(ans, len, pass, seed);
 	fail_unless(strncmp(ans, good, len) == 0, NULL);
+}
+END_TEST
+
+START_TEST(test_login_hash_short)
+{
+	char ans[8];
+	char check[sizeof(ans)];
+	char pass[32] = "iodine is the shit";
+	int len;
+	int seed;
+
+	len = sizeof(ans);
+	seed = 15;
+
+	memset(ans, 0, sizeof(ans));
+	memset(check, 0, sizeof(check));
+
+	/* If len < 16, it should do nothing */
+	login_calculate(ans, len, pass, seed);
+	fail_if(memcmp(ans, check, sizeof(ans)));
 }
 END_TEST
 
@@ -44,6 +64,7 @@ test_login_create_tests()
 
 	tc = tcase_create("Login");
 	tcase_add_test(tc, test_login_hash);
+	tcase_add_test(tc, test_login_hash_short);
 
 	return tc;
 }
