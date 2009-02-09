@@ -30,12 +30,12 @@
 struct fw_query {
 	struct sockaddr addr;
 	int addrlen;
-	short id;
+	unsigned short id;
 };
 
 void fw_query_init();
 void fw_query_put(struct fw_query *fw_query);
-void fw_query_get(short query_id, struct fw_query **fw_query);
+void fw_query_get(unsigned short query_id, struct fw_query **fw_query);
 
 #endif /*__FW_QUERY_H__*/
 

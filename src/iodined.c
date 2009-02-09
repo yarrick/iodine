@@ -625,7 +625,7 @@ tunnel_bind(int bind_fd, int dns_fd)
 	struct sockaddr_in from;
 	socklen_t fromlen;
 	struct fw_query *query;
-	short id;
+	unsigned short id;
 	int r;
 
 	fromlen = sizeof(struct sockaddr);

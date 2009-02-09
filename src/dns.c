@@ -183,7 +183,7 @@ dns_encode_ns_response(char *buf, size_t buflen, struct query *q, char *topdomai
 	return len;
 }
 
-short
+unsigned short
 dns_get_id(char *packet, size_t packetlen)
 {
 	HEADER *header;

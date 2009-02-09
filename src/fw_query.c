@@ -35,7 +35,7 @@ void fw_query_put(struct fw_query *fw_query)
 		fwq_ix = 0;
 }
 
-void fw_query_get(short query_id, struct fw_query **fw_query)
+void fw_query_get(unsigned short query_id, struct fw_query **fw_query)
 {
 	int i;
 
