@@ -1,7 +1,7 @@
 CC = gcc
 TEST = test
-OBJS = test.o base32.o base64.o read.o dns.o encoding.o login.o user.o 
-SRCOBJS = ../src/base32.o  ../src/base64.o ../src/read.o ../src/dns.o ../src/encoding.o ../src/login.o ../src/md5.o ../src/user.o
+OBJS = test.o base32.o base64.o read.o dns.o encoding.o login.o user.o fw_query.o
+SRCOBJS = ../src/base32.o  ../src/base64.o ../src/read.o ../src/dns.o ../src/encoding.o ../src/login.o ../src/md5.o ../src/user.o ../src/fw_query.o
 
 OS = `uname | tr "a-z" "A-Z"`
 
