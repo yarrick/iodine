@@ -46,6 +46,7 @@
 #include <sys/uio.h>
 #include <pwd.h>
 #include <netdb.h>
+#include <syslog.h>
 #endif
 
 #include "common.h"
@@ -92,6 +93,23 @@ sigint(int sig)
 {
 	running = 0;
 }
+
+#ifdef WINDOWS32
+#define	LOG_EMERG	0
+#define	LOG_ALERT	1
+#define	LOG_CRIT	2
+#define	LOG_ERR		3
+#define	LOG_WARNING	4
+#define	LOG_NOTICE	5
+#define	LOG_INFO	6
+#define	LOG_DEBUG	7
+static void
+syslog(int a, const char *str, ...)
+{
+	/* TODO: implement (add to event log), move to common.c */
+	;
+}
+#endif
 
 static int
 check_user_and_ip(int userid, struct query *q)
@@ -318,13 +336,19 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				memcpy(&(users[userid].q), q, sizeof(struct query));
 				users[userid].encoder = get_base32_encoder();
 				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
+				syslog(LOG_INFO, "accepted version for user #%d from %s",
+					userid, inet_ntoa(tempin->sin_addr));
 				users[userid].q.id = 0;
 			} else {
 				/* No space for another user */
 				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
+				syslog(LOG_INFO, "dropped user from %s, server full", 
+					inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			}
 		} else {
 			send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
+			syslog(LOG_INFO, "dropped user from %s, sent bad version %08X", 
+				inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr), version);
 		}
 		return;
 	} else if(in[0] == 'L' || in[0] == 'l') {
@@ -334,6 +358,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
+			syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
+				userid, inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			return;
 		} else {
 			users[userid].last_pkt = time(NULL);
@@ -352,11 +378,14 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 				write_dns(dns_fd, q, out, read);
 				q->id = 0;
+				syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
 
 				free(tmp[1]);
 				free(tmp[0]);
 			} else {
 				write_dns(dns_fd, q, "LNAK", 4);
+				syslog(LOG_WARNING, "rejected login request from user #%d from %s, bad password",
+					userid, inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			}
 		}
 		return;
@@ -911,6 +940,7 @@ version() {
 int
 main(int argc, char **argv)
 {
+	extern char *__progname;
 	in_addr_t listen_ip;
 #ifndef WINDOWS32
 	struct passwd *pw;
@@ -1152,9 +1182,15 @@ main(int argc, char **argv)
 		}
 #endif
 	}
+
+#ifndef WINDOWS32
+	openlog(__progname, LOG_NOWAIT, LOG_DAEMON);
+#endif
+	syslog(LOG_INFO, "started, listening on port %d", port);
 	
 	tunnel(tun_fd, dnsd_fd, bind_fd);
 
+	syslog(LOG_INFO, "stopping");
 cleanup3:
 	close_dns(bind_fd);
 cleanup2:

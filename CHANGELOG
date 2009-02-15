@@ -7,6 +7,9 @@ CHANGES:
 
 2009-xx-yy: x.y.z "Boringo"
 	- Added initial Windows support, fixes #43.
+	- Added length check of autoprobe responses
+	- Refactored and added unit tests
+	- Added syslog logging for iodined on version and login packets
 
 2009-01-23: 0.5.0 "iPassed"
 	- Fixed segfault in server when sending version reject.
