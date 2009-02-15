@@ -75,9 +75,6 @@ static int downstream_fragment;
 static int down_ack_seqno;
 static int down_ack_fragment;
 
-static int max_downstream_frag_size;
-static int autodetect_frag_size;
-
 /* Current up/downstream IP packet */
 static struct packet outpkt;
 static struct packet inpkt;
@@ -749,10 +746,11 @@ handshake_autoprobe_fragsize(int dns_fd)
 	int read;
 	int proposed_fragsize = 768;
 	int range = 768;
+	int max_fragsize = 0;
 
-	max_downstream_frag_size = 0;
+	max_fragsize = 0;
 	printf("Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
-	while (running && range > 0 && (range >= 8 || !max_downstream_frag_size)) {
+	while (running && range > 0 && (range >= 8 || !max_fragsize)) {
 		for (i=0; running && i<3 ;i++) {
 			tv.tv_sec = 1;
 			tv.tv_usec = 0;
@@ -773,7 +771,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 						if (read == proposed_fragsize) {
 							printf("%d ok.. ", acked_fragsize);
 							fflush(stdout);
-							max_downstream_frag_size = acked_fragsize;
+							max_fragsize = acked_fragsize;
 							range >>= 1;
 							proposed_fragsize += range;
 							continue;
@@ -797,20 +795,20 @@ badlen:
 	if (!running) {
 		printf("\n");
 		warnx("stopped while autodetecting fragment size (Try probing manually with -m)");
-		return 1;
+		return 0;
 	}
 	if (range == 0) {
 		/* Tried all the way down to 2 and found no good size */
 		printf("\n");
 		warnx("found no accepted fragment size. (Try probing manually with -m)");
-		return 1;
+		return 0;
 	}
-	printf("will use %d\n", max_downstream_frag_size);
-	return 0;
+	printf("will use %d\n", max_fragsize);
+	return max_fragsize;
 }
 
 static void
-handshake_set_fragsize(int dns_fd)
+handshake_set_fragsize(int dns_fd, int fragsize)
 {
 	struct timeval tv;
 	char in[4096];
@@ -819,12 +817,12 @@ handshake_set_fragsize(int dns_fd)
 	int r;
 	int read;
 
-	printf("Setting downstream fragment size to max %d...\n", max_downstream_frag_size);
+	printf("Setting downstream fragment size to max %d...\n", fragsize);
 	for (i=0; running && i<5 ;i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		send_set_downstream_fragsize(dns_fd, max_downstream_frag_size);
+		send_set_downstream_fragsize(dns_fd, fragsize);
 		
 		FD_ZERO(&fds);
 		FD_SET(dns_fd, &fds);
@@ -855,7 +853,7 @@ handshake_set_fragsize(int dns_fd)
 }
 
 static int
-handshake(int dns_fd)
+handshake(int dns_fd, int autodetect_frag_size, int fragsize)
 {
 	int seed;
 	int r;
@@ -877,13 +875,13 @@ handshake(int dns_fd)
 	}
 
 	if (autodetect_frag_size) {
-		r = handshake_autoprobe_fragsize(dns_fd);
-		if (r) {
-			return r;
+		fragsize = handshake_autoprobe_fragsize(dns_fd);
+		if (!fragsize) {
+			return 1;
 		}
 	}
 
-	handshake_set_fragsize(dns_fd);
+	handshake_set_fragsize(dns_fd, fragsize);
 
 	return 0;
 }
@@ -985,6 +983,8 @@ main(int argc, char **argv)
 	int choice;
 	int tun_fd;
 	int dns_fd;
+	int max_downstream_frag_size;
+	int autodetect_frag_size;
 
 	memset(password, 0, 33);
 	username = NULL;
@@ -1113,7 +1113,7 @@ main(int argc, char **argv)
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
-	if(handshake(dns_fd))
+	if(handshake(dns_fd, autodetect_frag_size, max_downstream_frag_size))
 		goto cleanup2;
 	
 	printf("Sending queries for %s to %s\n", topdomain, nameserv_addr);
