@@ -78,7 +78,6 @@ base64_encode(char *buf, size_t *buflen, const void *data, size_t size)
 {
 	size_t newsize;
 	size_t maxsize;
-	unsigned char c;
 	unsigned char *s;
 	unsigned char *p;
 	unsigned char *q;
@@ -86,14 +85,6 @@ base64_encode(char *buf, size_t *buflen, const void *data, size_t size)
 
 	memset(buf, 0, *buflen);
 	
-	if (!reverse_init) {
-		for (i = 0; i < 64; i++) {
-			c = cb64[i];
-			rev64[(int) c] = i;
-		}
-		reverse_init = 1;
-	}
-
 	/* how many chars can we encode within the buf */
 	maxsize = BLKSIZE_RAW * (*buflen / BLKSIZE_ENC);
 	/* how big will the encoded data be */
