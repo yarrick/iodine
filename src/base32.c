@@ -27,7 +27,6 @@
 static const char cb32[] = 
 	"abcdefghijklmnopqrstuvwxyz012345";
 static unsigned char rev32[128];
-static int reverse_init = 0;
 
 static int base32_decode(void *, size_t *, const char *, size_t);
 static int base32_encode(char *, size_t *, const void *, size_t);
@@ -70,6 +69,22 @@ base32_blksize_enc()
 	return BLKSIZE_ENC;
 }
 
+static void
+base32_reverse_init()
+{
+	int i;
+	unsigned char c;
+	static int reverse_init = 0;
+
+	if (!reverse_init) {
+		for (i = 0; i < 32; i++) {
+			c = cb32[i];
+			rev32[(int) c] = i;
+		}
+		reverse_init = 1;
+	}
+}
+
 int
 b32_5to8(int in)
 {
@@ -79,15 +94,7 @@ b32_5to8(int in)
 int
 b32_8to5(int in)
 {
-	int i;
-	int c;
-	if (!reverse_init) {
-		for (i = 0; i < 32; i++) {
-			c = cb32[i];
-			rev32[(int) c] = i;
-		}
-		reverse_init = 1;
-	}
+	base32_reverse_init();
 	return rev32[in];
 }
 
@@ -186,17 +193,9 @@ base32_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 	size_t newsize;
 	size_t maxsize;
 	const char *p;
-	unsigned char c;
 	int len;
-	int i;
 
-	if (!reverse_init) {
-		for (i = 0; i < 32; i++) {
-			c = cb32[i];
-			rev32[(int) c] = i;
-		}
-		reverse_init = 1;
-	}
+	base32_reverse_init();
 	
 	/* chars needed to decode slen */
 	newsize = BLKSIZE_RAW * (slen / BLKSIZE_ENC + 1) + 1;
