@@ -103,9 +103,12 @@ base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
 	memset(buf, 0, *buflen);
 
 	/* how many chars can we encode within the buf */
-	maxsize = BLKSIZE_RAW * (*buflen / BLKSIZE_ENC - 1) - 1;
+	maxsize = BLKSIZE_RAW * (*buflen / BLKSIZE_ENC);
 	/* how big will the encoded data be */
-	newsize = BLKSIZE_ENC * (size / BLKSIZE_RAW + 1) + 1;
+	newsize = BLKSIZE_ENC * (size / BLKSIZE_RAW);
+	if (size % BLKSIZE_RAW) {
+		newsize += BLKSIZE_ENC;
+	}
 	/* if the buffer is too small, eat some of the data */
 	if (*buflen < newsize) {
 		size = maxsize;
@@ -132,7 +135,7 @@ base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
 	/* store number of bytes from data that was used */
 	*buflen = size;
 
-	return strlen(buf) - 1;
+	return strlen(buf);
 }
 
 #define DECODE_ERROR 0xffffffff
