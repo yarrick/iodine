@@ -85,6 +85,48 @@ START_TEST(test_base32_5to8_8to5)
 }
 END_TEST
 
+START_TEST(test_base32_blksize)
+{
+	size_t rawlen;
+	size_t enclen;
+	char *rawbuf;
+	char *encbuf;
+	struct encoder *b32;
+	int i;
+	int val;
+
+	b32 = get_base32_encoder();
+
+	rawlen = b32->blocksize_raw();
+	enclen = b32->blocksize_encoded();
+
+	rawbuf = malloc(rawlen + 16);
+	encbuf = malloc(enclen + 16);
+
+	for (i = 0; i < rawlen; i++) {
+		rawbuf[i] = 'A';
+	}
+	rawbuf[i] = 0;
+
+	val = b32->encode(encbuf, &enclen, rawbuf, rawlen);
+
+	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
+	fail_unless(enclen == 5, "encoded %d bytes, not 5", enclen);
+	fail_unless(val == 8, "encoded string %s was length %d", encbuf, val);
+
+	memset(rawbuf, 0, rawlen + 16);
+
+	enclen = val;
+	val = b32->decode(rawbuf, &rawlen, encbuf, enclen);
+
+	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
+	fail_unless(val == 5, "val was not 5 but %d", val);
+	for (i = 0; i < rawlen; i++) {
+		fail_unless(rawbuf[i] == 'A');
+	}
+}
+END_TEST
+
 TCase *
 test_base32_create_tests()
 {
@@ -94,6 +136,7 @@ test_base32_create_tests()
 	tcase_add_loop_test(tc, test_base32_encode, 0, TUPLES);
 	tcase_add_loop_test(tc, test_base32_decode, 0, TUPLES);
 	tcase_add_test(tc, test_base32_5to8_8to5);
+	tcase_add_test(tc, test_base32_blksize);
 
 	return tc;
 }
