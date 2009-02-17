@@ -140,7 +140,7 @@ build_hostname(char *buf, size_t buflen,
 	size_t space;
 	char *b;
 
-	space = MIN(0xFF, buflen) - strlen(topdomain) - 5;
+	space = MIN(0xFF, buflen) - strlen(topdomain) - 7;
 	if (!encoder->places_dots())
 		space -= (space / 57); /* space for dots */
 
