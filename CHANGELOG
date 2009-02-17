@@ -10,6 +10,8 @@ CHANGES:
 	- Added length check of autoprobe responses
 	- Refactored and added unit tests
 	- Added syslog logging for iodined on version and login packets
+	- Fixed segfault when encoding just one block, fixes #51.
+		The normal code was never affected by this.
 
 2009-01-23: 0.5.0 "iPassed"
 	- Fixed segfault in server when sending version reject.
