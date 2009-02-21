@@ -61,7 +61,7 @@
 #include "version.h"
 
 #ifdef WINDOWS32
-WORD req_version = MAKEWORD(1, 1);
+WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
 #endif
 

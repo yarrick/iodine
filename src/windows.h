@@ -21,7 +21,7 @@ typedef unsigned int in_addr_t;
 
 #include <windows.h>
 #include <windns.h>
-#include <winsock.h>
+#include <winsock2.h>
 
 #define T_A DNS_TYPE_A
 #define T_NS DNS_TYPE_NS
