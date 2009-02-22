@@ -931,6 +931,7 @@ get_resolvconf_addr()
 		addr[15] = 0;
 		rv = addr;
 	}
+	free(fixed_info);
 #endif
 	return rv;
 }
