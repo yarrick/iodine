@@ -890,8 +890,9 @@ static char *
 get_resolvconf_addr()
 {
 	static char addr[16];
-	char buf[80];
 	char *rv;
+#ifndef WINDOWS32
+	char buf[80];
 	FILE *fp;
 	
 	rv = NULL;
@@ -909,7 +910,26 @@ get_resolvconf_addr()
 	}
 	
 	fclose(fp);
+#else /* !WINDOWS32 */
+	FIXED_INFO  *fixed_info;
+	ULONG       buflen;
+	DWORD       ret;
 
+	rv = NULL;
+	fixed_info = malloc(sizeof(FIXED_INFO));
+	buflen = sizeof(FIXED_INFO);
+
+	if (GetNetworkParams(fixed_info, &buflen) == ERROR_BUFFER_OVERFLOW) {
+		/* official ugly api workaround */
+		free(fixed_info);
+		fixed_info = malloc(buflen);
+	}
+
+	ret = GetNetworkParams(fixed_info, &buflen);
+	if (ret == NO_ERROR) {
+		rv = fixed_info->DnsServerList.IpAddress.String;
+	}
+#endif
 	return rv;
 }
 

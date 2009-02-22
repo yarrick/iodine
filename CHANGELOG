@@ -12,6 +12,7 @@ CHANGES:
 	- Added syslog logging for iodined on version and login packets
 	- Fixed segfault when encoding just one block, fixes #51.
 		The normal code was never affected by this.
+	- Added win32 code to read DNS server from system, fixes #45.
 
 2009-01-23: 0.5.0 "iPassed"
 	- Fixed segfault in server when sending version reject.
