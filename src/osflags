@@ -14,7 +14,7 @@ link)
 			echo '-lnetwork';
 		;;
 		windows32)
-			echo '-lws2_32';
+			echo '-lws2_32 -liphlpapi';
 		;;
 	esac
 	;;

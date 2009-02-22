@@ -49,7 +49,6 @@ cross-compile.
 == Results of crappy Win32 API:
 The following fixable limitations apply:
 - The password is shown when entered
-- DNS server IP can not be fetched automatically
 - Exactly one TAP32 interface must be installed
 - The TAP32 interface must be named "dns" and be version 0801
 - Server cannot read packet destination address
