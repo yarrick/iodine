@@ -13,6 +13,7 @@ CHANGES:
 	- Fixed segfault when encoding just one block, fixes #51.
 		The normal code was never affected by this.
 	- Added win32 code to read DNS server from system, fixes #45.
+	- Disabled password echo on win32, fixes #44.
 
 2009-01-23: 0.5.0 "iPassed"
 	- Fixed segfault in server when sending version reject.

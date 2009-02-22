@@ -48,12 +48,12 @@ cross-compile.
 
 == Results of crappy Win32 API:
 The following fixable limitations apply:
-- The password is shown when entered
 - Exactly one TAP32 interface must be installed
 - The TAP32 interface must be named "dns" and be version 0801
 - Server cannot read packet destination address
 
 The following (probably) un-fixable limitations apply:
+- A password entered as -P argument can be shown in process list
 - Priviligies cannot be dropped
 - chroot() cannot be used
 - Detaching from terminal not possible
