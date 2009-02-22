@@ -28,7 +28,8 @@
 #include <fcntl.h>
 
 #ifdef WINDOWS32
-#include <winsock.h>
+#include <winsock2.h>
+#include <conio.h>
 #else
 #include <arpa/nameser.h>
 #ifdef DARWIN
@@ -183,11 +184,26 @@ read_password(char *buf, size_t len)
 	
 	tp.c_lflag &= (~ECHO);
 	tcsetattr(0, TCSANOW, &tp);
+#else
+	int i;
 #endif
 
 	printf("Enter password: ");
 	fflush(stdout);
+#ifndef WINDOWS32
 	scanf("%79s", pwd);
+#else
+	for (i = 0; i < sizeof(pwd); i++) {
+		pwd[i] = getch();
+		if (pwd[i] == '\r' || pwd[i] == '\n') {
+			pwd[i] = 0;
+			break;
+		} else if (pwd[i] == '\b') {
+			i--; 			/* Remove the \b char */
+			if (i >=0) i--; 	/* If not first char, remove one more */
+		}
+	}
+#endif
 	printf("\n");
 
 #ifndef WINDOWS32
