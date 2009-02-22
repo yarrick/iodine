@@ -927,7 +927,9 @@ get_resolvconf_addr()
 
 	ret = GetNetworkParams(fixed_info, &buflen);
 	if (ret == NO_ERROR) {
-		rv = fixed_info->DnsServerList.IpAddress.String;
+		strncpy(addr, fixed_info->DnsServerList.IpAddress.String, sizeof(addr));
+		addr[15] = 0;
+		rv = addr;
 	}
 #endif
 	return rv;
