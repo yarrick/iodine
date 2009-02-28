@@ -115,7 +115,7 @@ open_dns(int localport, in_addr_t listen_ip)
 	addr.sin_addr.s_addr = listen_ip; 
 
 	if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
-		printf("got fd %d\n", fd);
+		fprintf(stderr, "got fd %d\n", fd);
 		err(1, "socket");
 	}
 
@@ -133,7 +133,7 @@ open_dns(int localport, in_addr_t listen_ip)
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
 		err(1, "bind");
 
-	printf("Opened UDP socket\n");
+	fprintf(stderr, "Opened UDP socket\n");
 
 	return fd;
 }
@@ -162,12 +162,12 @@ void
 do_detach()
 {
 #ifndef WINDOWS32
-	printf("Detaching from terminal...\n");
+	fprintf(stderr, "Detaching from terminal...\n");
 	daemon(0, 0);
 	umask(0);
 	alarm(0);
 #else
-	printf("Windows version does not support detaching\n");
+	fprintf(stderr, "Windows version does not support detaching\n");
 #endif
 }
 
@@ -188,8 +188,8 @@ read_password(char *buf, size_t len)
 	int i;
 #endif
 
-	printf("Enter password: ");
-	fflush(stdout);
+	fprintf(stderr, "Enter password: ");
+	fflush(stderr);
 #ifndef WINDOWS32
 	scanf("%79s", pwd);
 #else
@@ -204,7 +204,7 @@ read_password(char *buf, size_t len)
 		}
 	}
 #endif
-	printf("\n");
+	fprintf(stderr, "\n");
 
 #ifndef WINDOWS32
 	tcsetattr(0, TCSANOW, &old);	

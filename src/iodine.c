@@ -539,7 +539,7 @@ handshake_version(int dns_fd, int *seed)
 					*seed = payload;
 					userid = in[8];
 
-					printf("Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
+					fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
 					return 0;
 				} else if (strncmp("VNAK", in, 4) == 0) {
 					warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
@@ -553,7 +553,7 @@ handshake_version(int dns_fd, int *seed)
 				warnx("did not receive proper login challenge");
 		}
 		
-		printf("Retrying version check...\n");
+		fprintf(stderr, "Retrying version check...\n");
 	}
 	warnx("couldn't connect to server");
 	return 1;
@@ -597,7 +597,7 @@ handshake_login(int dns_fd, int seed)
 			if (read > 0) {
 				int netmask;
 				if (strncmp("LNAK", in, 4) == 0) {
-					printf("Bad password\n");
+					fprintf(stderr, "Bad password\n");
 					return 1;
 				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d", 
 					server, client, &mtu, &netmask) == 4) {
@@ -611,12 +611,12 @@ handshake_login(int dns_fd, int seed)
 						warnx("Received handshake with bad data");
 					}
 				} else {
-					printf("Received bad handshake\n");
+					fprintf(stderr, "Received bad handshake\n");
 				}
 			}
 		}
 
-		printf("Retrying login...\n");
+		fprintf(stderr, "Retrying login...\n");
 	}
 	warnx("couldn't login to server");
 	return 1;
@@ -650,7 +650,7 @@ handshake_case_check(int dns_fd)
 			if (read > 0) {
 				if (in[0] == 'z' || in[0] == 'Z') {
 					if (read < (27 * 2)) {
-						printf("Received short case check reply. Will use base32 encoder\n");
+						fprintf(stderr, "Received short case check reply. Will use base32 encoder\n");
 						return;
 					} else {
 						int k;
@@ -666,18 +666,18 @@ handshake_case_check(int dns_fd)
 						return;
 					}
 				} else {
-					printf("Received bad case check reply\n");
+					fprintf(stderr, "Received bad case check reply\n");
 				}
 			} else {
-				printf("Got error on case check, will use base32\n");
+				fprintf(stderr, "Got error on case check, will use base32\n");
 				return;
 			}
 		}
 
-		printf("Retrying case check...\n");
+		fprintf(stderr, "Retrying case check...\n");
 	}
 
-	printf("No reply on case check, continuing\n");
+	fprintf(stderr, "No reply on case check, continuing\n");
 }
 
 static void
@@ -691,7 +691,7 @@ handshake_switch_codec(int dns_fd)
 	int read;
 
 	dataenc = get_base64_encoder();
-	printf("Switching to %s codec\n", dataenc->name);
+	fprintf(stderr, "Switching to %s codec\n", dataenc->name);
 	/* Send to server that this user will use base64 from now on */
 	for (i=0; running && i<5 ;i++) {
 		int bits;
@@ -712,26 +712,26 @@ handshake_switch_codec(int dns_fd)
 			
 			if (read > 0) {
 				if (strncmp("BADLEN", in, 6) == 0) {
-					printf("Server got bad message length. ");
+					fprintf(stderr, "Server got bad message length. ");
 					goto codec_revert;
 				} else if (strncmp("BADIP", in, 5) == 0) {
-					printf("Server rejected sender IP address. ");
+					fprintf(stderr, "Server rejected sender IP address. ");
 					goto codec_revert;
 				} else if (strncmp("BADCODEC", in, 8) == 0) {
-					printf("Server rejected the selected codec. ");
+					fprintf(stderr, "Server rejected the selected codec. ");
 					goto codec_revert;
 				}
 				in[read] = 0; /* zero terminate */
-				printf("Server switched to codec %s\n", in);
+				fprintf(stderr, "Server switched to codec %s\n", in);
 				return;
 			}
 		}
-		printf("Retrying codec switch...\n");
+		fprintf(stderr, "Retrying codec switch...\n");
 	}
-	printf("No reply from server on codec switch. ");
+	fprintf(stderr, "No reply from server on codec switch. ");
 
 codec_revert: 
-	printf("Falling back to base32\n");
+	fprintf(stderr, "Falling back to base32\n");
 	dataenc = get_base32_encoder();
 }
 
@@ -749,7 +749,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 	int max_fragsize = 0;
 
 	max_fragsize = 0;
-	printf("Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
+	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
 	while (running && range > 0 && (range >= 8 || !max_fragsize)) {
 		for (i=0; running && i<3 ;i++) {
 			tv.tv_sec = 1;
@@ -769,8 +769,8 @@ handshake_autoprobe_fragsize(int dns_fd)
 					int acked_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
 					if (acked_fragsize == proposed_fragsize) {
 						if (read == proposed_fragsize) {
-							printf("%d ok.. ", acked_fragsize);
-							fflush(stdout);
+							fprintf(stderr, "%d ok.. ", acked_fragsize);
+							fflush(stderr);
 							max_fragsize = acked_fragsize;
 							range >>= 1;
 							proposed_fragsize += range;
@@ -780,30 +780,30 @@ handshake_autoprobe_fragsize(int dns_fd)
 						}
 					}
 					if (strncmp("BADIP", in, 5) == 0) {
-						printf("got BADIP.. ");
-						fflush(stdout);
+						fprintf(stderr, "got BADIP.. ");
+						fflush(stderr);
 					}
 				}
 			}
 		}
 badlen:
-		printf("%d not ok.. ", proposed_fragsize);
-		fflush(stdout);
+		fprintf(stderr, "%d not ok.. ", proposed_fragsize);
+		fflush(stderr);
 		range >>= 1;
 		proposed_fragsize -= range;
 	}
 	if (!running) {
-		printf("\n");
+		fprintf(stderr, "\n");
 		warnx("stopped while autodetecting fragment size (Try probing manually with -m)");
 		return 0;
 	}
 	if (range == 0) {
 		/* Tried all the way down to 2 and found no good size */
-		printf("\n");
+		fprintf(stderr, "\n");
 		warnx("found no accepted fragment size. (Try probing manually with -m)");
 		return 0;
 	}
-	printf("will use %d\n", max_fragsize);
+	fprintf(stderr, "will use %d\n", max_fragsize);
 	return max_fragsize;
 }
 
@@ -817,7 +817,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 	int r;
 	int read;
 
-	printf("Setting downstream fragment size to max %d...\n", fragsize);
+	fprintf(stderr, "Setting downstream fragment size to max %d...\n", fragsize);
 	for (i=0; running && i<5 ;i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
@@ -836,10 +836,10 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 				int accepted_fragsize;
 
 				if (strncmp("BADFRAG", in, 7) == 0) {
-					printf("Server rejected fragsize. Keeping default.");
+					fprintf(stderr, "Server rejected fragsize. Keeping default.");
 					return;
 				} else if (strncmp("BADIP", in, 5) == 0) {
-					printf("Server rejected sender IP address.\n");
+					fprintf(stderr, "Server rejected sender IP address.\n");
 					return;
 				}
 
@@ -847,9 +847,9 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 				return;
 			}
 		}
-		printf("Retrying set fragsize...\n");
+		fprintf(stderr, "Retrying set fragsize...\n");
 	}
-	printf("No reply from server when setting fragsize. Keeping default.\n");
+	fprintf(stderr, "No reply from server when setting fragsize. Keeping default.\n");
 }
 
 static int
@@ -954,7 +954,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [nameserver] topdomain\n", __progname);
 	exit(2);
 }
@@ -963,19 +963,19 @@ static void
 help() {
 	extern char *__progname;
 
-	printf("iodine IP over DNS tunneling client\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "iodine IP over DNS tunneling client\n");
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [nameserver] topdomain\n", __progname);
-	printf("  -v to print version info and exit\n");
-	printf("  -h to print this help and exit\n");
-	printf("  -f to keep running in foreground\n");
-	printf("  -u name to drop privileges and run as user 'name'\n");
-	printf("  -t dir to chroot to directory dir\n");
-	printf("  -d device to set tunnel device name\n");
-	printf("  -P password used for authentication (max 32 chars will be used)\n");
-	printf("  -m maxfragsize, to limit size of downstream packets\n");
-	printf("nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
-	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
+	fprintf(stderr, "  -v to print version info and exit\n");
+	fprintf(stderr, "  -h to print this help and exit\n");
+	fprintf(stderr, "  -f to keep running in foreground\n");
+	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
+	fprintf(stderr, "  -t dir to chroot to directory dir\n");
+	fprintf(stderr, "  -d device to set tunnel device name\n");
+	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "  -m maxfragsize, to limit size of downstream packets\n");
+	fprintf(stderr, "nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
+	fprintf(stderr, "topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
 }
@@ -986,8 +986,8 @@ version() {
 
 	svnver = "$Rev$ from $Date$";
 
-	printf("iodine IP over DNS tunneling client\n");
-	printf("SVN version: %s\n", svnver);
+	fprintf(stderr, "iodine IP over DNS tunneling client\n");
+	fprintf(stderr, "SVN version: %s\n", svnver);
 
 	exit(0);
 }
@@ -1139,7 +1139,7 @@ main(int argc, char **argv)
 	if(handshake(dns_fd, autodetect_frag_size, max_downstream_frag_size))
 		goto cleanup2;
 	
-	printf("Sending queries for %s to %s\n", topdomain, nameserv_addr);
+	fprintf(stderr, "Sending queries for %s to %s\n", topdomain, nameserv_addr);
 
 	if (foreground == 0) 
 		do_detach();

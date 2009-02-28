@@ -85,7 +85,7 @@ open_tun(const char *tun_device)
 		if_name[sizeof(if_name)-1] = '\0';
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
-			printf("Opened %s\n", ifreq.ifr_name);
+			fprintf(stderr, "Opened %s\n", ifreq.ifr_name);
 			return tun_fd;
 		}
 
@@ -98,7 +98,7 @@ open_tun(const char *tun_device)
 			snprintf(ifreq.ifr_name, IFNAMSIZ, "dns%d", i);
 
 			if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
-				printf("Opened %s\n", ifreq.ifr_name);
+				fprintf(stderr, "Opened %s\n", ifreq.ifr_name);
 				snprintf(if_name, sizeof(if_name), "dns%d", i);
 				return tun_fd;
 			}
@@ -133,14 +133,14 @@ open_tun(const char *tun_device)
 			return -1;
 		}
 
-		printf("Opened %s\n", tun_name);
+		fprintf(stderr, "Opened %s\n", tun_name);
 		return tun_fd;
 	} else {
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
 
 			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
-				printf("Opened %s\n", tun_name);
+				fprintf(stderr, "Opened %s\n", tun_name);
 				snprintf(if_name, sizeof(if_name), "tun%d", i);
 				return tun_fd;
 			}
@@ -270,7 +270,7 @@ open_tun(const char *tun_device)
 	}
 	
 	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
-	printf("Opening device %s\n", tapfile);
+	fprintf(stderr, "Opening device %s\n", tapfile);
 	dev_handle = CreateFile(tapfile, GENERIC_WRITE | GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM | FILE_FLAG_OVERLAPPED, NULL);
 	if (dev_handle == INVALID_HANDLE_VALUE) {
 		return -1;
@@ -394,7 +394,7 @@ tun_setip(const char *ip, int netbits)
 	net.s_addr = htonl(netmask);
 
 	if (inet_addr(ip) == INADDR_NONE) {
-		printf("Invalid IP: %s!\n", ip);
+		fprintf(stderr, "Invalid IP: %s!\n", ip);
 		return 1;
 	}
 #ifndef WINDOWS32
@@ -405,7 +405,7 @@ tun_setip(const char *ip, int netbits)
 			ip,
 			inet_ntoa(net));
 	
-	printf("Setting IP of %s to %s\n", if_name, ip);
+	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
 	r = system(cmdline);
 	if(r != 0) {
@@ -415,18 +415,18 @@ tun_setip(const char *ip, int netbits)
 				"/sbin/route add %s/%d %s",
 				ip, netbits, ip);
 	}
-	printf("Adding route %s/%d to %s\n", ip, netbits, ip);
+	fprintf(stderr, "Adding route %s/%d to %s\n", ip, netbits, ip);
 #endif
 	return system(cmdline);
 #else /* WINDOWS32 */
 
 	/* Set device as connected */
-	printf("Enabling interface '%s'\n", if_name);
+	fprintf(stderr, "Enabling interface '%s'\n", if_name);
 	status = 1;
 	r = DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, 
 		sizeof(status), &status, sizeof(status), &len, NULL);
 	if (!r) {
-		printf("Failed to enable interface\n");
+		fprintf(stderr, "Failed to enable interface\n");
 		return -1;
 	}
 	
@@ -442,12 +442,12 @@ tun_setip(const char *ip, int netbits)
 	r = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata, 
 		sizeof(ipdata), &ipdata, sizeof(ipdata), &len, NULL);
 	if (!r) {
-		printf("Failed to set interface in TUN mode\n");
+		fprintf(stderr, "Failed to set interface in TUN mode\n");
 		return -1;
 	}
 
 	/* use netsh to set ip address */
-	printf("Setting IP of interface '%s' to %s (can take a few seconds)...\n", if_name, ip);
+	fprintf(stderr, "Setting IP of interface '%s' to %s (can take a few seconds)...\n", if_name, ip);
 	snprintf(cmdline, sizeof(cmdline), "netsh interface ip set address \"%s\" static %s %s",
 		if_name, ip, inet_ntoa(net));
 	return system(cmdline);
@@ -466,7 +466,7 @@ tun_setmtu(const unsigned mtu)
 				if_name,
 				mtu);
 		
-		printf("Setting MTU of %s to %u\n", if_name, mtu);
+		fprintf(stderr, "Setting MTU of %s to %u\n", if_name, mtu);
 		return system(cmdline);
 	} else {
 		warn("MTU out of range: %u\n", mtu);
