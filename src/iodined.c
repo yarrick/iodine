@@ -238,7 +238,7 @@ send_chunk(int dns_fd, int userid) {
 		((users[userid].outpacket.fragment & 15) << 1) | (last & 1);
 
 	if (debug >= 1) {
-		printf("OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %d, total %d, to user %d\n",
+		fprintf(stderr, "OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %d, total %d, to user %d\n",
 			users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15, 
 			last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
 	}
@@ -482,7 +482,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		}
 				
 		if (debug >= 1) {
-			printf("PING pkt from user %d\n", userid);
+			fprintf(stderr, "PING pkt from user %d\n", userid);
 		}
 
 		if (users[userid].q.id != 0) {
@@ -532,7 +532,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				up_frag <= users[userid].inpacket.fragment) {
 				/* Got repeated old packet, skip it */
 				if (debug >= 1) {
-					printf("IN   pkt seq# %d, frag %d, dropped duplicate\n",
+					fprintf(stderr, "IN   pkt seq# %d, frag %d, dropped duplicate\n",
 						up_seq, up_frag);
 				}
 				/* Update seqno and maybe send immediate response packet */
@@ -557,7 +557,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			users[userid].inpacket.offset += read;
 
 			if (debug >= 1) {
-				printf("IN   pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
+				fprintf(stderr, "IN   pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
 					up_seq, up_frag, lastfrag, read, users[userid].inpacket.len, userid);
 			}
 
@@ -583,7 +583,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 						}
 					}
 				} else {
-					printf("Discarded data, uncompress() result: %d\n", ret);
+					fprintf(stderr, "Discarded data, uncompress() result: %d\n", ret);
 				}
 				users[userid].inpacket.len = users[userid].inpacket.offset = 0;
 			}
@@ -608,7 +608,7 @@ handle_ns_request(int dns_fd, struct query *q)
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q->from);
-		printf("TX: client %s, type %d, name %s, %d bytes NS reply\n", 
+		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes NS reply\n", 
 			inet_ntoa(tempin->sin_addr), q->type, q->name, len);
 	}
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
@@ -639,7 +639,7 @@ forward_query(int bind_fd, struct query *q)
 	myaddr->sin_port = htons(bind_port);
 	
 	if (debug >= 2) {
-		printf("TX: NS reply \n");
+		fprintf(stderr, "TX: NS reply \n");
 	}
 
 	if (sendto(bind_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
@@ -667,20 +667,20 @@ tunnel_bind(int bind_fd, int dns_fd)
 	id = dns_get_id(packet, r);
 	
 	if (debug >= 2) {
-		printf("RX: Got response on query %u from DNS\n", (id & 0xFFFF));
+		fprintf(stderr, "RX: Got response on query %u from DNS\n", (id & 0xFFFF));
 	}
 
 	/* Get sockaddr from id */
 	fw_query_get(id, &query);
 	if (!query && debug >= 2) {
-		printf("Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
+		fprintf(stderr, "Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
 		return 0;
 	}
 
 	if (debug >= 2) {
 		struct sockaddr_in *in;
 		in = (struct sockaddr_in *) &(query->addr);
-		printf("TX: client %s id %u, %d bytes\n",
+		fprintf(stderr, "TX: client %s id %u, %d bytes\n",
 			inet_ntoa(in->sin_addr), (id & 0xffff), r);
 	}
 	
@@ -707,7 +707,7 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q.from);
-		printf("RX: client %s, type %d, name %s\n", 
+		fprintf(stderr, "RX: client %s, type %d, name %s\n", 
 			inet_ntoa(tempin->sin_addr), q.type, q.name);
 	}
 	
@@ -878,7 +878,7 @@ write_dns(int fd, struct query *q, char *data, int datalen)
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q->from);
-		printf("TX: client %s, type %d, name %s, %d bytes data\n", 
+		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes data\n", 
 			inet_ntoa(tempin->sin_addr), q->type, q->name, datalen);
 	}
 
@@ -889,7 +889,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
 		" tunnel_ip[/netmask] topdomain\n", __progname);
@@ -900,31 +900,31 @@ static void
 help() {
 	extern char *__progname;
 
-	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+	fprintf(stderr, "iodine IP over DNS tunneling server\n");
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
 		" tunnel_ip[/netmask] topdomain\n", __progname);
-	printf("  -v to print version info and exit\n");
-	printf("  -h to print this help and exit\n");
-	printf("  -c to disable check of client IP/port on each request\n");
-	printf("  -s to skip creating and configuring the tun device, "
+	fprintf(stderr, "  -v to print version info and exit\n");
+	fprintf(stderr, "  -h to print this help and exit\n");
+	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
+	fprintf(stderr, "  -s to skip creating and configuring the tun device, "
 		"which then has to be created manually\n");
-	printf("  -f to keep running in foreground\n");
-	printf("  -D to increase debug level\n");
-	printf("  -u name to drop privileges and run as user 'name'\n");
-	printf("  -t dir to chroot to directory dir\n");
-	printf("  -d device to set tunnel device name\n");
-	printf("  -m mtu to set tunnel device mtu\n");
-	printf("  -l ip address to listen on for incoming dns traffic "
+	fprintf(stderr, "  -f to keep running in foreground\n");
+	fprintf(stderr, "  -D to increase debug level\n");
+	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
+	fprintf(stderr, "  -t dir to chroot to directory dir\n");
+	fprintf(stderr, "  -d device to set tunnel device name\n");
+	fprintf(stderr, "  -m mtu to set tunnel device mtu\n");
+	fprintf(stderr, "  -l ip address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n");
-	printf("  -p port to listen on for incoming dns traffic (default 53)\n");
-	printf("  -n ip to respond with to NS queries\n");
-	printf("  -b port to forward normal DNS queries to (on localhost)\n");
-	printf("  -P password used for authentication (max 32 chars will be used)\n");
-	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
-	printf("   /netmask sets the size of the tunnel network.\n");
-	printf("topdomain is the FQDN that is delegated to this server.\n");
+	fprintf(stderr, "  -p port to listen on for incoming dns traffic (default 53)\n");
+	fprintf(stderr, "  -n ip to respond with to NS queries\n");
+	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
+	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "tunnel_ip is the IP number of the local tunnel interface.\n");
+	fprintf(stderr, "   /netmask sets the size of the tunnel network.\n");
+	fprintf(stderr, "topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
 }
 
@@ -932,8 +932,8 @@ static void
 version() {
 	char *svnver;
 	svnver = "$Rev$ from $Date$";
-	printf("iodine IP over DNS tunneling server\n");
-	printf("SVN version: %s\n", svnver);
+	fprintf(stderr, "iodine IP over DNS tunneling server\n");
+	fprintf(stderr, "SVN version: %s\n", svnver);
 	exit(0);
 }
 
@@ -1112,18 +1112,18 @@ main(int argc, char **argv)
 			usage();
 			/* NOTREACHED */
 		}
-		printf("Requests for domains outside of %s will be forwarded to port %d\n",
+		fprintf(stderr, "Requests for domains outside of %s will be forwarded to port %d\n",
 			topdomain, bind_port);
 	}
 	
 	if (port != 53) {
-		printf("ALERT! Other dns servers expect you to run on port 53.\n");
-		printf("You must manually forward port 53 to port %d for things to work.\n", port);
+		fprintf(stderr, "ALERT! Other dns servers expect you to run on port 53.\n");
+		fprintf(stderr, "You must manually forward port 53 to port %d for things to work.\n", port);
 	}
 
 	if (debug) {
-		printf("Debug level %d enabled, will stay in foreground.\n", debug);
-		printf("Add more -D switches to set higher debug level.\n");
+		fprintf(stderr, "Debug level %d enabled, will stay in foreground.\n", debug);
+		fprintf(stderr, "Add more -D switches to set higher debug level.\n");
 		foreground = 1;
 	}
 
@@ -1160,10 +1160,10 @@ main(int argc, char **argv)
 	created_users = init_users(my_ip, netmask);
 	
 	if (created_users < USERS) {
-		printf("Limiting to %d simultaneous users because of netmask /%d\n",
+		fprintf(stderr, "Limiting to %d simultaneous users because of netmask /%d\n",
 			created_users, netmask);
 	}
-	printf("Listening to dns for domain %s\n", topdomain);
+	fprintf(stderr, "Listening to dns for domain %s\n", topdomain);
 
 	if (foreground == 0) 
 		do_detach();
