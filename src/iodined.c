@@ -969,7 +969,7 @@ main(int argc, char **argv)
 	foreground = 0;
 	bind_enable = 0;
 	bind_fd = 0;
-	mtu = 1024;
+	mtu = 1500;
 	listen_ip = INADDR_ANY;
 	port = 53;
 	ns_ip = INADDR_ANY;
