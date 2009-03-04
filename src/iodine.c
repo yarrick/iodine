@@ -432,7 +432,7 @@ send_fragsize_probe(int fd, int fragsize)
 	fragsize &= 2047;
 
 	buf[0] = 'r'; /* Probe downstream fragsize packet */
-	buf[1] = b32_5to8((userid << 1) | (fragsize & 1024));
+	buf[1] = b32_5to8((userid << 1) | ((fragsize >> 10) & 1));
 	buf[2] = b32_5to8((fragsize >> 5) & 31);
 	buf[3] = b32_5to8(fragsize & 31);
 
