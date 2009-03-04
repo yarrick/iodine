@@ -460,7 +460,7 @@ tun_setmtu(const unsigned mtu)
 #ifndef WINDOWS32
 	char cmdline[512];
 
-	if (mtu > 200 && mtu < 1500) {
+	if (mtu > 200 && mtu <= 1500) {
 		snprintf(cmdline, sizeof(cmdline), 
 				"/sbin/ifconfig %s mtu %u",
 				if_name,
