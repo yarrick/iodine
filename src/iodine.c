@@ -772,25 +772,26 @@ handshake_autoprobe_fragsize(int dns_fd)
 							fprintf(stderr, "%d ok.. ", acked_fragsize);
 							fflush(stderr);
 							max_fragsize = acked_fragsize;
-							range >>= 1;
-							proposed_fragsize += range;
-							continue;
-						} else {
-							goto badlen;
 						}
 					}
 					if (strncmp("BADIP", in, 5) == 0) {
 						fprintf(stderr, "got BADIP.. ");
 						fflush(stderr);
 					}
+					break;
 				}
 			}
 		}
-badlen:
-		fprintf(stderr, "%d not ok.. ", proposed_fragsize);
-		fflush(stderr);
 		range >>= 1;
-		proposed_fragsize -= range;
+		if (max_fragsize == proposed_fragsize) {
+			/* Try bigger */
+			proposed_fragsize += range;
+		} else {
+			/* Try smaller */
+			fprintf(stderr, "%d not ok.. ", proposed_fragsize);
+			fflush(stderr);
+			proposed_fragsize -= range;
+		}
 	}
 	if (!running) {
 		fprintf(stderr, "\n");
