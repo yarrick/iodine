@@ -19,7 +19,6 @@
 
 #ifdef WINDOWS32
 #include "windows.h"
-#include <winsock.h>
 #else
 #include <sys/socket.h>
 #include <err.h>
@@ -43,6 +42,20 @@
 #elif defined IP_PKTINFO 
 # define DSTADDR_SOCKOPT IP_PKTINFO 
 # define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr)) 
+#endif
+
+#if defined IP_MTUDISC
+# define IP_OPT_DONT_FRAG IP_MTUDISC
+# define DONT_FRAG_VALUE 1
+#elif defined IP_MTU_DISCOVER
+# define IP_OPT_DONT_FRAG IP_MTU_DISCOVER
+# define DONT_FRAG_VALUE IP_PMTUDISC_DO
+#elif defined IP_DONTFRAG
+# define IP_OPT_DONT_FRAG IP_DONTFRAG
+# define DONT_FRAG_VALUE 1
+#elif defined IP_DONTFRAGMENT
+# define IP_OPT_DONT_FRAG IP_DONTFRAGMENT
+# define DONT_FRAG_VALUE 1
 #endif
 
 struct packet 

@@ -130,6 +130,10 @@ open_dns(int localport, in_addr_t listen_ip)
 	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
 #endif
 
+	/* Set dont-fragment ip header flag */
+	flag = DONT_FRAG_VALUE;
+	setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
+
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
 		err(1, "bind");
 
