@@ -25,7 +25,7 @@
 #include <fcntl.h>
 
 #ifdef WINDOWS32
-#include <winsock.h>
+#include <winsock2.h>
 #include <winioctl.h>
 #include "windows.h"
 

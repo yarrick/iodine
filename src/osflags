@@ -20,7 +20,7 @@ link)
 	;;
 cflags)
 	case $1 in
-		BeOS | windows32)
+		BeOS)
 			echo '-Dsocklen_t=int';
 		;;
 	esac

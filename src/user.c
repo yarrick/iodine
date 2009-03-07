@@ -25,7 +25,7 @@
 #include <fcntl.h>
 
 #ifdef WINDOWS32
-#include <winsock.h>
+#include <winsock2.h>
 #else
 #include <err.h>
 #include <arpa/inet.h>
