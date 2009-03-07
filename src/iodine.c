@@ -781,6 +781,8 @@ handshake_autoprobe_fragsize(int dns_fd)
 					break;
 				}
 			}
+			fprintf(stderr, ".");
+			fflush(stderr);
 		}
 		range >>= 1;
 		if (max_fragsize == proposed_fragsize) {
