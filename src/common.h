@@ -44,16 +44,16 @@
 # define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr)) 
 #endif
 
-#if defined IP_MTUDISC
-# define IP_OPT_DONT_FRAG IP_MTUDISC
-# define DONT_FRAG_VALUE 1
-#elif defined IP_MTU_DISCOVER
+#if defined IP_MTU_DISCOVER
+  /* Linux */
 # define IP_OPT_DONT_FRAG IP_MTU_DISCOVER
 # define DONT_FRAG_VALUE IP_PMTUDISC_DO
 #elif defined IP_DONTFRAG
+  /* FreeBSD */
 # define IP_OPT_DONT_FRAG IP_DONTFRAG
 # define DONT_FRAG_VALUE 1
 #elif defined IP_DONTFRAGMENT
+  /* Winsock2 */
 # define IP_OPT_DONT_FRAG IP_DONTFRAGMENT
 # define DONT_FRAG_VALUE 1
 #endif
