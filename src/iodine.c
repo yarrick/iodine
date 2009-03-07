@@ -28,7 +28,7 @@
 
 #ifdef WINDOWS32
 #include "windows.h"
-#include <winsock.h>
+#include <winsock2.h>
 #else
 #include <arpa/nameser.h>
 #ifdef DARWIN
