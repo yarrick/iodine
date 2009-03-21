@@ -18,6 +18,7 @@ CHANGES:
 	- Increase default interface MTU to 1200.
 	- Fix autoprobing error making every third probe fail, set IP flag
 		Dont-Fragment where supported. Fixes #54.
+	- Added TAP32 version 0901 as accepted (#53).
 
 2009-01-23: 0.5.0 "iPassed"
 	- Fixed segfault in server when sending version reject.
