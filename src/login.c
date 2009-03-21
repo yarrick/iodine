@@ -15,8 +15,13 @@
  */
 
 #include <string.h>
-#include <arpa/inet.h>
 #include <sys/types.h>
+
+#ifdef WINDOWS32
+#include "windows.h"
+#else
+#include <arpa/inet.h>
+#endif
 
 #include "md5.h"
 

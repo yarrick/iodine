@@ -18,19 +18,24 @@
 #define __FW_QUERY_H__
 
 #include <sys/types.h>
+#ifdef WINDOWS32
+#include "windows.h"
+#include <winsock2.h>
+#else
 #include <sys/socket.h>
+#endif
 
 #define FW_QUERY_CACHE_SIZE 16
 
 struct fw_query {
 	struct sockaddr addr;
 	int addrlen;
-	short id;
+	unsigned short id;
 };
 
 void fw_query_init();
 void fw_query_put(struct fw_query *fw_query);
-void fw_query_get(short query_id, struct fw_query **fw_query);
+void fw_query_get(unsigned short query_id, struct fw_query **fw_query);
 
 #endif /*__FW_QUERY_H__*/
 

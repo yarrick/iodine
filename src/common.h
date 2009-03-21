@@ -17,10 +17,15 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-#include <arpa/inet.h>
-#include <sys/types.h>
+#ifdef WINDOWS32
+#include "windows.h"
+#else
 #include <sys/socket.h>
+#include <err.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
+#endif
+
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -37,6 +42,20 @@
 #elif defined IP_PKTINFO 
 # define DSTADDR_SOCKOPT IP_PKTINFO 
 # define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr)) 
+#endif
+
+#if defined IP_MTU_DISCOVER
+  /* Linux */
+# define IP_OPT_DONT_FRAG IP_MTU_DISCOVER
+# define DONT_FRAG_VALUE IP_PMTUDISC_DO
+#elif defined IP_DONTFRAG
+  /* FreeBSD */
+# define IP_OPT_DONT_FRAG IP_DONTFRAG
+# define DONT_FRAG_VALUE 1
+#elif defined IP_DONTFRAGMENT
+  /* Winsock2 */
+# define IP_OPT_DONT_FRAG IP_DONTFRAGMENT
+# define DONT_FRAG_VALUE 1
 #endif
 
 struct packet 
@@ -58,6 +77,7 @@ struct query {
 	int fromlen;
 };
 
+void check_superuser(void (*usage_fn)(void));
 int open_dns(int, in_addr_t);
 void close_dns(int);
 
@@ -67,5 +87,14 @@ void do_detach();
 void read_password(char*, size_t);
 
 int check_topdomain(char *);
+
+#ifdef WINDOWS32
+int inet_aton(const char *cp, struct in_addr *inp);
+
+void err(int eval, const char *fmt, ...);
+void warn(const char *fmt, ...);
+void errx(int eval, const char *fmt, ...);
+void warnx(const char *fmt, ...);
+#endif
 
 #endif

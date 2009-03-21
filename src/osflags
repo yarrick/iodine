@@ -1,9 +1,9 @@
 #!/bin/sh
 
-case $1 in
+case $2 in
 link)
 
-	case `uname` in
+	case $1 in
 		SunOS | solaris)
 			echo '-lsocket -lnsl';
 		;;
@@ -13,10 +13,13 @@ link)
 		Haiku)
 			echo '-lnetwork';
 		;;
+		windows32)
+			echo '-lws2_32 -liphlpapi';
+		;;
 	esac
 	;;
 cflags)
-	case `uname` in
+	case $1 in
 		BeOS)
 			echo '-Dsocklen_t=int';
 		;;

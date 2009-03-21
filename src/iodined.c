@@ -23,22 +23,30 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
+#include <fcntl.h>
+#include <time.h>
+#include <zlib.h>
+
+#ifdef WINDOWS32
+#include "windows.h"
+#include <winsock2.h>
+#else
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser8_compat.h>
+#endif
 #define _XPG4_2
 #include <sys/socket.h>
-#include <sys/uio.h>
-#include <fcntl.h>
 #include <err.h>
-#include <grp.h>
-#include <time.h>
-#include <pwd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <zlib.h>
-#include <arpa/nameser.h>
-#ifdef DARWIN
-#include <arpa/nameser8_compat.h>
+#include <grp.h>
+#include <sys/uio.h>
+#include <pwd.h>
+#include <netdb.h>
+#include <syslog.h>
 #endif
 
 #include "common.h"
@@ -51,6 +59,11 @@
 #include "tun.h"
 #include "fw_query.h"
 #include "version.h"
+
+#ifdef WINDOWS32
+WORD req_version = MAKEWORD(2, 2);
+WSADATA wsa_data;
+#endif
 
 static int running = 1;
 static char *topdomain;
@@ -80,6 +93,23 @@ sigint(int sig)
 {
 	running = 0;
 }
+
+#ifdef WINDOWS32
+#define	LOG_EMERG	0
+#define	LOG_ALERT	1
+#define	LOG_CRIT	2
+#define	LOG_ERR		3
+#define	LOG_WARNING	4
+#define	LOG_NOTICE	5
+#define	LOG_INFO	6
+#define	LOG_DEBUG	7
+static void
+syslog(int a, const char *str, ...)
+{
+	/* TODO: implement (add to event log), move to common.c */
+	;
+}
+#endif
 
 static int
 check_user_and_ip(int userid, struct query *q)
@@ -208,7 +238,7 @@ send_chunk(int dns_fd, int userid) {
 		((users[userid].outpacket.fragment & 15) << 1) | (last & 1);
 
 	if (debug >= 1) {
-		printf("OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %d, total %d, to user %d\n",
+		fprintf(stderr, "OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %d, total %d, to user %d\n",
 			users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15, 
 			last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
 	}
@@ -306,13 +336,19 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				memcpy(&(users[userid].q), q, sizeof(struct query));
 				users[userid].encoder = get_base32_encoder();
 				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
+				syslog(LOG_INFO, "accepted version for user #%d from %s",
+					userid, inet_ntoa(tempin->sin_addr));
 				users[userid].q.id = 0;
 			} else {
 				/* No space for another user */
 				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
+				syslog(LOG_INFO, "dropped user from %s, server full", 
+					inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			}
 		} else {
 			send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
+			syslog(LOG_INFO, "dropped user from %s, sent bad version %08X", 
+				inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr), version);
 		}
 		return;
 	} else if(in[0] == 'L' || in[0] == 'l') {
@@ -322,6 +358,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5);
+			syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
+				userid, inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			return;
 		} else {
 			users[userid].last_pkt = time(NULL);
@@ -340,11 +378,14 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 				write_dns(dns_fd, q, out, read);
 				q->id = 0;
+				syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
 
 				free(tmp[1]);
 				free(tmp[0]);
 			} else {
 				write_dns(dns_fd, q, "LNAK", 4);
+				syslog(LOG_WARNING, "rejected login request from user #%d from %s, bad password",
+					userid, inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			}
 		}
 		return;
@@ -441,7 +482,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		}
 				
 		if (debug >= 1) {
-			printf("PING pkt from user %d\n", userid);
+			fprintf(stderr, "PING pkt from user %d\n", userid);
 		}
 
 		if (users[userid].q.id != 0) {
@@ -491,7 +532,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				up_frag <= users[userid].inpacket.fragment) {
 				/* Got repeated old packet, skip it */
 				if (debug >= 1) {
-					printf("IN   pkt seq# %d, frag %d, dropped duplicate\n",
+					fprintf(stderr, "IN   pkt seq# %d, frag %d, dropped duplicate\n",
 						up_seq, up_frag);
 				}
 				/* Update seqno and maybe send immediate response packet */
@@ -516,7 +557,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			users[userid].inpacket.offset += read;
 
 			if (debug >= 1) {
-				printf("IN   pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
+				fprintf(stderr, "IN   pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
 					up_seq, up_frag, lastfrag, read, users[userid].inpacket.len, userid);
 			}
 
@@ -542,7 +583,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 						}
 					}
 				} else {
-					printf("Discarded data, uncompress() result: %d\n", ret);
+					fprintf(stderr, "Discarded data, uncompress() result: %d\n", ret);
 				}
 				users[userid].inpacket.len = users[userid].inpacket.offset = 0;
 			}
@@ -567,7 +608,7 @@ handle_ns_request(int dns_fd, struct query *q)
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q->from);
-		printf("TX: client %s, type %d, name %s, %d bytes NS reply\n", 
+		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes NS reply\n", 
 			inet_ntoa(tempin->sin_addr), q->type, q->name, len);
 	}
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
@@ -598,7 +639,7 @@ forward_query(int bind_fd, struct query *q)
 	myaddr->sin_port = htons(bind_port);
 	
 	if (debug >= 2) {
-		printf("TX: NS reply \n");
+		fprintf(stderr, "TX: NS reply \n");
 	}
 
 	if (sendto(bind_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
@@ -613,7 +654,7 @@ tunnel_bind(int bind_fd, int dns_fd)
 	struct sockaddr_in from;
 	socklen_t fromlen;
 	struct fw_query *query;
-	short id;
+	unsigned short id;
 	int r;
 
 	fromlen = sizeof(struct sockaddr);
@@ -626,20 +667,20 @@ tunnel_bind(int bind_fd, int dns_fd)
 	id = dns_get_id(packet, r);
 	
 	if (debug >= 2) {
-		printf("RX: Got response on query %u from DNS\n", (id & 0xFFFF));
+		fprintf(stderr, "RX: Got response on query %u from DNS\n", (id & 0xFFFF));
 	}
 
 	/* Get sockaddr from id */
 	fw_query_get(id, &query);
 	if (!query && debug >= 2) {
-		printf("Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
+		fprintf(stderr, "Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
 		return 0;
 	}
 
 	if (debug >= 2) {
 		struct sockaddr_in *in;
 		in = (struct sockaddr_in *) &(query->addr);
-		printf("TX: client %s id %u, %d bytes\n",
+		fprintf(stderr, "TX: client %s id %u, %d bytes\n",
 			inet_ntoa(in->sin_addr), (id & 0xffff), r);
 	}
 	
@@ -666,7 +707,7 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q.from);
-		printf("RX: client %s, type %d, name %s\n", 
+		fprintf(stderr, "RX: client %s, type %d, name %s\n", 
 			inet_ntoa(tempin->sin_addr), q.type, q.name);
 	}
 	
@@ -774,11 +815,12 @@ read_dns(int fd, struct query *q)
 	struct sockaddr_in from;
 	socklen_t addrlen;
 	char packet[64*1024];
+	int r;
+#ifndef WINDOWS32
 	char address[96];
 	struct msghdr msg;
 	struct iovec iov;
 	struct cmsghdr *cmsg;
-	int r;
 
 	addrlen = sizeof(struct sockaddr);
 	iov.iov_base = packet;
@@ -793,12 +835,17 @@ read_dns(int fd, struct query *q)
 	msg.msg_flags = 0;
 	
 	r = recvmsg(fd, &msg, 0);
+#else
+	addrlen = sizeof(struct sockaddr);
+	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+#endif /* !WINDOWS32 */
 
 	if (r > 0) {
 		dns_decode(NULL, 0, q, QR_QUERY, packet, r);
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 		q->fromlen = addrlen;
 		
+#ifndef WINDOWS32
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; 
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) { 
 			
@@ -809,6 +856,7 @@ read_dns(int fd, struct query *q)
 				break;
 			} 
 		}
+#endif
 
 		return strlen(q->name);
 	} else if (r < 0) { 
@@ -830,7 +878,7 @@ write_dns(int fd, struct query *q, char *data, int datalen)
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q->from);
-		printf("TX: client %s, type %d, name %s, %d bytes data\n", 
+		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes data\n", 
 			inet_ntoa(tempin->sin_addr), q->type, q->name, datalen);
 	}
 
@@ -841,7 +889,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
 		" tunnel_ip[/netmask] topdomain\n", __progname);
@@ -852,46 +900,49 @@ static void
 help() {
 	extern char *__progname;
 
-	printf("iodine IP over DNS tunneling server\n");
-	printf("Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+	fprintf(stderr, "iodine IP over DNS tunneling server\n");
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
 		" tunnel_ip[/netmask] topdomain\n", __progname);
-	printf("  -v to print version info and exit\n");
-	printf("  -h to print this help and exit\n");
-	printf("  -c to disable check of client IP/port on each request\n");
-	printf("  -s to skip creating and configuring the tun device, "
+	fprintf(stderr, "  -v to print version info and exit\n");
+	fprintf(stderr, "  -h to print this help and exit\n");
+	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
+	fprintf(stderr, "  -s to skip creating and configuring the tun device, "
 		"which then has to be created manually\n");
-	printf("  -f to keep running in foreground\n");
-	printf("  -D to increase debug level\n");
-	printf("  -u name to drop privileges and run as user 'name'\n");
-	printf("  -t dir to chroot to directory dir\n");
-	printf("  -d device to set tunnel device name\n");
-	printf("  -m mtu to set tunnel device mtu\n");
-	printf("  -l ip address to listen on for incoming dns traffic "
+	fprintf(stderr, "  -f to keep running in foreground\n");
+	fprintf(stderr, "  -D to increase debug level\n");
+	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
+	fprintf(stderr, "  -t dir to chroot to directory dir\n");
+	fprintf(stderr, "  -d device to set tunnel device name\n");
+	fprintf(stderr, "  -m mtu to set tunnel device mtu\n");
+	fprintf(stderr, "  -l ip address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n");
-	printf("  -p port to listen on for incoming dns traffic (default 53)\n");
-	printf("  -n ip to respond with to NS queries\n");
-	printf("  -b port to forward normal DNS queries to (on localhost)\n");
-	printf("  -P password used for authentication (max 32 chars will be used)\n");
-	printf("tunnel_ip is the IP number of the local tunnel interface.\n");
-	printf("   /netmask sets the size of the tunnel network.\n");
-	printf("topdomain is the FQDN that is delegated to this server.\n");
+	fprintf(stderr, "  -p port to listen on for incoming dns traffic (default 53)\n");
+	fprintf(stderr, "  -n ip to respond with to NS queries\n");
+	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
+	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "tunnel_ip is the IP number of the local tunnel interface.\n");
+	fprintf(stderr, "   /netmask sets the size of the tunnel network.\n");
+	fprintf(stderr, "topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
 }
 
 static void
 version() {
 	printf("iodine IP over DNS tunneling server\n");
-	printf("version: 0.5.0 from 2009-01-23\n");
+	printf("version: 0.5.1 from 2009-03-21\n");
 	exit(0);
 }
 
 int
 main(int argc, char **argv)
 {
+	extern char *__progname;
 	in_addr_t listen_ip;
+#ifndef WINDOWS32
 	struct passwd *pw;
+#endif
 	int foreground;
 	char *username;
 	char *newroot;
@@ -916,7 +967,7 @@ main(int argc, char **argv)
 	foreground = 0;
 	bind_enable = 0;
 	bind_fd = 0;
-	mtu = 1024;
+	mtu = 1200;
 	listen_ip = INADDR_ANY;
 	port = 53;
 	ns_ip = INADDR_ANY;
@@ -926,6 +977,10 @@ main(int argc, char **argv)
 	netmask = 27;
 
 	b32 = get_base32_encoder();
+	
+#ifdef WINDOWS32
+	WSAStartup(req_version, &wsa_data);
+#endif
 
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
@@ -1000,10 +1055,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (geteuid() != 0) {
-		warnx("Run as root and you'll be happy.\n");
-		usage();
-	}
+	check_superuser(usage);
 
 	if (argc != 2) 
 		usage();
@@ -1034,10 +1086,12 @@ main(int argc, char **argv)
 	}
 
 	if (username != NULL) {
+#ifndef WINDOWS32
 		if ((pw = getpwnam(username)) == NULL) {
 			warnx("User %s does not exist!\n", username);
 			usage();
 		}
+#endif
 	}
 
 	if (mtu <= 0) {
@@ -1056,18 +1110,18 @@ main(int argc, char **argv)
 			usage();
 			/* NOTREACHED */
 		}
-		printf("Requests for domains outside of %s will be forwarded to port %d\n",
+		fprintf(stderr, "Requests for domains outside of %s will be forwarded to port %d\n",
 			topdomain, bind_port);
 	}
 	
 	if (port != 53) {
-		printf("ALERT! Other dns servers expect you to run on port 53.\n");
-		printf("You must manually forward port 53 to port %d for things to work.\n", port);
+		fprintf(stderr, "ALERT! Other dns servers expect you to run on port 53.\n");
+		fprintf(stderr, "You must manually forward port 53 to port %d for things to work.\n", port);
 	}
 
 	if (debug) {
-		printf("Debug level %d enabled, will stay in foreground.\n", debug);
-		printf("Add more -D switches to set higher debug level.\n");
+		fprintf(stderr, "Debug level %d enabled, will stay in foreground.\n", debug);
+		fprintf(stderr, "Add more -D switches to set higher debug level.\n");
 		foreground = 1;
 	}
 
@@ -1104,10 +1158,10 @@ main(int argc, char **argv)
 	created_users = init_users(my_ip, netmask);
 	
 	if (created_users < USERS) {
-		printf("Limiting to %d simultaneous users because of netmask /%d\n",
+		fprintf(stderr, "Limiting to %d simultaneous users because of netmask /%d\n",
 			created_users, netmask);
 	}
-	printf("Listening to dns for domain %s\n", topdomain);
+	fprintf(stderr, "Listening to dns for domain %s\n", topdomain);
 
 	if (foreground == 0) 
 		do_detach();
@@ -1117,16 +1171,24 @@ main(int argc, char **argv)
 
 	signal(SIGINT, sigint);
 	if (username != NULL) {
+#ifndef WINDOWS32
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
 		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
 			warnx("Could not switch to user %s!\n", username);
 			usage();
 		}
+#endif
 	}
+
+#ifndef WINDOWS32
+	openlog(__progname, LOG_NOWAIT, LOG_DAEMON);
+#endif
+	syslog(LOG_INFO, "started, listening on port %d", port);
 	
 	tunnel(tun_fd, dnsd_fd, bind_fd);
 
+	syslog(LOG_INFO, "stopping");
 cleanup3:
 	close_dns(bind_fd);
 cleanup2:

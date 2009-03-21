@@ -20,21 +20,27 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
-#include <sys/socket.h>
 #include <fcntl.h>
-#include <err.h>
-#include <grp.h>
-#include <pwd.h>
-#include <arpa/inet.h>
 #include <zlib.h>
+
+#ifdef WINDOWS32
+#include "windows.h"
+#include <winsock2.h>
+#else
 #include <arpa/nameser.h>
 #ifdef DARWIN
 #include <arpa/nameser8_compat.h>
+#endif
+#include <sys/socket.h>
+#include <err.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <grp.h>
+#include <pwd.h>
+#include <netdb.h>
 #endif
 
 #include "common.h"
@@ -45,6 +51,11 @@
 #include "login.h"
 #include "tun.h"
 #include "version.h"
+
+#ifdef WINDOWS32
+WORD req_version = MAKEWORD(2, 2);
+WSADATA wsa_data;
+#endif
 
 static void send_ping(int fd);
 static void send_chunk(int fd);
@@ -63,9 +74,6 @@ static int downstream_seqno;
 static int downstream_fragment;
 static int down_ack_seqno;
 static int down_ack_fragment;
-
-static int max_downstream_frag_size;
-static int autodetect_frag_size;
 
 /* Current up/downstream IP packet */
 static struct packet outpkt;
@@ -132,7 +140,7 @@ build_hostname(char *buf, size_t buflen,
 	size_t space;
 	char *b;
 
-	space = MIN(0xFF, buflen) - strlen(topdomain) - 5;
+	space = MIN(0xFF, buflen) - strlen(topdomain) - 7;
 	if (!encoder->places_dots())
 		space -= (space / 57); /* space for dots */
 
@@ -424,7 +432,7 @@ send_fragsize_probe(int fd, int fragsize)
 	fragsize &= 2047;
 
 	buf[0] = 'r'; /* Probe downstream fragsize packet */
-	buf[1] = b32_5to8((userid << 1) | (fragsize & 1024));
+	buf[1] = b32_5to8((userid << 1) | ((fragsize >> 10) & 1));
 	buf[2] = b32_5to8((fragsize >> 5) & 31);
 	buf[3] = b32_5to8(fragsize & 31);
 
@@ -487,22 +495,17 @@ send_codec_switch(int fd, int userid, int bits)
 	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, buf);
 }
-
+	
 static int
-handshake(int dns_fd)
+handshake_version(int dns_fd, int *seed)
 {
 	struct timeval tv;
-	uint32_t payload;
-	char server[65];
-	char client[65];
-	char login[16];
 	char in[4096];
 	fd_set fds;
-	int read;
-	int mtu;
-	int seed;
+	uint32_t payload;
 	int i;
 	int r;
+	int read;
 
 	for (i = 0; running && i < 5; i++) {
 		tv.tv_sec = i + 1;
@@ -533,11 +536,11 @@ handshake(int dns_fd)
 						((in[7] & 0xff)));
 
 				if (strncmp("VACK", in, 4) == 0) {
-					seed = payload;
+					*seed = payload;
 					userid = in[8];
 
-					printf("Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
-					goto perform_login;
+					fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
+					return 0;
 				} else if (strncmp("VNAK", in, 4) == 0) {
 					warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
 							VERSION, payload);
@@ -550,12 +553,26 @@ handshake(int dns_fd)
 				warnx("did not receive proper login challenge");
 		}
 		
-		printf("Retrying version check...\n");
+		fprintf(stderr, "Retrying version check...\n");
 	}
-	errx(1, "couldn't connect to server");
-	/* NOTREACHED */
-	
-perform_login:
+	warnx("couldn't connect to server");
+	return 1;
+}
+
+static int
+handshake_login(int dns_fd, int seed)
+{
+	struct timeval tv;
+	char in[4096];
+	char login[16];
+	char server[65];
+	char client[65];
+	int mtu;
+	fd_set fds;
+	int i;
+	int r;
+	int read;
+
 	login_calculate(login, 16, password, seed);
 	
 	for (i=0; running && i<5 ;i++) {
@@ -580,7 +597,7 @@ perform_login:
 			if (read > 0) {
 				int netmask;
 				if (strncmp("LNAK", in, 4) == 0) {
-					printf("Bad password\n");
+					fprintf(stderr, "Bad password\n");
 					return 1;
 				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d", 
 					server, client, &mtu, &netmask) == 4) {
@@ -589,22 +606,32 @@ perform_login:
 					client[64] = 0;
 					if (tun_setip(client, netmask) == 0 && 
 						tun_setmtu(mtu) == 0) {
-						goto perform_case_check;
+						return 0;
 					} else {
 						warnx("Received handshake with bad data");
 					}
 				} else {
-					printf("Received bad handshake\n");
+					fprintf(stderr, "Received bad handshake\n");
 				}
 			}
 		}
 
-		printf("Retrying login...\n");
+		fprintf(stderr, "Retrying login...\n");
 	}
 	warnx("couldn't login to server");
 	return 1;
+}
 
-perform_case_check:
+static void
+handshake_case_check(int dns_fd)
+{
+	struct timeval tv;
+	char in[4096];
+	fd_set fds;
+	int i;
+	int r;
+	int read;
+
 	case_preserved = 0;
 	for (i=0; running && i<5 ;i++) {
 		tv.tv_sec = i + 1;
@@ -623,8 +650,8 @@ perform_case_check:
 			if (read > 0) {
 				if (in[0] == 'z' || in[0] == 'Z') {
 					if (read < (27 * 2)) {
-						printf("Received short case check reply. Will use base32 encoder\n");
-						goto switch_codec;
+						fprintf(stderr, "Received short case check reply. Will use base32 encoder\n");
+						return;
 					} else {
 						int k;
 
@@ -636,27 +663,35 @@ perform_case_check:
 								case_preserved = 0;
 							}
 						}
-						goto switch_codec;
+						return;
 					}
 				} else {
-					printf("Received bad case check reply\n");
+					fprintf(stderr, "Received bad case check reply\n");
 				}
 			} else {
-				printf("Got error on case check, will use base32\n");
-				goto switch_codec;
+				fprintf(stderr, "Got error on case check, will use base32\n");
+				return;
 			}
 		}
 
-		printf("Retrying case check...\n");
+		fprintf(stderr, "Retrying case check...\n");
 	}
 
-	printf("No reply on case check, continuing\n");
-switch_codec:
-	if (!case_preserved)
-		goto autodetect_max_fragsize;
+	fprintf(stderr, "No reply on case check, continuing\n");
+}
+
+static void
+handshake_switch_codec(int dns_fd)
+{
+	struct timeval tv;
+	char in[4096];
+	fd_set fds;
+	int i;
+	int r;
+	int read;
 
 	dataenc = get_base64_encoder();
-	printf("Switching to %s codec\n", dataenc->name);
+	fprintf(stderr, "Switching to %s codec\n", dataenc->name);
 	/* Send to server that this user will use base64 from now on */
 	for (i=0; running && i<5 ;i++) {
 		int bits;
@@ -677,84 +712,120 @@ switch_codec:
 			
 			if (read > 0) {
 				if (strncmp("BADLEN", in, 6) == 0) {
-					printf("Server got bad message length. ");
+					fprintf(stderr, "Server got bad message length. ");
 					goto codec_revert;
 				} else if (strncmp("BADIP", in, 5) == 0) {
-					printf("Server rejected sender IP address. ");
+					fprintf(stderr, "Server rejected sender IP address. ");
 					goto codec_revert;
 				} else if (strncmp("BADCODEC", in, 8) == 0) {
-					printf("Server rejected the selected codec. ");
+					fprintf(stderr, "Server rejected the selected codec. ");
 					goto codec_revert;
 				}
 				in[read] = 0; /* zero terminate */
-				printf("Server switched to codec %s\n", in);
-				goto autodetect_max_fragsize;
+				fprintf(stderr, "Server switched to codec %s\n", in);
+				return;
 			}
 		}
-		printf("Retrying codec switch...\n");
+		fprintf(stderr, "Retrying codec switch...\n");
 	}
-	printf("No reply from server on codec switch. ");
+	fprintf(stderr, "No reply from server on codec switch. ");
+
 codec_revert: 
-	printf("Falling back to base32\n");
+	fprintf(stderr, "Falling back to base32\n");
 	dataenc = get_base32_encoder();
-autodetect_max_fragsize:
-	if (autodetect_frag_size) {
-		int proposed_fragsize = 768;
-		int range = 768;
-		max_downstream_frag_size = 0;
-		printf("Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
-		while (running && range > 0 && (range >= 8 || !max_downstream_frag_size)) {
-			for (i=0; running && i<3 ;i++) {
-				tv.tv_sec = 1;
-				tv.tv_usec = 0;
-				send_fragsize_probe(dns_fd, proposed_fragsize);
+}
 
-				FD_ZERO(&fds);
-				FD_SET(dns_fd, &fds);
+static int
+handshake_autoprobe_fragsize(int dns_fd)
+{
+	struct timeval tv;
+	char in[4096];
+	fd_set fds;
+	int i;
+	int r;
+	int read;
+	int proposed_fragsize = 768;
+	int range = 768;
+	int max_fragsize = 0;
 
-				r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+	max_fragsize = 0;
+	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
+	while (running && range > 0 && (range >= 8 || !max_fragsize)) {
+		for (i=0; running && i<3 ;i++) {
+			tv.tv_sec = 1;
+			tv.tv_usec = 0;
+			send_fragsize_probe(dns_fd, proposed_fragsize);
 
-				if(r > 0) {
-					read = read_dns(dns_fd, in, sizeof(in));
-					
-					if (read > 0) {
-						/* We got a reply */
-						int acked_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
-						if (acked_fragsize == proposed_fragsize) {
-							printf("%d ok.. ", acked_fragsize);
-							fflush(stdout);
-							max_downstream_frag_size = acked_fragsize;
-							range >>= 1;
-							proposed_fragsize += range;
-							continue;
+			FD_ZERO(&fds);
+			FD_SET(dns_fd, &fds);
+
+			r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+			if(r > 0) {
+				read = read_dns(dns_fd, in, sizeof(in));
+				
+				if (read > 0) {
+					/* We got a reply */
+					int acked_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
+					if (acked_fragsize == proposed_fragsize) {
+						if (read == proposed_fragsize) {
+							fprintf(stderr, "%d ok.. ", acked_fragsize);
+							fflush(stderr);
+							max_fragsize = acked_fragsize;
 						}
 					}
+					if (strncmp("BADIP", in, 5) == 0) {
+						fprintf(stderr, "got BADIP.. ");
+						fflush(stderr);
+					}
+					break;
 				}
 			}
-			printf("%d not ok.. ", proposed_fragsize);
-			fflush(stdout);
-			range >>= 1;
+			fprintf(stderr, ".");
+			fflush(stderr);
+		}
+		range >>= 1;
+		if (max_fragsize == proposed_fragsize) {
+			/* Try bigger */
+			proposed_fragsize += range;
+		} else {
+			/* Try smaller */
+			fprintf(stderr, "%d not ok.. ", proposed_fragsize);
+			fflush(stderr);
 			proposed_fragsize -= range;
 		}
-		if (!running) {
-			printf("\n");
-			warnx("stopped while autodetecting fragment size (Try probing manually with -m)");
-			return 1;
-		}
-		if (range == 0) {
-			/* Tried all the way down to 2 and found no good size */
-			printf("\n");
-			warnx("found no accepted fragment size. (Try probing manually with -m)");
-			return 1;
-		}
-		printf("will use %d\n", max_downstream_frag_size);
 	}
-	printf("Setting downstream fragment size to max %d...\n", max_downstream_frag_size);
+	if (!running) {
+		fprintf(stderr, "\n");
+		warnx("stopped while autodetecting fragment size (Try probing manually with -m)");
+		return 0;
+	}
+	if (range == 0) {
+		/* Tried all the way down to 2 and found no good size */
+		fprintf(stderr, "\n");
+		warnx("found no accepted fragment size. (Try probing manually with -m)");
+		return 0;
+	}
+	fprintf(stderr, "will use %d\n", max_fragsize);
+	return max_fragsize;
+}
+
+static void
+handshake_set_fragsize(int dns_fd, int fragsize)
+{
+	struct timeval tv;
+	char in[4096];
+	fd_set fds;
+	int i;
+	int r;
+	int read;
+
+	fprintf(stderr, "Setting downstream fragment size to max %d...\n", fragsize);
 	for (i=0; running && i<5 ;i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		send_set_downstream_fragsize(dns_fd, max_downstream_frag_size);
+		send_set_downstream_fragsize(dns_fd, fragsize);
 		
 		FD_ZERO(&fds);
 		FD_SET(dns_fd, &fds);
@@ -768,21 +839,53 @@ autodetect_max_fragsize:
 				int accepted_fragsize;
 
 				if (strncmp("BADFRAG", in, 7) == 0) {
-					printf("Server rejected fragsize. Keeping default.");
-					goto done;
+					fprintf(stderr, "Server rejected fragsize. Keeping default.");
+					return;
 				} else if (strncmp("BADIP", in, 5) == 0) {
-					printf("Server rejected sender IP address.\n");
-					goto done;
+					fprintf(stderr, "Server rejected sender IP address.\n");
+					return;
 				}
 
 				accepted_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
-				goto done;
+				return;
 			}
 		}
-		printf("Retrying set fragsize...\n");
+		fprintf(stderr, "Retrying set fragsize...\n");
 	}
-	printf("No reply from server when setting fragsize. Keeping default.\n");
-done:
+	fprintf(stderr, "No reply from server when setting fragsize. Keeping default.\n");
+}
+
+static int
+handshake(int dns_fd, int autodetect_frag_size, int fragsize)
+{
+	int seed;
+	int r;
+
+	r = handshake_version(dns_fd, &seed);
+	if (r) {
+		return r;
+	}
+
+	r = handshake_login(dns_fd, seed);
+	if (r) {
+		return r;
+	}
+
+	handshake_case_check(dns_fd);
+
+	if (case_preserved) {
+		handshake_switch_codec(dns_fd);
+	}
+
+	if (autodetect_frag_size) {
+		fragsize = handshake_autoprobe_fragsize(dns_fd);
+		if (!fragsize) {
+			return 1;
+		}
+	}
+
+	handshake_set_fragsize(dns_fd, fragsize);
+
 	return 0;
 }
 
@@ -790,8 +893,9 @@ static char *
 get_resolvconf_addr()
 {
 	static char addr[16];
-	char buf[80];
 	char *rv;
+#ifndef WINDOWS32
+	char buf[80];
 	FILE *fp;
 	
 	rv = NULL;
@@ -809,7 +913,29 @@ get_resolvconf_addr()
 	}
 	
 	fclose(fp);
+#else /* !WINDOWS32 */
+	FIXED_INFO  *fixed_info;
+	ULONG       buflen;
+	DWORD       ret;
 
+	rv = NULL;
+	fixed_info = malloc(sizeof(FIXED_INFO));
+	buflen = sizeof(FIXED_INFO);
+
+	if (GetNetworkParams(fixed_info, &buflen) == ERROR_BUFFER_OVERFLOW) {
+		/* official ugly api workaround */
+		free(fixed_info);
+		fixed_info = malloc(buflen);
+	}
+
+	ret = GetNetworkParams(fixed_info, &buflen);
+	if (ret == NO_ERROR) {
+		strncpy(addr, fixed_info->DnsServerList.IpAddress.String, sizeof(addr));
+		addr[15] = 0;
+		rv = addr;
+	}
+	free(fixed_info);
+#endif
 	return rv;
 }
 
@@ -831,7 +957,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [nameserver] topdomain\n", __progname);
 	exit(2);
 }
@@ -840,19 +966,19 @@ static void
 help() {
 	extern char *__progname;
 
-	printf("iodine IP over DNS tunneling client\n");
-	printf("Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "iodine IP over DNS tunneling client\n");
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [nameserver] topdomain\n", __progname);
-	printf("  -v to print version info and exit\n");
-	printf("  -h to print this help and exit\n");
-	printf("  -f to keep running in foreground\n");
-	printf("  -u name to drop privileges and run as user 'name'\n");
-	printf("  -t dir to chroot to directory dir\n");
-	printf("  -d device to set tunnel device name\n");
-	printf("  -P password used for authentication (max 32 chars will be used)\n");
-	printf("  -m maxfragsize, to limit size of downstream packets\n");
-	printf("nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
-	printf("topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
+	fprintf(stderr, "  -v to print version info and exit\n");
+	fprintf(stderr, "  -h to print this help and exit\n");
+	fprintf(stderr, "  -f to keep running in foreground\n");
+	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
+	fprintf(stderr, "  -t dir to chroot to directory dir\n");
+	fprintf(stderr, "  -d device to set tunnel device name\n");
+	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "  -m maxfragsize, to limit size of downstream packets\n");
+	fprintf(stderr, "nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
+	fprintf(stderr, "topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
 }
@@ -860,7 +986,7 @@ help() {
 static void
 version() {
 	printf("iodine IP over DNS tunneling client\n");
-	printf("version: 0.5.0 from 2009-01-23\n");
+	printf("version: 0.5.1 from 2009-03-21\n");
 
 	exit(0);
 }
@@ -869,7 +995,9 @@ int
 main(int argc, char **argv)
 {
 	char *nameserv_addr;
+#ifndef WINDOWS32
 	struct passwd *pw;
+#endif
 	char *username;
 	int foreground;
 	char *newroot;
@@ -877,6 +1005,8 @@ main(int argc, char **argv)
 	int choice;
 	int tun_fd;
 	int dns_fd;
+	int max_downstream_frag_size;
+	int autodetect_frag_size;
 
 	memset(password, 0, 33);
 	username = NULL;
@@ -893,6 +1023,10 @@ main(int argc, char **argv)
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
+
+#ifdef WINDOWS32
+	WSAStartup(req_version, &wsa_data);
+#endif
 	
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
@@ -941,11 +1075,7 @@ main(int argc, char **argv)
 		}
 	}
 	
-	if (geteuid() != 0) {
-		warnx("Run as root and you'll be happy.\n");
-		usage();
-		/* NOTREACHED */
-	}
+	check_superuser(usage);
 
 	argc -= optind;
 	argv += optind;
@@ -985,11 +1115,13 @@ main(int argc, char **argv)
 	}
 
 	if (username != NULL) {
+#ifndef WINDOWS32
 		if ((pw = getpwnam(username)) == NULL) {
 			warnx("User %s does not exist!\n", username);
 			usage();
 			/* NOTREACHED */
 		}
+#endif
 	}
 	
 	if (strlen(password) == 0) 
@@ -1003,10 +1135,10 @@ main(int argc, char **argv)
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
-	if(handshake(dns_fd))
+	if(handshake(dns_fd, autodetect_frag_size, max_downstream_frag_size))
 		goto cleanup2;
 	
-	printf("Sending queries for %s to %s\n", topdomain, nameserv_addr);
+	fprintf(stderr, "Sending queries for %s to %s\n", topdomain, nameserv_addr);
 
 	if (foreground == 0) 
 		do_detach();
@@ -1015,6 +1147,7 @@ main(int argc, char **argv)
 		do_chroot(newroot);
 	
 	if (username != NULL) {
+#ifndef WINDOWS32
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
 		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
@@ -1022,6 +1155,7 @@ main(int argc, char **argv)
 			usage();
 			/* NOTREACHED */
 		}
+#endif
 	}
 	
 	downstream_seqno = 0;

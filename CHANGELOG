@@ -5,6 +5,21 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
+2009-03-21: 0.5.1 "Boringo"
+	- Added initial Windows support, fixes #43.
+	- Added length check of autoprobe responses
+	- Refactored and added unit tests
+	- Added syslog logging for iodined on version and login packets
+	- Fixed segfault when encoding just one block, fixes #51.
+		The normal code was never affected by this.
+	- Added win32 code to read DNS server from system, fixes #45.
+	- Disabled password echo on win32, fixes #44.
+	- Fix encoding error making all autoprobing > 1024 bytes fail, #52.
+	- Increase default interface MTU to 1200.
+	- Fix autoprobing error making every third probe fail, set IP flag
+		Dont-Fragment where supported. Fixes #54.
+	- Added TAP32 version 0901 as accepted (#53).
+
 2009-01-23: 0.5.0 "iPassed"
 	- Fixed segfault in server when sending version reject.
 	- Applied patch to make iodine build on BeOS R5-BONE and Haiku,

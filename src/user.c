@@ -21,13 +21,18 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <fcntl.h>
+
+#ifdef WINDOWS32
+#include <winsock2.h>
+#else
 #include <err.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#endif
 
 #include "common.h"
 #include "encoding.h"

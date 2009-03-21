@@ -24,11 +24,13 @@
 #include "base64.h"
 #include "test.h"
 
+#define TUPLES 5
+
 static struct tuple
 {
 	char *a;
 	char *b;
-} testpairs[] = {
+} testpairs[TUPLES] = {
 	{ "iodinetestingtesting", "Aw8KAw4LDgvZDgLUz2rLC2rPBMC" },
 	{ "abc1231", "ywjJmtiZmq" },
 	{
@@ -59,7 +61,7 @@ static struct tuple
 	  "776543210-ZYXWVUTSRQfHKwfHGsHGFEDCBAzyxwvutsrqponmlkjihgfedcba+987654321"
 	  "0-ZYXWVUTSRQfHKwfHGsHGFEDCBAzyxwvutsrqponmlkjihgfedcba"
 	},
-	{ NULL, NULL }
+	{ "", "" }
 };
 
 START_TEST(test_base64_encode)
@@ -68,18 +70,14 @@ START_TEST(test_base64_encode)
 	char buf[4096];
 	struct encoder *b64;
 	int val;
-	int i;
 
 	b64 = get_base64_encoder();
 
-	for (i = 0; testpairs[i].a != NULL; i++) {
-		len = sizeof(buf);
-		val = b64->encode(buf, &len, testpairs[i].a, strlen(testpairs[i].a));
+	len = sizeof(buf);
+	val = b64->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
-		fail_unless(val > 0, strerror(errno));
-		fail_unless(strcmp(buf, testpairs[i].b) == 0,
-				"'%s' != '%s'", buf, testpairs[i].b);
-	}
+	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
+			"'%s' != '%s'", buf, testpairs[_i].b);
 }
 END_TEST
 
@@ -89,18 +87,56 @@ START_TEST(test_base64_decode)
 	char buf[4096];
 	struct encoder *b64;
 	int val;
-	int i;
 
 	b64 = get_base64_encoder();
 
-	for (i = 0; testpairs[i].a != NULL; i++) {
-		len = sizeof(buf);
-		val = b64->decode(buf, &len, testpairs[i].b, strlen(testpairs[i].b));
+	len = sizeof(buf);
+	val = b64->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
-		fail_unless(val > 0, strerror(errno));
-		fail_unless(buf != NULL, "buf == NULL");
-		fail_unless(strcmp(buf, testpairs[i].a) == 0,
-				"'%s' != '%s'", buf, testpairs[i].a);
+	fail_unless(buf != NULL, "buf == NULL");
+	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
+			"'%s' != '%s'", buf, testpairs[_i].a);
+}
+END_TEST
+
+START_TEST(test_base64_blksize)
+{
+	size_t rawlen;
+	size_t enclen;
+	char *rawbuf;
+	char *encbuf;
+	struct encoder *b64;
+	int i;
+	int val;
+
+	b64 = get_base64_encoder();
+
+	rawlen = b64->blocksize_raw();
+	enclen = b64->blocksize_encoded();
+
+	rawbuf = malloc(rawlen + 16);
+	encbuf = malloc(enclen + 16);
+
+	for (i = 0; i < rawlen; i++) {
+		rawbuf[i] = 'A';
+	}
+	rawbuf[i] = 0;
+
+	val = b64->encode(encbuf, &enclen, rawbuf, rawlen);
+
+	fail_unless(rawlen == 3, "raw length was %d not 3", rawlen);
+	fail_unless(enclen == 3, "encoded %d bytes, not 3", enclen);
+	fail_unless(val == 4, "encoded string %s was length %d", encbuf, val);
+
+	memset(rawbuf, 0, rawlen + 16);
+
+	enclen = val;
+	val = b64->decode(rawbuf, &rawlen, encbuf, enclen);
+
+	fail_unless(rawlen == 3, "raw length was %d not 3", rawlen);
+	fail_unless(val == 3);
+	for (i = 0; i < rawlen; i++) {
+		fail_unless(rawbuf[i] == 'A');
 	}
 }
 END_TEST
@@ -111,8 +147,9 @@ test_base64_create_tests()
 	TCase *tc;
 
 	tc = tcase_create("Base64");
-	tcase_add_test(tc, test_base64_encode);
-	tcase_add_test(tc, test_base64_decode);
+	tcase_add_loop_test(tc, test_base64_encode, 0, TUPLES);
+	tcase_add_loop_test(tc, test_base64_decode, 0, TUPLES);
+	tcase_add_test(tc, test_base64_blksize);
 
 	return tc;
 }
