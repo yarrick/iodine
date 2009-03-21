@@ -5,7 +5,7 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
-2009-xx-yy: x.y.z "Boringo"
+2009-03-21: 0.5.1 "Boringo"
 	- Added initial Windows support, fixes #43.
 	- Added length check of autoprobe responses
 	- Refactored and added unit tests
