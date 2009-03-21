@@ -93,10 +93,11 @@ iptables -t nat -A PREROUTING -i eth0 -p udp --dport 53 -j DNAT --to :5353
 PORTABILITY:
 
 iodine has been tested on Linux (arm, ia64, x86, AMD64 and SPARC64), FreeBSD
-(ia64, x86), OpenBSD (x86), NetBSD (x86) and MacOS X (ppc and x86, with
-http://tuntaposx.sourceforge.net/). It should be easy to port to other
-unix-like systems that has TUN/TAP tunneling support. Let us know if you get it
-to run on other platforms. 
+(ia64, x86), OpenBSD (x86), NetBSD (x86), MacOS X (ppc and x86, with
+http://tuntaposx.sourceforge.net/). and Windows (with OpenVPN TAP32 driver, see
+win32 readme file).  It should be easy to port to other unix-like systems that
+has TUN/TAP tunneling support. Let us know if you get it to run on other
+platforms. 
 
 
 THE NAME:
