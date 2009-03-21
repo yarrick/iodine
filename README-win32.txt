@@ -49,7 +49,7 @@ cross-compile.
 == Results of crappy Win32 API:
 The following fixable limitations apply:
 - Exactly one TAP32 interface must be installed
-- The TAP32 interface must be named "dns" and be version 0801
+- The TAP32 interface must be named "dns" and be version 0801 or 0901
 - Server cannot read packet destination address
 
 The following (probably) un-fixable limitations apply:

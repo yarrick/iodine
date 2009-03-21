@@ -38,7 +38,8 @@ struct tun_data data;
 
 #define TAP_ADAPTER_KEY "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}"
 #define TAP_DEVICE_SPACE "\\\\.\\Global\\"
-#define TAP_COMPONENT_ID "tap0801"
+#define TAP_VERSION_ID_0801 "tap0801"
+#define TAP_VERSION_ID_0901 "tap0901"
 #define KEY_COMPONENT_ID "ComponentId"
 #define NET_CFG_INST_ID "NetCfgInstanceId"
 #else
@@ -205,7 +206,8 @@ get_device(char *device, int device_len)
 		if (status != ERROR_SUCCESS || datatype != REG_SZ) {
 			goto next;
 		}
-		if (strncmp(TAP_COMPONENT_ID, component, strlen(TAP_COMPONENT_ID)) == 0) {
+		if (strncmp(TAP_VERSION_ID_0801, component, strlen(TAP_VERSION_ID_0801)) == 0 ||
+			strncmp(TAP_VERSION_ID_0901, component, strlen(TAP_VERSION_ID_0901)) == 0) {
 			/* We found a TAP32 device, get its NetCfgInstanceId */
 			char iid_string[256] = NET_CFG_INST_ID;
 			
