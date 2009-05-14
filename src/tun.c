@@ -360,7 +360,8 @@ read_tun(int tun_fd, char *buf, size_t len)
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	/* FreeBSD/Darwin/NetBSD has no header */
 	int bytes;
-	bytes = recv(tun_fd, buf + 4, len, 0);
+	memset(buf, 0, 4);
+	bytes = read(tun_fd, buf + 4, len - 4);
 	if (bytes < 0) {
 		return bytes;
 	} else {
