@@ -5,6 +5,11 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
+2009-06-01: 0.5.2 "WifiFree"
+	- Fixed client segfault on OS X, #57
+	- Added check that nameserver lookup was successful
+	- Fixed ENOTSOCK error on OS X and FreeBSD, #58.
+
 2009-03-21: 0.5.1 "Boringo"
 	- Added initial Windows support, fixes #43.
 	- Added length check of autoprobe responses
