@@ -361,7 +361,13 @@ read_tun(int tun_fd, char *buf, size_t len)
 	/* FreeBSD/Darwin/NetBSD has no header */
 	int bytes;
 	memset(buf, 0, 4);
+#ifdef WINDOWS32
+	/* Windows needs recv() since it is local UDP socket */
+	bytes = recv(tun_fd, buf + 4, len - 4, 0);
+#else
+	/* The other need read() because fd is not a socket */
 	bytes = read(tun_fd, buf + 4, len - 4);
+#endif /*WINDOWS32*/
 	if (bytes < 0) {
 		return bytes;
 	} else {
