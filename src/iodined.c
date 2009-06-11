@@ -389,6 +389,33 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			}
 		}
 		return;
+	} else if(in[0] == 'I' || in[0] == 'i') {
+		/* Request for IP number */
+		in_addr_t replyaddr;
+		unsigned addr;
+		char reply[5];
+		
+		userid = b32_8to5(in[1]);
+		if (check_user_and_ip(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5);
+			return; /* illegal id */
+		}
+
+		if (ns_ip != INADDR_ANY) {
+			/* If set, use assigned external ip (-n option) */
+			replyaddr = ns_ip;
+		} else {
+			/* otherwise return destination ip from packet */
+			memcpy(&replyaddr, &q->destination.s_addr, sizeof(in_addr_t));
+		}
+
+		addr = htonl(replyaddr);
+		reply[0] = 'I';
+		reply[1] = (addr >> 24) & 0xFF;
+		reply[2] = (addr >> 16) & 0xFF;
+		reply[3] = (addr >>  8) & 0xFF;
+		reply[4] = (addr >>  0) & 0xFF;
+		write_dns(dns_fd, q, reply, sizeof(reply));
 	} else if(in[0] == 'Z' || in[0] == 'z') {
 		/* Check for case conservation and chars not allowed according to RFC */
 
@@ -600,6 +627,8 @@ handle_ns_request(int dns_fd, struct query *q)
 	int len;
 
 	if (ns_ip != INADDR_ANY) {
+		/* If ns_ip set, overwrite destination addr with it.
+		 * Destination addr will be sent as additional record (A, IN) */
 		memcpy(&q->destination.s_addr, &ns_ip, sizeof(in_addr_t));
 	}
 
