@@ -9,7 +9,7 @@ Extra README file for Win32 related stuff
 
 == Running iodine on Windows:
 1. Install the TAP32 driver 
- http://openvpn.net/index.php/downloads.html 
+ http://openvpn.net/index.php/open-source/downloads.html
  choose OpenVPN 2.0.9 Windows Installer, when installing you can
  select to install only the TAP driver.
 
@@ -20,6 +20,7 @@ Extra README file for Win32 related stuff
 4. Make sure the interface does not have a default gateway set
 
 5. Run iodine/iodined as normal.
+   You may have to run is as administrator depending on user privileges.
 
 6. Enjoy!
 
