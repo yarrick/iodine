@@ -5,6 +5,9 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
+20xx-xx-xx: x.y.z
+	- Fixed tunnel not working on Windows.
+
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
 	- Added check that nameserver lookup was successful
