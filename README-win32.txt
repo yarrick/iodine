@@ -19,8 +19,8 @@ Extra README file for Win32 related stuff
 
 4. Make sure the interface does not have a default gateway set
 
-5. Run iodine/iodined as normal.
-   You may have to run is as administrator depending on user privileges.
+5. Run iodine/iodined as normal (see the main README file).
+   You may have to run it as administrator depending on user privileges.
 
 6. Enjoy!
 
