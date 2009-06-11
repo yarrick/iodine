@@ -474,6 +474,16 @@ send_version(int fd, uint32_t version)
 }
 
 static void
+send_ip_request(int fd, int userid)
+{
+	char buf[512] = "I_.";
+	buf[1] = b32_5to8(userid);
+	
+	strncat(buf, topdomain, 512 - strlen(buf));
+	send_query(fd, buf);
+}
+
+static void
 send_case_check(int fd)
 {
 	/* The '+' plus character is not allowed according to RFC. 
@@ -620,6 +630,66 @@ handshake_login(int dns_fd, int seed)
 	}
 	warnx("couldn't login to server");
 	return 1;
+}
+
+static int
+handshake_raw_udp(int dns_fd)
+{
+	struct timeval tv;
+	char in[4096];
+	fd_set fds;
+	int i;
+	int r;
+	int read;
+	unsigned remoteaddr = 0;
+	struct in_addr server;
+
+	fprintf(stderr, "Testing raw UDP data to the server");
+	fflush(stderr);
+	for (i=0; running && i<3 ;i++) {
+		tv.tv_sec = i + 1;
+		tv.tv_usec = 0;
+
+		send_ip_request(dns_fd, userid);
+		
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = read_dns(dns_fd, in, sizeof(in));
+			if (read == 5 && in[0] == 'I') {
+				/* Received IP address */
+				remoteaddr = (in[1] & 0xff);
+				remoteaddr <<= 8;
+				remoteaddr |= (in[2] & 0xff);
+				remoteaddr <<= 8;
+				remoteaddr |= (in[3] & 0xff);
+				remoteaddr <<= 8;
+				remoteaddr |= (in[4] & 0xff);
+				server.s_addr = ntohl(remoteaddr);
+				break;
+			}
+		} else {
+			fprintf(stderr, ".");
+			fflush(stderr);
+		}
+	}
+	
+	if (!remoteaddr) {
+		fprintf(stderr, " failed to get IP.\n");
+		return 1;
+	}
+	fprintf(stderr, " at %s", inet_ntoa(server));
+	fflush(stderr);
+
+	/* TODO do login against port 53 on remote server 
+	 *      based on the old seed. If reply received,
+	 *      switch to raw udp mode */
+	fprintf(stderr, ": not implemented\n");
+	return 1;
+	/* TODO and then return 0 on success */
 }
 
 static void
@@ -870,6 +940,8 @@ handshake(int dns_fd, int autodetect_frag_size, int fragsize)
 	if (r) {
 		return r;
 	}
+
+	handshake_raw_udp(dns_fd);
 
 	handshake_case_check(dns_fd);
 
