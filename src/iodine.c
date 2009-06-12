@@ -476,9 +476,14 @@ send_version(int fd, uint32_t version)
 static void
 send_ip_request(int fd, int userid)
 {
-	char buf[512] = "I_.";
+	char buf[512] = "I____.";
 	buf[1] = b32_5to8(userid);
 	
+	buf[2] = b32_5to8((rand_seed >> 10) & 0x1f);
+	buf[3] = b32_5to8((rand_seed >> 5) & 0x1f);
+	buf[4] = b32_5to8((rand_seed ) & 0x1f);
+	rand_seed++;
+
 	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, buf);
 }
@@ -498,10 +503,15 @@ send_case_check(int fd)
 static void
 send_codec_switch(int fd, int userid, int bits)
 {
-	char buf[512] = "S__.";
+	char buf[512] = "S_____.";
 	buf[1] = b32_5to8(userid);
 	buf[2] = b32_5to8(bits);
 	
+	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
+	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
+	buf[5] = b32_5to8((rand_seed ) & 0x1f);
+	rand_seed++;
+
 	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, buf);
 }

@@ -425,7 +425,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 	} else if(in[0] == 'S' || in[0] == 's') {
 		int codec;
 		struct encoder *enc;
-		if (domain_len != 4) { /* len = 4, example: "S15." */
+		if (domain_len < 3) { /* len at least 3, example: "S15" */
 			write_dns(dns_fd, q, "BADLEN", 6);
 			return;
 		}
