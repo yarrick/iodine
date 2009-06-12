@@ -54,10 +54,12 @@ Client sends:
 	5 bits coded as Base32 char, meaning userid
 	5 bits coded as Base32 char, with value 5 or 6, representing number of raw
 	bits per encoded byte
+	CMC
 Server sends:
 	Name of codec if accepted. After this all upstream data packets must 
 	be encoded with the new codec.
 	BADCODEC if not accepted. Client must then revert to Base32
+	BADLEN if length of query is too short
 
 Probe downstream fragment size:
 Client sends:
