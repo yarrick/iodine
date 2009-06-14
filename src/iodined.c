@@ -841,7 +841,7 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
 static void
 send_raw(int fd, char *buf, int buflen, int cmd, struct query *q)
 {
-	unsigned char packet[4096];
+	char packet[4096];
 	int len;
 
 	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);

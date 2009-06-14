@@ -93,9 +93,6 @@ static struct encoder *b32;
  * Defaults to Base32, can be changed after handshake */
 static struct encoder *dataenc;
 
-/* result of case preservation check done after login */
-static int case_preserved;
-
 #if !defined(BSD) && !defined(__GLIBC__)
 static char *__progname;
 #endif
@@ -124,7 +121,7 @@ send_query(int fd, char *hostname)
 static void
 send_raw(int fd, char *buf, int buflen, int cmd)
 {
-	unsigned char packet[4096];
+	char packet[4096];
 	int len;
 
 	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
@@ -765,7 +762,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	return 1;
 }
 
-static void
+static int
 handshake_case_check(int dns_fd)
 {
 	struct timeval tv;
@@ -774,6 +771,7 @@ handshake_case_check(int dns_fd)
 	int i;
 	int r;
 	int read;
+	int case_preserved;
 
 	case_preserved = 0;
 	for (i=0; running && i<5 ;i++) {
@@ -794,7 +792,7 @@ handshake_case_check(int dns_fd)
 				if (in[0] == 'z' || in[0] == 'Z') {
 					if (read < (27 * 2)) {
 						fprintf(stderr, "Received short case check reply. Will use base32 encoder\n");
-						return;
+						return case_preserved;
 					} else {
 						int k;
 
@@ -806,14 +804,14 @@ handshake_case_check(int dns_fd)
 								case_preserved = 0;
 							}
 						}
-						return;
+						return case_preserved;
 					}
 				} else {
 					fprintf(stderr, "Received bad case check reply\n");
 				}
 			} else {
 				fprintf(stderr, "Got error on case check, will use base32\n");
-				return;
+				return case_preserved;
 			}
 		}
 
@@ -821,6 +819,7 @@ handshake_case_check(int dns_fd)
 	}
 
 	fprintf(stderr, "No reply on case check, continuing\n");
+	return case_preserved;
 }
 
 static void
@@ -1002,6 +1001,7 @@ static int
 handshake(int dns_fd, int autodetect_frag_size, int fragsize)
 {
 	int seed;
+	int case_preserved;
 	int r;
 
 	r = handshake_version(dns_fd, &seed);
@@ -1016,7 +1016,7 @@ handshake(int dns_fd, int autodetect_frag_size, int fragsize)
 
 	handshake_raw_udp(dns_fd, seed);
 
-	handshake_case_check(dns_fd);
+	case_preserved = handshake_case_check(dns_fd);
 
 	if (case_preserved) {
 		handshake_switch_codec(dns_fd);
