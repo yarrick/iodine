@@ -870,7 +870,9 @@ read_dns(int fd, struct query *q)
 #endif /* !WINDOWS32 */
 
 	if (r > 0) {
-		dns_decode(NULL, 0, q, QR_QUERY, packet, r);
+		if (dns_decode(NULL, 0, q, QR_QUERY, packet, r) < 0) {
+			return 0;
+		}
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 		q->fromlen = addrlen;
 		

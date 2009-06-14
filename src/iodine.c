@@ -67,6 +67,7 @@ static int running = 1;
 static char password[33];
 
 static struct sockaddr_in nameserv;
+static struct sockaddr_in raw_serv;
 static char *topdomain;
 
 static uint16_t rand_seed;
@@ -118,6 +119,23 @@ send_query(int fd, char *hostname)
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
 
 	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
+}
+
+static void
+send_raw(int fd, char *buf, int buflen, int cmd)
+{
+	unsigned char packet[4096];
+	int len;
+
+	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
+
+	memcpy(packet, raw_header, RAW_HDR_LEN);
+	memcpy(&packet[RAW_HDR_LEN], buf, len);
+
+	len += RAW_HDR_LEN;
+	packet[RAW_HDR_CMD] = cmd;
+
+	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv, sizeof(raw_serv));
 }
 
 static void
@@ -489,6 +507,16 @@ send_ip_request(int fd, int userid)
 }
 
 static void
+send_raw_udp_login(int dns_fd, int userid, int seed)
+{
+	char buf[17];
+	login_calculate(buf, 16, password, seed + 1);
+	buf[16] = userid;
+
+	send_raw(dns_fd, buf, sizeof(buf), RAW_HDR_CMD_LOGIN);
+}
+
+static void
 send_case_check(int fd)
 {
 	/* The '+' plus character is not allowed according to RFC. 
@@ -643,7 +671,7 @@ handshake_login(int dns_fd, int seed)
 }
 
 static int
-handshake_raw_udp(int dns_fd)
+handshake_raw_udp(int dns_fd, int seed)
 {
 	struct timeval tv;
 	char in[4096];
@@ -694,9 +722,36 @@ handshake_raw_udp(int dns_fd)
 	fprintf(stderr, " at %s", inet_ntoa(server));
 	fflush(stderr);
 
-	/* TODO do login against port 53 on remote server 
-	 *      based on the old seed. If reply received,
-	 *      switch to raw udp mode */
+	/* Store address to iodined server */
+	memset(&raw_serv, 0, sizeof(raw_serv));
+	raw_serv.sin_family = AF_INET;
+	raw_serv.sin_port = htons(53);
+	raw_serv.sin_addr = server;
+
+	/* do login against port 53 on remote server 
+	 * based on the old seed. If reply received,
+	 * switch to raw udp mode */
+	for (i=0; running && i<4 ;i++) {
+		tv.tv_sec = i + 1;
+		tv.tv_usec = 0;
+
+		send_raw_udp_login(dns_fd, userid, seed);
+		
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = read_dns(dns_fd, in, sizeof(in));
+		} else {
+			fprintf(stderr, ".");
+			fflush(stderr);
+		}
+	}
+	
+
+	/* TODO */
 	fprintf(stderr, ": not implemented\n");
 	return 1;
 	/* TODO and then return 0 on success */
@@ -951,7 +1006,7 @@ handshake(int dns_fd, int autodetect_frag_size, int fragsize)
 		return r;
 	}
 
-	handshake_raw_udp(dns_fd);
+	handshake_raw_udp(dns_fd, seed);
 
 	handshake_case_check(dns_fd);
 
