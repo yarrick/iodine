@@ -7,6 +7,7 @@ CHANGES:
 
 20xx-xx-xx: x.y.z
 	- Fixed tunnel not working on Windows.
+	- Any device name is now supported on Windows, fixes #47.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
