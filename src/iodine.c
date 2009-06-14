@@ -740,7 +740,8 @@ handshake_raw_udp(int dns_fd, int seed)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			len = read(dns_fd, in, sizeof(in));
+			/* recv() needed for windows, dont change to read() */
+			len = recv(dns_fd, in, sizeof(in), 0);
 			if (len >= (17 + RAW_HDR_LEN)) {
 				char hash[16];
 				login_calculate(hash, 16, password, seed - 1);

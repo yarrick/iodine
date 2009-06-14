@@ -15,14 +15,12 @@ Extra README file for Win32 related stuff
 
 2. Have one TAP32 interface installed
 
-3. Name the interface "dns"
+3. Make sure the interface does not have a default gateway set
 
-4. Make sure the interface does not have a default gateway set
-
-5. Run iodine/iodined as normal (see the main README file).
+4. Run iodine/iodined as normal (see the main README file).
    You may have to run it as administrator depending on user privileges.
 
-6. Enjoy!
+5. Enjoy!
 
 
 == Building on Windows:
@@ -50,7 +48,6 @@ cross-compile.
 == Results of crappy Win32 API:
 The following fixable limitations apply:
 - Exactly one TAP32 interface must be installed
-- The TAP32 interface must be named "dns" and be version 0801 or 0901
 - Server cannot read packet destination address
 
 The following (probably) un-fixable limitations apply:

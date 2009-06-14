@@ -37,6 +37,7 @@ struct tun_data data;
 #define TAP_IOCTL_SET_MEDIA_STATUS TAP_CONTROL_CODE(6, METHOD_BUFFERED)
 
 #define TAP_ADAPTER_KEY "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}"
+#define NETWORK_KEY "SYSTEM\\CurrentControlSet\\Control\\Network\\{4D36E972-E325-11CE-BFC1-08002BE10318}"
 #define TAP_DEVICE_SPACE "\\\\.\\Global\\"
 #define TAP_VERSION_ID_0801 "tap0801"
 #define TAP_VERSION_ID_0901 "tap0901"
@@ -53,7 +54,7 @@ struct tun_data data;
 #include "tun.h"
 #include "common.h"
 
-char if_name[50];
+char if_name[250];
 
 #ifndef WINDOWS32
 #ifdef LINUX
@@ -227,6 +228,36 @@ next:
 	RegCloseKey(adapter_key);
 }
 
+static void
+get_name(char *dev_name)
+{
+	char path[256];
+	char name_str[256] = "Name";
+	LONG status;
+	HKEY conn_key;
+	DWORD len;
+	DWORD datatype;
+
+	memset(if_name, 0, sizeof(if_name));
+
+	snprintf(path, sizeof(path), NETWORK_KEY "\\%s\\Connection", dev_name);
+	status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, path, 0, KEY_READ, &conn_key);
+	printf("%s ?? %s\n", path, dev_name);
+	if (status != ERROR_SUCCESS) {
+		fprintf(stderr, "Could not look up name of interface %s: error opening key\n", dev_name);
+		RegCloseKey(conn_key);
+		return;
+	}
+	len = sizeof(if_name);
+	status = RegQueryValueEx(conn_key, name_str, NULL, &datatype, (LPBYTE)if_name, &len);
+	if (status != ERROR_SUCCESS || datatype != REG_SZ) {
+		fprintf(stderr, "Could not look up name of interface %s: error reading value\n", dev_name);
+		RegCloseKey(conn_key);
+		return;
+	}
+	RegCloseKey(conn_key);
+}
+
 DWORD WINAPI tun_reader(LPVOID arg)
 {
 	struct tun_data *tun = arg;
@@ -265,8 +296,9 @@ open_tun(const char *tun_device)
 
 	memset(adapter, 0, sizeof(adapter));
 	get_device(adapter, sizeof(adapter));
+	get_name(adapter); /* Copies interface 'human name' to if_name */
 
-	if (strlen(adapter) == 0) {
+	if (strlen(adapter) == 0 || strlen(if_name) == 0) {
 		warnx("No TAP adapters found. See README-win32.txt for help.\n");
 		return -1;
 	}
@@ -277,9 +309,6 @@ open_tun(const char *tun_device)
 	if (dev_handle == INVALID_HANDLE_VALUE) {
 		return -1;
 	}
-
-	/* TODO get name of interface */
-	strncpy(if_name, "dns", MIN(4, sizeof(if_name)));
 
 	/* Use a UDP connection to forward packets from tun,
 	 * so we can still use select() in main code.
