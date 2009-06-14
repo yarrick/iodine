@@ -838,6 +838,61 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
 	return 0;
 }
 
+static void
+send_raw(int fd, char *buf, int buflen, int cmd, struct query *q)
+{
+	unsigned char packet[4096];
+	int len;
+
+	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
+
+	memcpy(packet, raw_header, RAW_HDR_LEN);
+	memcpy(&packet[RAW_HDR_LEN], buf, len);
+
+	len += RAW_HDR_LEN;
+	packet[RAW_HDR_CMD] = cmd;
+
+	sendto(fd, packet, len, 0, &q->from, q->fromlen);
+}
+
+static void
+handle_raw_login(char *packet, int len, struct query *q, int fd)
+{
+	int userid;
+	char myhash[16];
+	
+	if (len < 17) return;
+
+	userid = packet[16];
+	if (userid < 0 || userid > created_users) return;
+	if (!users[userid].active) return;
+
+	login_calculate(myhash, 16, password, users[userid].seed + 1);
+	if (memcmp(packet, myhash, 16) == 0) {
+		/* Correct hash, reply with hash of seed - 1 */
+		users[userid].last_pkt = time(NULL);
+		login_calculate(myhash, 16, password, users[userid].seed - 1);
+		memcpy(packet, myhash, 16);
+		send_raw(fd, packet, 17, RAW_HDR_CMD_LOGIN, q);
+	}
+}
+
+static int
+raw_decode(char *packet, int len, struct query *q, int fd)
+{
+	/* minimum length */
+	if (len < RAW_HDR_LEN) return 0;
+	/* should start with header */
+	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
+
+	if (packet[RAW_HDR_CMD] == RAW_HDR_CMD_LOGIN) {
+		handle_raw_login(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, fd);
+	} else {
+		warnx("Unhandled raw command %02X\n", packet[RAW_HDR_CMD]);
+	}
+	return 1;
+}
+
 static int
 read_dns(int fd, struct query *q)
 {
@@ -870,11 +925,16 @@ read_dns(int fd, struct query *q)
 #endif /* !WINDOWS32 */
 
 	if (r > 0) {
+		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
+		q->fromlen = addrlen;
+
+		/* TODO do not handle raw packets here! */
+		if (raw_decode(packet, r, q, fd)) {
+			return 0;
+		}
 		if (dns_decode(NULL, 0, q, QR_QUERY, packet, r) < 0) {
 			return 0;
 		}
-		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
-		q->fromlen = addrlen;
 		
 #ifndef WINDOWS32
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; 
