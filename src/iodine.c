@@ -678,7 +678,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	fd_set fds;
 	int i;
 	int r;
-	int read;
+	int len;
 	unsigned remoteaddr = 0;
 	struct in_addr server;
 
@@ -696,8 +696,8 @@ handshake_raw_udp(int dns_fd, int seed)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = read_dns(dns_fd, in, sizeof(in));
-			if (read == 5 && in[0] == 'I') {
+			len = read_dns(dns_fd, in, sizeof(in));
+			if (len == 5 && in[0] == 'I') {
 				/* Received IP address */
 				remoteaddr = (in[1] & 0xff);
 				remoteaddr <<= 8;
@@ -719,7 +719,7 @@ handshake_raw_udp(int dns_fd, int seed)
 		fprintf(stderr, " failed to get IP.\n");
 		return 1;
 	}
-	fprintf(stderr, " at %s", inet_ntoa(server));
+	fprintf(stderr, " at %s: ", inet_ntoa(server));
 	fflush(stderr);
 
 	/* Store address to iodined server */
@@ -743,18 +743,26 @@ handshake_raw_udp(int dns_fd, int seed)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = read_dns(dns_fd, in, sizeof(in));
-		} else {
-			fprintf(stderr, ".");
-			fflush(stderr);
+			len = read(dns_fd, in, sizeof(in));
+			if (len >= (17 + RAW_HDR_LEN)) {
+				char hash[16];
+				login_calculate(hash, 16, password, seed - 1);
+				if (memcmp(in, raw_header, RAW_HDR_IDENT_LEN) == 0
+					&& in[RAW_HDR_CMD] == RAW_HDR_CMD_LOGIN 
+					&& memcmp(&in[RAW_HDR_LEN], hash, sizeof(hash)) == 0
+					&& in[16 + RAW_HDR_LEN] ==  userid) {
+
+					fprintf(stderr, "OK\n");
+					return 0;
+				}
+			}
 		}
+		fprintf(stderr, ".");
+		fflush(stderr);
 	}
 	
-
-	/* TODO */
-	fprintf(stderr, ": not implemented\n");
+	fprintf(stderr, "failed\n");
 	return 1;
-	/* TODO and then return 0 on success */
 }
 
 static void
