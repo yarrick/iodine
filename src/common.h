@@ -17,6 +17,14 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+/* Last byte of raw header is the command */
+#define RAW_HDR_LEN 4
+#define RAW_HDR_IDENT_LEN 3
+#define RAW_HDR_CMD 3
+#define RAW_HDR_CMD_LOGIN 0x01
+#define RAW_HDR_CMD_DATA  0x02
+extern const unsigned char raw_header[RAW_HDR_LEN];
+
 #ifdef WINDOWS32
 #include "windows.h"
 #else
