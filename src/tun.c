@@ -307,18 +307,23 @@ open_tun(const char *tun_device)
 	in_addr_t local;
 
 	memset(adapter, 0, sizeof(adapter));
+	memset(if_name, 0, sizeof(if_name));
 	get_device(adapter, sizeof(adapter), tun_device);
-	get_name(if_name, sizeof(if_name), adapter);
 
 	if (strlen(adapter) == 0 || strlen(if_name) == 0) {
-		warnx("No TAP adapters found. See README-win32.txt for help.\n");
+		if (tun_device) {
+			warnx("No TAP adapters found. Try without -d.");
+		} else {
+			warnx("No TAP adapters found. Version 0801 and 0901 are supported.");
+		}
 		return -1;
 	}
 	
-	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
 	fprintf(stderr, "Opening device %s\n", if_name);
+	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
 	dev_handle = CreateFile(tapfile, GENERIC_WRITE | GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM | FILE_FLAG_OVERLAPPED, NULL);
 	if (dev_handle == INVALID_HANDLE_VALUE) {
+		warnx("Could not open device!");
 		return -1;
 	}
 
