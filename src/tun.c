@@ -32,6 +32,8 @@
 HANDLE dev_handle;
 struct tun_data data;
 
+static void get_name(char *ifname, int namelen, char *dev_name);
+
 #define TAP_CONTROL_CODE(request,method) CTL_CODE(FILE_DEVICE_UNKNOWN, request, method, FILE_ANY_ACCESS)
 #define TAP_IOCTL_CONFIG_TUN       TAP_CONTROL_CODE(10, METHOD_BUFFERED)
 #define TAP_IOCTL_SET_MEDIA_STATUS TAP_CONTROL_CODE(6, METHOD_BUFFERED)
@@ -160,7 +162,7 @@ open_tun(const char *tun_device)
 #endif /* !LINUX */
 #else /* WINDOWS32 */
 static void
-get_device(char *device, int device_len)
+get_device(char *device, int device_len, const char *wanted_dev)
 {
 	LONG status;
 	HKEY adapter_key;
@@ -216,7 +218,18 @@ get_device(char *device, int device_len)
 			if (status != ERROR_SUCCESS || datatype != REG_SZ) {
 				warnx("Error reading registry key %s\\%s on TAP device", unit, iid_string);
 			} else {
-				/* Done getting name of TAP device */
+				/* Done getting GUID of TAP device,
+				 * now check if the name is the requested one */
+				if (wanted_dev) {
+					char name[250];
+					get_name(name, sizeof(name), device);
+					if (strncmp(name, wanted_dev, strlen(wanted_dev))) {
+						/* Skip if name mismatch */
+						goto next;
+					}
+				}
+				/* Get the if name */
+				get_name(if_name, sizeof(if_name), device);
 				RegCloseKey(device_key);
 				return;
 			}
@@ -229,7 +242,7 @@ next:
 }
 
 static void
-get_name(char *dev_name)
+get_name(char *ifname, int namelen, char *dev_name)
 {
 	char path[256];
 	char name_str[256] = "Name";
@@ -238,18 +251,17 @@ get_name(char *dev_name)
 	DWORD len;
 	DWORD datatype;
 
-	memset(if_name, 0, sizeof(if_name));
+	memset(ifname, 0, namelen);
 
 	snprintf(path, sizeof(path), NETWORK_KEY "\\%s\\Connection", dev_name);
 	status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, path, 0, KEY_READ, &conn_key);
-	printf("%s ?? %s\n", path, dev_name);
 	if (status != ERROR_SUCCESS) {
 		fprintf(stderr, "Could not look up name of interface %s: error opening key\n", dev_name);
 		RegCloseKey(conn_key);
 		return;
 	}
-	len = sizeof(if_name);
-	status = RegQueryValueEx(conn_key, name_str, NULL, &datatype, (LPBYTE)if_name, &len);
+	len = namelen;
+	status = RegQueryValueEx(conn_key, name_str, NULL, &datatype, (LPBYTE)ifname, &len);
 	if (status != ERROR_SUCCESS || datatype != REG_SZ) {
 		fprintf(stderr, "Could not look up name of interface %s: error reading value\n", dev_name);
 		RegCloseKey(conn_key);
@@ -295,8 +307,8 @@ open_tun(const char *tun_device)
 	in_addr_t local;
 
 	memset(adapter, 0, sizeof(adapter));
-	get_device(adapter, sizeof(adapter));
-	get_name(adapter); /* Copies interface 'human name' to if_name */
+	get_device(adapter, sizeof(adapter), tun_device);
+	get_name(if_name, sizeof(if_name), adapter);
 
 	if (strlen(adapter) == 0 || strlen(if_name) == 0) {
 		warnx("No TAP adapters found. See README-win32.txt for help.\n");
@@ -304,7 +316,7 @@ open_tun(const char *tun_device)
 	}
 	
 	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
-	fprintf(stderr, "Opening device %s\n", tapfile);
+	fprintf(stderr, "Opening device %s\n", if_name);
 	dev_handle = CreateFile(tapfile, GENERIC_WRITE | GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM | FILE_FLAG_OVERLAPPED, NULL);
 	if (dev_handle == INVALID_HANDLE_VALUE) {
 		return -1;

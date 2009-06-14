@@ -13,14 +13,14 @@ Extra README file for Win32 related stuff
  choose OpenVPN 2.0.9 Windows Installer, when installing you can
  select to install only the TAP driver.
 
-2. Have one TAP32 interface installed
+2. Make sure the interface you want to use does not have a default gateway set.
+   Use -d to specify the interface, use double quotes to include spaces, example
+   iodine.exe -d "Local Area Connection 4" abc.ab
 
-3. Make sure the interface does not have a default gateway set
-
-4. Run iodine/iodined as normal (see the main README file).
+3. Run iodine/iodined as normal (see the main README file).
    You may have to run it as administrator depending on user privileges.
 
-5. Enjoy!
+4. Enjoy!
 
 
 == Building on Windows:
@@ -47,7 +47,6 @@ cross-compile.
 
 == Results of crappy Win32 API:
 The following fixable limitations apply:
-- Exactly one TAP32 interface must be installed
 - Server cannot read packet destination address
 
 The following (probably) un-fixable limitations apply:
