@@ -41,6 +41,10 @@
 #include <netinet/in.h>
 #endif
 
+#ifdef HAVE_SETCON
+# include <selinux/selinux.h>
+#endif
+
 #include "common.h"
 
 /* The raw header used when not using DNS protocol */
@@ -164,6 +168,17 @@ do_chroot(char *newroot)
 	setuid(getuid());
 #else
 	warnx("chroot not available");
+#endif
+}
+
+void
+do_setcon(char *context)
+{
+#ifdef HAVE_SETCON
+	if (-1 == setcon(context))
+		err(1, "%s", context);
+#else
+	warnx("No SELinux support built in");
 #endif
 }
 

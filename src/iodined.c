@@ -981,7 +981,7 @@ usage() {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
-		"[-t chrootdir] [-d device] [-m mtu] "
+		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
 		" tunnel_ip[/netmask] topdomain\n", __progname);
 	exit(2);
@@ -993,7 +993,7 @@ help() {
 
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
-		"[-t chrootdir] [-d device] [-m mtu] "
+		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
 		" tunnel_ip[/netmask] topdomain\n", __progname);
 	fprintf(stderr, "  -v to print version info and exit\n");
@@ -1007,6 +1007,7 @@ help() {
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
 	fprintf(stderr, "  -m mtu to set tunnel device mtu\n");
+	fprintf(stderr, "  -z context to apply SELinux context after initialization\n");
 	fprintf(stderr, "  -l ip address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n");
 	fprintf(stderr, "  -p port to listen on for incoming dns traffic (default 53)\n");
@@ -1039,6 +1040,7 @@ main(int argc, char **argv)
 	int foreground;
 	char *username;
 	char *newroot;
+	char *context;
 	char *device;
 	int dnsd_fd;
 	int tun_fd;
@@ -1057,6 +1059,7 @@ main(int argc, char **argv)
 
 	username = NULL;
 	newroot = NULL;
+	context = NULL;
 	device = NULL;
 	foreground = 0;
 	bind_enable = 0;
@@ -1090,7 +1093,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 	
-	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -1141,6 +1144,9 @@ main(int argc, char **argv)
 			
 			/* XXX: find better way of cleaning up ps(1) */
 			memset(optarg, 0, strlen(optarg)); 
+			break;
+		case 'z':
+			context = optarg;
 			break;
 		default:
 			usage();
@@ -1286,6 +1292,9 @@ main(int argc, char **argv)
 		}
 #endif
 	}
+
+	if (context != NULL)
+		do_setcon(context);
 
 #ifndef WINDOWS32
 	openlog(__progname, LOG_NOWAIT, LOG_DAEMON);

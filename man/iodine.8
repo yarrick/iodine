@@ -19,6 +19,8 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I device
 .B ] [-m
 .I fragsize
+.B ] [-z
+.I context
 .B ]
 .B [
 .I nameserver
@@ -47,7 +49,9 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I dnsport
 .B ] [-P
 .I password
-.B ] 
+.B ] [-z
+.I context
+.B ]
 .I tunnel_ip
 .B [
 .I /netmask
@@ -89,6 +93,9 @@ and otherwise tunX.
 Use 'password' to authenticate. If not used, 
 .B stdin
 will be used as input. Only the first 32 characters will be used.
+.TP
+.B -z context
+Apply SELinux 'context' after initialization.
 .SS Client Options:
 .TP
 .B -m fragsize
