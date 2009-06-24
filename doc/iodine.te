@@ -1,0 +1,25 @@
+# Sample post-initialization SELinux policy for Iodine
+policy_module(iodine, 1.1)
+
+require {
+	type init_t;
+	type initrc_t;
+	type unconfined_t;
+	type unlabeled_t;
+	class udp_socket { read write };
+	class rawip_socket { write read };
+	class association recvfrom;
+	class unix_dgram_socket { create connect };
+}
+
+type iodine_t;
+domain_type(iodine_t)
+domain_dyntrans_type(initrc_t)
+allow initrc_t iodine_t:process dyntransition;
+
+allow iodine_t unconfined_t:udp_socket { read write };
+allow iodine_t unconfined_t:rawip_socket { write read };
+allow iodine_t unlabeled_t:association recvfrom;
+allow iodine_t self:unix_dgram_socket { create connect };
+corenet_raw_receive_generic_node(iodine_t)
+corenet_rw_tun_tap_dev(iodine_t)

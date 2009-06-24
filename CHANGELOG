@@ -10,6 +10,8 @@ CHANGES:
 	- Any device name is now supported on Windows, fixes #47.
 	- Multiple installed TAP32 interfaces are now supported, fixes #46.
 	- Return nonzero if tunnel fails to open, fixes #62.
+	- Support for setting a SELinux context, based on patch by
+		Sebastien Raveau. Sample context file in doc/iodine.te
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
