@@ -1053,6 +1053,7 @@ main(int argc, char **argv)
 	int mtu;
 	int skipipconfig;
 	char *netsize;
+	int retval;
 
 	username = NULL;
 	newroot = NULL;
@@ -1071,6 +1072,8 @@ main(int argc, char **argv)
 
 	b32 = get_base32_encoder();
 	
+	retval = 0;
+
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
 #endif
@@ -1235,16 +1238,26 @@ main(int argc, char **argv)
 	if (strlen(password) == 0)
 		read_password(password, sizeof(password));
 
-	if ((tun_fd = open_tun(device)) == -1)
+	if ((tun_fd = open_tun(device)) == -1) {
+		retval = 1;
 		goto cleanup0;
-	if (!skipipconfig)
-		if (tun_setip(argv[0], netmask) != 0 || tun_setmtu(mtu) != 0)
+	}
+	if (!skipipconfig) {
+		if (tun_setip(argv[0], netmask) != 0 || tun_setmtu(mtu) != 0) {
+			retval = 1;
 			goto cleanup1;
-	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) 
+		}
+	}
+	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
+		retval = 1;
 		goto cleanup2;
-	if (bind_enable)
-		if ((bind_fd = open_dns(0, INADDR_ANY)) == -1)
+	}
+	if (bind_enable) {
+		if ((bind_fd = open_dns(0, INADDR_ANY)) == -1) {
+			retval = 1;
 			goto cleanup3;
+		}
+	}
 
 	my_mtu = mtu;
 
@@ -1290,5 +1303,5 @@ cleanup1:
 	close_tun(tun_fd);	
 cleanup0:
 
-	return 0;
+	return retval;
 }
