@@ -115,6 +115,7 @@ open_tun(const char *tun_device)
 
 		warn("open_tun: Couldn't set interface name");
 	}
+	warn("error when opening tun");
 	return -1;
 }
 
