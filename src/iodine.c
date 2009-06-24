@@ -1157,6 +1157,7 @@ main(int argc, char **argv)
 	int dns_fd;
 	int max_downstream_frag_size;
 	int autodetect_frag_size;
+	int retval;
 
 	memset(password, 0, 33);
 	username = NULL;
@@ -1173,6 +1174,8 @@ main(int argc, char **argv)
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
+
+	retval = 0;
 
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
@@ -1282,16 +1285,22 @@ main(int argc, char **argv)
 	if (strlen(password) == 0) 
 		read_password(password, sizeof(password));
 
-	if ((tun_fd = open_tun(device)) == -1)
+	if ((tun_fd = open_tun(device)) == -1) {
+		retval = 1;
 		goto cleanup1;
-	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1)
+	}
+	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1) {
+		retval = 1;
 		goto cleanup2;
+	}
 
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
-	if(handshake(dns_fd, autodetect_frag_size, max_downstream_frag_size))
+	if (handshake(dns_fd, autodetect_frag_size, max_downstream_frag_size)) {
+		retval = 1;
 		goto cleanup2;
+	}
 	
 	fprintf(stderr, "Sending queries for %s to %s\n", topdomain, nameserv_addr);
 
@@ -1325,5 +1334,6 @@ cleanup2:
 	close_tun(tun_fd);
 cleanup1:
 
-	return 0;
+	return retval;
 }
+
