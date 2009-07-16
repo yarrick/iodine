@@ -230,11 +230,14 @@ replace the default gateway with the servers IP address within the DNS tunnel,
 and configure the server to do NAT.
 .TP
 .B Troubleshooting:
-Use the \-D option on the server to show received and sent queries, or a 
+Use the \-D option on the server to show received and sent queries, or use a 
 tool like Wireshark/tcpdump. The iodined server replies to NS requests sent for
 subdomains of the tunnel domain. If your domain is tunnel.com, send a NS
 request for foo.tunnel.com to see if the delegation works. dig is a good tool
-for this: dig \-t NS foo123.tunnel.com
+for this: 
+.nf
+dig \-t NS foo123.tunnel.com
+.fi
 .TP
 .B MTU issues:
 These issues should be solved now, with automatic fragmentation of downstream 
