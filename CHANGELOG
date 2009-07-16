@@ -12,6 +12,8 @@ CHANGES:
 	- Return nonzero if tunnel fails to open, fixes #62.
 	- Support for setting a SELinux context, based on patch by
 		Sebastien Raveau. Sample context file in doc/iodine.te
+	- Allow listen port and DNS forward port to be the same if listen IP
+		does not include localhost.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
