@@ -64,15 +64,25 @@ be able to ping the other end of the tunnel from either side.
 
 MISC. INFO:
 
-Try experimenting with the MTU size (-m option) to get maximum bandwidth. It is
-set to 1024 by default, which seems to work with most DNS servers. If you have
-problems, try setting it to 220 as this ensures all packets to be < 512 bytes.
-Some DNS servers enforce a 512 byte packet limit, and this is probably the case
-if you can ping through the tunnel but not login via SSH.
+Routing:
+The normal case is to route all traffic through the DNS tunnel. To do this, first
+add a route to the nameserver you use with the default gateway as gateway. Then
+replace the default gateway with the servers IP address within the DNS tunnel,
+and configure the server to do NAT.
+
+MTU issues:
+These issues should be solved now, with automatic fragmentation of downstream 
+packets. There should be no need to set the MTU explicitly on the server.
 
 If you have problems, try inspecting the traffic with network monitoring tools
 and make sure that the relaying DNS server has not cached the response. A
 cached error message could mean that you started the client before the server.
+The -D option on the server can also show received and sent queries.
+
+The iodined server replies to NS requests sent for subdomains of the tunnel
+domain. If your domain is tunnel.com, send a NS request for foo.tunnel.com
+to see if the delegation works. dig is a good tool for this:
+dig -t NS foo123.tunnel.com
 
 The upstream data is sent gzipped encoded with Base32, or Base64 if the relay
 server support '+' in domain names. DNS protocol allows one query per packet,
