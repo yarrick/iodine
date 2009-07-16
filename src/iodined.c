@@ -1172,43 +1172,50 @@ main(int argc, char **argv)
 	my_ip = inet_addr(argv[0]);
 	
 	if (my_ip == INADDR_NONE) {
-		warnx("Bad IP address to use inside tunnel.\n");
+		warnx("Bad IP address to use inside tunnel.");
 		usage();
 	}
 
 	topdomain = strdup(argv[1]);
 	if(strlen(topdomain) <= 128) {
 		if(check_topdomain(topdomain)) {
-			warnx("Topdomain contains invalid characters.\n");
+			warnx("Topdomain contains invalid characters.");
 			usage();
 		}
 	} else {
-		warnx("Use a topdomain max 128 chars long.\n");
+		warnx("Use a topdomain max 128 chars long.");
 		usage();
 	}
 
 	if (username != NULL) {
 #ifndef WINDOWS32
 		if ((pw = getpwnam(username)) == NULL) {
-			warnx("User %s does not exist!\n", username);
+			warnx("User %s does not exist!", username);
 			usage();
 		}
 #endif
 	}
 
 	if (mtu <= 0) {
-		warnx("Bad MTU given.\n");
+		warnx("Bad MTU given.");
 		usage();
 	}
 	
 	if(port < 1 || port > 65535) {
-		warnx("Bad port number given.\n");
+		warnx("Bad port number given.");
 		usage();
 	}
 	
 	if(bind_enable) {
-		if (bind_port < 1 || bind_port > 65535 || bind_port == port) {
-			warnx("Bad DNS server port number given.\n");
+		if (bind_port < 1 || bind_port > 65535) {
+			warnx("Bad DNS server port number given.");
+			usage();
+			/* NOTREACHED */
+		}
+		/* Avoid forwarding loops */
+		if (bind_port == port && (listen_ip == INADDR_ANY || listen_ip == htonl(0x7f000001L))) {
+			warnx("Forward port is same as listen port (%d), will create a loop!", bind_port);
+			fprintf(stderr, "Use -l to set listen ip to avoid this.\n");
 			usage();
 			/* NOTREACHED */
 		}
@@ -1228,16 +1235,16 @@ main(int argc, char **argv)
 	}
 
 	if (listen_ip == INADDR_NONE) {
-		warnx("Bad IP address to listen on.\n");
+		warnx("Bad IP address to listen on.");
 		usage();
 	}
 	
 	if (ns_ip == INADDR_NONE) {
-		warnx("Bad IP address to return as nameserver.\n");
+		warnx("Bad IP address to return as nameserver.");
 		usage();
 	}
 	if (netmask > 30 || netmask < 8) {
-		warnx("Bad netmask (%d bits). Use 8-30 bits.\n", netmask);
+		warnx("Bad netmask (%d bits). Use 8-30 bits.", netmask);
 		usage();
 	}
 	
