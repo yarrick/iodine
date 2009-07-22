@@ -653,7 +653,7 @@ handshake_login(int dns_fd, int seed)
 						tun_setmtu(mtu) == 0) {
 						return 0;
 					} else {
-						warnx("Received handshake with bad data");
+						errx(4, "Failed to set IP and MTU");
 					}
 				} else {
 					fprintf(stderr, "Received bad handshake\n");
