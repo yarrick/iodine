@@ -25,6 +25,7 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <zlib.h>
+#include <time.h>
 
 #ifdef WINDOWS32
 #include "windows.h"
@@ -1183,6 +1184,9 @@ main(int argc, char **argv)
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
 #endif
+
+	srand((unsigned) time(NULL));
+	rand_seed = rand();
 	
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
