@@ -14,6 +14,8 @@ CHANGES:
 		Sebastien Raveau. Sample context file in doc/iodine.te
 	- Allow listen port and DNS forward port to be the same if listen IP
 		does not include localhost.
+	- The client will now exit if configuring IP or MTU fails.
+	- The starting cache miss value is randomized at startup, fixes #65.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
