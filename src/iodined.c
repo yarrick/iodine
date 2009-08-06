@@ -123,6 +123,9 @@ check_user_and_ip(int userid, struct query *q)
 	if (!users[userid].active) {
 		return 1;
 	}
+	if (users[userid].last_pkt + 60 < time(NULL)) {
+		return 1;
+	}
 
 	/* return early if IP checking is disabled */
 	if (!check_ip) {
@@ -132,6 +135,24 @@ check_user_and_ip(int userid, struct query *q)
 	tempin = (struct sockaddr_in *) &(q->from);
 	return memcmp(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
 }
+
+static void
+send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
+{
+	char packet[4096];
+	int len;
+
+	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
+
+	memcpy(packet, raw_header, RAW_HDR_LEN);
+	memcpy(&packet[RAW_HDR_LEN], buf, len);
+
+	len += RAW_HDR_LEN;
+	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
+
+	sendto(fd, packet, len, 0, &q->from, q->fromlen);
+}
+
 
 static int
 tunnel_tun(int tun_fd, int dns_fd)
@@ -155,17 +176,22 @@ tunnel_tun(int tun_fd, int dns_fd)
 	outlen = sizeof(out);
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, read, 9);
 
-	/* if another packet is queued, throw away this one. TODO build queue */
-	if (users[userid].outpacket.len == 0) {
-		memcpy(users[userid].outpacket.data, out, outlen);
-		users[userid].outpacket.len = outlen;
-		users[userid].outpacket.offset = 0;
-		users[userid].outpacket.sentlen = 0;
-		users[userid].outpacket.seqno = (++users[userid].outpacket.seqno & 7);
-		users[userid].outpacket.fragment = 0;
+	if (users[userid].conn == CONN_DNS_NULL) {
+		/* if another packet is queued, throw away this one. TODO build queue */
+		if (users[userid].outpacket.len == 0) {
+			memcpy(users[userid].outpacket.data, out, outlen);
+			users[userid].outpacket.len = outlen;
+			users[userid].outpacket.offset = 0;
+			users[userid].outpacket.sentlen = 0;
+			users[userid].outpacket.seqno = (++users[userid].outpacket.seqno & 7);
+			users[userid].outpacket.fragment = 0;
+			return outlen;
+		} else {
+			return 0;
+		}
+	} else { /* CONN_RAW_UDP */
+		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].q);
 		return outlen;
-	} else {
-		return 0;
 	}
 }
 
@@ -790,7 +816,7 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
  		if (i==0) {	
 			int j;
  			for (j = 0; j < USERS; j++) {
- 				if (users[j].q.id != 0) {
+ 				if (users[j].q.id != 0 && users[j].conn == CONN_DNS_NULL) {
 					send_chunk(dns_fd, j);
  				}
  			}
@@ -846,23 +872,6 @@ handle_full_packet(int tun_fd, int userid)
 		fprintf(stderr, "Discarded data, uncompress() result: %d\n", ret);
 	}
 	users[userid].inpacket.len = users[userid].inpacket.offset = 0;
-}
-
-static void
-send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
-{
-	char packet[4096];
-	int len;
-
-	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
-
-	memcpy(packet, raw_header, RAW_HDR_LEN);
-	memcpy(&packet[RAW_HDR_LEN], buf, len);
-
-	len += RAW_HDR_LEN;
-	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
-
-	sendto(fd, packet, len, 0, &q->from, q->fromlen);
 }
 
 static void
@@ -931,7 +940,6 @@ raw_decode(char *packet, int len, struct query *q, int dns_fd, int tun_fd)
 	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
 
 	raw_user = RAW_HDR_GET_USR(packet);
-	printf("raw %02x\n", packet[RAW_HDR_CMD]);
 	switch (RAW_HDR_GET_CMD(packet)) {
 	case RAW_HDR_CMD_LOGIN:
 		/* Login challenge */
