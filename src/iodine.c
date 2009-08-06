@@ -1270,7 +1270,7 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}	
 
-	if(strlen(topdomain) <= 128) {
+	if (strlen(topdomain) <= 128) {
 		if(check_topdomain(topdomain)) {
 			warnx("Topdomain contains invalid characters.\n");
 			usage();
