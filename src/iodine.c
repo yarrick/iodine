@@ -189,58 +189,77 @@ is_sending()
 }
 
 static int
-read_dns(int fd, char *buf, int buflen)
+read_dns(int dns_fd, int tun_fd, char *buf, int buflen) /* FIXME: tun_fd needed for raw handling */
 {
 	struct sockaddr_in from;
 	char data[64*1024];
 	socklen_t addrlen;
 	struct query q;
-	int rv;
 	int r;
 
 	addrlen = sizeof(struct sockaddr);
-	if ((r = recvfrom(fd, data, sizeof(data), 0, 
+	if ((r = recvfrom(dns_fd, data, sizeof(data), 0, 
 			  (struct sockaddr*)&from, &addrlen)) == -1) {
 		warn("recvfrom");
 		return 0;
 	}
 
-	rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
+	if (conn == CONN_DNS_NULL) {
+		int rv;
 
-	/* decode the data header, update seqno and frag before next request */
-	if (rv >= 2) {
-		downstream_seqno = (buf[1] >> 5) & 7;
-		downstream_fragment = (buf[1] >> 1) & 15;
-	}
+		rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
 
-
-	if (is_sending()) {
-		if (chunkid == q.id) {
-			/* Got ACK on sent packet */
-			outpkt.offset += outpkt.sentlen;
-			if (outpkt.offset == outpkt.len) {
-				/* Packet completed */
-				outpkt.offset = 0;
-				outpkt.len = 0;
-				outpkt.sentlen = 0;
-
-				/* If the ack contains unacked frag number but no data, 
-				 * send a ping to ack the frag number and get more data*/
-				if (rv == 2 && (
-					downstream_seqno != down_ack_seqno ||
-					downstream_fragment != down_ack_fragment
-					)) {
-					
-					send_ping(fd);
-				}
-			} else {
-				/* More to send */
-				send_chunk(fd);
-			}
-
+		/* decode the data header, update seqno and frag before next request */
+		if (rv >= 2) {
+			downstream_seqno = (buf[1] >> 5) & 7;
+			downstream_fragment = (buf[1] >> 1) & 15;
 		}
+
+
+		if (is_sending()) {
+			if (chunkid == q.id) {
+				/* Got ACK on sent packet */
+				outpkt.offset += outpkt.sentlen;
+				if (outpkt.offset == outpkt.len) {
+					/* Packet completed */
+					outpkt.offset = 0;
+					outpkt.len = 0;
+					outpkt.sentlen = 0;
+
+					/* If the ack contains unacked frag number but no data, 
+					 * send a ping to ack the frag number and get more data*/
+					if (rv == 2 && (
+						downstream_seqno != down_ack_seqno ||
+						downstream_fragment != down_ack_fragment
+						)) {
+						
+						send_ping(dns_fd);
+					}
+				} else {
+					/* More to send */
+					send_chunk(dns_fd);
+				}
+			}
+		}
+		return rv;
+	} else { /* CONN_RAW_UDP */
+		unsigned long datalen;
+		char buf[64*1024];
+		int raw_user;
+
+		/* minimum length */
+		if (r < RAW_HDR_LEN) return 0;
+		/* should start with header */
+		if (memcmp(data, raw_header, RAW_HDR_IDENT_LEN)) return 0;
+		/* should be data packet */
+		if (RAW_HDR_GET_CMD(data) != RAW_HDR_CMD_DATA) return 0;
+
+		raw_user = RAW_HDR_GET_USR(data);
+		if (uncompress((uint8_t*)buf, &datalen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
+			write_tun(tun_fd, buf, datalen);
+		}
+		return 0;
 	}
-	return rv;
 }
 
 
@@ -283,7 +302,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	char buf[64*1024];
 	size_t read;
 
-	if ((read = read_dns(dns_fd, buf, sizeof(buf))) <= 2) 
+	if ((read = read_dns(dns_fd, tun_fd, buf, sizeof(buf))) <= 2) 
 		return -1;
 
 	if (downstream_seqno != inpkt.seqno) {
@@ -578,7 +597,7 @@ handshake_version(int dns_fd, int *seed)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = read_dns(dns_fd, in, sizeof(in));
+			read = read_dns(dns_fd, 0, in, sizeof(in));
 			
 			if(read <= 0) {
 				if (read == 0) {
@@ -646,7 +665,7 @@ handshake_login(int dns_fd, int seed)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = read_dns(dns_fd, in, sizeof(in));
+			read = read_dns(dns_fd, 0, in, sizeof(in));
 			
 			if(read <= 0) {
 				warn("read");
@@ -707,7 +726,7 @@ handshake_raw_udp(int dns_fd, int seed)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			len = read_dns(dns_fd, in, sizeof(in));
+			len = read_dns(dns_fd, 0, in, sizeof(in));
 			if (len == 5 && in[0] == 'I') {
 				/* Received IP address */
 				remoteaddr = (in[1] & 0xff);
@@ -800,7 +819,7 @@ handshake_case_check(int dns_fd)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = read_dns(dns_fd, in, sizeof(in));
+			read = read_dns(dns_fd, 0, in, sizeof(in));
 			
 			if (read > 0) {
 				if (in[0] == 'z' || in[0] == 'Z') {
@@ -864,7 +883,7 @@ handshake_switch_codec(int dns_fd)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = read_dns(dns_fd, in, sizeof(in));
+			read = read_dns(dns_fd, 0, in, sizeof(in));
 			
 			if (read > 0) {
 				if (strncmp("BADLEN", in, 6) == 0) {
@@ -918,7 +937,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 			r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 			if(r > 0) {
-				read = read_dns(dns_fd, in, sizeof(in));
+				read = read_dns(dns_fd, 0, in, sizeof(in));
 				
 				if (read > 0) {
 					/* We got a reply */
@@ -989,7 +1008,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
-			read = read_dns(dns_fd, in, sizeof(in));
+			read = read_dns(dns_fd, 0, in, sizeof(in));
 			
 			if (read > 0) {
 				int accepted_fragsize;

@@ -106,7 +106,7 @@ users_waiting_on_reply()
 	for (i = 0; i < USERS; i++) {
 		if (users[i].active && !users[i].disabled && 
 			users[i].last_pkt + 60 > time(NULL) &&
-			users[i].q.id != 0) {
+			users[i].q.id != 0 && users[i].conn == CONN_DNS_NULL) {
 			ret++;
 		}
 	}
@@ -144,7 +144,9 @@ all_users_waiting_to_send()
 	for (i = 0; i < USERS; i++) {
 		if (users[i].active && !users[i].disabled &&
 			users[i].last_pkt + 60 > now &&
-			users[i].outpacket.len == 0) {
+			((users[i].outpacket.len == 0 && users[i].conn == CONN_DNS_NULL) 
+				|| users[i].conn == CONN_RAW_UDP)) {
+
 			ret = 0;
 			break;
 		}
