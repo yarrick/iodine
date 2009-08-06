@@ -85,8 +85,9 @@ static int debug;
 static char *__progname;
 #endif
 
-static int read_dns(int, struct query *);
+static int read_dns(int, int, struct query *);
 static void write_dns(int, struct query *, char *, int);
+static void handle_full_packet(int, int);
 
 static void
 sigint(int sig) 
@@ -295,15 +296,12 @@ static void
 handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 {
 	struct in_addr tempip;
-	struct ip *hdr;
-	unsigned long outlen;
 	char in[512];
 	char logindata[16];
 	char out[64*1024];
 	char unpacked[64*1024];
 	char *tmp[2];
 	int userid;
-	int touser;
 	int version;
 	int code;
 	int read;
@@ -589,30 +587,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			}
 
 			if (lastfrag & 1) { /* packet is complete */
-				int ret;
-				outlen = sizeof(out);
-				ret = uncompress((uint8_t*)out, &outlen, 
-					   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
-
-				if (ret == Z_OK) {
-					hdr = (struct ip*) (out + 4);
-					touser = find_user_by_ip(hdr->ip_dst.s_addr);
-
-					if (touser == -1) {
-						/* send the uncompressed packet to tun device */
-						write_tun(tun_fd, out, outlen);
-					} else {
-						/* send the compressed packet to other client
-						 * if another packet is queued, throw away this one. TODO build queue */
-						if (users[touser].outpacket.len == 0) {
-							memcpy(users[touser].outpacket.data, users[userid].inpacket.data, users[userid].inpacket.len);
-							users[touser].outpacket.len = users[userid].inpacket.len;
-						}
-					}
-				} else {
-					fprintf(stderr, "Discarded data, uncompress() result: %d\n", ret);
-				}
-				users[userid].inpacket.len = users[userid].inpacket.offset = 0;
+				handle_full_packet(tun_fd, userid);
 			}
 			/* Update seqno and maybe send immediate response packet */
 			update_downstream_seqno(dns_fd, userid, dn_seq, dn_frag);
@@ -730,7 +705,7 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	int domain_len;
 	int inside_topdomain;
 
-	if ((read = read_dns(dns_fd, &q)) <= 0)
+	if ((read = read_dns(dns_fd, tun_fd, &q)) <= 0)
 		return 0;
 
 	if (debug >= 2) {
@@ -820,15 +795,15 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
  				}
  			}
  		} else {
- 			if(FD_ISSET(tun_fd, &fds)) {
+ 			if (FD_ISSET(tun_fd, &fds)) {
  				tunnel_tun(tun_fd, dns_fd);
  				continue;
  			}
- 			if(FD_ISSET(dns_fd, &fds)) {
+ 			if (FD_ISSET(dns_fd, &fds)) {
  				tunnel_dns(tun_fd, dns_fd, bind_fd);
  				continue;
  			} 
-			if(FD_ISSET(bind_fd, &fds)) {
+			if (FD_ISSET(bind_fd, &fds)) {
 				tunnel_bind(bind_fd, dns_fd);
 				continue;
 			}
@@ -839,7 +814,42 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
 }
 
 static void
-send_raw(int fd, char *buf, int buflen, int cmd, struct query *q)
+handle_full_packet(int tun_fd, int userid)
+{
+	unsigned long outlen;
+	char out[64*1024];
+	int touser;
+	int ret;
+
+	outlen = sizeof(out);
+	ret = uncompress((uint8_t*)out, &outlen, 
+		   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
+
+	if (ret == Z_OK) {
+		struct ip *hdr;
+
+		hdr = (struct ip*) (out + 4);
+		touser = find_user_by_ip(hdr->ip_dst.s_addr);
+
+		if (touser == -1) {
+			/* send the uncompressed packet to tun device */
+			write_tun(tun_fd, out, outlen);
+		} else {
+			/* send the compressed packet to other client
+			 * if another packet is queued, throw away this one. TODO build queue */
+			if (users[touser].outpacket.len == 0) {
+				memcpy(users[touser].outpacket.data, users[userid].inpacket.data, users[userid].inpacket.len);
+				users[touser].outpacket.len = users[userid].inpacket.len;
+			}
+		}
+	} else {
+		fprintf(stderr, "Discarded data, uncompress() result: %d\n", ret);
+	}
+	users[userid].inpacket.len = users[userid].inpacket.offset = 0;
+}
+
+static void
+send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 {
 	char packet[4096];
 	int len;
@@ -850,51 +860,96 @@ send_raw(int fd, char *buf, int buflen, int cmd, struct query *q)
 	memcpy(&packet[RAW_HDR_LEN], buf, len);
 
 	len += RAW_HDR_LEN;
-	packet[RAW_HDR_CMD] = cmd;
+	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
 	sendto(fd, packet, len, 0, &q->from, q->fromlen);
 }
 
 static void
-handle_raw_login(char *packet, int len, struct query *q, int fd)
+handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 {
-	int userid;
 	char myhash[16];
 	
-	if (len < 17) return;
+	if (len < 16) return;
 
-	userid = packet[16];
 	if (userid < 0 || userid > created_users) return;
 	if (!users[userid].active) return;
 
+	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, password, users[userid].seed + 1);
 	if (memcmp(packet, myhash, 16) == 0) {
+		struct sockaddr_in *tempin;
+
+		/* Update query and time info for user */
+		users[userid].last_pkt = time(NULL);
+		memcpy(&(users[userid].q), q, sizeof(struct query));
+
+		/* Store remote IP number */
+		tempin = (struct sockaddr_in *) &(q->from);
+		memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+		 
 		/* Correct hash, reply with hash of seed - 1 */
+		user_set_conn_type(userid, CONN_RAW_UDP);
 		users[userid].last_pkt = time(NULL);
 		login_calculate(myhash, 16, password, users[userid].seed - 1);
-		memcpy(packet, myhash, 16);
-		send_raw(fd, packet, 17, RAW_HDR_CMD_LOGIN, q);
+		send_raw(fd, myhash, 16, userid, RAW_HDR_CMD_LOGIN, q);
 	}
 }
 
-static int
-raw_decode(char *packet, int len, struct query *q, int fd)
+static void
+handle_raw_data(char *packet, int len, struct query *q, int dns_fd, int tun_fd, int userid)
 {
+	if (check_user_and_ip(userid, q) != 0) {
+		return;
+	}
+
+	/* Update query and time info for user */
+	users[userid].last_pkt = time(NULL);
+	memcpy(&(users[userid].q), q, sizeof(struct query));
+
+	/* copy to packet buffer, update length */
+	users[userid].inpacket.offset = 0;
+	memcpy(users[userid].inpacket.data, packet, len);
+	users[userid].inpacket.len = len;
+
+	if (debug >= 1) {
+		fprintf(stderr, "IN   pkt raw, total %d, from user %d\n",
+			users[userid].inpacket.len, userid);
+	}
+
+	handle_full_packet(tun_fd, userid);
+}
+
+static int
+raw_decode(char *packet, int len, struct query *q, int dns_fd, int tun_fd)
+{
+	int raw_user;
+
 	/* minimum length */
 	if (len < RAW_HDR_LEN) return 0;
 	/* should start with header */
 	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
 
-	if (packet[RAW_HDR_CMD] == RAW_HDR_CMD_LOGIN) {
-		handle_raw_login(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, fd);
-	} else {
-		warnx("Unhandled raw command %02X\n", packet[RAW_HDR_CMD]);
+	raw_user = RAW_HDR_GET_USR(packet);
+	printf("raw %02x\n", packet[RAW_HDR_CMD]);
+	switch (RAW_HDR_GET_CMD(packet)) {
+	case RAW_HDR_CMD_LOGIN:
+		/* Login challenge */
+		handle_raw_login(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, dns_fd, raw_user);
+		break;
+	case RAW_HDR_CMD_DATA:
+		/* Data packet */
+		handle_raw_data(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, dns_fd, tun_fd, raw_user);
+		break;
+	default:
+		warnx("Unhandled raw command %02X from user %d", RAW_HDR_GET_CMD(packet), raw_user);
+		break;
 	}
 	return 1;
 }
 
 static int
-read_dns(int fd, struct query *q)
+read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw_decode() below */
 {
 	struct sockaddr_in from;
 	socklen_t addrlen;
@@ -929,7 +984,7 @@ read_dns(int fd, struct query *q)
 		q->fromlen = addrlen;
 
 		/* TODO do not handle raw packets here! */
-		if (raw_decode(packet, r, q, fd)) {
+		if (raw_decode(packet, r, q, fd, tun_fd)) {
 			return 0;
 		}
 		if (dns_decode(NULL, 0, q, QR_QUERY, packet, r) < 0) {
@@ -1177,7 +1232,7 @@ main(int argc, char **argv)
 	}
 
 	topdomain = strdup(argv[1]);
-	if(strlen(topdomain) <= 128) {
+	if (strlen(topdomain) <= 128) {
 		if(check_topdomain(topdomain)) {
 			warnx("Topdomain contains invalid characters.");
 			usage();

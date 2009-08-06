@@ -90,6 +90,7 @@ init_users(in_addr_t my_ip, int netbits)
 		users[i].out_acked_seqno = 0;
 		users[i].out_acked_fragment = 0;
 		users[i].fragsize = 4096;
+		users[i].conn = CONN_DNS_NULL;
 	}
 
 	return created_users;
@@ -161,6 +162,8 @@ find_available_user()
 		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
 			users[i].active = 1;
 			users[i].last_pkt = time(NULL);
+			users[i].fragsize = 4096;
+			users[i].conn = CONN_DNS_NULL;
 			ret = i;
 			break;
 		}
@@ -176,3 +179,16 @@ user_switch_codec(int userid, struct encoder *enc)
 	
 	users[userid].encoder = enc;
 }
+
+void
+user_set_conn_type(int userid, enum connection c)
+{
+	if (userid < 0 || userid >= USERS)
+		return;
+
+	if (c < 0 || c >= CONN_MAX)
+		return;
+	
+	users[userid].conn = c;
+}
+	
