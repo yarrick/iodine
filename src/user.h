@@ -34,6 +34,7 @@ struct user {
 	int out_acked_seqno;
 	int out_acked_fragment;
 	int fragsize;
+	enum connection conn;
 };
 
 extern struct user users[USERS];
@@ -44,5 +45,6 @@ int find_user_by_ip(uint32_t);
 int all_users_waiting_to_send();
 int find_available_user();
 void user_switch_codec(int userid, struct encoder *enc);
+void user_set_conn_type(int userid, enum connection c);
 
 #endif

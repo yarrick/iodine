@@ -60,6 +60,7 @@ WSADATA wsa_data;
 
 static void send_ping(int fd);
 static void send_chunk(int fd);
+static void send_raw_data(int fd);
 static int build_hostname(char *buf, size_t buflen, 
 	const char *data, const size_t datalen, 
 	const char *topdomain, struct encoder *encoder);
@@ -94,6 +95,9 @@ static struct encoder *b32;
  * Defaults to Base32, can be changed after handshake */
 static struct encoder *dataenc;
 
+/* My connection mode */
+static enum connection conn;
+
 #if !defined(BSD) && !defined(__GLIBC__)
 static char *__progname;
 #endif
@@ -120,7 +124,7 @@ send_query(int fd, char *hostname)
 }
 
 static void
-send_raw(int fd, char *buf, int buflen, int cmd)
+send_raw(int fd, char *buf, int buflen, int user, int cmd)
 {
 	char packet[4096];
 	int len;
@@ -131,7 +135,7 @@ send_raw(int fd, char *buf, int buflen, int cmd)
 	memcpy(&packet[RAW_HDR_LEN], buf, len);
 
 	len += RAW_HDR_LEN;
-	packet[RAW_HDR_CMD] = cmd;
+	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
 	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv, sizeof(raw_serv));
 }
@@ -263,7 +267,11 @@ tunnel_tun(int tun_fd, int dns_fd)
 	outpkt.seqno++;
 	outpkt.fragment = 0;
 
-	send_chunk(dns_fd);
+	if (conn == CONN_DNS_NULL) {
+		send_chunk(dns_fd);
+	} else {
+		send_raw_data(dns_fd);
+	}
 
 	return read;
 }
@@ -327,7 +335,7 @@ tunnel(int tun_fd, int dns_fd)
 
 
 		FD_ZERO(&fds);
-		if (!is_sending()) {
+		if ((!is_sending()) || conn == CONN_RAW_UDP) {
 			FD_SET(tun_fd, &fds);
 		}
 		FD_SET(dns_fd, &fds);
@@ -340,7 +348,7 @@ tunnel(int tun_fd, int dns_fd)
 		if (i < 0) 
 			err(1, "select");
 
-		if (i == 0) /* timeout */
+		if (i == 0 && conn == CONN_DNS_NULL) /* timeout */
 			send_ping(dns_fd);
 		else {
 			if (FD_ISSET(tun_fd, &fds)) {
@@ -355,6 +363,12 @@ tunnel(int tun_fd, int dns_fd)
 	}
 
 	return rv;
+}
+
+static void
+send_raw_data(int dns_fd)
+{
+	send_raw(dns_fd, outpkt.data, outpkt.len, userid, RAW_HDR_CMD_DATA);
 }
 
 static void
@@ -507,11 +521,10 @@ send_ip_request(int fd, int userid)
 static void
 send_raw_udp_login(int dns_fd, int userid, int seed)
 {
-	char buf[17];
+	char buf[16];
 	login_calculate(buf, 16, password, seed + 1);
-	buf[16] = userid;
 
-	send_raw(dns_fd, buf, sizeof(buf), RAW_HDR_CMD_LOGIN);
+	send_raw(dns_fd, buf, sizeof(buf), userid, RAW_HDR_CMD_LOGIN);
 }
 
 static void
@@ -715,7 +728,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	
 	if (!remoteaddr) {
 		fprintf(stderr, " failed to get IP.\n");
-		return 1;
+		return 0;
 	}
 	fprintf(stderr, " at %s: ", inet_ntoa(server));
 	fflush(stderr);
@@ -743,16 +756,15 @@ handshake_raw_udp(int dns_fd, int seed)
 		if(r > 0) {
 			/* recv() needed for windows, dont change to read() */
 			len = recv(dns_fd, in, sizeof(in), 0);
-			if (len >= (17 + RAW_HDR_LEN)) {
+			if (len >= (16 + RAW_HDR_LEN)) {
 				char hash[16];
 				login_calculate(hash, 16, password, seed - 1);
 				if (memcmp(in, raw_header, RAW_HDR_IDENT_LEN) == 0
-					&& in[RAW_HDR_CMD] == RAW_HDR_CMD_LOGIN 
-					&& memcmp(&in[RAW_HDR_LEN], hash, sizeof(hash)) == 0
-					&& in[16 + RAW_HDR_LEN] ==  userid) {
+					&& RAW_HDR_GET_CMD(in) == RAW_HDR_CMD_LOGIN 
+					&& memcmp(&in[RAW_HDR_LEN], hash, sizeof(hash)) == 0) {
 
 					fprintf(stderr, "OK\n");
-					return 0;
+					return 1;
 				}
 			}
 		}
@@ -761,7 +773,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	}
 	
 	fprintf(stderr, "failed\n");
-	return 1;
+	return 0;
 }
 
 static int
@@ -1016,22 +1028,24 @@ handshake(int dns_fd, int autodetect_frag_size, int fragsize)
 		return r;
 	}
 
-	handshake_raw_udp(dns_fd, seed);
+	if (handshake_raw_udp(dns_fd, seed)) {
+		conn = CONN_RAW_UDP;
+	} else {
+		case_preserved = handshake_case_check(dns_fd);
 
-	case_preserved = handshake_case_check(dns_fd);
-
-	if (case_preserved) {
-		handshake_switch_codec(dns_fd);
-	}
-
-	if (autodetect_frag_size) {
-		fragsize = handshake_autoprobe_fragsize(dns_fd);
-		if (!fragsize) {
-			return 1;
+		if (case_preserved) {
+			handshake_switch_codec(dns_fd);
 		}
-	}
 
-	handshake_set_fragsize(dns_fd, fragsize);
+		if (autodetect_frag_size) {
+			fragsize = handshake_autoprobe_fragsize(dns_fd);
+			if (!fragsize) {
+				return 1;
+			}
+		}
+
+		handshake_set_fragsize(dns_fd, fragsize);
+	}
 
 	return 0;
 }
@@ -1178,6 +1192,7 @@ main(int argc, char **argv)
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
+	conn = CONN_DNS_NULL;
 
 	retval = 0;
 
@@ -1312,7 +1327,11 @@ main(int argc, char **argv)
 		goto cleanup2;
 	}
 	
-	fprintf(stderr, "Sending queries for %s to %s\n", topdomain, nameserv_addr);
+	if (conn == CONN_DNS_NULL) {
+		fprintf(stderr, "Sending queries for %s to %s\n", topdomain, nameserv_addr);
+	} else {
+		fprintf(stderr, "Sending raw traffic directly to %s\n", inet_ntoa(raw_serv.sin_addr));
+	}
 
 	if (foreground == 0) 
 		do_detach();
