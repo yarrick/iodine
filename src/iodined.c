@@ -1068,8 +1068,9 @@ usage() {
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
-		" tunnel_ip[/netmask] topdomain\n", __progname);
+		"[-l ip address to listen on] [-p port] [-n external ip] "
+		"[-b dnsport] [-P password] [-F pidfile] "
+		"tunnel_ip[/netmask] topdomain\n", __progname);
 	exit(2);
 }
 
@@ -1080,8 +1081,8 @@ help() {
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password]"
-		" tunnel_ip[/netmask] topdomain\n", __progname);
+		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
+		"[-F pidfile] tunnel_ip[/netmask] topdomain\n", __progname);
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
@@ -1100,6 +1101,7 @@ help() {
 	fprintf(stderr, "  -n ip to respond with to NS queries\n");
 	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "  -F pidfile to write pid to a file\n");
 	fprintf(stderr, "tunnel_ip is the IP number of the local tunnel interface.\n");
 	fprintf(stderr, "   /netmask sets the size of the tunnel network.\n");
 	fprintf(stderr, "topdomain is the FQDN that is delegated to this server.\n");
@@ -1128,6 +1130,7 @@ main(int argc, char **argv)
 	char *newroot;
 	char *context;
 	char *device;
+	char *pidfile;
 	int dnsd_fd;
 	int tun_fd;
 
@@ -1161,6 +1164,7 @@ main(int argc, char **argv)
 	skipipconfig = 0;
 	debug = 0;
 	netmask = 27;
+	pidfile = NULL;
 
 	b32 = get_base32_encoder();
 	
@@ -1182,7 +1186,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 	
-	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -1227,6 +1231,9 @@ main(int argc, char **argv)
 			bind_enable = 1;
 			bind_port = atoi(optarg);
 			break;
+		case 'F':
+			pidfile = optarg;
+			break;    
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
 			password[sizeof(password)-1] = 0;
@@ -1374,6 +1381,9 @@ main(int argc, char **argv)
 	if (foreground == 0) 
 		do_detach();
 	
+	if (pidfile != NULL)
+		do_pidfile(pidfile);
+
 	if (newroot != NULL)
 		do_chroot(newroot);
 
@@ -1392,9 +1402,6 @@ main(int argc, char **argv)
 	if (context != NULL)
 		do_setcon(context);
 
-#ifndef WINDOWS32
-	openlog(__progname, LOG_NOWAIT, LOG_DAEMON);
-#endif
 	syslog(LOG_INFO, "started, listening on port %d", port);
 	
 	tunnel(tun_fd, dnsd_fd, bind_fd);

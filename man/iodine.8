@@ -21,6 +21,8 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I fragsize
 .B ] [-z
 .I context
+.B ] [-F
+.I pidfile
 .B ]
 .B [
 .I nameserver
@@ -51,6 +53,8 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I password
 .B ] [-z
 .I context
+.B ] [-F
+.I pidfile
 .B ]
 .I tunnel_ip
 .B [
@@ -96,6 +100,9 @@ will be used as input. Only the first 32 characters will be used.
 .TP
 .B -z context
 Apply SELinux 'context' after initialization.
+.TP
+.B -F pidfile
+Create 'pidfile' and write process id in it.
 .SS Client Options:
 .TP
 .B -m fragsize
