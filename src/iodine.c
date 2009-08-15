@@ -712,8 +712,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	unsigned remoteaddr = 0;
 	struct in_addr server;
 
-	fprintf(stderr, "Testing raw UDP data to the server");
-	fflush(stderr);
+	fprintf(stderr, "Testing raw UDP data to the server (skip with -r)\n");
 	for (i=0; running && i<3 ;i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
@@ -749,7 +748,7 @@ handshake_raw_udp(int dns_fd, int seed)
 		fprintf(stderr, " failed to get IP.\n");
 		return 0;
 	}
-	fprintf(stderr, " at %s: ", inet_ntoa(server));
+	fprintf(stderr, "Server is at %s, trying login: ", inet_ntoa(server));
 	fflush(stderr);
 
 	/* Store address to iodined server */
@@ -1031,7 +1030,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 }
 
 static int
-handshake(int dns_fd, int autodetect_frag_size, int fragsize)
+handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize)
 {
 	int seed;
 	int case_preserved;
@@ -1047,9 +1046,12 @@ handshake(int dns_fd, int autodetect_frag_size, int fragsize)
 		return r;
 	}
 
-	if (handshake_raw_udp(dns_fd, seed)) {
+	if (raw_mode && handshake_raw_udp(dns_fd, seed)) {
 		conn = CONN_RAW_UDP;
 	} else {
+		if (raw_mode == 0) {
+			fprintf(stderr, "Skipping raw mode\n");
+		}
 		case_preserved = handshake_case_check(dns_fd);
 
 		if (case_preserved) {
@@ -1194,6 +1196,7 @@ main(int argc, char **argv)
 	int max_downstream_frag_size;
 	int autodetect_frag_size;
 	int retval;
+	int raw_mode;
 
 	memset(password, 0, 33);
 	username = NULL;
@@ -1208,6 +1211,7 @@ main(int argc, char **argv)
 
 	autodetect_frag_size = 1;
 	max_downstream_frag_size = 3072;
+	raw_mode = 1;
 
 	b32 = get_base32_encoder();
 	dataenc = get_base32_encoder();
@@ -1230,7 +1234,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhu:t:d:P:m:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -1243,6 +1247,8 @@ main(int argc, char **argv)
 			help();
 			/* NOTREACHED */
 			break;
+		case 'r':
+			raw_mode = 0;
 		case 'u':
 			username = optarg;
 			break;
@@ -1341,7 +1347,7 @@ main(int argc, char **argv)
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
-	if (handshake(dns_fd, autodetect_frag_size, max_downstream_frag_size)) {
+	if (handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
 		retval = 1;
 		goto cleanup2;
 	}
