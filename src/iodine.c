@@ -249,7 +249,6 @@ read_dns(int dns_fd, int tun_fd, char *buf, int buflen) /* FIXME: tun_fd needed 
 	} else { /* CONN_RAW_UDP */
 		unsigned long datalen;
 		char buf[64*1024];
-		int raw_user;
 
 		/* minimum length */
 		if (r < RAW_HDR_LEN) return 0;
@@ -257,8 +256,11 @@ read_dns(int dns_fd, int tun_fd, char *buf, int buflen) /* FIXME: tun_fd needed 
 		if (memcmp(data, raw_header, RAW_HDR_IDENT_LEN)) return 0;
 		/* should be data packet */
 		if (RAW_HDR_GET_CMD(data) != RAW_HDR_CMD_DATA) return 0;
+		/* should be my user id */
+		if (RAW_HDR_GET_USR(data) != userid) return 0;
 
-		raw_user = RAW_HDR_GET_USR(data);
+		r -= RAW_HDR_LEN;
+		datalen = sizeof(buf);
 		if (uncompress((uint8_t*)buf, &datalen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
 			write_tun(tun_fd, buf, datalen);
 		}
