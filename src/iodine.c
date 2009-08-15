@@ -1157,7 +1157,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [-z context] [-F pidfile] "
 			"[nameserver] topdomain\n", __progname);
 	exit(2);
@@ -1168,12 +1168,13 @@ help() {
 	extern char *__progname;
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
-	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [-z context] [-F pidfile] "
 			"[nameserver] topdomain\n", __progname);
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -f to keep running in foreground\n");
+	fprintf(stderr, "  -r to skip raw UDP mode attempt\n");
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
