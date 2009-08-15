@@ -1215,6 +1215,8 @@ main(int argc, char **argv)
 	int raw_mode;
 
 	memset(password, 0, 33);
+	nameserv_addr = NULL;
+	pw = NULL;
 	username = NULL;
 	foreground = 0;
 	newroot = NULL;
