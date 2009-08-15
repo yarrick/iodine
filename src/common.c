@@ -26,6 +26,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #ifdef WINDOWS32
 #include <winsock2.h>
@@ -39,6 +40,7 @@
 #include <err.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <syslog.h>
 #endif
 
 #ifdef HAVE_SETCON
@@ -179,6 +181,24 @@ do_setcon(char *context)
 		err(1, "%s", context);
 #else
 	warnx("No SELinux support built in");
+#endif
+}
+
+void
+do_pidfile(char *pidfile)
+{
+#ifndef WINDOWS32
+	FILE *file;
+
+	if ((file = fopen(pidfile, "w")) == NULL) {
+		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
+		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
+	} else {
+		fprintf(file, "%d\n", (int)getpid());
+		fclose(file);
+	}
+#else
+	fprintf(stderr, "Windows version does not support pid file\n");
 #endif
 }
 

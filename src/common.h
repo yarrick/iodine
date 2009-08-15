@@ -104,6 +104,7 @@ void close_dns(int);
 void do_chroot(char *);
 void do_setcon(char *);
 void do_detach();
+void do_pidfile(char *);
 
 void read_password(char*, size_t);
 

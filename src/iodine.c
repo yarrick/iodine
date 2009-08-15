@@ -1158,7 +1158,8 @@ usage() {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-z context] [nameserver] topdomain\n", __progname);
+			"[-P password] [-m maxfragsize] [-z context] [-F pidfile] "
+			"[nameserver] topdomain\n", __progname);
 	exit(2);
 }
 
@@ -1168,7 +1169,8 @@ help() {
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-z context] [nameserver] topdomain\n", __progname);
+			"[-P password] [-m maxfragsize] [-z context] [-F pidfile] "
+			"[nameserver] topdomain\n", __progname);
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -f to keep running in foreground\n");
@@ -1178,6 +1180,7 @@ help() {
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
 	fprintf(stderr, "  -m maxfragsize, to limit size of downstream packets\n");
 	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
+	fprintf(stderr, "  -F pidfile to write pid to a file\n");
 	fprintf(stderr, "nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
 	fprintf(stderr, "topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
@@ -1208,6 +1211,7 @@ main(int argc, char **argv)
 	char *newroot;
 	char *context;
 	char *device;
+	char *pidfile;
 	int choice;
 	int tun_fd;
 	int dns_fd;
@@ -1227,6 +1231,7 @@ main(int argc, char **argv)
 	context = NULL;
 	device = NULL;
 	chunkid = 0;
+	pidfile = NULL;
 
 	outpkt.seqno = 0;
 	inpkt.len = 0;
@@ -1256,7 +1261,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:F:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -1294,6 +1299,9 @@ main(int argc, char **argv)
 		case 'z':
 			context = optarg;
 			break;
+		case 'F':
+			pidfile = optarg;
+			break;    
 		default:
 			usage();
 			/* NOTREACHED */
@@ -1382,6 +1390,9 @@ main(int argc, char **argv)
 
 	if (foreground == 0) 
 		do_detach();
+	
+	if (pidfile != NULL)
+		do_pidfile(pidfile);
 
 	if (newroot != NULL)
 		do_chroot(newroot);
@@ -1400,7 +1411,7 @@ main(int argc, char **argv)
 
 	if (context != NULL)
 		do_setcon(context);
-	
+
 	downstream_seqno = 0;
 	downstream_fragment = 0;
 	down_ack_seqno = 0;
