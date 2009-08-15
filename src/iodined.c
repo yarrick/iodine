@@ -330,7 +330,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 	char unpacked[64*1024];
 	char *tmp[2];
 	int userid;
-	int version;
 	int code;
 	int read;
 
@@ -339,6 +338,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 	memcpy(in, q->name, MIN(domain_len, sizeof(in)));
 
 	if(in[0] == 'V' || in[0] == 'v') {
+		int version = 0;
+
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		/* Version greeting, compare and send ack/nak */
 		if (read > 4) { 
@@ -1141,6 +1142,7 @@ main(int argc, char **argv)
 	char *netsize;
 	int retval;
 
+	pw = NULL;
 	username = NULL;
 	newroot = NULL;
 	context = NULL;
