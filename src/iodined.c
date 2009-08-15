@@ -330,7 +330,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 	char unpacked[64*1024];
 	char *tmp[2];
 	int userid;
-	int code;
 	int read;
 
 	userid = -1;
@@ -554,6 +553,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 	} else if((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {
+		int code = -1;
+
 		if ((in[0] >= '0' && in[0] <= '9'))
 			code = in[0] - '0';
 		if ((in[0] >= 'a' && in[0] <= 'f'))
@@ -1142,7 +1143,9 @@ main(int argc, char **argv)
 	char *netsize;
 	int retval;
 
+#ifndef WINDOWS32
 	pw = NULL;
+#endif
 	username = NULL;
 	newroot = NULL;
 	context = NULL;
