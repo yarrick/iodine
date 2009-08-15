@@ -1,4 +1,3 @@
-CC = gcc
 COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o md5.o common.o
 CLIENTOBJS = iodine.o
 CLIENT = ../bin/iodine
@@ -9,8 +8,8 @@ OS = `echo $(TARGETOS) | tr "a-z" "A-Z"`
 ARCH = `uname -m`
 
 LIBPATH = -L.
-LDFLAGS =  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
-CFLAGS = -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags`
+LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
+CFLAGS += -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags`
 
 all: stateos $(CLIENT) $(SERVER)
 
