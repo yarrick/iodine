@@ -145,7 +145,9 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
 
 	memcpy(packet, raw_header, RAW_HDR_LEN);
-	memcpy(&packet[RAW_HDR_LEN], buf, len);
+	if (len) {
+		memcpy(&packet[RAW_HDR_LEN], buf, len);
+	}
 
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
@@ -929,6 +931,21 @@ handle_raw_data(char *packet, int len, struct query *q, int dns_fd, int tun_fd, 
 	handle_full_packet(tun_fd, userid);
 }
 
+static void
+handle_raw_ping(struct query *q, int dns_fd, int userid)
+{
+	if (check_user_and_ip(userid, q) != 0) {
+		return;
+	}
+
+	/* Update query and time info for user */
+	users[userid].last_pkt = time(NULL);
+	memcpy(&(users[userid].q), q, sizeof(struct query));
+
+	/* Send ping reply */
+	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, q);
+}
+
 static int
 raw_decode(char *packet, int len, struct query *q, int dns_fd, int tun_fd)
 {
@@ -948,6 +965,10 @@ raw_decode(char *packet, int len, struct query *q, int dns_fd, int tun_fd)
 	case RAW_HDR_CMD_DATA:
 		/* Data packet */
 		handle_raw_data(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, dns_fd, tun_fd, raw_user);
+		break;
+	case RAW_HDR_CMD_PING:
+		/* Keepalive packet */
+		handle_raw_ping(q, dns_fd, raw_user);
 		break;
 	default:
 		warnx("Unhandled raw command %02X from user %d", RAW_HDR_GET_CMD(packet), raw_user);
