@@ -7,7 +7,7 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodine [-h]
 
-.B iodine [-f] [-u
+.B iodine [-f] [-r] [-u
 .I user
 .B ] [-P
 .I password
@@ -104,6 +104,11 @@ Apply SELinux 'context' after initialization.
 .B -F pidfile
 Create 'pidfile' and write process id in it.
 .SS Client Options:
+.TP
+.B -r
+Skip raw UDP mode. If not used, iodine will try getting the public IP address
+of the iodined host and test if it is reachable directly. If it is, traffic
+will be sent to the server instead of the DNS relay.
 .TP
 .B -m fragsize
 Maximum downstream fragsize. Not setting this will cause the client to probe

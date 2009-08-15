@@ -18,6 +18,8 @@ CHANGES:
 	- The starting cache miss value is randomized at startup, fixes #65.
 	- Raw UDP mode added. If the iodined server is reachable directly,
 		packets can be sent to it without DNS encoding. Fixes #36.
+	- Added -F option to write pidfile, based on patch from
+		misc at mandriva.org. Fixes #70.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
