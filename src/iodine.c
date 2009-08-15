@@ -1216,7 +1216,9 @@ main(int argc, char **argv)
 
 	memset(password, 0, 33);
 	nameserv_addr = NULL;
+#ifndef WINDOWS32
 	pw = NULL;
+#endif
 	username = NULL;
 	foreground = 0;
 	newroot = NULL;
