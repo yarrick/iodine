@@ -745,10 +745,10 @@ handshake_raw_udp(int dns_fd, int seed)
 	}
 	
 	if (!remoteaddr) {
-		fprintf(stderr, " failed to get IP.\n");
+		fprintf(stderr, "Failed to get raw server IP, will use DNS mode.\n");
 		return 0;
 	}
-	fprintf(stderr, "Server is at %s, trying login: ", inet_ntoa(server));
+	fprintf(stderr, "Server is at %s, trying raw login: ", inet_ntoa(server));
 	fflush(stderr);
 
 	/* Store address to iodined server */
