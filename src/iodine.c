@@ -58,6 +58,8 @@ WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
 #endif
 
+#define PING_TIMEOUT(t) ((t) >= (conn == CONN_DNS_NULL ? 1 : 20))
+
 static void send_ping(int fd);
 static void send_chunk(int fd);
 static void send_raw_data(int fd);
@@ -132,7 +134,9 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd)
 	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
 
 	memcpy(packet, raw_header, RAW_HDR_LEN);
-	memcpy(&packet[RAW_HDR_LEN], buf, len);
+	if (len) {
+		memcpy(&packet[RAW_HDR_LEN], buf, len);
+	}
 
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
@@ -345,8 +349,10 @@ tunnel(int tun_fd, int dns_fd)
 	fd_set fds;
 	int rv;
 	int i;
+	int seconds;
 
 	rv = 0;
+	seconds = 0;
 
 	while (running) {
 		tv.tv_sec = 1;
@@ -367,10 +373,11 @@ tunnel(int tun_fd, int dns_fd)
 		if (i < 0) 
 			err(1, "select");
 
-		if (i == 0 && conn == CONN_DNS_NULL) /* timeout */
-			send_ping(dns_fd);
-		else {
+		if (i == 0) { /* timeout */
+			seconds++;
+		} else {
 			if (FD_ISSET(tun_fd, &fds)) {
+				seconds = 0;
 				if (tunnel_tun(tun_fd, dns_fd) <= 0)
 					continue;
 			}
@@ -378,6 +385,11 @@ tunnel(int tun_fd, int dns_fd)
 				if (tunnel_dns(tun_fd, dns_fd) <= 0)
 					continue;
 			} 
+		}
+
+		if (PING_TIMEOUT(seconds)) {
+			send_ping(dns_fd);
+			seconds = 0;
 		}
 	}
 
@@ -445,25 +457,29 @@ send_login(int fd, char *login, int len)
 static void
 send_ping(int fd)
 {
-	char data[4];
-	
-	if (is_sending()) {
-		outpkt.sentlen = 0;
-		outpkt.offset = 0;
-		outpkt.len = 0;
+	if (conn == CONN_DNS_NULL) {
+		char data[4];
+		
+		if (is_sending()) {
+			outpkt.sentlen = 0;
+			outpkt.offset = 0;
+			outpkt.len = 0;
+		}
+
+		data[0] = userid;
+		data[1] = ((downstream_seqno & 7) << 4) | (downstream_fragment & 15);
+		data[2] = (rand_seed >> 8) & 0xff;
+		data[3] = (rand_seed >> 0) & 0xff;
+		
+		down_ack_seqno = downstream_seqno;
+		down_ack_fragment = downstream_fragment;
+		
+		rand_seed++;
+
+		send_packet(fd, 'P', data, sizeof(data));
+	} else {
+		send_raw(fd, NULL, 0, userid, RAW_HDR_CMD_PING);
 	}
-
-	data[0] = userid;
-	data[1] = ((downstream_seqno & 7) << 4) | (downstream_fragment & 15);
-	data[2] = (rand_seed >> 8) & 0xff;
-	data[3] = (rand_seed >> 0) & 0xff;
-	
-	down_ack_seqno = downstream_seqno;
-	down_ack_fragment = downstream_fragment;
-	
-	rand_seed++;
-
-	send_packet(fd, 'P', data, sizeof(data));
 }
 
 static void

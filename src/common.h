@@ -23,6 +23,7 @@
 #define RAW_HDR_CMD 3
 #define RAW_HDR_CMD_LOGIN 0x10
 #define RAW_HDR_CMD_DATA  0x20
+#define RAW_HDR_CMD_PING  0x30
 
 #define RAW_HDR_CMD_MASK  0xF0
 #define RAW_HDR_USR_MASK  0x0F
