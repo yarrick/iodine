@@ -5,7 +5,7 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
-20xx-xx-xx: x.y.z
+20xx-xx-xx: x.y.z "Hotspotify"
 	- Fixed tunnel not working on Windows.
 	- Any device name is now supported on Windows, fixes #47.
 	- Multiple installed TAP32 interfaces are now supported, fixes #46.
@@ -18,6 +18,7 @@ CHANGES:
 	- The starting cache miss value is randomized at startup, fixes #65.
 	- Raw UDP mode added. If the iodined server is reachable directly,
 		packets can be sent to it without DNS encoding. Fixes #36.
+	- Do not overwrite users CC/CFLAGS/LDFLAGS, only add to them.
 	- Added -F option to write pidfile, based on patch from
 		misc at mandriva.org. Fixes #70.
 
