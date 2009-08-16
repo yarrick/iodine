@@ -130,6 +130,7 @@ main(int argc, char **argv)
 	pw = NULL;
 #endif
 	username = NULL;
+	memset(password, 0, 33);
 	foreground = 0;
 	newroot = NULL;
 	context = NULL;
