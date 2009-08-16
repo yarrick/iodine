@@ -1,5 +1,5 @@
 COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o md5.o common.o
-CLIENTOBJS = iodine.o
+CLIENTOBJS = iodine.o client.o util.o
 CLIENT = ../bin/iodine
 SERVEROBJS = iodined.o user.o fw_query.o
 SERVER = ../bin/iodined
