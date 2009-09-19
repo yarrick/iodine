@@ -742,6 +742,8 @@ handshake_login(int dns_fd, int seed)
 					client[64] = 0;
 					if (tun_setip(client, netmask) == 0 && 
 						tun_setmtu(mtu) == 0) {
+
+						fprintf(stderr, "Server tunnel IP is %s\n", server);
 						return 0;
 					} else {
 						errx(4, "Failed to set IP and MTU");
