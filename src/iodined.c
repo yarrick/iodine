@@ -65,6 +65,8 @@ WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
 #endif
 
+#define PASSWORD_ENV_VAR "IODINED_PASS"
+
 static int running = 1;
 static char *topdomain;
 static char password[33];
@@ -1344,8 +1346,12 @@ main(int argc, char **argv)
 		usage();
 	}
 	
-	if (strlen(password) == 0)
-		read_password(password, sizeof(password));
+	if (strlen(password) == 0) {
+		if (NULL != getenv(PASSWORD_ENV_VAR))
+			snprintf(password, sizeof(password), "%s", getenv(PASSWORD_ENV_VAR));
+		else
+			read_password(password, sizeof(password));
+	}
 
 	if ((tun_fd = open_tun(device)) == -1) {
 		retval = 1;

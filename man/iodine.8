@@ -254,6 +254,22 @@ dig \-t NS foo123.tunnel.com
 .B MTU issues:
 These issues should be solved now, with automatic fragmentation of downstream 
 packets. There should be no need to set the MTU explicitly on the server.
+.SH ENVIRONMENT
+.SS IODINE_PASS
+If the environment variable
+.B IODINE_PASS
+is set, iodine will use the value it is set to as password instead of asking
+for one. The 
+.B -P
+option still has preference.
+.SS IODINED_PASS
+If the environment variable
+.B IODINED_PASS
+is set, iodined will use the value it is set to as password instead of asking
+for one. The
+.B -P
+option still has preference.
+.El
 .SH BUGS
 File bugs at http://dev.kryo.se/iodine/
 .SH AUTHORS

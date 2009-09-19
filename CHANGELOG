@@ -21,6 +21,8 @@ CHANGES:
 	- Do not overwrite users CC/CFLAGS/LDFLAGS, only add to them.
 	- Added -F option to write pidfile, based on patch from
 		misc at mandriva.org. Fixes #70.
+	- Allow password to be set via environment variable, fixes #77.
+		Based on patch by logix.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
