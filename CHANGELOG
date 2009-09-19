@@ -23,6 +23,7 @@ CHANGES:
 		misc at mandriva.org. Fixes #70.
 	- Allow password to be set via environment variable, fixes #77.
 		Based on patch by logix.
+	- Client now prints server tunnel IP, fixes #78. Patch by logix.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
