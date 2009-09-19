@@ -33,7 +33,8 @@
 #else
 #include <arpa/nameser.h>
 #ifdef DARWIN
-#include <arpa/nameser8_compat.h>
+#define BIND_8_COMPAT
+#include <arpa/nameser_compat.h>
 #endif
 #define _XPG4_2
 #include <sys/socket.h>
