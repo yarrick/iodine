@@ -376,6 +376,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				users[userid].inpacket.seqno = 0;
 				users[userid].inpacket.fragment = 0;
 				users[userid].fragsize = 100; /* very safe */
+				users[userid].conn = CONN_DNS_NULL;
 			} else {
 				/* No space for another user */
 				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);

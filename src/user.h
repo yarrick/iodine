@@ -19,6 +19,13 @@
 
 #define USERS 16
 
+#define OUTPACKETQ_LEN 4		/* Note: 16 users * 1 packet = 1MB */
+/* Undefine to have no queue for packets coming in from tun device, which may
+   lead to massive dropping in multi-user situations with high traffic. */
+
+#define DNSCACHE_LEN 4
+/* Undefine to disable. MUST be less than 7; also see comments in iodined.c */
+
 struct user {
 	char id;
 	int active;
@@ -28,14 +35,30 @@ struct user {
 	in_addr_t tun_ip;
 	struct in_addr host;
 	struct query q;
+	struct query q_prev;
+	struct query q_sendrealsoon;
+	int q_sendrealsoon_new;
 	struct packet inpacket;
 	struct packet outpacket;
+	int outfragresent;
 	struct encoder *encoder;
 	char downenc;
 	int out_acked_seqno;
 	int out_acked_fragment;
 	int fragsize;
 	enum connection conn;
+	int lazy;
+#ifdef OUTPACKETQ_LEN
+	struct packet outpacketq[OUTPACKETQ_LEN];
+	int outpacketq_nexttouse;
+	int outpacketq_filled;
+#endif
+#ifdef DNSCACHE_LEN
+	struct query dnscache_q[DNSCACHE_LEN];
+	char dnscache_answer[DNSCACHE_LEN][4096];
+	int dnscache_answerlen[DNSCACHE_LEN];
+	int dnscache_lastfilled;
+#endif
 };
 
 extern struct user users[USERS];

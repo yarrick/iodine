@@ -356,6 +356,13 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		readshort(packet, &data, &type);
 		readshort(packet, &data, &class);
 		
+		/* if CHECKLEN okay, then we're sure to have a proper name */
+		if (q != NULL) {
+			/* We only need the first char to check it */
+			q->name[0] = name[0];
+			q->name[1] = '\0';
+		}
+
 		/* Assume that first answer is NULL/CNAME that we wanted */
 		readname(packet, packetlen, &data, name, sizeof(name));
 		CHECKLEN(10);
