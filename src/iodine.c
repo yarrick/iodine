@@ -61,7 +61,7 @@ usage() {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-z context] [-F pidfile] "
+			"[-P password] [-m maxfragsize] [-T type] [-O enc] [-z context] [-F pidfile] "
 			"[nameserver] topdomain\n", __progname);
 	exit(2);
 }
@@ -72,7 +72,7 @@ help() {
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-z context] [-F pidfile] "
+			"[-P password] [-m maxfragsize] [-T type] [-O enc] [-z context] [-F pidfile] "
 			"[nameserver] topdomain\n", __progname);
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
@@ -83,6 +83,8 @@ help() {
 	fprintf(stderr, "  -d device to set tunnel device name\n");
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
 	fprintf(stderr, "  -m maxfragsize, to limit size of downstream packets\n");
+	fprintf(stderr, "  -T dns type: NULL (default, fastest), TXT, CNAME, A (CNAME answer), MX\n");
+	fprintf(stderr, "  -O downstream encoding (!NULL): Base32(default), Base64, or Raw (only TXT)\n");
 	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
 	fprintf(stderr, "  -F pidfile to write pid to a file\n");
 	fprintf(stderr, "nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
@@ -133,6 +135,7 @@ main(int argc, char **argv)
 #endif
 	username = NULL;
 	memset(password, 0, 33);
+	srand(time(NULL));
 	foreground = 0;
 	newroot = NULL;
 	context = NULL;
@@ -159,7 +162,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:F:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:F:T:O:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -200,6 +203,12 @@ main(int argc, char **argv)
 		case 'F':
 			pidfile = optarg;
 			break;    
+		case 'T':
+			set_qtype(optarg);
+			break;
+		case 'O':       /* not -D, is Debug in server */
+			set_downenc(optarg);
+			break;
 		default:
 			usage();
 			/* NOTREACHED */
@@ -234,6 +243,7 @@ main(int argc, char **argv)
 	if (nameserv_addr) {
 		client_set_nameserver(nameserv_addr, DNS_PORT);
 	} else {
+		warnx("No nameserver found - not connected to any network?\n");
 		usage();
 		/* NOTREACHED */
 	}	
