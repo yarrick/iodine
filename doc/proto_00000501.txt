@@ -63,6 +63,26 @@ Server sends:
 	BADCODEC if not accepted. Client must then revert to Base32
 	BADLEN if length of query is too short
 
+Options:
+Client sends:
+	First byte o or O
+	5 bits coded as Base32 char, meaning userid
+	1 char, meaning option
+Server sends:
+	Full name of option if accepted. After this, option immediately takes
+	effect in server.
+	BADCODEC if not accepted. Previous situation remains.
+	All options affect only the requesting client.
+
+	Option chars:
+	t or T: Downstream encoding Base32, for TXT/CNAME/A/MX (default)
+	s or S: Downstream encoding Base64, for TXT/CNAME/A/MX
+	r or R: Downstream encoding Raw, for TXT/NULL (default for NULL)
+	If codec unsupported for request type, server will use Base32; note
+	that server will answer any mix of request types that a client sends.
+	Server may disregard this option; client must always use the downstream
+	encoding type indicated in every downstream DNS packet.
+
 Probe downstream fragment size:
 Client sends:
 	First byte r or R
@@ -112,6 +132,19 @@ Base32 encoded header, then comes the payload data, encoded with chosen codec.
 
 Downstream data starts with 2 byte header. Then payload data, which may be
 compressed.
+
+In NULL responses, downstream data is always raw. In all other response types,
+downstream data is encoded (see Options above).
+Encoding type is indicated by 1 prefix char:
+TXT:
+	End result is always DNS-chopped (series of len-prefixed strings
+	<=255 bytes)
+	t or T: Base32	 encoded before chop, decoded after un-chop
+	s or S: Base64	 encoded before chop, decoded after un-chop
+	r or R: Raw	 no encoding, only DNS-chop
+CNAME/A/MX:
+	h or H: Hostname encoded with Base32
+	i or I: Hostname encoded with Base64
 
 Ping:
 Client sends:
