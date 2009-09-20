@@ -26,6 +26,8 @@
 #include <time.h>
 #include <zlib.h>
 
+#include "common.h"
+
 #ifdef WINDOWS32
 #include "windows.h"
 #include <winsock2.h>
@@ -45,7 +47,6 @@
 #include <syslog.h>
 #endif
 
-#include "common.h"
 #include "dns.h"
 #include "encoding.h"
 #include "base32.h"
