@@ -232,7 +232,7 @@ main(int argc, char **argv)
 	}
 
 	if (nameserv_addr) {
-		client_set_nameserver(nameserv_addr);
+		client_set_nameserver(nameserv_addr, DNS_PORT);
 	} else {
 		usage();
 		/* NOTREACHED */

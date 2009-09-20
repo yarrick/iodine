@@ -15,8 +15,39 @@
  */
 
 #include <string.h>
+#include "common.h"
 #include "encoding.h"
 
+int
+build_hostname(char *buf, size_t buflen, 
+		const char *data, const size_t datalen, 
+		const char *topdomain, struct encoder *encoder)
+{
+	int encsize;
+	size_t space;
+	char *b;
+
+	space = MIN(0xFF, buflen) - strlen(topdomain) - 7;
+	if (!encoder->places_dots())
+		space -= (space / 57); /* space for dots */
+
+	memset(buf, 0, buflen);
+	
+	encsize = encoder->encode(buf, &space, data, datalen);
+
+	if (!encoder->places_dots())
+		inline_dotify(buf, buflen);
+
+	b = buf;
+	b += strlen(buf);
+
+	if (*b != '.') 
+		*b++ = '.';
+
+	strncpy(b, topdomain, strlen(topdomain)+1);
+
+	return space;
+}
 
 int
 unpack_data(char *buf, size_t buflen, char *data, size_t datalen, struct encoder *enc)

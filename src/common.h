@@ -40,6 +40,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include <netinet/in.h>
 #endif
 
+#define DNS_PORT 53
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
