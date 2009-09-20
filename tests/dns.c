@@ -68,8 +68,8 @@ START_TEST(test_encode_query)
 	struct encoder *enc;
 	char *d;
 	size_t len;
+	size_t enclen;
 	int ret;
-	int enclen;
 
 	enclen = sizeof(resolv);
 	memset(&buf, 0, sizeof(buf));
