@@ -68,6 +68,7 @@ static int running = 1;
 static char *topdomain;
 static char password[33];
 static struct encoder *b32;
+static struct encoder *b64;
 static int created_users;
 
 static int check_ip;
@@ -85,7 +86,7 @@ static char *__progname;
 #endif
 
 static int read_dns(int, int, struct query *);
-static void write_dns(int, struct query *, char *, int);
+static void write_dns(int, struct query *, char *, int, char);
 static void handle_full_packet(int, int);
 
 static void
@@ -119,7 +120,7 @@ check_user_and_ip(int userid, struct query *q)
 	if (userid < 0 || userid >= created_users ) {
 		return 1; 
 	}
-	if (!users[userid].active) {
+	if (!users[userid].active || users[userid].disabled) {
 		return 1;
 	}
 	if (users[userid].last_pkt + 60 < time(NULL)) {
@@ -225,7 +226,7 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 	out[7] = ((payload) & 0xff);
 	out[8] = userid & 0xff;
 
-	write_dns(fd, q, out, sizeof(out));
+	write_dns(fd, q, out, sizeof(out), users[userid].downenc);
 }
 
 static void
@@ -270,7 +271,7 @@ send_chunk(int dns_fd, int userid) {
 			users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15, 
 			last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
 	}
-	write_dns(dns_fd, &users[userid].q, pkt, datalen + 2);
+	write_dns(dns_fd, &users[userid].q, pkt, datalen + 2, users[userid].downenc);
 	users[userid].q.id = 0;
 
 	if (users[userid].outpacket.len > 0 && 
@@ -360,10 +361,21 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				
 				memcpy(&(users[userid].q), q, sizeof(struct query));
 				users[userid].encoder = get_base32_encoder();
+				users[userid].downenc = 'T';
 				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
 				syslog(LOG_INFO, "accepted version for user #%d from %s",
 					userid, inet_ntoa(tempin->sin_addr));
 				users[userid].q.id = 0;
+				users[userid].outpacket.len = 0;
+				users[userid].outpacket.offset = 0;
+				users[userid].outpacket.sentlen = 0;
+				users[userid].outpacket.seqno = 0;
+				users[userid].outpacket.fragment = 0;
+				users[userid].inpacket.len = 0;
+				users[userid].inpacket.offset = 0;
+				users[userid].inpacket.seqno = 0;
+				users[userid].inpacket.fragment = 0;
+				users[userid].fragsize = 100; /* very safe */
 			} else {
 				/* No space for another user */
 				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
@@ -382,7 +394,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		userid = unpacked[0];
 
 		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5);
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
 				userid, inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			return;
@@ -401,14 +413,14 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				read = snprintf(out, sizeof(out), "%s-%s-%d-%d", 
 						tmp[0], tmp[1], my_mtu, netmask);
 
-				write_dns(dns_fd, q, out, read);
+				write_dns(dns_fd, q, out, read, users[userid].downenc);
 				q->id = 0;
 				syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
 
 				free(tmp[1]);
 				free(tmp[0]);
 			} else {
-				write_dns(dns_fd, q, "LNAK", 4);
+				write_dns(dns_fd, q, "LNAK", 4, 'T');
 				syslog(LOG_WARNING, "rejected login request from user #%d from %s, bad password",
 					userid, inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			}
@@ -422,7 +434,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		
 		userid = b32_8to5(in[1]);
 		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5);
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
 
@@ -440,25 +452,26 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		reply[2] = (addr >> 16) & 0xFF;
 		reply[3] = (addr >>  8) & 0xFF;
 		reply[4] = (addr >>  0) & 0xFF;
-		write_dns(dns_fd, q, reply, sizeof(reply));
+		write_dns(dns_fd, q, reply, sizeof(reply), 'T');
 	} else if(in[0] == 'Z' || in[0] == 'z') {
 		/* Check for case conservation and chars not allowed according to RFC */
 
 		/* Reply with received hostname as data */
-		write_dns(dns_fd, q, in, domain_len);
+		/* No userid here, reply with lowest-grade downenc */
+		write_dns(dns_fd, q, in, domain_len, 'T');
 		return;
 	} else if(in[0] == 'S' || in[0] == 's') {
 		int codec;
 		struct encoder *enc;
 		if (domain_len < 3) { /* len at least 3, example: "S15" */
-			write_dns(dns_fd, q, "BADLEN", 6);
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
 			return;
 		}
 
 		userid = b32_8to5(in[1]);
 		
 		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5);
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
 		
@@ -468,15 +481,49 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		case 5: /* 5 bits per byte = base32 */
 			enc = get_base32_encoder();
 			user_switch_codec(userid, enc);
-			write_dns(dns_fd, q, enc->name, strlen(enc->name));
+			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
 			break;
 		case 6: /* 6 bits per byte = base64 */
 			enc = get_base64_encoder();
 			user_switch_codec(userid, enc);
-			write_dns(dns_fd, q, enc->name, strlen(enc->name));
+			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
 			break;
 		default:
-			write_dns(dns_fd, q, "BADCODEC", 8);
+			write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
+			break;
+		}
+		return;
+	} else if(in[0] == 'O' || in[0] == 'o') {
+		if (domain_len != 4) { /* len = 4, example: "O1T." */
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
+			return;
+		}
+
+		userid = b32_8to5(in[1]);
+
+		if (check_user_and_ip(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
+			return; /* illegal id */
+		}
+
+		switch (in[2]) {
+		case 'T':
+		case 't':
+			users[userid].downenc = 'T';
+			write_dns(dns_fd, q, "Base32", 6, users[userid].downenc);
+			break;
+		case 'S':
+		case 's':
+			users[userid].downenc = 'S';
+			write_dns(dns_fd, q, "Base64", 6, users[userid].downenc);
+			break;
+		case 'R':
+		case 'r':
+			users[userid].downenc = 'R';
+			write_dns(dns_fd, q, "Raw", 3, users[userid].downenc);
+			break;
+		default:
+			write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
 			break;
 		}
 		return;
@@ -486,20 +533,26 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		/* Downstream fragsize probe packet */
 		userid = (b32_8to5(in[1]) >> 1) & 15;
 		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5);
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
 				
 		req_frag_size = ((b32_8to5(in[1]) & 1) << 10) | ((b32_8to5(in[2]) & 31) << 5) | (b32_8to5(in[3]) & 31);
 		if (req_frag_size < 2 || req_frag_size > 2047) {	
-			write_dns(dns_fd, q, "BADFRAG", 7);
+			write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
 		} else {
 			char buf[2048];
+			int i;
+			unsigned int v = (unsigned int) rand();
 
 			memset(buf, 0, sizeof(buf));
 			buf[0] = (req_frag_size >> 8) & 0xff;
 			buf[1] = req_frag_size & 0xff;
-			write_dns(dns_fd, q, buf, req_frag_size);
+			/* make checkable pseudo-random sequence */
+			buf[2] = 107;
+			for (i = 3; i < 2048; i++, v += 107)
+				buf[i] = (char) (v & 0xff);
+			write_dns(dns_fd, q, buf, req_frag_size, users[userid].downenc);
 		}
 		return;
 	} else if(in[0] == 'N' || in[0] == 'n') {
@@ -509,16 +562,16 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		/* Downstream fragsize packet */
 		userid = unpacked[0];
 		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5);
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
 				
 		max_frag_size = ((unpacked[1] & 0xff) << 8) | (unpacked[2] & 0xff);
 		if (max_frag_size < 2) {	
-			write_dns(dns_fd, q, "BADFRAG", 7);
+			write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
 		} else {
 			users[userid].fragsize = max_frag_size;
-			write_dns(dns_fd, q, &unpacked[1], 2);
+			write_dns(dns_fd, q, &unpacked[1], 2, users[userid].downenc);
 		}
 		return;
 	} else if(in[0] == 'P' || in[0] == 'p') {
@@ -529,7 +582,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		/* Ping packet, store userid */
 		userid = unpacked[0];
 		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5);
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
 				
@@ -564,7 +617,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		userid = code;
 		/* Check user and sending ip number */
 		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5);
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
 		} else {
 			/* Decode data header */
 			int up_seq = (b32_8to5(in[1]) >> 2) & 7;
@@ -637,6 +690,10 @@ handle_ns_request(int dns_fd, struct query *q)
 	}
 
 	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
+	if (len < 1) {
+		warnx("dns_encode_ns_response doesn't fit");
+		return;
+	}
 	
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
@@ -659,6 +716,10 @@ forward_query(int bind_fd, struct query *q)
 	in_addr_t newaddr;
 
 	len = dns_encode(buf, sizeof(buf), q, QR_QUERY, q->name, strlen(q->name));
+	if (len < 1) {
+		warnx("dns_encode doesn't fit");
+		return;
+	}
 
 	/* Store sockaddr for q->id */
 	memcpy(&(fwq.addr), &(q->from), q->fromlen);
@@ -755,8 +816,14 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	
 	if (inside_topdomain) {
 		/* This is a query we can handle */
+
 		switch (q.type) {
 		case T_NULL:
+		case T_CNAME:
+		case T_A:
+		case T_MX:
+		case T_TXT:
+			/* encoding is "transparent" here */
 			handle_null_request(tun_fd, dns_fd, &q, domain_len);
 			break;
 		case T_NS:
@@ -1044,12 +1111,91 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 }
 
 static void
-write_dns(int fd, struct query *q, char *data, int datalen)
+write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 {
 	char buf[64*1024];
-	int len;
+	int len = 0;
 
-	len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
+	if (q->type == T_CNAME || q->type == T_A || q->type == T_MX) {
+		static int td1 = 0;
+		static int td2 = 0;
+		char cnamebuf[1024];		/* max 255 */
+		size_t space;
+		char *b;
+
+		/* Make a rotating topdomain to prevent filtering */
+		td1+=3;
+		td2+=7;
+		if (td1>=26) td1-=26;
+		if (td2>=25) td2-=25;
+
+		/* encode data,datalen to CNAME/MX answer */
+		/* (adapted from build_hostname() in iodine.c) */
+
+		space = MIN(0xFF, sizeof(cnamebuf)) - 4 - 2;
+		/* -1 encoding type, -3 ".xy", -2 for safety */
+
+		memset(cnamebuf, 0, sizeof(cnamebuf));
+
+		if (downenc == 'S') {
+			cnamebuf[0] = 'I';
+			if (!b64->places_dots())
+				space -= (space / 57);	/* space for dots */
+			b64->encode(cnamebuf+1, &space, data, datalen);
+			if (!b64->places_dots())
+				inline_dotify(cnamebuf, sizeof(cnamebuf), 57);
+		} else {
+			cnamebuf[0] = 'H';
+			if (!b32->places_dots())
+				space -= (space / 57);	/* space for dots */
+			b32->encode(cnamebuf+1, &space, data, datalen);
+			if (!b32->places_dots())
+				inline_dotify(cnamebuf, sizeof(cnamebuf), 57);
+		}
+
+		/* Add dot (if it wasn't there already) and topdomain */
+		b = cnamebuf;
+		b += strlen(cnamebuf);
+		if (*b != '.') 
+			*b++ = '.';
+
+		*b = 'a' + td1;
+		b++;
+		*b = 'a' + td2;
+		b++;
+		*b = '\0';
+
+		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, cnamebuf, sizeof(cnamebuf));
+	}
+	else if (q->type == T_TXT) {
+		/* TXT with base32 */
+		char txtbuf[64*1024];
+		size_t space = sizeof(txtbuf) - 1;;
+
+		memset(txtbuf, 0, sizeof(txtbuf));
+
+		if (downenc == 'S') {
+			txtbuf[0] = 'S';	/* plain base64(Sixty-four) */
+			len = b64->encode(txtbuf+1, &space, data, datalen);
+		}
+		else if (downenc == 'R') {
+			txtbuf[0] = 'R';	/* Raw binary data */
+			len = MIN(datalen, sizeof(txtbuf) - 1);
+			memcpy(txtbuf + 1, data, len);
+		} else {
+			txtbuf[0] = 'T';	/* plain base32(Thirty-two) */
+			len = b32->encode(txtbuf+1, &space, data, datalen);
+		}
+		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, txtbuf, len+1);
+	} else {
+		/* Normal NULL-record encode */
+		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
+	}
+
+	if (len < 1) {
+		warnx("dns_encode doesn't fit");
+		return;
+	}
 	
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
@@ -1166,6 +1312,7 @@ main(int argc, char **argv)
 	pidfile = NULL;
 
 	b32 = get_base32_encoder();
+	b64 = get_base64_encoder();
 	
 	retval = 0;
 
