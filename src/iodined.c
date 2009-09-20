@@ -20,7 +20,6 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <fcntl.h>
@@ -37,10 +36,6 @@
 #include <arpa/nameser_compat.h>
 #endif
 #define _XPG4_2
-#include <sys/socket.h>
-#include <err.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <grp.h>
