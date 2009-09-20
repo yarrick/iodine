@@ -20,7 +20,6 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <fcntl.h>
@@ -36,10 +35,6 @@
 #define BIND_8_COMPAT
 #include <arpa/nameser_compat.h>
 #endif
-#include <sys/socket.h>
-#include <err.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <grp.h>
 #include <pwd.h>
 #include <netdb.h>
