@@ -25,6 +25,14 @@ typedef unsigned int in_addr_t;
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 
+/* Missing from the mingw headers */
+#ifndef DNS_TYPE_SRV
+# define DNS_TYPE_SRV 33
+#endif
+#ifndef DNS_TYPE_TXT
+# define DNS_TYPE_TXT 16
+#endif
+
 #define T_A DNS_TYPE_A
 #define T_NS DNS_TYPE_NS
 #define T_NULL DNS_TYPE_NULL
