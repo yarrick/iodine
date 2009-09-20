@@ -198,8 +198,9 @@ client_set_selecttimeout(int select_timeout)
 }
 
 void
-client_set_lazymode(int lazy_mode) {
-	lazymode = lazymode;
+client_set_lazymode(int lazy_mode)
+{
+	lazymode = lazy_mode;
 }
 
 const char *
