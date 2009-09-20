@@ -94,6 +94,41 @@ should always work. For more bandwidth, try Base64 or Raw (TXT only) via the
 -O option. If Base64/Raw doesn't work, you'll see many failures in the
 fragment size autoprobe.
 
+Normal operation now is for the server to _not_ answer a DNS request until
+the next DNS request has come in, a.k.a. being "lazy". This way, the server
+will always have a DNS request handy when new downstream data has to be sent.
+This greatly improves (interactive) performance and latency, and allows to
+slow down the quiescent ping requests to 4 second intervals by default.
+In fact, the main purpose of the pings now is to force a reply to the previous
+ping, and prevent DNS server timeouts (usually 5-10 seconds per RFC1035).
+In the unlikely case that you do experience DNS server timeouts (SERVFAIL),
+decrease the -I option to 1. If you are running on a local network without
+any DNS server in-between, try -I 50 (iodine and iodined time out after 60
+seconds). The only time you'll notice a slowdown, is when DNS reply packets
+go missing; the iodined server then has to wait for a new ping to re-send the
+data. You can speed this up by generating some upstream traffic (keypress,
+ping). If this happens often, check your network for bottlenecks and/or run
+with -I1 .
+
+Some DNS servers appear to be quite impatient and start retrying DNS requests
+(with _different_ DNS ids!) when an answer does not appear within a few
+milliseconds. Usually they scale back retries when iodined's lazy mode
+repeatedly takes several seconds to answer; and they scale up retries again
+when iodined answers fast during heavy data transfer. Some commercial DNS
+servers advertise this as "carrier-grade adaptive retransmission techniques".
+The effect will only be visible in the network traffic at the iodined server,
+and will not affect the client's connection. Iodined has rather elaborate
+logic to deal with (i.e., ignore) these unwanted duplicates.
+
+Other DNS servers, notably the opendns.com network, seem to regard iodined's
+lazyness as incompetency, and will start shuffling requests around, possibly
+in an attempt to reduce iodined's workload. The resulting out-of-sequence DNS
+traffic works quite badly for lazy mode. The iodine client will detect this,
+and switch back to legacy mode ("immediate ping-pong") automatically. In these
+cases, start the iodine client with -L0 to prevent it from operating in lazy
+mode altogether. Note that this will negatively affect interactive performance
+and latency, especially in the downstream direction.
+
 If you have problems, try inspecting the traffic with network monitoring tools
 and make sure that the relaying DNS server has not cached the response. A
 cached error message could mean that you started the client before the server.
@@ -109,11 +144,102 @@ iptables -t nat -A PREROUTING -i eth0 -p udp --dport 53 -j DNAT --to :5353
 (Sent in by Tom Schouten)
 
 Iodined will reject data from clients that have not been active (data/pings)
-for more than 60 seconds. In case of a long network outage or similar, just
-stop iodine and restart (re-login), possibly multiple times until you get
+for more than 60 seconds. Similarly, iodine will exit when no downstream
+data has been received for 60 seconds. In case of a long network outage or
+similar, just restart iodine (re-login), possibly multiple times until you get
 your old IP address back. Once that's done, just wait a while, and you'll
 eventually see the tunneled TCP traffic continue to flow from where it left
 off before the outage.
+
+With the introduction of the downstream packet queue in the server, its memory
+usage has increased with several megabytes in the default configuration.
+For use in low-memory environments (e.g. running on your DSL router), you can
+decrease USERS and undefine OUTPACKETQ_LEN in user.h without any ill conse-
+quence, assuming at most one client will be connected at any time. A small
+DNSCACHE_LEN is still advised, preferably 2 or higher, however you can also
+undefine it to save a few more kilobytes.
+
+
+PERFORMANCE:
+
+This section tabulates some performance measurements. To view properly, use
+a fixed-width font like Courier.
+
+Measurements were done in protocol 00000500 with lazy mode unless indicated
+otherwise. Upstream encoding always Base64.
+Upstream/downstream throughput was measured by scp'ing a file previously
+read from /dev/urandom (i.e. incompressible), and measuring size with
+"ls -l ; sleep 30 ; ls -l" on a separate non-tunneled connection. Given the
+large scp block size of 16 kB, this gives a resolution of 4.3 kbit/s, which
+explains why many values are exactly equal.
+Ping round-trip times measured with "ping -c100", presented are average rtt
+and mean deviation (indicating spread around the average), in milliseconds.
+
+
+Situation 1:
+Laptop  ->   Wifi AP   ->  Home server  ->  DSL provider  ->  Datacenter
+ iodine    DNS "relay"        bind9           DNS cache        iodined
+
+                        downstr.  upstream downstr.  ping-up       ping-down
+                        fragsize   kbit/s   kbit/s  avg +/-mdev   avg +/-mdev
+------------------------------------------------------------------------------
+
+iodine -> Wifi AP :53
+  -Tnull (= -Oraw)           982    39.3    148.5   26.7    3.1   26.6    3.0
+
+iodine -> Home server :53
+  -Tnull (= -Oraw)          1174    43.6    174.7   25.2    4.0   25.5    3.4
+
+iodine -> DSL provider :53  
+  -Tnull (= -Oraw)          1174    52.4    200.9   20.3    3.2   20.3    2.7
+  -Ttxt -Obase32             730    52.4    192.2*
+  -Ttxt -Obase64             874    52.4    192.2
+  -Ttxt -Oraw               1162    52.4    192.2
+  -Tcname -Obase32           148    52.4     48.0
+  -Tcname -Obase64           181    52.4     61.1
+
+iodine -> DSL provider :53  
+  wired (no Wifi) -Tnull    1174    65.5    244.6   17.7    1.9   17.8    1.6
+
+ [192.2* : nice, because still 2frag/packet]
+
+
+Situation 2:
+Laptop -> (wire) -> (Home server) -> (DSL) ->  opendns.com ->  Datacenter
+ iodine                                         DNS cache       iodined
+
+                        downstr.  upstream downstr.  ping-up       ping-down
+                        fragsize   kbit/s   kbit/s  avg +/-mdev   avg +/-mdev
+------------------------------------------------------------------------------
+
+iodine -> opendns.com :53
+  -Tnull -L1 (lazy mode)     230      -        -   404.4  196.2  663.8  679.6
+                                                    (20% lost)     (2% lost)
+
+  -Tnull -L0 (legacy mode)   230     5.6      7.4  197.3    4.7  610.8  323.5
+
+ [Note: Throughput measured over 300 seconds to get better resolution]
+
+
+Situation 3:
+Laptop  ->  Wifi+vpn / wired  ->  Home server
+ iodine                            iodined
+
+                        downstr.  upstream downstr.  ping-up       ping-down
+                        fragsize   kbit/s   kbit/s  avg +/-mdev   avg +/-mdev
+------------------------------------------------------------------------------
+
+wifi + openvpn  -Tnull      1186   183.5    611.6    5.7    1.4    7.0    2.7
+
+wired  -Tnull               1186   685.9   2350.5    1.3    0.1    1.4    0.4
+
+
+Performance is strongly coupled to low ping times, as iodine requires
+confirmation for every data fragment before moving on to the next. Allowing
+multiple fragments in-flight like TCP could possibly increase performance,
+but it would likely cause serious overload for the intermediary DNS servers.
+The current protocol scales performance with DNS responsivity, since the
+DNS servers are on average handling at most one DNS request per client.
 
 
 PORTABILITY:
