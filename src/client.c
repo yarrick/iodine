@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -75,12 +76,20 @@ static char userid;
 /* DNS id for next packet */
 static uint16_t chunkid;
 
-/* Base32 encoder used for non-data packets */
+/* Base32 encoder used for non-data packets and replies */
 static struct encoder *b32;
+/* Base64 encoder for replies */
+static struct encoder *b64;
 
 /* The encoder used for data packets
  * Defaults to Base32, can be changed after handshake */
 static struct encoder *dataenc;
+  
+/* The encoder to use for downstream data */
+static char downenc = ' ';
+ 
+/* set query type to send */
+static unsigned short do_qtype = T_NULL;
 
 /* My connection mode */
 static enum connection conn;
@@ -95,10 +104,11 @@ client_init()
 	downstream_fragment = 0;
 	down_ack_seqno = 0;
 	down_ack_fragment = 0;
-	chunkid = 0;
+	chunkid = ((unsigned int) rand()) & 0xFFFF;
 	b32 = get_base32_encoder();
+	b64 = get_base64_encoder();
 	dataenc = get_base32_encoder();
-	rand_seed = rand();
+	rand_seed = ((unsigned int) rand()) & 0xFFFF;
 	conn = CONN_DNS_NULL;
 }
 
@@ -140,6 +150,32 @@ client_set_password(const char *cp)
 	password = cp;
 }
 
+void
+set_qtype(char *qtype)
+{
+	if (!strcasecmp(qtype, "NULL"))
+      		do_qtype = T_NULL;
+	else if (!strcasecmp(qtype, "CNAME"))
+		do_qtype = T_CNAME;
+	else if (!strcasecmp(qtype, "A"))
+		do_qtype = T_A;
+	else if (!strcasecmp(qtype, "MX"))
+		do_qtype = T_MX;
+	else if (!strcasecmp(qtype, "TXT"))
+		do_qtype = T_TXT;
+}
+
+void
+set_downenc(char *encoding)
+{
+	if (!strcasecmp(encoding, "base32"))
+		downenc = 'T';
+	else if (!strcasecmp(encoding, "base64"))
+		downenc = 'S';
+	else if (!strcasecmp(encoding, "raw"))
+		downenc = 'R';
+}
+
 const char *
 client_get_raw_addr()
 {
@@ -153,10 +189,19 @@ send_query(int fd, char *hostname)
 	struct query q;
 	size_t len;
 
-	q.id = ++chunkid;
-	q.type = T_NULL;
+	chunkid += 7727;
+	if (chunkid == 0)
+		/* 0 is used as "no-query" in iodined.c */
+		chunkid = 7727;
+
+	q.id = chunkid;
+	q.type = do_qtype;
 
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
+	if (len < 1) {
+		warnx("dns_encode doesn't fit");
+		return;
+	}
 
 	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
 }
@@ -207,7 +252,7 @@ is_sending()
 static void
 send_chunk(int fd)
 {
-	char hex[] = "0123456789ABCDEF";
+	char hex[] = "0123456789abcdef";
 	char buf[4096];
 	int avail;
 	int code;
@@ -261,7 +306,7 @@ send_ping(int fd)
 		
 		rand_seed++;
 
-		send_packet(fd, 'P', data, sizeof(data));
+		send_packet(fd, 'p', data, sizeof(data));
 	} else {
 		send_raw(fd, NULL, 0, userid, RAW_HDR_CMD_PING);
 	}
@@ -288,6 +333,88 @@ read_dns(int dns_fd, int tun_fd, char *buf, int buflen) /* FIXME: tun_fd needed 
 
 		rv = dns_decode(buf, buflen, &q, QR_ANSWER, data, r);
 
+		if ((q.type == T_CNAME || q.type == T_MX || q.type == T_TXT)
+		    && rv >= 1)
+		/* CNAME an also be returned from an A (or MX) question */
+		{
+			size_t space;
+
+			/*
+			 * buf is a hostname or txt stream that we still need to
+			 * decode to binary
+			 * 
+			 * also update rv with the number of valid bytes
+			 * 
+			 * data is unused here, and will certainly hold the smaller binary
+			 */
+
+			switch (buf[0]) {
+			case 'h': /* Hostname with base32 */
+			case 'H':
+				if (rv < 5) {
+					/* 1 byte H, 3 bytes ".xy", >=1 byte data */
+					rv = 0;
+					break;
+				}
+
+				rv -= 3;	/* rv=strlen, strip ".xy" */
+				rv = unpack_data (data, sizeof(data), buf + 1, rv - 1, b32);
+				/* this also does undotify */
+
+				rv = MIN(rv, buflen);
+				memcpy(buf, data, rv);
+				break;
+			case 'i': /* Hostname++ with base64 */
+			case 'I':
+				if (rv < 5) {
+					/* 1 byte H, 3 bytes ".xy", >=1 byte data */
+					rv = 0;
+					break;
+				}
+
+				rv -= 3;	/* rv=strlen, strip ".xy" */
+				rv = unpack_data (data, sizeof(data), buf + 1, rv - 1, b64);
+				/* this also does undotify */
+
+				rv = MIN(rv, buflen);
+				memcpy(buf, data, rv);
+				break;
+			case 't': /* plain base32(Thirty-two) from TXT */
+			case 'T':
+				if (rv < 2) {
+					rv = 0;
+					break;
+				}
+
+				space = sizeof(data);
+				rv = b32->decode (data, &space, buf + 1, rv - 1);
+				rv = MIN(rv, buflen);
+				memcpy(buf, data, rv);
+				break;
+			case 's': /* plain base64(Sixty-four) from TXT */
+			case 'S':
+				if (rv < 2) {
+					rv = 0;
+					break;
+				}
+
+				space = sizeof(data);
+				rv = b64->decode (data, &space, buf + 1, rv - 1);
+				rv = MIN(rv, buflen);
+				memcpy(buf, data, rv);
+				break;
+			case 'r': /* Raw binary from TXT */
+			case 'R':
+				rv--;			/* rv>=1 already checked */
+				memmove(buf, buf+1, rv);
+				break;
+			default:
+				warnx("Received unsupported encoding");
+				rv = 0;
+				break;
+			}
+		}
+
 		/* decode the data header, update seqno and frag before next request */
 		if (rv >= 2) {
 			downstream_seqno = (buf[1] >> 5) & 7;
@@ -311,7 +438,7 @@ read_dns(int dns_fd, int tun_fd, char *buf, int buflen) /* FIXME: tun_fd needed 
 						downstream_seqno != down_ack_seqno ||
 						downstream_fragment != down_ack_fragment
 						)) {
-						
+
 						send_ping(dns_fd);
 					}
 				} else {
@@ -487,7 +614,7 @@ send_login(int fd, char *login, int len)
 	
 	rand_seed++;
 
-	send_packet(fd, 'L', data, sizeof(data));
+	send_packet(fd, 'l', data, sizeof(data));
 }
 
 static void
@@ -496,9 +623,12 @@ send_fragsize_probe(int fd, int fragsize)
 	char probedata[256];
 	char buf[4096];
 
-	/* build a large query domain which is random and maximum size */
-	memset(probedata, MIN(1, rand_seed & 0xff), sizeof(probedata));
-	probedata[1] = MIN(1, (rand_seed >> 8) & 0xff);
+	/*
+	 * build a large query domain which is random and maximum size,
+	 * will also take up maximal space in the return packet
+	 */
+	memset(probedata, MAX(1, rand_seed & 0xff), sizeof(probedata));
+	probedata[1] = MAX(1, (rand_seed >> 8) & 0xff);
 	rand_seed++;
 	build_hostname(buf + 4, sizeof(buf) - 4, probedata, sizeof(probedata), topdomain, dataenc);
 
@@ -525,14 +655,14 @@ send_set_downstream_fragsize(int fd, int fragsize)
 	
 	rand_seed++;
 
-	send_packet(fd, 'N', data, sizeof(data));
+	send_packet(fd, 'n', data, sizeof(data));
 }
 
 static void 
 send_version(int fd, uint32_t version)
 {
 	char data[6];
-
+ 
 	data[0] = (version >> 24) & 0xff;
 	data[1] = (version >> 16) & 0xff;
 	data[2] = (version >> 8) & 0xff;
@@ -585,10 +715,27 @@ send_case_check(int fd)
 static void
 send_codec_switch(int fd, int userid, int bits)
 {
-	char buf[512] = "S_____.";
+	char buf[512] = "s_____.";
 	buf[1] = b32_5to8(userid);
 	buf[2] = b32_5to8(bits);
 	
+	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
+	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
+	buf[5] = b32_5to8((rand_seed ) & 0x1f);
+	rand_seed++;
+
+	strncat(buf, topdomain, 512 - strlen(buf));
+	send_query(fd, buf);
+}
+
+
+static void
+send_downenc_switch(int fd, int userid)
+{
+	char buf[512] = "o_____.";
+	buf[1] = b32_5to8(userid);
+	buf[2] = tolower(downenc);
+
 	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
 	buf[5] = b32_5to8((rand_seed ) & 0x1f);
@@ -657,7 +804,7 @@ handshake_version(int dns_fd, int *seed)
 		
 		fprintf(stderr, "Retrying version check...\n");
 	}
-	warnx("couldn't connect to server");
+	warnx("couldn't connect to server (maybe other -T options will work)");
 	return 1;
 }
 
@@ -891,7 +1038,7 @@ handshake_switch_codec(int dns_fd)
 	int read;
 
 	dataenc = get_base64_encoder();
-	fprintf(stderr, "Switching to %s codec\n", dataenc->name);
+	fprintf(stderr, "Switching upstream to %s codec\n", dataenc->name);
 	/* Send to server that this user will use base64 from now on */
 	for (i=0; running && i<5 ;i++) {
 		int bits;
@@ -922,7 +1069,7 @@ handshake_switch_codec(int dns_fd)
 					goto codec_revert;
 				}
 				in[read] = 0; /* zero terminate */
-				fprintf(stderr, "Server switched to codec %s\n", in);
+				fprintf(stderr, "Server switched upstream to codec %s\n", in);
 				return;
 			}
 		}
@@ -935,6 +1082,138 @@ codec_revert:
 	dataenc = get_base32_encoder();
 }
 
+static void
+handshake_switch_downenc(int dns_fd)
+{
+	struct timeval tv;
+	char in[4096];
+	fd_set fds;
+	int i;
+	int r;
+	int read;
+	char *dname;
+
+	dname = "Base32";
+	if (downenc == 'S')
+		dname = "Base64";
+	else if (downenc == 'R')
+		dname = "Raw";
+
+	fprintf(stderr, "Switching downstream to codec %s\n", dname);
+	for (i=0; running && i<5 ;i++) {
+		tv.tv_sec = i + 1;
+		tv.tv_usec = 0;
+
+		send_downenc_switch(dns_fd, userid);
+
+		FD_ZERO(&fds);
+		FD_SET(dns_fd, &fds);
+
+		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+
+		if(r > 0) {
+			read = read_dns(dns_fd, 0, in, sizeof(in));
+
+			if (read > 0) {
+				if (strncmp("BADLEN", in, 6) == 0) {
+					fprintf(stderr, "Server got bad message length. ");
+					goto codec_revert;
+				} else if (strncmp("BADIP", in, 5) == 0) {
+					fprintf(stderr, "Server rejected sender IP address. ");
+					goto codec_revert;
+				} else if (strncmp("BADCODEC", in, 8) == 0) {
+					fprintf(stderr, "Server rejected the selected codec. ");
+					goto codec_revert;
+				}
+				in[read] = 0; /* zero terminate */
+				fprintf(stderr, "Server switched downstream to codec %s\n", in);
+				return;
+			}
+		}
+		fprintf(stderr, "Retrying codec switch...\n");
+	}
+	fprintf(stderr, "No reply from server on codec switch. ");
+
+codec_revert: 
+	fprintf(stderr, "Falling back to base32\n");
+}
+
+
+static int
+fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
+/* Returns: 0: keep checking, 1: break loop (either okay or definitely wrong) */
+{
+	int acked_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
+	static int nocheck_warned = 0;
+
+	if (read >= 5 && strncmp("BADIP", in, 5) == 0) {
+		fprintf(stderr, "got BADIP (Try iodined -c)..\n");
+		fflush(stderr);
+		return 0;		/* maybe temporary error */
+	}
+
+	if (acked_fragsize != proposed_fragsize) {
+		/*
+		 * got ack for wrong fragsize, maybe late response for
+		 * earlier query, or ack corrupted
+		 */
+		return 0;
+	}
+
+	if (read != proposed_fragsize) {
+		/*
+		 * correctly acked fragsize but read too little (or too
+		 * much): this fragsize is definitely not reliable
+		 */
+		return 1;
+	}
+
+	/* here: read == proposed_fragsize == acked_fragsize */
+
+	/* test: */
+	/* in[123] = 123; */
+
+	/* Check for corruption */
+	if ((in[2] & 0xff) == 107) {
+		int okay = 1;
+		int i;
+		unsigned int v = in[3] & 0xff;
+
+		for (i = 3; i < read; i++, v += 107)
+			if ((in[i] & 0xff) != (v & 0xff)) {
+				okay = 0;
+				break;
+			}
+
+		if (okay) {
+			fprintf(stderr, "%d ok.. ", acked_fragsize);
+			fflush(stderr);
+			*max_fragsize = acked_fragsize;
+			return 1;
+		} else {
+			if (downenc != ' ' && downenc != 'T')
+				fprintf(stderr, "%d corrupted at %d.. (Try -O Base32)\n", acked_fragsize, i);
+			else
+				fprintf(stderr, "%d corrupted at %d.. ", acked_fragsize, i);
+				fflush(stderr);
+			return 1;
+		}
+	}		/* always returns */
+
+	/* here when uncheckable, so assume correct */
+
+	if (read >= 3 && nocheck_warned == 0) {
+		fprintf(stderr, "(Old server version, cannot check for corruption)\n");
+		fflush(stderr);
+		nocheck_warned = 1;
+	}
+	fprintf(stderr, "%d ok.. ", acked_fragsize);
+	fflush(stderr);
+	*max_fragsize = acked_fragsize;
+	return 1;
+}
+
+
 static int
 handshake_autoprobe_fragsize(int dns_fd)
 {
@@ -946,11 +1225,12 @@ handshake_autoprobe_fragsize(int dns_fd)
 	int read;
 	int proposed_fragsize = 768;
 	int range = 768;
-	int max_fragsize = 0;
+	int max_fragsize;
 
 	max_fragsize = 0;
 	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
-	while (running && range > 0 && (range >= 8 || !max_fragsize)) {
+	while (running && range > 0 && (range >= 8 || max_fragsize < 300)) {
+		/* stop the slow probing early when we have enough bytes anyway */
 		for (i=0; running && i<3 ;i++) {
 			tv.tv_sec = 1;
 			tv.tv_usec = 0;
@@ -961,24 +1241,13 @@ handshake_autoprobe_fragsize(int dns_fd)
 
 			r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
-			if(r > 0) {
+			if(r >= 2) {
 				read = read_dns(dns_fd, 0, in, sizeof(in));
 				
 				if (read > 0) {
 					/* We got a reply */
-					int acked_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
-					if (acked_fragsize == proposed_fragsize) {
-						if (read == proposed_fragsize) {
-							fprintf(stderr, "%d ok.. ", acked_fragsize);
-							fflush(stderr);
-							max_fragsize = acked_fragsize;
-						}
-					}
-					if (strncmp("BADIP", in, 5) == 0) {
-						fprintf(stderr, "got BADIP.. ");
-						fflush(stderr);
-					}
-					break;
+					if (fragsize_check(in, read, proposed_fragsize, &max_fragsize) == 1)
+						break;
 				}
 			}
 			fprintf(stderr, ".");
@@ -997,17 +1266,22 @@ handshake_autoprobe_fragsize(int dns_fd)
 	}
 	if (!running) {
 		fprintf(stderr, "\n");
-		warnx("stopped while autodetecting fragment size (Try probing manually with -m)");
+		warnx("stopped while autodetecting fragment size (Try setting manually with -m)");
 		return 0;
 	}
-	if (range == 0) {
+	if (max_fragsize <= 2) {
 		/* Tried all the way down to 2 and found no good size */
 		fprintf(stderr, "\n");
-		warnx("found no accepted fragment size. (Try probing manually with -m)");
+		warnx("found no accepted fragment size. (Try forcing with -m, or try other -T or -O options)");
 		return 0;
 	}
-	fprintf(stderr, "will use %d\n", max_fragsize);
-	return max_fragsize;
+	/* data header adds 2 bytes */
+	fprintf(stderr, "will use %d-2=%d\n", max_fragsize, max_fragsize - 2);
+
+	if (do_qtype != T_NULL && downenc == ' ')
+		fprintf(stderr, "(Maybe other -O options will increase throughput)\n");
+
+	return max_fragsize - 2;
 }
 
 static void
@@ -1082,6 +1356,10 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 
 		if (case_preserved) {
 			handshake_switch_codec(dns_fd);
+		}
+
+		if (downenc != ' ') {
+			handshake_switch_downenc(dns_fd);
 		}
 
 		if (autodetect_frag_size) {
