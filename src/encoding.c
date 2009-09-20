@@ -41,8 +41,12 @@ build_hostname(char *buf, size_t buflen,
 	b = buf;
 	b += strlen(buf);
 
+	/* move b back one step to see if the dot is there */
+	b--;
 	if (*b != '.') 
-		*b++ = '.';
+		*++b = '.';
+	b++;
+	/* move b ahead of the string so we can copy to it */
 
 	strncpy(b, topdomain, strlen(topdomain)+1);
 
