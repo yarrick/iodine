@@ -28,6 +28,8 @@ void client_set_topdomain(const char *cp);
 void client_set_password(const char *cp);
 void set_qtype(char *qtype);
 void set_downenc(char *encoding);
+void client_set_selecttimeout(int select_timeout);
+void client_set_lazymode(int lazy_mode);
 
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize);
 int client_tunnel(int tun_fd, int dns_fd);
