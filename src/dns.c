@@ -90,47 +90,41 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		putshort(&p, C_IN);
 		putlong(&p, 0);		/* TTL */
 
-	      if (q->type == T_CNAME || q->type == T_A || q->type == T_MX)
-	      {
-		/* data is expected to be like "Hblabla.host.name.com\0" */
+		if (q->type == T_CNAME || q->type == T_A || q->type == T_MX) {
+			/* data is expected to be like "Hblabla.host.name.com\0" */
 
-		char *startp = p;
-		int namelen;
+			char *startp = p;
+			int namelen;
 
-		p += 2;			/* skip 2 bytes length */
-		CHECKLEN(2);
-		if (q->type == T_MX)
-			putshort(&p, 10);	/* preference */
-		putname(&p, buflen - (p - buf), data);
-		CHECKLEN(0);
-		namelen = p - startp;
-		namelen -= 2;
-		putshort(&startp, namelen);
-	      }
-	      else if (q->type == T_TXT)
-	      {
-		/* TXT has binary or base-X data */
-		char *startp = p;
-		int txtlen;
+			p += 2;			/* skip 2 bytes length */
+			CHECKLEN(2);
+			if (q->type == T_MX)
+				putshort(&p, 10);	/* preference */
+			putname(&p, buflen - (p - buf), data);
+			CHECKLEN(0);
+			namelen = p - startp;
+			namelen -= 2;
+			putshort(&startp, namelen);
+		} else if (q->type == T_TXT) {
+			/* TXT has binary or base-X data */
+			char *startp = p;
+			int txtlen;
 
-		p += 2;			/* skip 2 bytes length */
-		puttxtbin(&p, buflen - (p - buf), data, datalen);
-		CHECKLEN(0);
-		txtlen = p - startp;
-		txtlen -= 2;
-		putshort(&startp, txtlen);
-	      }
-	      else
-	      {
-		/* NULL has raw binary data */
-		datalen = MIN(datalen, buflen - (p - buf));
-		CHECKLEN(2);
-		putshort(&p, datalen);
-		CHECKLEN(datalen);
-		putdata(&p, data, datalen);
-		CHECKLEN(0);
-	      }
-
+			p += 2;			/* skip 2 bytes length */
+			puttxtbin(&p, buflen - (p - buf), data, datalen);
+			CHECKLEN(0);
+			txtlen = p - startp;
+			txtlen -= 2;
+			putshort(&startp, txtlen);
+		} else {
+			/* NULL has raw binary data */
+			datalen = MIN(datalen, buflen - (p - buf));
+			CHECKLEN(2);
+			putshort(&p, datalen);
+			CHECKLEN(datalen);
+			putdata(&p, data, datalen);
+			CHECKLEN(0);
+		}
 		break;
 	case QR_QUERY:
 		/* Note that iodined also uses this for forward queries */
@@ -138,7 +132,8 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		header->qdcount = htons(1);
 		header->arcount = htons(1);
 	
-		putname(&p, buflen - (p - buf), data);
+		datalen = MIN(datalen, buflen - (p - buf));
+		putname(&p, datalen, data);
 
 		CHECKLEN(4);
 		putshort(&p, q->type);
