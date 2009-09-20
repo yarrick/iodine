@@ -88,6 +88,7 @@ struct query {
 	char name[QUERY_NAME_SIZE];
 	unsigned short type;
 	unsigned short id;
+	unsigned short iddupe;		/* only used for dupe checking */
 	struct in_addr destination;
 	struct sockaddr from;
 	int fromlen;
@@ -120,5 +121,7 @@ void warn(const char *fmt, ...);
 void errx(int eval, const char *fmt, ...);
 void warnx(const char *fmt, ...);
 #endif
+
+int recent_seqno(int , int);
 
 #endif
