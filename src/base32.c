@@ -26,6 +26,8 @@
 
 static const char cb32[] = 
 	"abcdefghijklmnopqrstuvwxyz012345";
+static const char cb32_ucase[] = 
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
 static unsigned char rev32[128];
 
 static int base32_decode(void *, size_t *, const char *, size_t);
@@ -79,6 +81,8 @@ base32_reverse_init()
 	if (!reverse_init) {
 		for (i = 0; i < 32; i++) {
 			c = cb32[i];
+			rev32[(int) c] = i;
+			c = cb32_ucase[i];
 			rev32[(int) c] = i;
 		}
 		reverse_init = 1;
