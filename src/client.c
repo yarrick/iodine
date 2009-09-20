@@ -1191,11 +1191,12 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 			*max_fragsize = acked_fragsize;
 			return 1;
 		} else {
-			if (downenc != ' ' && downenc != 'T')
+			if (downenc != ' ' && downenc != 'T') {
 				fprintf(stderr, "%d corrupted at %d.. (Try -O Base32)\n", acked_fragsize, i);
-			else
+			} else {
 				fprintf(stderr, "%d corrupted at %d.. ", acked_fragsize, i);
 				fflush(stderr);
+			}
 			return 1;
 		}
 	}		/* always returns */
@@ -1241,7 +1242,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 
 			r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
 
-			if(r >= 2) {
+			if(r > 0) {
 				read = read_dns(dns_fd, 0, in, sizeof(in));
 				
 				if (read > 0) {
