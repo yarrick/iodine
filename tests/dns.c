@@ -69,8 +69,9 @@ START_TEST(test_encode_query)
 	char *d;
 	size_t len;
 	int ret;
+	int enclen;
 
-	len = sizeof(buf);
+	enclen = sizeof(resolv);
 	memset(&buf, 0, sizeof(buf));
 	memset(&resolv, 0, sizeof(resolv));
 	memset(&q, 0, sizeof(struct query));
@@ -80,12 +81,13 @@ START_TEST(test_encode_query)
 	enc = get_base32_encoder();
 
 	*d++ = 'A';
-	enc->encode(d, &len, innerData, strlen(innerData));
+	enc->encode(d, &enclen, innerData, strlen(innerData));
 	d = resolv + strlen(resolv);
 	if (*d != '.') {
 		*d++ = '.';
 	}
 	strcpy(d, topdomain);
+	len = sizeof(buf);
 	ret = dns_encode(buf, len, &q, QR_QUERY, resolv, strlen(resolv));
 	len = sizeof(query_packet) - 1; /* Skip extra null character */
 
