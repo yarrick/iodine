@@ -28,9 +28,13 @@ typedef unsigned int in_addr_t;
 #define T_A DNS_TYPE_A
 #define T_NS DNS_TYPE_NS
 #define T_NULL DNS_TYPE_NULL
+#define T_CNAME DNS_TYPE_CNAME
+#define T_MX DNS_TYPE_MX
+#define T_TXT DNS_TYPE_TXT
 
 #define C_IN 1
 
+#define FORMERR 1
 #define SERVFAIL 2
 #define NXDOMAIN 3
 #define NOTIMP 4
