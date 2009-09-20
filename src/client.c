@@ -120,7 +120,7 @@ client_get_conn()
 }
 
 void
-client_set_nameserver(const char *cp) 
+client_set_nameserver(const char *cp, int port) 
 {
 	struct in_addr addr;
 
@@ -129,7 +129,7 @@ client_set_nameserver(const char *cp)
 
 	memset(&nameserv, 0, sizeof(nameserv));
 	nameserv.sin_family = AF_INET;
-	nameserv.sin_port = htons(53);
+	nameserv.sin_port = htons(port);
 	nameserv.sin_addr = addr;
 }
 
@@ -191,36 +191,6 @@ send_raw_data(int dns_fd)
 	send_raw(dns_fd, outpkt.data, outpkt.len, userid, RAW_HDR_CMD_DATA);
 }
 
-static int
-build_hostname(char *buf, size_t buflen, 
-		const char *data, const size_t datalen, 
-		const char *topdomain, struct encoder *encoder)
-{
-	int encsize;
-	size_t space;
-	char *b;
-
-	space = MIN(0xFF, buflen) - strlen(topdomain) - 7;
-	if (!encoder->places_dots())
-		space -= (space / 57); /* space for dots */
-
-	memset(buf, 0, buflen);
-	
-	encsize = encoder->encode(buf, &space, data, datalen);
-
-	if (!encoder->places_dots())
-		inline_dotify(buf, buflen);
-
-	b = buf;
-	b += strlen(buf);
-
-	if (*b != '.') 
-		*b++ = '.';
-
-	strncpy(b, topdomain, strlen(topdomain)+1);
-
-	return space;
-}
 
 static void
 send_packet(int fd, char cmd, const char *data, const size_t datalen)
