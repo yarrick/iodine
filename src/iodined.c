@@ -1143,14 +1143,14 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 				space -= (space / 57);	/* space for dots */
 			b64->encode(cnamebuf+1, &space, data, datalen);
 			if (!b64->places_dots())
-				inline_dotify(cnamebuf, sizeof(cnamebuf), 57);
+				inline_dotify(cnamebuf, sizeof(cnamebuf));
 		} else {
 			cnamebuf[0] = 'H';
 			if (!b32->places_dots())
 				space -= (space / 57);	/* space for dots */
 			b32->encode(cnamebuf+1, &space, data, datalen);
 			if (!b32->places_dots())
-				inline_dotify(cnamebuf, sizeof(cnamebuf), 57);
+				inline_dotify(cnamebuf, sizeof(cnamebuf));
 		}
 
 		/* Add dot (if it wasn't there already) and topdomain */
