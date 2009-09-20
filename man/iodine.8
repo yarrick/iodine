@@ -27,6 +27,10 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I dnstype
 .B ] [-O
 .I downenc
+.B ] [-L
+.I 0|1
+.B ] [-I
+.I interval
 .B ]
 .B [
 .I nameserver
@@ -70,7 +74,12 @@ iodine, iodined \- tunnel IPv4 over DNS
 lets you tunnel IPv4 data through a DNS 
 server. This can be useful in situations where Internet access is firewalled,
 but DNS queries are allowed. It needs a TUN/TAP device to operate. The 
-bandwidth is asymmetrical with limited upstream and up to 1 Mbit/s downstream.
+bandwidth is asymmetrical,
+with a measured maximum of 680 kbit/s upstream and 2.3 Mbit/s
+downstream in a wired LAN test network.
+Realistic sustained throughput on a Wifi network using a carrier-grade
+DNS cache has been measured at some 50 kbit/s upstream and over 200 kbit/s
+downstream.
 .B iodine
 is the client application,
 .B iodined
@@ -143,6 +152,26 @@ For TXT queries,
 .I Raw
 will provide maximum performance. This will only work if the nameserver
 path is fully 8-bit-clean for responses that are assumed to be "legible text".
+.TP
+.B -L 0|1
+Lazy-mode switch.
+\-L1 (default): Use lazy mode if server supports it, for improved
+performance and decreased latency.
+Some DNS servers, notably the opendns.com network, appear unstable when
+handling lazy mode DNS traffic and will re-order requests. If this occurs,
+you will notice fluctuating response speed in interactive sessions.
+The iodine client will eventually detect this and switch back to legacy
+mode automatically. Use \-L0 to force running in legacy mode
+(implies \-I1).
+.TP
+.B -I interval
+Maximum interval between requests (pings) so that intermediate DNS
+servers will not time out. Default is 4 in lazy mode, which will work
+fine in almost all cases. Decrease if you get SERVFAIL errors in periods
+without tunneled data traffic. To get absolute minimum DNS traffic,
+increase well above 4 until SERVFAIL errors start to occur.
+Maximum useful value is 59, since iodined will close a client's
+connection after 60 seconds of inactivity.
 .SS Server Options:
 .TP
 .B -c
