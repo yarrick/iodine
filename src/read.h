@@ -21,11 +21,13 @@ int readname(char *, int, char **, char *, size_t);
 int readshort(char *, char **, short *);
 int readlong(char *, char **, uint32_t *);
 int readdata(char *, char **, char *, size_t);
+int readtxtbin(char *, char **, size_t, char *, size_t);
 
 int putname(char **, size_t, const char *);
 int putbyte(char **, unsigned char);
 int putshort(char **, unsigned short);
 int putlong(char **, uint32_t);
 int putdata(char **, char *, size_t);
+int puttxtbin(char **, size_t, char *, size_t);
 
 #endif
