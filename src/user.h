@@ -31,6 +31,7 @@ struct user {
 	struct packet inpacket;
 	struct packet outpacket;
 	struct encoder *encoder;
+	char downenc;
 	int out_acked_seqno;
 	int out_acked_fragment;
 	int fragsize;
