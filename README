@@ -70,14 +70,8 @@ add a route to the nameserver you use with the default gateway as gateway. Then
 replace the default gateway with the servers IP address within the DNS tunnel,
 and configure the server to do NAT.
 
-MTU issues:
-These issues should be solved now, with automatic fragmentation of downstream 
-packets. There should be no need to set the MTU explicitly on the server.
-
-If you have problems, try inspecting the traffic with network monitoring tools
-and make sure that the relaying DNS server has not cached the response. A
-cached error message could mean that you started the client before the server.
-The -D option on the server can also show received and sent queries.
+The DNS-response fragment size is normally autoprobed to get maximum bandwidth.
+To force a specific value (and speed things up), use the -m option.
 
 The iodined server replies to NS requests sent for subdomains of the tunnel
 domain. If your domain is tunnel.com, send a NS request for foo.tunnel.com
@@ -90,6 +84,21 @@ and one query can be max 256 chars. Each domain name part can be max 63 chars.
 So your domain name and subdomain should be as short as possible to allow
 maximum upstream throughput.
 
+The default is to use DNS NULL-type queries, as this provides the largest
+downstream bandwidth. If your DNS server blocks NULL requests, try TXT or
+CNAME queries via the -T option. Also supported are A (returning CNAME) and
+MX requests, but these may/will cause additional lookups by "smart" caching
+nameservers to get an actual IP address, which may either slow down or fail
+completely. DNS responses for non-NULL are Base32 encoded by default, which
+should always work. For more bandwidth, try Base64 or Raw (TXT only) via the
+-O option. If Base64/Raw doesn't work, you'll see many failures in the
+fragment size autoprobe.
+
+If you have problems, try inspecting the traffic with network monitoring tools
+and make sure that the relaying DNS server has not cached the response. A
+cached error message could mean that you started the client before the server.
+The -D (and -DD) option on the server can also show received and sent queries.
+
 
 TIPS & TRICKS:
 
@@ -98,6 +107,13 @@ not use it, use -p on iodined to specify an alternate port (like -p 5353) and
 use for instance iptables (on Linux) to forward the traffic:
 iptables -t nat -A PREROUTING -i eth0 -p udp --dport 53 -j DNAT --to :5353
 (Sent in by Tom Schouten)
+
+Iodined will reject data from clients that have not been active (data/pings)
+for more than 60 seconds. In case of a long network outage or similar, just
+stop iodine and restart (re-login), possibly multiple times until you get
+your old IP address back. Once that's done, just wait a while, and you'll
+eventually see the tunneled TCP traffic continue to flow from where it left
+off before the outage.
 
 
 PORTABILITY:
