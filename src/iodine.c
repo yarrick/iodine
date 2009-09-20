@@ -61,8 +61,8 @@ usage() {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-T type] [-O enc] [-z context] [-F pidfile] "
-			"[nameserver] topdomain\n", __progname);
+			"[-P password] [-m maxfragsize] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 	exit(2);
 }
 
@@ -72,8 +72,8 @@ help() {
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-T type] [-O enc] [-z context] [-F pidfile] "
-			"[nameserver] topdomain\n", __progname);
+			"[-P password] [-m maxfragsize] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -f to keep running in foreground\n");
@@ -85,6 +85,8 @@ help() {
 	fprintf(stderr, "  -m maxfragsize, to limit size of downstream packets\n");
 	fprintf(stderr, "  -T dns type: NULL (default, fastest), TXT, CNAME, A (CNAME answer), MX\n");
 	fprintf(stderr, "  -O downstream encoding (!NULL): Base32(default), Base64, or Raw (only TXT)\n");
+	fprintf(stderr, "  -L 1: try lazy mode for low-latency (default). 0: don't (implies -I1)\n");
+	fprintf(stderr, "  -I max interval between requests (default 4 sec) to prevent server timeouts\n");
 	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
 	fprintf(stderr, "  -F pidfile to write pid to a file\n");
 	fprintf(stderr, "nameserver is the IP number of the relaying nameserver, if absent /etc/resolv.conf is used\n");
@@ -127,6 +129,8 @@ main(int argc, char **argv)
 	int autodetect_frag_size;
 	int retval;
 	int raw_mode;
+	int lazymode;
+	int selecttimeout;
 
 	nameserv_addr = NULL;
 	topdomain = NULL;
@@ -146,6 +150,8 @@ main(int argc, char **argv)
 	max_downstream_frag_size = 3072;
 	retval = 0;
 	raw_mode = 1;
+	lazymode = 1;
+	selecttimeout = 4;
 
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
@@ -162,7 +168,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:F:T:O:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -208,6 +214,20 @@ main(int argc, char **argv)
 			break;
 		case 'O':       /* not -D, is Debug in server */
 			set_downenc(optarg);
+			break;
+		case 'L':
+			lazymode = atoi(optarg);
+			if (lazymode > 1)
+				lazymode = 1;
+			if (lazymode < 0)
+				lazymode = 0;
+			if (!lazymode)
+				selecttimeout = 1;
+			break;
+		case 'I':
+			selecttimeout = atoi(optarg);
+			if (selecttimeout < 1)
+				selecttimeout = 1;
 			break;
 		default:
 			usage();
@@ -260,6 +280,8 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
+	client_set_selecttimeout(selecttimeout);
+	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	
 	if (username != NULL) {
