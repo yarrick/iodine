@@ -87,6 +87,7 @@ struct packet
 struct query {
 	char name[QUERY_NAME_SIZE];
 	unsigned short type;
+	unsigned short rcode;
 	unsigned short id;
 	unsigned short iddupe;		/* only used for dupe checking */
 	struct in_addr destination;

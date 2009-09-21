@@ -297,54 +297,13 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		
 	rlen = 0;
 
+	if (q != NULL) 
+		q->rcode = header->rcode;
+
 	switch (qr) {
 	case QR_ANSWER:
 		if(qdcount < 1 || ancount < 1) {
 			/* We may get both CNAME and A, then ancount=2 */
-			switch (header->rcode) {
-			case NOERROR:	/* 0 */
-				if (header->tc)
-					warnx("Got TRUNCATION as reply: response too long for DNS path");
-				else
-					warnx("Got reply without error, but also without question and/or answer");
-				break;
-
-			case FORMERR:	/* 1 */
-				warnx("Got FORMERR as reply: server does not understand our request");
-				break;
-
-			case SERVFAIL:	/* 2 */
-				if (qdcount >= 1
-				    && packetlen >= sizeof(HEADER) + 2
-				    && (data[1] == 'r' || data[1] == 'R'))
-					warnx("Got SERVFAIL as reply on earlier fragsize autoprobe");
-				else if (qdcount >= 1
-				    && packetlen >= sizeof(HEADER) + 2
-				    && (data[1] < '0' || data[1] > '9')
-				    && (data[1] < 'a' || data[1] > 'f')
-				    && (data[1] < 'A' || data[1] > 'F')
-				    && data[1] != 'p' && data[1] != 'P')
-					warnx("Got SERVFAIL as reply on earlier config setting");
-				else
-					warnx("Got SERVFAIL as reply: server failed or recursion timeout");
-				break;
-
-			case NXDOMAIN:	/* 3 */
-				warnx("Got NXDOMAIN as reply: domain does not exist");
-				break;
-
-			case NOTIMP:	/* 4 */
-				warnx("Got NOTIMP as reply: server does not support our request");
-				break;
-
-			case REFUSED:	/* 5 */
-				warnx("Got REFUSED as reply");
-				break;
-
-			default:
-				warnx("Got RCODE %u as reply", (unsigned int) header->rcode);
-				break;
-			}
 			return -1;
 		}
 
@@ -377,8 +336,9 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			if (rv >= 2 && buf) {
 				rv = MIN(rv, buflen);
 				memcpy(buf, rdata, rv);
+			} else {
+				rv = 0;
 			}
-			/* "else rv=0;" here? */
 		}
 		if ((type == T_CNAME || type == T_MX) && buf) {
 			if (type == T_MX)
@@ -395,6 +355,8 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			if (rv >= 1) {
 				rv = MIN(rv, buflen);
 				memcpy(buf, rdata, rv);
+			} else {
+				rv = 0;
 			}
 		}
 		if (q != NULL)
