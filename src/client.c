@@ -339,6 +339,36 @@ send_ping(int fd)
 	}
 }
 
+static void
+write_dns_error(struct query *q)
+{
+	if (!q) return;
+
+	switch (q->rcode) {
+	case NOERROR:	/* 0 */
+		warnx("Got reply without error, but also without question and/or answer");
+		break;
+	case FORMERR:	/* 1 */
+		warnx("Got FORMERR as reply: server does not understand our request");
+		break;
+	case SERVFAIL:	/* 2 */
+		warnx("Got SERVFAIL as reply: server failed or recursion timeout");
+		break;
+	case NXDOMAIN:	/* 3 */
+		warnx("Got NXDOMAIN as reply: domain does not exist");
+		break;
+	case NOTIMP:	/* 4 */
+		warnx("Got NOTIMP as reply: server does not support our request");
+		break;
+	case REFUSED:	/* 5 */
+		warnx("Got REFUSED as reply");
+		break;
+	default:
+		warnx("Got RCODE %u as reply", q->rcode);
+		break;
+	}
+}
+
 static int
 read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q) /* FIXME: tun_fd needed for raw handling */
 {
@@ -479,9 +509,15 @@ read_dns_namecheck(int dns_fd, int tun_fd, char *buf, int buflen, char c1, char 
 
 	rv = read_dns_withq(dns_fd, tun_fd, buf, buflen, &q);
 
-	if (rv > 0 && q.name[0] != c1 && q.name[0] != c2)
+	/* Filter out any other replies */
+	if (q.name[0] != c1 && q.name[0] != c2)
 		return 0;
-
+	
+	/* Print rcode errors */
+	if (rv < 0) {
+		write_dns_error(&q);
+	}
+	
 	return rv;	/* may also be 0 = useless or -1 = error (printed) */
 }
 
@@ -540,29 +576,31 @@ tunnel_dns(int tun_fd, int dns_fd)
 	int read;
 	int send_something_now = 0;
 
-	if ((read = read_dns_withq(dns_fd, tun_fd, buf, sizeof(buf), &q)) < 2) {
-		/* Maybe SERVFAIL etc. Send ping to get things back in order,
-		   but wait a bit to prevent fast ping-pong loops. */
-		send_ping_soon = 900;
-		return -1;	/* nothing done */
-	}
+	memset(q.name, 0, sizeof(q.name));
+	read = read_dns_withq(dns_fd, tun_fd, buf, sizeof(buf), &q);
 
-	/* Don't process anything that isn't data; already checked read>=2 */
+	/* Don't process anything that isn't data for us */
 	if (q.name[0] != 'P' && q.name[0] != 'p' &&
 	    q.name[0] != userid_char && q.name[0] != userid_char2)
 		return -1;	/* nothing done */
+
+	if (read < 2) {
+		/* Maybe SERVFAIL etc. Send ping to get things back in order,
+		   but wait a bit to prevent fast ping-pong loops. */
+		write_dns_error(&q);
+		send_ping_soon = 900;
+		return -1;	/* nothing done */
+	}
 
 	if (read == 5 && !strncmp("BADIP", buf, 5)) {
 		warnx("BADIP: Server rejected sender IP address (maybe iodined -c will help), or server kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.");
 		return -1;	/* nothing done */
 	}
 
-
 	if (send_ping_soon) {
 		send_something_now = 1;
 		send_ping_soon = 0;
 	}
-
 
 	/* Decode the data header, update seqno and frag;
 	   already checked read>=2
