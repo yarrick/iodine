@@ -302,14 +302,15 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 
 	switch (qr) {
 	case QR_ANSWER:
-		if(qdcount < 1 || ancount < 1) {
-			/* We may get both CNAME and A, then ancount=2 */
+		if(qdcount < 1) {
+			/* We need a question */
 			return -1;
 		}
 
 		if (q != NULL) 
 			q->id = id;
 
+		/* Read name even if no answer, to give better error message */
 		readname(packet, packetlen, &data, name, sizeof(name));
 		CHECKLEN(4);
 		readshort(packet, &data, &type);
@@ -320,6 +321,11 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			/* We only need the first char to check it */
 			q->name[0] = name[0];
 			q->name[1] = '\0';
+		} 
+		
+		if (ancount < 1) {
+			/* We may get both CNAME and A, then ancount=2 */
+			return -1;
 		}
 
 		/* Assume that first answer is NULL/CNAME that we wanted */
