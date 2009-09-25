@@ -220,7 +220,8 @@ in production environments.
 .TP
 .B nameserver
 The nameserver to use to relay the dns traffic. This can be any relaying
-nameserver  or the ip number of the server running iodined if reachable.
+nameserver or the server running iodined if reachable. This field can be
+given as an IP address, or as a hostname (except on Win32 currently).
 This argument is optional, and if not specified a nameserver will be read
 from the
 .I /etc/resolv.conf
