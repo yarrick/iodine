@@ -144,8 +144,26 @@ client_set_nameserver(const char *cp, int port)
 {
 	struct in_addr addr;
 
-	if (inet_aton(cp, &addr) != 1)
-		errx(1, "error parsing nameserver address: '%s'", cp);
+	if (inet_aton(cp, &addr) != 1) {
+#ifndef WINDOWS32
+		/* MinGW only supports getaddrinfo on WinXP and higher..
+		 * so turn it off in windows for now
+		 *
+		 * try resolving if domain a domain is given */
+		struct addrinfo *addrinfo;
+		struct addrinfo *res;
+		if (getaddrinfo(cp, NULL, NULL, &addrinfo) == 0) {
+			struct sockaddr_in *inaddr;
+			for (res = addrinfo; res != NULL; res = res->ai_next) {
+				inaddr = (struct sockaddr_in *) res->ai_addr;
+				addr = inaddr->sin_addr;
+				break;
+			}
+			freeaddrinfo(addrinfo);
+		} else
+#endif
+			errx(1, "error parsing nameserver address: '%s'", cp);
+	}
 
 	memset(&nameserv, 0, sizeof(nameserv));
 	nameserv.sin_family = AF_INET;
