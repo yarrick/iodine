@@ -149,7 +149,7 @@ client_set_nameserver(const char *cp, int port)
 		/* MinGW only supports getaddrinfo on WinXP and higher..
 		 * so turn it off in windows for now
 		 *
-		 * try resolving if domain a domain is given */
+		 * try resolving if a domain is given */
 		struct addrinfo *addrinfo;
 		struct addrinfo *res;
 		if (getaddrinfo(cp, NULL, NULL, &addrinfo) == 0) {

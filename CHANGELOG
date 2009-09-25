@@ -28,6 +28,7 @@ CHANGES:
 	- Added support for CNAME/TXT/A/MX query types, fixes #75.
 		Patch by Anne Bezemer, merge help by logix.
 	- Merged low-latency patch from Anne Bezemer, fixes #76.
+	- Resolve client nameserver argument (except on win32), #82.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
