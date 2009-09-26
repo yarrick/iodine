@@ -145,26 +145,40 @@ client_set_nameserver(const char *cp, int port)
 	struct in_addr addr;
 
 	if (inet_aton(cp, &addr) != 1) {
+		/* try resolving if a domain is given */
+		struct hostent *host;
+		const char *err;
+		host = gethostbyname(cp);
+		if (host != NULL && h_errno > 0) {
+			int i = 0;
+			while (host->h_addr_list[i] != 0) {
+				addr = *(struct in_addr *) host->h_addr_list[i++];
+				fprintf(stderr, "Resolved %s to %s\n", cp, inet_ntoa(addr));
+				goto setaddr;
+			}
+		}
 #ifndef WINDOWS32
-		/* MinGW only supports getaddrinfo on WinXP and higher..
-		 * so turn it off in windows for now
-		 *
-		 * try resolving if a domain is given */
-		struct addrinfo *addrinfo;
-		struct addrinfo *res;
-		if (getaddrinfo(cp, NULL, NULL, &addrinfo) == 0) {
-			struct sockaddr_in *inaddr;
-			for (res = addrinfo; res != NULL; res = res->ai_next) {
-				inaddr = (struct sockaddr_in *) res->ai_addr;
-				addr = inaddr->sin_addr;
+		err = hstrerror(h_errno);
+#else
+		{
+			DWORD wserr = WSAGetLastError();
+			switch (wserr) {
+			case WSAHOST_NOT_FOUND:
+				err = "Host not found";
+				break;
+			case WSANO_DATA:
+				err = "No data record found";
+				break;
+			default:
+				err = "Unknown error";
 				break;
 			}
-			freeaddrinfo(addrinfo);
-		} else
-#endif
-			errx(1, "error parsing nameserver address: '%s'", cp);
+		}
+#endif /* !WINDOWS32 */
+		errx(1, "error resolving nameserver '%s': %s", cp, err);
 	}
 
+setaddr:
 	memset(&nameserv, 0, sizeof(nameserv));
 	nameserv.sin_family = AF_INET;
 	nameserv.sin_port = htons(port);
