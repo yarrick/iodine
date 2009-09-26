@@ -89,8 +89,7 @@ help() {
 	fprintf(stderr, "  -I max interval between requests (default 4 sec) to prevent server timeouts\n");
 	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
 	fprintf(stderr, "  -F pidfile to write pid to a file\n");
-	fprintf(stderr, "nameserver is the IP number/hostname of the relaying nameserver\n    "
-			"(hostname not supported on win32). if absent, /etc/resolv.conf is used\n");
+	fprintf(stderr, "nameserver is the IP number/hostname of the relaying nameserver. if absent, /etc/resolv.conf is used\n");
 	fprintf(stderr, "topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
