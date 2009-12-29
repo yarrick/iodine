@@ -51,6 +51,8 @@
 #include "encoding.h"
 #include "base32.h"
 #include "base64.h"
+#include "base64u.h"
+#include "base128.h"
 #include "user.h"
 #include "login.h"
 #include "tun.h"
@@ -69,6 +71,8 @@ static char *topdomain;
 static char password[33];
 static struct encoder *b32;
 static struct encoder *b64;
+static struct encoder *b64u;
+static struct encoder *b128;
 static int created_users;
 
 static int check_ip;
@@ -117,6 +121,8 @@ check_user_and_ip(int userid, struct query *q)
 {
 	struct sockaddr_in *tempin;
 
+	/* Note: duplicate in handle_raw_login() except IP-address check */
+
 	if (userid < 0 || userid >= created_users ) {
 		return 1; 
 	}
@@ -151,6 +157,13 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
+
+	if (debug >= 2) {
+		struct sockaddr_in *tempin;
+		tempin = (struct sockaddr_in *) &(q->from);
+		fprintf(stderr, "TX-raw: client %s, cmd %d, %d bytes\n", 
+			inet_ntoa(tempin->sin_addr), cmd, len);
+	}
 
 	sendto(fd, packet, len, 0, &q->from, q->fromlen);
 }
@@ -243,18 +256,11 @@ get_from_outpacketq(int userid)
    pruning(=dropping) the improper requests, since the DNS server will
    actually get an answer instead of silence.
 
-   We normally use either CMC (ping) or seqno/frag (upstream data) to prevent
-   cache hits on in-between caching DNS servers. Also, the iodine client is
-   designed to mostly operate properly when cached results are returned.
-   Two cache-hit situations:
-   - Repeated DNS query when our ack got lost: has same seqno/frag and doesn't
-     have CMC; but the client will not have sent any new data or pings
-     in-between, so this is always cacheable. Even in lazy mode, since we send
-     the first answer to the actual DNS query only on receipt of the first
-     client retransmit.
-   - Identical second+ fragment of mod-8 packets ago, same seqno/frag and no
-     TCP counter in those fragments to tell them apart. This is _not_
-     cachable, so our cache length should never exceed 7 packets.
+   Because of the CMC in both ping and upstream data, unwanted cache hits
+   are prevented. Data-CMC is only 36 counts, so our cache length should
+   not exceed 36/2=18 packets. (This quick rule assumes all packets are
+   otherwise equal, which they arent: up/downstream seq/frag, tcp sequence
+   number, and of course data.)
 */
 
 static void
@@ -302,6 +308,9 @@ answer_from_dnscache(int dns_fd, int userid, struct query *q)
 			continue;
 
 		/* okay, match */
+		if (debug >= 1)
+			fprintf(stderr, "OUT  user %d %s from dnscache\n", userid, q->name);
+
 		write_dns(dns_fd, q, users[userid].dnscache_answer[use],
 			  users[userid].dnscache_answerlen[use],
 			  users[userid].downenc);
@@ -315,6 +324,130 @@ answer_from_dnscache(int dns_fd, int userid, struct query *q)
 }
 
 #endif /* DNSCACHE_LEN */
+
+static inline void
+save_to_qmem(unsigned char *qmem_cmc, unsigned short *qmem_type, int qmem_len,
+	     int *qmem_lastfilled, unsigned char *cmc_to_add,
+	     unsigned short type_to_add)
+/* Remember query to check for duplicates */
+{
+	int fill;
+
+	fill = *qmem_lastfilled + 1;
+	if (fill >= qmem_len)
+		fill = 0;
+
+	memcpy(qmem_cmc + fill * 4, cmc_to_add, 4);
+	qmem_type[fill] = type_to_add;
+	*qmem_lastfilled = fill;
+}
+
+static inline void
+save_to_qmem_pingordata(int userid, struct query *q)
+{
+	/* Our CMC is a bit more than the "official" CMC; we store 4 bytes
+	   just because we can, and because it may prevent some false matches.
+	   For ping, we save the 4 decoded bytes: userid + seq/frag + CMC.
+	   For data, we save the 4 _un_decoded chars in lowercase: seq/frag's
+	   + 1 char CMC; that last char is non-Base32.
+	 */
+
+	char cmc[8];
+	int i;
+
+	if (q->name[0] == 'P' || q->name[0] == 'p') {
+		/* Ping packet */
+
+		size_t cmcsize = sizeof(cmc);
+		char *cp = strchr(q->name, '.');
+
+		if (cp == NULL)
+			return;  /* illegal hostname; shouldn't happen */
+
+		/* We already unpacked in handle_null_request(), but that's
+		   lost now... Note: b32 directly, we want no undotify here! */
+		i = b32->decode(cmc, &cmcsize, q->name + 1, (cp - q->name) - 1);
+
+		if (i < 4)
+			return;	 /* illegal ping; shouldn't happen */
+
+		save_to_qmem(users[userid].qmemping_cmc,
+			     users[userid].qmemping_type, QMEMPING_LEN,
+			     &users[userid].qmemping_lastfilled,
+			     (void *) cmc, q->type);
+	} else {
+		/* Data packet, hopefully not illegal */
+		if (strlen(q->name) < 5)
+			return;
+
+		/* We store CMC in lowercase; if routing via multiple parallel
+		   DNS servers, one may do case-switch and another may not,
+		   and we still want to detect duplicates.
+		   Data-header is always base32, so case-swap won't hurt.
+		 */
+		for (i = 0; i < 4; i++)
+			if (q->name[i+1] >= 'A' && q->name[i+1] <= 'Z')
+				cmc[i] = q->name[i+1] + ('a' - 'A');
+			else
+				cmc[i] = q->name[i+1];
+
+		save_to_qmem(users[userid].qmemdata_cmc,
+			     users[userid].qmemdata_type, QMEMDATA_LEN,
+			     &users[userid].qmemdata_lastfilled,
+			     (void *) cmc, q->type);
+	}
+}
+
+static int
+answer_from_qmem(int dns_fd, struct query *q, unsigned char *qmem_cmc,
+		 unsigned short *qmem_type, int qmem_len,
+		 unsigned char *cmc_to_check)
+/* Checks query memory and sends an (illegal) answer if this is a duplicate.
+   Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
+   not a duplicate. */
+{
+	int i;
+
+	for (i = 0; i < qmem_len ; i++) {
+
+		if (qmem_type[i] == T_UNSET)
+			continue;
+		if (qmem_type[i] != q->type)
+			continue;
+		if (memcmp(qmem_cmc + i * 4, cmc_to_check, 4))
+			continue;
+
+		/* okay, match */
+		if (debug >= 1)
+			fprintf(stderr, "OUT  from qmem for %s == duplicate, sending illegal reply\n", q->name);
+
+		write_dns(dns_fd, q, "x", 1, 'T');
+
+		q->id = 0;	/* this query was used */
+		return 1;
+	}
+
+	/* here only when no match found */
+	return 0;
+}
+
+static inline int
+answer_from_qmem_data(int dns_fd, int userid, struct query *q)
+/* Quick helper function to keep handle_null_request() clean */
+{
+	char cmc[4];
+	int i;
+
+	for (i = 0; i < 4; i++)
+		if (q->name[i+1] >= 'A' && q->name[i+1] <= 'Z')
+			cmc[i] = q->name[i+1] + ('a' - 'A');
+		else
+			cmc[i] = q->name[i+1];
+
+	return answer_from_qmem(dns_fd, q, users[userid].qmemdata_cmc,
+				users[userid].qmemdata_type, QMEMDATA_LEN,
+				(void *) cmc);
+}
 
 static int
 send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
@@ -373,12 +506,22 @@ send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 	}
 	write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
 
+	if (q->id2 != 0) {
+		q->id = q->id2;
+		q->fromlen = q->fromlen2;
+		memcpy(&(q->from), &(q->from2), q->fromlen2);
+		if (debug >= 1)
+			fprintf(stderr, "OUT  again to last duplicate\n");
+		write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
+	}
+
+	save_to_qmem_pingordata(userid, q);
+
 #ifdef DNSCACHE_LEN
 	save_to_dnscache(userid, q, pkt, datalen + 2);
 #endif
 
 	q->id = 0;			/* this query is used */
-	/* .iddupe is _not_ reset on purpose */
 
 	if (datalen > 0 && datalen == users[userid].outpacket.len) {
 		/* Whole packet was sent in one chunk, dont wait for ack */
@@ -504,11 +647,11 @@ process_downstream_ack(int userid, int down_seq, int down_frag)
 	users[userid].outfragresent = 0;
 
 	/* Is packet done? */
-	if (users[userid].outpacket.offset == users[userid].outpacket.len) {
+	if (users[userid].outpacket.offset >= users[userid].outpacket.len) {
 		users[userid].outpacket.len = 0;
 		users[userid].outpacket.offset = 0;
 		users[userid].outpacket.fragment--;	/* unneeded ++ above */
-		/* last seqno/frag are always returned on pings */
+		/* ^keep last seqno/frag, are always returned on pings */
 		/* users[userid].outfragresent = 0; already above */
 
 #ifdef OUTPACKETQ_LEN
@@ -554,6 +697,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		if (version == VERSION) {
 			userid = find_available_user();
 			if (userid >= 0) {
+				int i;
 				struct sockaddr_in *tempin;
 
 				users[userid].seed = rand();
@@ -568,10 +712,9 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				syslog(LOG_INFO, "accepted version for user #%d from %s",
 					userid, inet_ntoa(tempin->sin_addr));
 				users[userid].q.id = 0;
-				users[userid].q.iddupe = 0;
-				users[userid].q_prev.id = 0;
-				users[userid].q_prev.iddupe = 0;
+				users[userid].q.id2 = 0;
 				users[userid].q_sendrealsoon.id = 0;
+				users[userid].q_sendrealsoon.id2 = 0;
 				users[userid].q_sendrealsoon_new = 0;
 				users[userid].outpacket.len = 0;
 				users[userid].outpacket.offset = 0;
@@ -592,7 +735,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 #endif
 #ifdef DNSCACHE_LEN
 				{
-					int i;
 					for (i = 0; i < DNSCACHE_LEN; i++) {
 					        users[userid].dnscache_q[i].id = 0;
 					        users[userid].dnscache_answerlen[i] = 0;
@@ -600,6 +742,12 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				}
 				users[userid].dnscache_lastfilled = 0;
 #endif
+				for (i = 0; i < QMEMPING_LEN; i++)
+				        users[userid].qmemping_type[i] = T_UNSET;
+				users[userid].qmemping_lastfilled = 0;
+				for (i = 0; i < QMEMDATA_LEN; i++)
+				        users[userid].qmemdata_type[i] = T_UNSET;
+				users[userid].qmemdata_lastfilled = 0;
 			} else {
 				/* No space for another user */
 				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
@@ -614,6 +762,11 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		return;
 	} else if(in[0] == 'L' || in[0] == 'l') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
+		if (read < 17) {
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
+			return;
+		}
+
 		/* Login phase, handle auth */
 		userid = unpacked[0];
 
@@ -712,13 +865,23 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			user_switch_codec(userid, enc);
 			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
 			break;
+		case 26: /* "2nd" 6 bits per byte = base64u, with underscore */
+			enc = get_base64u_encoder();
+			user_switch_codec(userid, enc);
+			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
+			break;
+		case 7: /* 7 bits per byte = base128 */
+			enc = get_base128_encoder();
+			user_switch_codec(userid, enc);
+			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
+			break;
 		default:
 			write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
 			break;
 		}
 		return;
 	} else if(in[0] == 'O' || in[0] == 'o') {
-		if (domain_len != 4) { /* len = 4, example: "O1T." */
+		if (domain_len < 3) { /* len at least 3, example: "O1T" */
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
 			return;
 		}
@@ -741,6 +904,16 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			users[userid].downenc = 'S';
 			write_dns(dns_fd, q, "Base64", 6, users[userid].downenc);
 			break;
+		case 'U':
+		case 'u':
+			users[userid].downenc = 'U';
+			write_dns(dns_fd, q, "Base64u", 7, users[userid].downenc);
+			break;
+		case 'V':
+		case 'v':
+			users[userid].downenc = 'V';
+			write_dns(dns_fd, q, "Base128", 7, users[userid].downenc);
+			break;
 		case 'R':
 		case 'r':
 			users[userid].downenc = 'R';
@@ -761,8 +934,85 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			break;
 		}
 		return;
+	} else if(in[0] == 'Y' || in[0] == 'y') {
+		int i;
+		char *datap;
+		int datalen;
+
+		if (domain_len < 6) { /* len at least 6, example: "YTxCMC" */
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
+			return;
+		}
+
+		i = b32_8to5(in[2]);	/* check variant */
+
+		switch (i) {
+		case 1:
+			datap = DOWNCODECCHECK1;
+			datalen = DOWNCODECCHECK1_LEN;
+			break;
+		default:
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
+			return;
+		}
+
+		switch (in[1]) {
+		case 'T':
+		case 't':
+			if (q->type == T_TXT ||
+			    q->type == T_SRV || q->type == T_MX ||
+			    q->type == T_CNAME || q->type == T_A) {
+				write_dns(dns_fd, q, datap, datalen, 'T');
+				return;
+			}
+			break;
+		case 'S':
+		case 's':
+			if (q->type == T_TXT ||
+			    q->type == T_SRV || q->type == T_MX ||
+			    q->type == T_CNAME || q->type == T_A) {
+				write_dns(dns_fd, q, datap, datalen, 'S');
+				return;
+			}
+			break;
+		case 'U':
+		case 'u':
+			if (q->type == T_TXT ||
+			    q->type == T_SRV || q->type == T_MX ||
+			    q->type == T_CNAME || q->type == T_A) {
+				write_dns(dns_fd, q, datap, datalen, 'U');
+				return;
+			}
+			break;
+		case 'V':
+		case 'v':
+			if (q->type == T_TXT ||
+			    q->type == T_SRV || q->type == T_MX ||
+			    q->type == T_CNAME || q->type == T_A) {
+				write_dns(dns_fd, q, datap, datalen, 'V');
+				return;
+			}
+			break;
+		case 'R':
+		case 'r':
+			if (q->type == T_NULL || q->type == T_TXT) {
+				write_dns(dns_fd, q, datap, datalen, 'R');
+				return;
+			}
+			break;
+		}
+
+		/* if still here, then codec not available */
+		write_dns(dns_fd, q, "BADCODEC", 8, 'T');
+		return;
+
 	} else if(in[0] == 'R' || in[0] == 'r') {
 		int req_frag_size;
+
+		if (domain_len < 16) {  /* we'd better have some chars for data... */
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
+			return;
+		}
 
 		/* Downstream fragsize probe packet */
 		userid = (b32_8to5(in[1]) >> 1) & 15;
@@ -777,15 +1027,15 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		} else {
 			char buf[2048];
 			int i;
-			unsigned int v = (unsigned int) rand();
+			unsigned int v = ((unsigned int) rand()) & 0xff ;
 
 			memset(buf, 0, sizeof(buf));
 			buf[0] = (req_frag_size >> 8) & 0xff;
 			buf[1] = req_frag_size & 0xff;
 			/* make checkable pseudo-random sequence */
 			buf[2] = 107;
-			for (i = 3; i < 2048; i++, v += 107)
-				buf[i] = (char) (v & 0xff);
+			for (i = 3; i < 2048; i++, v = (v + 107) & 0xff)
+				buf[i] = v;
 			write_dns(dns_fd, q, buf, req_frag_size, users[userid].downenc);
 		}
 		return;
@@ -793,6 +1043,12 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		int max_frag_size;
 
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
+
+		if (read < 3) {
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
+			return;
+		}
+
 		/* Downstream fragsize packet */
 		userid = unpacked[0];
 		if (check_user_and_ip(userid, q) != 0) {
@@ -835,68 +1091,51 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 #ifdef DNSCACHE_LEN
 		/* Check if cached */
-		if (answer_from_dnscache(dns_fd, userid, q)) {
-			/* Answer sent. But if this is our currently waiting
-			   request in the queue, invalidate now since we can't
-			   be sure that our coming new answer will ever reach
-			   client. Happens on 3+ retransmits in the "lost pings
-			   problem" with agressive DNS server.
-			*/
-			if (users[userid].q.id != 0 &&
-			    q->type == users[userid].q.type &&
-			    !strcmp(q->name, users[userid].q.name))
-				users[userid].q.id = 0;
+		if (answer_from_dnscache(dns_fd, userid, q))
 			return;
-		}
 #endif
 
-		/* Dupe pruning */
-		if (users[userid].q.iddupe != 0 &&
+		/* Check if duplicate (and not in full dnscache any more) */
+		if (answer_from_qmem(dns_fd, q, users[userid].qmemping_cmc,
+				     users[userid].qmemping_type, QMEMPING_LEN,
+				     (void *) unpacked))
+			return;
+
+		/* Check if duplicate of waiting queries; impatient DNS relays
+		   like to re-try early and often (with _different_ .id!)  */
+		if (users[userid].q.id != 0 &&
 		    q->type == users[userid].q.type &&
 		    !strcmp(q->name, users[userid].q.name) &&
 		    users[userid].lazy) {
-			/* We have this ping already. Aggressively impatient
-			   DNS servers resend queries with _different_ id.
-			   But hostname check is sufficient, includes CMC.
-			   Just drop this ping.
-			   If we already answered it (e.g. data available some
-			   milliseconds ago), DNS server should have noticed
-			   by now (race condition, happens rarely).
-			   If we didn't answer yet, we'll do later (to the
-			   first id, thank you very much). */
+			/* We have this ping already, and it's waiting to be
+			   answered. Always keep the last duplicate, since the
+			   relay may have forgotten its first version already.
+			   Our answer will go to both.
+			   (If we already sent an answer, qmem/cache will
+			   have triggered.) */
 			if (debug >= 2) {
-				fprintf(stderr, "PING pkt from user %d = dupe from impatient DNS server, ignoring\n",
+				fprintf(stderr, "PING pkt from user %d = dupe from impatient DNS server, remembering\n",
 					userid);
 			}
+			users[userid].q.id2 = q->id;
+			users[userid].q.fromlen2 = q->fromlen;
+			memcpy(&(users[userid].q.from2), &(q->from), q->fromlen);
 			return;
 		}
  
- 		if (users[userid].q_prev.iddupe != 0 &&
-		    q->type == users[userid].q_prev.type &&
-		    !strcmp(q->name, users[userid].q_prev.name) &&
-		    users[userid].lazy) {
-			/* Okay, even older ping that we already saw
-			   and probably answered just milliseconds ago.
-			   This is a race condition that agressive DNS servers
-			   actually train into; happens quite often.
-			   Just drop this new version. */
-			/* If using dnscache, this new query probably got a
-			   cached answer already, and this shouldn't trigger. */
-			if (debug >= 2) {
-				fprintf(stderr, "PING pkt from user %d = dupe (previous) from impatient DNS server, ignoring\n",
-					userid);
-			}
-			return;
-		}
-
 		if (users[userid].q_sendrealsoon.id != 0 &&
 		    q->type == users[userid].q_sendrealsoon.type &&
 		    !strcmp(q->name, users[userid].q_sendrealsoon.name)) {
-			/* Outer select loop will send answer immediately. */
+			/* Outer select loop will send answer immediately,
+			   to both queries. */
 			if (debug >= 2) {
-				fprintf(stderr, "PING pkt from user %d = dupe from impatient DNS server, ignoring\n",
+				fprintf(stderr, "PING pkt from user %d = dupe from impatient DNS server, remembering\n",
 					userid);
 			}
+			users[userid].q_sendrealsoon.id2 = q->id;
+			users[userid].q_sendrealsoon.fromlen2 = q->fromlen;
+			memcpy(&(users[userid].q_sendrealsoon.from2),
+			       &(q->from), q->fromlen);
 			return;
 		}
 				
@@ -934,10 +1173,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				didsend = 0;
 		}
 
-		/* Save previous query for dupe checking */
-		memcpy(&(users[userid].q_prev), &(users[userid].q),
-		       sizeof(struct query));
-
 		/* Save new query and time info */
 		memcpy(&(users[userid].q), q, sizeof(struct query));
 		users[userid].last_pkt = time(NULL);
@@ -955,11 +1190,10 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		int up_seq, up_frag, dn_seq, dn_frag, lastfrag;
 		int upstream_ok = 1;
 		int didsend = 0;
-		int thisisdupe = 0;
 		int code = -1;
 
-		/* Need 4char header + >=1 char data */
-		if (domain_len < 5)
+		/* Need 5char header + >=1 char data */
+		if (domain_len < 6)
 			return;
 
 		/* We can't handle id=0, that's "no packet" to us. So drop
@@ -987,86 +1221,52 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 #ifdef DNSCACHE_LEN
 		/* Check if cached */
-		if (answer_from_dnscache(dns_fd, userid, q)) {
-			/* Answer sent. But if this is our currently waiting
-			   request in the queue, invalidate now since we can't
-			   be sure that our coming new answer will ever reach
-			   client. Happens on 3+ retransmits in the "lost pings
-			   problem" with agressive DNS server.
-			*/
-			if (users[userid].q.id != 0 &&
-			    q->type == users[userid].q.type &&
-			    !strcmp(q->name, users[userid].q.name))
-				users[userid].q.id = 0;
+		if (answer_from_dnscache(dns_fd, userid, q))
 			return;
-		}
 #endif
 
-		/* Dupe pruning */
-		if (users[userid].q.iddupe != 0 &&
-		    q->id == users[userid].q.iddupe &&
-		    q->type == users[userid].q.type &&
-		    !strcmp(q->name, users[userid].q.name) &&
-		    users[userid].lazy) {
-			/* We have this exact query already, with same id.
-			   So this is surely a honest dupe. */
-			if (debug >= 2) {
-				fprintf(stderr, "IN   pkt from user %d = dupe from impatient DNS server, ignoring\n",
-					userid);
-  			}
+		/* Check if duplicate (and not in full dnscache any more) */
+		if (answer_from_qmem_data(dns_fd, userid, q))
 			return;
-		}
-		/* Note: Upstream data packet retransmits have exact same
-		   hostname, so can't reliably ignore the id here.
-		   And that's not even needed because of send_ping_soon in
-		   client. Nice. We still do need a queue-flush on data1-data1,
-		   see thisisdupe.
-		   But then there's the race condition in two variants:
-		   data1 - ping - data1
-		   data1 - data2 - data1
-		   These are surely dupes, irrespective of id, because client
-		   will only send ping/data2 when it has received our ack for
-		   data1. (Okay, and ping/data2 should be dupe-pruned
-		   themselves already...)
-		   Draw pictures if you don't understand immediately.
-		*/
-		/* If using dnscache, the new data1 probably got a
-		   cached answer already, and this shouldn't trigger. */
-		if (users[userid].q.iddupe != 0 &&
-		    (q->type != users[userid].q.type ||
-		     strcmp(q->name, users[userid].q.name)) &&
-		    users[userid].q_prev.iddupe != 0 &&
-		    q->type == users[userid].q_prev.type &&
-		    !strcmp(q->name, users[userid].q_prev.name) &&
+
+		/* Check if duplicate of waiting queries; impatient DNS relays
+		   like to re-try early and often (with _different_ .id!)  */
+		if (users[userid].q.id != 0 &&
+		    q->type == users[userid].q.type &&
+		    !strcmp(q->name, users[userid].q.name) && 
 		    users[userid].lazy) {
+			/* We have this packet already, and it's waiting to be
+			   answered. Always keep the last duplicate, since the
+			   relay may have forgotten its first version already.
+			   Our answer will go to both.
+			   (If we already sent an answer, qmem/cache will
+			   have triggered.) */
 			if (debug >= 2) {
-				fprintf(stderr, "IN   pkt from user %d = dupe (previous) from impatient DNS server, ignoring\n",
+				fprintf(stderr, "IN   pkt from user %d = dupe from impatient DNS server, remembering\n",
 					userid);
 			}
+			users[userid].q.id2 = q->id;
+			users[userid].q.fromlen2 = q->fromlen;
+			memcpy(&(users[userid].q.from2), &(q->from), q->fromlen);
 			return;
 		}
   
 		if (users[userid].q_sendrealsoon.id != 0 &&
 		    q->type == users[userid].q_sendrealsoon.type &&
 		    !strcmp(q->name, users[userid].q_sendrealsoon.name)) {
-			/* Outer select loop will send answer immediately. */
+			/* Outer select loop will send answer immediately,
+			   to both queries. */
 			if (debug >= 2) {
-				fprintf(stderr, "IN   pkt from user %d = dupe from impatient DNS server, ignoring\n",
+				fprintf(stderr, "IN   pkt from user %d = dupe from impatient DNS server, remembering\n",
 					userid);
 			}
+			users[userid].q_sendrealsoon.id2 = q->id;
+			users[userid].q_sendrealsoon.fromlen2 = q->fromlen;
+			memcpy(&(users[userid].q_sendrealsoon.from2),
+			       &(q->from), q->fromlen);
 			return;
 		}
   
-		/* We need to flush our queue on dupes, since our new answer
-		   to the first query may/will be duplicated by DNS caches to
-		   also answer the client's re-sent (=dupe) query.
-		   (Caches take TTL=0 to mean: "good for current and earlier
-		   queries") */
-		if (users[userid].q.iddupe != 0 &&
-		    q->type == users[userid].q.type &&
-		    !strcmp(q->name, users[userid].q.name))
-			thisisdupe = 1;
-
 
 		/* Decode data header */
 		up_seq = (b32_8to5(in[1]) >> 2) & 7;
@@ -1122,8 +1322,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		}
 
 		if (upstream_ok) {
-			/* decode with this users encoding */
-			read = unpack_data(unpacked, sizeof(unpacked), &(in[4]), domain_len - 4, 
+			/* decode with this user's encoding */
+			read = unpack_data(unpacked, sizeof(unpacked), &(in[5]), domain_len - 5,
 					   users[userid].encoder);
 
 			/* copy to packet buffer, update length */
@@ -1160,7 +1360,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		     more, so ack immediately if we didn't already.
 		   - If we are in non-lazy mode, there should be no query
 		     waiting, but if there is, send immediately.
-		   - If we are flushing queue due to dupe, send immediately.
 		   - In all other cases (mostly the last-fragment cases),
 		     we can afford to wait just a tiny little while for the
 		     TCP ack to arrive from our tun. Note that this works best
@@ -1170,8 +1369,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			if ((users[userid].outpacket.len > 0 && !didsend) ||
 			    (upstream_ok && !lastfrag && !didsend) ||
 			    (!upstream_ok && !didsend) ||
-			    !users[userid].lazy ||
-			    thisisdupe) {
+			    !users[userid].lazy) {
 				didsend = 1;
 				if (send_chunk_or_dataless(dns_fd, userid, &users[userid].q) == 1)
 					/* new packet from queue, send immediately */
@@ -1186,10 +1384,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			}
 		}
 
-		/* Save previous query for dupe checking */
-		memcpy(&(users[userid].q_prev), &(users[userid].q),
-		       sizeof(struct query));
-
 		/* Save new query and time info */
 		memcpy(&(users[userid].q), q, sizeof(struct query));
 		users[userid].last_pkt = time(NULL);
@@ -1198,7 +1392,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		   upstream flowing.
 		   - If we have new data waiting and not yet sent above,
 		     send immediately.
-		   - If we are flushing queue due to dupe, send immediately.
 		   - If this wasn't the last upstream fragment, then we expect
 		     more, so ack immediately if we didn't already or are
 		     in non-lazy mode.
@@ -1208,8 +1401,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		     our tun device.
 		   - In all other cases, don't send anything now.
 		*/
-		if ((users[userid].outpacket.len > 0 && !didsend)
-		    || thisisdupe)
+		if (users[userid].outpacket.len > 0 && !didsend)
 			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
 		else if (!didsend || !users[userid].lazy) {
 			if (upstream_ok && lastfrag) {
@@ -1227,6 +1419,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 static void
 handle_ns_request(int dns_fd, struct query *q)
+/* Mostly identical to handle_a_request() below */
 {
 	char buf[64*1024];
 	int len;
@@ -1251,6 +1444,40 @@ handle_ns_request(int dns_fd, struct query *q)
 	}
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("ns reply send error");
+	}
+}
+
+static void
+handle_a_request(int dns_fd, struct query *q, int fakeip)
+/* Mostly identical to handle_ns_request() above */
+{
+	char buf[64*1024];
+	int len;
+
+	if (fakeip) {
+		in_addr_t ip = inet_addr("127.0.0.1");
+		memcpy(&q->destination.s_addr, &ip, sizeof(in_addr_t));
+
+	} else if (ns_ip != INADDR_ANY) {
+		/* If ns_ip set, overwrite destination addr with it.
+		 * Destination addr will be sent as additional record (A, IN) */
+		memcpy(&q->destination.s_addr, &ns_ip, sizeof(in_addr_t));
+	}
+
+	len = dns_encode_a_response(buf, sizeof(buf), q);
+	if (len < 1) {
+		warnx("dns_encode_a_response doesn't fit");
+		return;
+	}
+	
+	if (debug >= 2) {
+		struct sockaddr_in *tempin;
+		tempin = (struct sockaddr_in *) &(q->from);
+		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes A reply\n",
+			inet_ntoa(tempin->sin_addr), q->type, q->name, len);
+	}
+	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
+		warn("a reply send error");
 	}
 }
 
@@ -1339,7 +1566,6 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 {
 	struct query q;
 	int read;
-	char *domain;
 	int domain_len;
 	int inside_topdomain;
 
@@ -1352,24 +1578,44 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 		fprintf(stderr, "RX: client %s, type %d, name %s\n", 
 			inet_ntoa(tempin->sin_addr), q.type, q.name);
 	}
-	
-	domain = strstr(q.name, topdomain);
-	inside_topdomain = 0;
-	if (domain) {
-		domain_len = (int) (domain - q.name); 
-		if (domain_len + strlen(topdomain) == strlen(q.name)) {
-			inside_topdomain = 1;
-		}
-	}
-	
+
+	domain_len = strlen(q.name) - strlen(topdomain);
+	if (domain_len >= 0 && !strcasecmp(q.name + domain_len, topdomain))
+		inside_topdomain = 1;
+	/* require dot before topdomain */
+	if (domain_len >= 1 && q.name[domain_len - 1] != '.')
+		inside_topdomain = 0;
+
 	if (inside_topdomain) {
 		/* This is a query we can handle */
+
+		/* Handle A-type query for ns.topdomain, possibly caused
+		   by our proper response to any NS request */
+		if (domain_len == 3 && q.type == T_A &&
+		    (q.name[0] == 'n' || q.name[0] == 'N') &&
+		    (q.name[1] == 's' || q.name[1] == 'S') &&
+		     q.name[2] == '.') {
+			handle_a_request(dns_fd, &q, 0);
+			return 0;
+		}
+
+		/* Handle A-type query for www.topdomain, for anyone that's
+		   poking around */
+		if (domain_len == 4 && q.type == T_A &&
+		    (q.name[0] == 'w' || q.name[0] == 'W') &&
+		    (q.name[1] == 'w' || q.name[1] == 'W') &&
+		    (q.name[2] == 'w' || q.name[2] == 'W') &&
+		     q.name[3] == '.') {
+			handle_a_request(dns_fd, &q, 1);
+			return 0;
+		}
 
 		switch (q.type) {
 		case T_NULL:
 		case T_CNAME:
 		case T_A:
 		case T_MX:
+		case T_SRV:
 		case T_TXT:
 			/* encoding is "transparent" here */
 			handle_null_request(tun_fd, dns_fd, &q, domain_len);
@@ -1496,6 +1742,8 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 			write_tun(tun_fd, out, outlen);
 		} else {
 			/* send the compressed(!) packet to other client */
+		/*XXX START adjust indent 1 tab forward*/
+		if (users[touser].conn == CONN_DNS_NULL) {
 			if (users[touser].outpacket.len == 0) {
 				start_new_outpacket(touser,
 					users[userid].inpacket.data,
@@ -1505,7 +1753,7 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 				if (users[touser].q_sendrealsoon.id != 0)
 					send_chunk_or_dataless(dns_fd, touser, &users[touser].q_sendrealsoon);
 				else if (users[touser].q.id != 0)
-					send_chunk_or_dataless(dns_fd, touser, &users[userid].q);
+					send_chunk_or_dataless(dns_fd, touser, &users[touser].q);
 #ifdef OUTPACKETQ_LEN
 			} else {
 				save_to_outpacketq(touser,
@@ -1513,6 +1761,12 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 					users[userid].inpacket.len);
 #endif
 			}
+		} else{ /* CONN_RAW_UDP */
+			send_raw(dns_fd, users[userid].inpacket.data,
+				 users[userid].inpacket.len, touser,
+				 RAW_HDR_CMD_DATA, &users[touser].q);
+		}
+		/*XXX END adjust indent 1 tab forward*/
 		}
 	} else {
 		if (debug >= 1)
@@ -1531,8 +1785,16 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 	
 	if (len < 16) return;
 
-	if (userid < 0 || userid > created_users) return;
-	if (!users[userid].active) return;
+	/* can't use check_user_and_ip() since IP address will be different,
+	   so duplicate here except IP address */
+	if (userid < 0 || userid >= created_users) return;
+	if (!users[userid].active || users[userid].disabled) return;
+	if (users[userid].last_pkt + 60 < time(NULL)) return;
+
+	if (debug >= 1) {
+		fprintf(stderr, "IN   login raw, len %d, from user %d\n",
+			len, userid);
+	}
 
 	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, password, users[userid].seed + 1);
@@ -1549,7 +1811,6 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 		 
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
-		users[userid].last_pkt = time(NULL);
 		login_calculate(myhash, 16, password, users[userid].seed - 1);
 		send_raw(fd, myhash, 16, userid, RAW_HDR_CMD_LOGIN, q);
 	}
@@ -1589,6 +1850,10 @@ handle_raw_ping(struct query *q, int dns_fd, int userid)
 	/* Update query and time info for user */
 	users[userid].last_pkt = time(NULL);
 	memcpy(&(users[userid].q), q, sizeof(struct query));
+
+	if (debug >= 1) {
+		fprintf(stderr, "IN   ping raw, from user %d\n", userid);
+	}
 
 	/* Send ping reply */
 	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, q);
@@ -1690,64 +1955,119 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 	return 0;
 }
 
+static size_t
+write_dns_nameenc(char *buf, size_t buflen, char *data, int datalen, char downenc)
+/* Returns #bytes of data that were encoded */
+{
+	static int td1 = 0;
+	static int td2 = 0;
+	size_t space;
+	char *b;
+
+	/* Make a rotating topdomain to prevent filtering */
+	td1+=3;
+	td2+=7;
+	if (td1>=26) td1-=26;
+	if (td2>=25) td2-=25;
+
+	/* encode data,datalen to CNAME/MX answer
+	   (adapted from build_hostname() in encoding.c)
+	 */
+
+	space = MIN(0xFF, buflen) - 4 - 2;
+	/* -1 encoding type, -3 ".xy", -2 for safety */
+
+	memset(buf, 0, sizeof(buf));
+
+	if (downenc == 'S') {
+		buf[0] = 'i';
+		if (!b64->places_dots())
+			space -= (space / 57);	/* space for dots */
+		b64->encode(buf+1, &space, data, datalen);
+		if (!b64->places_dots())
+			inline_dotify(buf, buflen);
+	} else if (downenc == 'U') {
+		buf[0] = 'j';
+		if (!b64u->places_dots())
+			space -= (space / 57);	/* space for dots */
+		b64u->encode(buf+1, &space, data, datalen);
+		if (!b64u->places_dots())
+			inline_dotify(buf, buflen);
+	} else if (downenc == 'V') {
+		buf[0] = 'k';
+		if (!b128->places_dots())
+			space -= (space / 57);	/* space for dots */
+		b128->encode(buf+1, &space, data, datalen);
+		if (!b128->places_dots())
+			inline_dotify(buf, buflen);
+	} else {
+		buf[0] = 'h';
+		if (!b32->places_dots())
+			space -= (space / 57);	/* space for dots */
+		b32->encode(buf+1, &space, data, datalen);
+		if (!b32->places_dots())
+			inline_dotify(buf, buflen);
+	}
+
+	/* Add dot (if it wasn't there already) and topdomain */
+	b = buf;
+	b += strlen(buf) - 1;
+	if (*b != '.') 
+		*++b = '.';
+        b++;
+
+	*b = 'a' + td1;
+	b++;
+	*b = 'a' + td2;
+	b++;
+	*b = '\0';
+
+	return space;
+}
+
 static void
 write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 {
 	char buf[64*1024];
 	int len = 0;
 
-	if (q->type == T_CNAME || q->type == T_A || q->type == T_MX) {
-		static int td1 = 0;
-		static int td2 = 0;
+	if (q->type == T_CNAME || q->type == T_A) {
 		char cnamebuf[1024];		/* max 255 */
-		size_t space;
-		char *b;
 
-		/* Make a rotating topdomain to prevent filtering */
-		td1+=3;
-		td2+=7;
-		if (td1>=26) td1-=26;
-		if (td2>=25) td2-=25;
+		write_dns_nameenc(cnamebuf, sizeof(cnamebuf),
+				  data, datalen, downenc);
 
-		/* encode data,datalen to CNAME/MX answer */
-		/* (adapted from build_hostname() in iodine.c) */
+		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, cnamebuf,
+				 sizeof(cnamebuf));
+	} else if (q->type == T_MX || q->type == T_SRV) {
+		char mxbuf[64*1024];
+		char *b = mxbuf;
+		int offset = 0;
+		int res;
 
-		space = MIN(0xFF, sizeof(cnamebuf)) - 4 - 2;
-		/* -1 encoding type, -3 ".xy", -2 for safety */
+		while (1) {
+			res = write_dns_nameenc(b, sizeof(mxbuf) - (b - mxbuf),
+						data + offset,
+						datalen - offset, downenc);
+			if (res < 1) {
+				/* nothing encoded */
+				b++;	/* for final \0 */
+				break;
+			}
 
-		memset(cnamebuf, 0, sizeof(cnamebuf));
+			b = b + strlen(b) + 1;
 
-		if (downenc == 'S') {
-			cnamebuf[0] = 'I';
-			if (!b64->places_dots())
-				space -= (space / 57);	/* space for dots */
-			b64->encode(cnamebuf+1, &space, data, datalen);
-			if (!b64->places_dots())
-				inline_dotify(cnamebuf, sizeof(cnamebuf));
-		} else {
-			cnamebuf[0] = 'H';
-			if (!b32->places_dots())
-				space -= (space / 57);	/* space for dots */
-			b32->encode(cnamebuf+1, &space, data, datalen);
-			if (!b32->places_dots())
-				inline_dotify(cnamebuf, sizeof(cnamebuf));
+			offset += res;
+			if (offset >= datalen)
+				break;
 		}
 
-		/* Add dot (if it wasn't there already) and topdomain */
-		b = cnamebuf;
-		b += strlen(cnamebuf);
-		if (*b != '.') 
-			*b++ = '.';
-
-		*b = 'a' + td1;
-		b++;
-		*b = 'a' + td2;
-		b++;
+		/* Add final \0 */
 		*b = '\0';
 
-		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, cnamebuf, sizeof(cnamebuf));
-	}
-	else if (q->type == T_TXT) {
+		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, mxbuf,
+				 sizeof(mxbuf));
+	} else if (q->type == T_TXT) {
 		/* TXT with base32 */
 		char txtbuf[64*1024];
 		size_t space = sizeof(txtbuf) - 1;;
@@ -1755,15 +2075,23 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 		memset(txtbuf, 0, sizeof(txtbuf));
 
 		if (downenc == 'S') {
-			txtbuf[0] = 'S';	/* plain base64(Sixty-four) */
+			txtbuf[0] = 's';	/* plain base64(Sixty-four) */
 			len = b64->encode(txtbuf+1, &space, data, datalen);
 		}
+		else if (downenc == 'U') {
+			txtbuf[0] = 'u';	/* Base64 with Underscore */
+			len = b64u->encode(txtbuf+1, &space, data, datalen);
+		}
+		else if (downenc == 'V') {
+			txtbuf[0] = 'v';	/* Base128 */
+			len = b128->encode(txtbuf+1, &space, data, datalen);
+		}
 		else if (downenc == 'R') {
-			txtbuf[0] = 'R';	/* Raw binary data */
+			txtbuf[0] = 'r';	/* Raw binary data */
 			len = MIN(datalen, sizeof(txtbuf) - 1);
 			memcpy(txtbuf + 1, data, len);
 		} else {
-			txtbuf[0] = 'T';	/* plain base32(Thirty-two) */
+			txtbuf[0] = 't';	/* plain base32(Thirty-two) */
 			len = b32->encode(txtbuf+1, &space, data, datalen);
 		}
 		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, txtbuf, len+1);
@@ -1815,6 +2143,7 @@ help() {
 		"which then has to be created manually\n");
 	fprintf(stderr, "  -f to keep running in foreground\n");
 	fprintf(stderr, "  -D to increase debug level\n");
+	fprintf(stderr, "     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n");
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
@@ -1881,7 +2210,8 @@ main(int argc, char **argv)
 	foreground = 0;
 	bind_enable = 0;
 	bind_fd = 0;
-	mtu = 1200;
+	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
+			   higher for NULL; tun/zlib adds ~17 bytes. */
 	listen_ip = INADDR_ANY;
 	port = 53;
 	ns_ip = INADDR_ANY;
@@ -1893,6 +2223,8 @@ main(int argc, char **argv)
 
 	b32 = get_base32_encoder();
 	b64 = get_base64_encoder();
+	b64u = get_base64u_encoder();
+	b128 = get_base128_encoder();
 	
 	retval = 0;
 

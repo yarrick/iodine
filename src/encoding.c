@@ -21,13 +21,15 @@
 int
 build_hostname(char *buf, size_t buflen, 
 		const char *data, const size_t datalen, 
-		const char *topdomain, struct encoder *encoder)
+		const char *topdomain, struct encoder *encoder, int maxlen)
 {
 	int encsize;
 	size_t space;
 	char *b;
 
-	space = MIN(0xFF, buflen) - strlen(topdomain) - 7;
+	space = MIN(maxlen, buflen) - strlen(topdomain) - 8;
+	/* 8 = 5 max header length + 1 dot before topdomain + 2 safety */
+
 	if (!encoder->places_dots())
 		space -= (space / 57); /* space for dots */
 

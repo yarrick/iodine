@@ -74,6 +74,9 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 # define DONT_FRAG_VALUE 1
 #endif
 
+#define T_UNSET 65432
+/* Unused RR type; "private use" range, see http://www.bind9.net/dns-parameters */
+
 struct packet 
 {
 	int len;		/* Total packet length */
@@ -89,10 +92,12 @@ struct query {
 	unsigned short type;
 	unsigned short rcode;
 	unsigned short id;
-	unsigned short iddupe;		/* only used for dupe checking */
 	struct in_addr destination;
 	struct sockaddr from;
 	int fromlen;
+	unsigned short id2;
+	struct sockaddr from2;
+	int fromlen2;
 };
 
 enum connection {
