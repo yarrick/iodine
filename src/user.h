@@ -24,7 +24,14 @@
    lead to massive dropping in multi-user situations with high traffic. */
 
 #define DNSCACHE_LEN 4
-/* Undefine to disable. MUST be less than 7; also see comments in iodined.c */
+/* Undefine to disable. Should be less than 18; also see comments in iodined.c */
+
+
+#define QMEMPING_LEN 30
+/* Max advisable: 64k/2 = 32000. Total mem usage: QMEMPING_LEN * USERS * 6 bytes */
+
+#define QMEMDATA_LEN 15
+/* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 6 bytes */
 
 struct user {
 	char id;
@@ -35,7 +42,6 @@ struct user {
 	in_addr_t tun_ip;
 	struct in_addr host;
 	struct query q;
-	struct query q_prev;
 	struct query q_sendrealsoon;
 	int q_sendrealsoon_new;
 	struct packet inpacket;
@@ -48,6 +54,12 @@ struct user {
 	int fragsize;
 	enum connection conn;
 	int lazy;
+	unsigned char qmemping_cmc[QMEMPING_LEN * 4];
+	unsigned short qmemping_type[QMEMPING_LEN];
+	int qmemping_lastfilled;
+	unsigned char qmemdata_cmc[QMEMDATA_LEN * 4];
+	unsigned short qmemdata_type[QMEMDATA_LEN];
+	int qmemdata_lastfilled;
 #ifdef OUTPACKETQ_LEN
 	struct packet outpacketq[OUTPACKETQ_LEN];
 	int outpacketq_nexttouse;

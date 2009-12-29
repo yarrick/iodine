@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (C) 2009 J.A.Bezemer@opensourcepartners.nl
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,12 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _VERSION_H_
-#define _VERSION_H_
+#ifndef __BASE128_H__
+#define __BASE128_H__
 
-/* This is the version of the network protocol
-   It is usually equal to the latest iodine version number */
-#define VERSION 0x00000502
+struct encoder *get_base128_encoder(void);
 
-#endif /* _VERSION_H_ */
-
+#endif

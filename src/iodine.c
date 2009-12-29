@@ -61,7 +61,7 @@ usage() {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 	exit(2);
 }
@@ -72,21 +72,25 @@ help() {
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+	fprintf(stderr, "Options to try if connection doesn't work:\n");
+	fprintf(stderr, "  -T force dns type: NULL, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
+	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
+	fprintf(stderr, "     Base128, or (only for TXT:) Raw  (default: autodetect)\n");
+	fprintf(stderr, "  -I max interval between requests (default 4 sec) to prevent DNS timeouts\n");
+	fprintf(stderr, "  -L 1: use lazy mode for low-latency (default). 0: don't (implies -I1)\n");
+	fprintf(stderr, "  -m max size of downstream fragments (default: autodetect)\n");
+	fprintf(stderr, "  -M max size of upstream hostnames (~100-255, default: 255)\n");
+	fprintf(stderr, "  -r to skip raw UDP mode attempt\n");
+	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -f to keep running in foreground\n");
-	fprintf(stderr, "  -r to skip raw UDP mode attempt\n");
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
-	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
-	fprintf(stderr, "  -m maxfragsize, to limit size of downstream packets\n");
-	fprintf(stderr, "  -T dns type: NULL (default, fastest), TXT, CNAME, A (CNAME answer), MX\n");
-	fprintf(stderr, "  -O downstream encoding (!NULL): Base32(default), Base64, or Raw (only TXT)\n");
-	fprintf(stderr, "  -L 1: try lazy mode for low-latency (default). 0: don't (implies -I1)\n");
-	fprintf(stderr, "  -I max interval between requests (default 4 sec) to prevent server timeouts\n");
 	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
 	fprintf(stderr, "  -F pidfile to write pid to a file\n");
 	fprintf(stderr, "nameserver is the IP number/hostname of the relaying nameserver. if absent, /etc/resolv.conf is used\n");
@@ -131,6 +135,7 @@ main(int argc, char **argv)
 	int raw_mode;
 	int lazymode;
 	int selecttimeout;
+	int hostname_maxlen;
 
 	nameserv_addr = NULL;
 	topdomain = NULL;
@@ -152,6 +157,7 @@ main(int argc, char **argv)
 	raw_mode = 1;
 	lazymode = 1;
 	selecttimeout = 4;
+	hostname_maxlen = 0xFF;
 
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
@@ -168,7 +174,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -202,6 +208,13 @@ main(int argc, char **argv)
 		case 'm':
 			autodetect_frag_size = 0;
 			max_downstream_frag_size = atoi(optarg);
+			break;
+		case 'M':
+			hostname_maxlen = atoi(optarg);
+			if (hostname_maxlen > 255)
+				hostname_maxlen = 255;
+			if (hostname_maxlen < 10)
+				hostname_maxlen = 10;
 			break;
 		case 'z':
 			context = optarg;
@@ -283,6 +296,7 @@ main(int argc, char **argv)
 	client_set_selecttimeout(selecttimeout);
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
+	client_set_hostname_maxlen(hostname_maxlen);
 	
 	if (username != NULL) {
 #ifndef WINDOWS32
@@ -315,16 +329,19 @@ main(int argc, char **argv)
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
+	fprintf(stderr, "Sending DNS queries for %s to %s\n",
+		topdomain, nameserv_addr);
+
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
 		retval = 1;
 		goto cleanup2;
 	}
 	
-	if (client_get_conn() == CONN_DNS_NULL) {
-		fprintf(stderr, "Sending queries for %s to %s\n", topdomain, nameserv_addr);
-	} else {
+	if (client_get_conn() == CONN_RAW_UDP) {
 		fprintf(stderr, "Sending raw traffic directly to %s\n", client_get_raw_addr());
 	}
+
+	fprintf(stderr, "Connection setup complete, transmitting data.\n");
 
 	if (foreground == 0) 
 		do_detach();
