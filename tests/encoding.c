@@ -86,7 +86,7 @@ START_TEST(test_build_hostname)
 	buflen = sizeof(buf);
 	
 	for (i = 1; i < sizeof(data); i++) {
-		int len = build_hostname(buf, buflen, data, i, topdomain, get_base32_encoder(), sizeof(buflen));
+		int len = build_hostname(buf, buflen, data, i, topdomain, get_base32_encoder(), sizeof(buf));
 
 		fail_if(len > i);
 		fail_if(strstr(buf, ".."), "Found double dots when encoding data len %d! buf: %s", i, buf);
