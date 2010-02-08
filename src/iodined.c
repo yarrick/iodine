@@ -2409,12 +2409,14 @@ main(int argc, char **argv)
 			read_password(password, sizeof(password));
 	}
 
+	created_users = init_users(my_ip, netmask);
+
 	if ((tun_fd = open_tun(device)) == -1) {
 		retval = 1;
 		goto cleanup0;
 	}
 	if (!skipipconfig) {
-		if (tun_setip(argv[0], netmask) != 0 || tun_setmtu(mtu) != 0) {
+		if (tun_setip(argv[0], users_get_first_ip(), netmask) != 0 || tun_setmtu(mtu) != 0) {
 			retval = 1;
 			goto cleanup1;
 		}
@@ -2431,8 +2433,6 @@ main(int argc, char **argv)
 	}
 
 	my_mtu = mtu;
-
-	created_users = init_users(my_ip, netmask);
 	
 	if (created_users < USERS) {
 		fprintf(stderr, "Limiting to %d simultaneous users because of netmask /%d\n",
