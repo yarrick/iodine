@@ -85,6 +85,14 @@ init_users(in_addr_t my_ip, int netbits)
 	return created_users;
 }
 
+const char*
+users_get_first_ip()
+{
+	struct in_addr ip;
+	ip.s_addr = users[0].tun_ip;
+	return inet_ntoa(ip);
+}
+
 int
 users_waiting_on_reply()
 {

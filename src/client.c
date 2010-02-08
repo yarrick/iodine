@@ -1492,7 +1492,7 @@ handshake_login(int dns_fd, int seed)
 					
 					server[64] = 0;
 					client[64] = 0;
-					if (tun_setip(client, netmask) == 0 && 
+					if (tun_setip(client, server, netmask) == 0 && 
 						tun_setmtu(mtu) == 0) {
 
 						fprintf(stderr, "Server tunnel IP is %s\n", server);
