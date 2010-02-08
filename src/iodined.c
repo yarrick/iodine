@@ -2449,7 +2449,9 @@ main(int argc, char **argv)
 #ifdef FREEBSD
 	tzsetwall();
 #endif
+#ifndef WINDOWS32
 	openlog( __progname, LOG_NDELAY, LOG_DAEMON );
+#endif
 
 	if (newroot != NULL)
 		do_chroot(newroot);
