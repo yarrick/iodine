@@ -2446,6 +2446,11 @@ main(int argc, char **argv)
 	if (pidfile != NULL)
 		do_pidfile(pidfile);
 
+#ifdef FREEBSD
+	tzsetwall();
+#endif
+	openlog( __progname, LOG_NDELAY, LOG_DAEMON );
+
 	if (newroot != NULL)
 		do_chroot(newroot);
 
