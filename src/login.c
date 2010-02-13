@@ -29,7 +29,7 @@
  * Needs a 16byte array for output, and 32 bytes password 
  */
 void 
-login_calculate(char *buf, int buflen, char *pass, int seed) 
+login_calculate(char *buf, int buflen, const char *pass, int seed) 
 {
 	unsigned char temp[32];
 	md5_state_t ctx;
