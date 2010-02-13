@@ -126,6 +126,35 @@ readdata(char *packet, char **src, char *dst, size_t len)
 }
 
 int
+readtxtbin(char *packet, char **src, size_t srcremain, char *dst, size_t dstremain)
+{
+	unsigned char *uc;
+	int tocopy;
+	int dstused = 0;
+
+	while (srcremain > 0)
+	{
+		uc = (unsigned char*) (*src);
+		tocopy = *uc;
+		(*src)++;
+		srcremain--;
+
+		if (tocopy > srcremain)
+			return 0;	/* illegal, better have nothing */
+		if (tocopy > dstremain)
+			return 0;	/* doesn't fit, better have nothing */
+
+		memcpy(dst, *src, tocopy);
+		dst += tocopy;
+		(*src) += tocopy;
+		srcremain -= tocopy;
+		dstremain -= tocopy;
+		dstused += tocopy;
+	}
+	return dstused;
+}
+
+int
 putname(char **buf, size_t buflen, const char *host)
 {
 	char *word;
@@ -212,3 +241,35 @@ putdata(char **dst, char *data, size_t len)
 	return len;
 }
 
+int
+puttxtbin(char **buf, size_t bufremain, char *from, size_t fromremain)
+{
+	unsigned char uc;
+	unsigned char *ucp = &uc;
+	char *cp = (char *) ucp;
+	int tocopy;
+	int bufused = 0;
+
+	while (fromremain > 0)
+	{
+		tocopy = fromremain;
+		if (tocopy > 252)
+			tocopy = 252;	/* allow off-by-1s in caches etc */
+		if (tocopy + 1 > bufremain)
+			return -1;	/* doesn't fit, better have nothing */
+
+		uc = tocopy;
+		**buf = *cp;
+		(*buf)++;
+		bufremain--;
+		bufused++;
+
+		memcpy(*buf, from, tocopy);
+		(*buf) += tocopy;
+		from += tocopy;
+		bufremain -= tocopy;
+		fromremain -= tocopy;
+		bufused += tocopy;
+	}
+	return bufused;
+}

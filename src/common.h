@@ -34,12 +34,14 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #ifdef WINDOWS32
 #include "windows.h"
 #else
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <err.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #endif
 
+#define DNS_PORT 53
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -72,6 +74,9 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 # define DONT_FRAG_VALUE 1
 #endif
 
+#define T_UNSET 65432
+/* Unused RR type; "private use" range, see http://www.bind9.net/dns-parameters */
+
 struct packet 
 {
 	int len;		/* Total packet length */
@@ -85,10 +90,14 @@ struct packet
 struct query {
 	char name[QUERY_NAME_SIZE];
 	unsigned short type;
+	unsigned short rcode;
 	unsigned short id;
 	struct in_addr destination;
 	struct sockaddr from;
 	int fromlen;
+	unsigned short id2;
+	struct sockaddr from2;
+	int fromlen2;
 };
 
 enum connection {
@@ -118,5 +127,7 @@ void warn(const char *fmt, ...);
 void errx(int eval, const char *fmt, ...);
 void warnx(const char *fmt, ...);
 #endif
+
+int recent_seqno(int , int);
 
 #endif

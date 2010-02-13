@@ -21,6 +21,15 @@ CHANGES:
 	- Do not overwrite users CC/CFLAGS/LDFLAGS, only add to them.
 	- Added -F option to write pidfile, based on patch from
 		misc at mandriva.org. Fixes #70.
+	- Allow password to be set via environment variable, fixes #77.
+		Based on patch by logix.
+	- Client now prints server tunnel IP, fixes #78. Patch by logix.
+	- Fix build error on Mac OS X 10.6, patch by G. Rischard. #79.
+	- Added support for CNAME/TXT/A/MX query types, fixes #75.
+		Patch by Anne Bezemer, merge help by logix.
+	- Merged low-latency patch from Anne Bezemer, fixes #76.
+	- Resolve client nameserver argument if given as hostname, fixes #82.
+	- Open log before chroot, fixes #86: logging on FreeBSD.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57

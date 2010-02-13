@@ -426,7 +426,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 }
 
 int
-tun_setip(const char *ip, int netbits)
+tun_setip(const char *ip, const char *remoteip, int netbits)
 {
 	char cmdline[512];
 	int netmask;
@@ -458,7 +458,11 @@ tun_setip(const char *ip, int netbits)
 			"/sbin/ifconfig %s %s %s netmask %s",
 			if_name,
 			ip,
+#ifdef FREEBSD
+			remoteip, /* FreeBSD wants other IP as second IP */
+#else
 			ip,
+#endif
 			inet_ntoa(net));
 	
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);

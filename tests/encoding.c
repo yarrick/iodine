@@ -21,8 +21,12 @@
 
 #include "encoding.h"
 #include "test.h"
+#include "base32.h"
+#include "base64.h"
 
-struct tuple
+#define TUPLES 4
+
+static struct tuple
 {
 	char *a;
 	char *b;
@@ -39,40 +43,53 @@ struct tuple
 
 START_TEST(test_inline_dotify)
 {
-	unsigned i;
 	char temp[1024];
 	char *b;
 
-	i = 0;
-	while (dottests[i].a) {
-		memset(temp, 0, sizeof(temp));
-		strcpy(temp, dottests[i].a);
-		b = temp;
-		inline_dotify(b, sizeof(temp));
+	memset(temp, 0, sizeof(temp));
+	strcpy(temp, dottests[_i].a);
+	b = temp;
+	inline_dotify(b, sizeof(temp));
 
-		fail_unless(strcmp(dottests[i].b, temp) == 0,
-				"'%s' != '%s'", temp, dottests[i].b);
-		i++;
-	}
+	fail_unless(strcmp(dottests[_i].b, temp) == 0,
+			"'%s' != '%s'", temp, dottests[_i].b);
 }
 END_TEST
 
 START_TEST(test_inline_undotify)
 {
-	unsigned i;
 	char temp[1024];
 	char *b;
 
-	i = 0;
-	while (dottests[i].a) {
-		memset(temp, 0, sizeof(temp));
-		strcpy(temp, dottests[i].b);
-		b = temp;
-		inline_undotify(b, sizeof(temp));
+	memset(temp, 0, sizeof(temp));
+	strcpy(temp, dottests[_i].b);
+	b = temp;
+	inline_undotify(b, sizeof(temp));
 
-		fail_unless(strcmp(dottests[i].a, temp) == 0,
-				"'%s' != '%s'", temp, dottests[i].a);
-		i++;
+	fail_unless(strcmp(dottests[_i].a, temp) == 0,
+			"'%s' != '%s'", temp, dottests[_i].a);
+}
+END_TEST
+
+START_TEST(test_build_hostname)
+{
+	char data[256];
+	char buf[1024];
+	char *topdomain = "a.c";
+	int buflen;
+	int i;
+
+	for (i = 0; i < sizeof(data); i++) {
+		data[i] = i & 0xFF;
+	}
+
+	buflen = sizeof(buf);
+	
+	for (i = 1; i < sizeof(data); i++) {
+		int len = build_hostname(buf, buflen, data, i, topdomain, get_base32_encoder(), sizeof(buf));
+
+		fail_if(len > i);
+		fail_if(strstr(buf, ".."), "Found double dots when encoding data len %d! buf: %s", i, buf);
 	}
 }
 END_TEST
@@ -83,8 +100,9 @@ test_encoding_create_tests()
 	TCase *tc;
 
 	tc = tcase_create("Encoding");
-	tcase_add_test(tc, test_inline_dotify);
-	tcase_add_test(tc, test_inline_undotify);
+	tcase_add_loop_test(tc, test_inline_dotify, 0, TUPLES);
+	tcase_add_loop_test(tc, test_inline_undotify, 0, TUPLES);
+	tcase_add_test(tc, test_build_hostname);
 
 	return tc;
 }

@@ -25,16 +25,31 @@ typedef unsigned int in_addr_t;
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 
+/* Missing from the mingw headers */
+#ifndef DNS_TYPE_SRV
+# define DNS_TYPE_SRV 33
+#endif
+#ifndef DNS_TYPE_TXT
+# define DNS_TYPE_TXT 16
+#endif
+
 #define T_A DNS_TYPE_A
 #define T_NS DNS_TYPE_NS
 #define T_NULL DNS_TYPE_NULL
+#define T_CNAME DNS_TYPE_CNAME
+#define T_MX DNS_TYPE_MX
+#define T_TXT DNS_TYPE_TXT
+#define T_SRV DNS_TYPE_SRV
 
 #define C_IN 1
 
+#define FORMERR 1
 #define SERVFAIL 2
 #define NXDOMAIN 3
 #define NOTIMP 4
 #define REFUSED 5
+
+#define sleep(seconds) Sleep((seconds)*1000)
 
 typedef struct {
         unsigned        id :16;         /* query identification number */
