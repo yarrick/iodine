@@ -1,0 +1,61 @@
+Detailed specification of protocol in version 00000402
+======================================================
+
+CMC = 2 byte Cache Miss Counter, increased every time it is used
+
+Version:
+Client sends:
+	First byte v or V
+	Rest encoded with base32:
+	4 bytes big endian protocol version
+	CMC
+Server replies:
+	4 chars:
+		VACK (version ok), followed by login challenge
+		VNAK (version differs), followed by server protocol version
+		VFUL (server has no free slots), followed by max users
+	4 byte value: means login challenge/server protocol version/max users
+	1 byte userid of the new user, or any byte if not VACK
+	
+Login:
+Client sends:
+	First byte l or L
+	Rest encoded with base32:
+	1 byte userid
+	16 bytes MD5 hash of: (first 32 bytes of password) xor (8 repetitions of login challenge)
+	CMC
+Server replies:
+	LNAK means not accepted
+	x.x.x.x-y.y.y.y-mtu means accepted (server ip, client ip, mtu)
+
+Case check:
+Client sends: 
+	First byte z or Z
+	Lots of data that should not be decoded
+Server replies:
+	The requested domain copied raw
+
+Data:
+Data header:
+	 321 0 
+	+---+-+
+	|UUU|L|
+	+---+-+
+
+UUU = Userid
+L = Last fragment in packet flag
+
+First byte is the header, 4 bits coded as hex in ASCII. 
+Followed by data encoded with Base32.
+
+Ping:
+Client sends:
+	First byte p or P
+	Rest encoded with Base32:
+	1 byte userid
+	CMC
+
+The server response to Ping and Data packets is a DNS NULL type response:
+If server has nothing to send, data length is 0 bytes.
+If server has a packet to send, data length is set and the data is a full raw
+unencoded ip packet, prefixed with 32 bits tun data.

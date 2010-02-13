@@ -1,0 +1,142 @@
+
+iodine - http://code.kryo.se/iodine
+
+***********************************
+
+CHANGES:
+
+20xx-xx-xx: x.y.z "Hotspotify"
+	- Fixed tunnel not working on Windows.
+	- Any device name is now supported on Windows, fixes #47.
+	- Multiple installed TAP32 interfaces are now supported, fixes #46.
+	- Return nonzero if tunnel fails to open, fixes #62.
+	- Support for setting a SELinux context, based on patch by
+		Sebastien Raveau. Sample context file in doc/iodine.te
+	- Allow listen port and DNS forward port to be the same if listen IP
+		does not include localhost.
+	- The client will now exit if configuring IP or MTU fails.
+	- The starting cache miss value is randomized at startup, fixes #65.
+	- Raw UDP mode added. If the iodined server is reachable directly,
+		packets can be sent to it without DNS encoding. Fixes #36.
+	- Do not overwrite users CC/CFLAGS/LDFLAGS, only add to them.
+	- Added -F option to write pidfile, based on patch from
+		misc at mandriva.org. Fixes #70.
+	- Allow password to be set via environment variable, fixes #77.
+		Based on patch by logix.
+	- Client now prints server tunnel IP, fixes #78. Patch by logix.
+	- Fix build error on Mac OS X 10.6, patch by G. Rischard. #79.
+	- Added support for CNAME/TXT/A/MX query types, fixes #75.
+		Patch by Anne Bezemer, merge help by logix.
+	- Merged low-latency patch from Anne Bezemer, fixes #76.
+	- Resolve client nameserver argument if given as hostname, fixes #82.
+	- Open log before chroot, fixes #86: logging on FreeBSD.
+
+2009-06-01: 0.5.2 "WifiFree"
+	- Fixed client segfault on OS X, #57
+	- Added check that nameserver lookup was successful
+	- Fixed ENOTSOCK error on OS X and FreeBSD, #58.
+
+2009-03-21: 0.5.1 "Boringo"
+	- Added initial Windows support, fixes #43.
+	- Added length check of autoprobe responses
+	- Refactored and added unit tests
+	- Added syslog logging for iodined on version and login packets
+	- Fixed segfault when encoding just one block, fixes #51.
+		The normal code was never affected by this.
+	- Added win32 code to read DNS server from system, fixes #45.
+	- Disabled password echo on win32, fixes #44.
+	- Fix encoding error making all autoprobing > 1024 bytes fail, #52.
+	- Increase default interface MTU to 1200.
+	- Fix autoprobing error making every third probe fail, set IP flag
+		Dont-Fragment where supported. Fixes #54.
+	- Added TAP32 version 0901 as accepted (#53).
+
+2009-01-23: 0.5.0 "iPassed"
+	- Fixed segfault in server when sending version reject.
+	- Applied patch to make iodine build on BeOS R5-BONE and Haiku,
+		from Francois Revol. Still work to do to get tun device working.
+	- Added capability to forward DNS queries outside tunnel domain to
+		a nameserver on localhost. Use -b port to enable, fixes #31.
+	- iodined now replies to NS request on its own domain, fixes issue #33.
+		The destination IP address is sent as reply. Use -n to specify
+		a specific IP address to return (if behind NAT etc).
+	- Upstream data is now Base64 encoded if relay server preserves case and
+		supports the plus (+) character in domain names, fixes #16.
+	- Fixed problem in client when DNS trans. ID has highest bit set (#37)
+	- IP addresses are now assigned within the netmask, so iodined can
+		use any address for itself, fixes #28.
+	- Netmask size is now adjustable. Setting a small net will reduce the
+		number of users. Use x.x.x.x/n notation on iodined tunnel ip.
+		This fixes #27.
+	- Downstream data is now fragmented, and the fragment size is auto-
+		probed after login. Fixes #7. It only took a few years :)
+	- Enhanced the checks that validates incoming packets
+	- Fixed endless loop in fragment size autodetection, #39.
+	- Fixed broken hostname dot placing with specific lengths, #40.
+
+2008-08-06: 0.4.2 "Opened Zone"
+	- Applied a few small patches from Maxim Bourmistrov and Gregor Herrmann
+	- Applied a patch for not creating and configuring the tun interface,
+		Debian bug #477692 by Vincent Bernat, controlled by -s switch
+	- Applied a security patch from Andrew Griffiths, use setgroups() to
+		limit the groups of the user
+	- Applied a patch to make iodine build on (Open)Solaris, from Albert Lee
+		Needs TUN/TAP driver http://www.whiteboard.ne.jp/~admin2/tuntap/
+		Still needs more code in tun.c for opening/closing the device
+	- Added option in server (-c) to disable IP/port checking on packets,
+		will hopefully help when server is behind NAT
+	- Fixed bug #21, now only IP address part of each packet is checked.
+		Should remove the need for the -c option and also work with
+		bugfixed DNS servers worldwide.
+	- Added -D option on server to enable debugging. Debug level 1 now 
+		prints info about each RX/TX datagram.
+
+2007-11-30: 0.4.1 "Tea Online"
+	- Introduced encoding API
+	- Switched to new Base32 implementation
+	- Added Base64 implementation that only uses 63 chars (not used yet)
+	- Refined 'install' make target and use $(MAKE) for recursive calls
+	- All received error messages (RCODE field) are echoed
+	- Top domain limited to 128 chars
+	- Case preservation check sent after login to decide codec
+	- Fixed crash on incoming NULL query in server with bad top domain
+	- /etc/resolv.conf is consulted if no nameserver is given on commandline
+	- Applied patch from Matthew W. S. Bell (Detach before chroot/dropping priv)
+
+2007-03-25: 0.4.0 "Run Home"
+	- Added multiuser support (up to 8 users simultaneously)
+	- Added authentication (password entered as argument or on stdin)
+	- Added manpage
+	- Added install/uninstall make target
+	- Cleanup of dns code, more test cases, use check library
+	- Changed directory structure
+
+2006-11-08: 0.3.4
+	- Fixed handshake() buffer overflow
+	  (Found by poplix, Secunia: SA22674 / FrSIRT/ADV-2006-4333)
+	- Added more tests
+	- More name parsing enhancements
+	- Now runs on Linux/AMD64
+	- Added setting to change server port
+
+2006-11-05: 0.3.3
+	- Fixed possible buffer overflow
+	  (Found by poplix, Bugtraq ID: 20883)
+	- Reworked dns hostname encoding
+
+2006-09-11: 0.3.2
+	- Support for NetBSD
+	- Fixed potential security problems
+	- Name parsing routines rewritten, added regression tests
+	- New encoding, 25% more peak upstream throughput
+	- New -l option to set local ip to listen to on server
+
+2006-07-11: 0.3.1 
+	- Add Mac OSX support
+	- Add setting device name
+	- Use compression of domain name in reply (should allow setting MTU 
+		approx 200 bytes higher)
+
+2006-06-24: 0.3.0
+	- First public release
+	- Support for Linux, FreeBSD, OpenBSD

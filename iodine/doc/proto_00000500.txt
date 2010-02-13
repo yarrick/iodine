@@ -1,0 +1,112 @@
+Detailed specification of protocol in version 00000500
+======================================================
+
+CMC = 2 byte Cache Miss Counter, increased every time it is used
+
+Version:
+Client sends:
+	First byte v or V
+	Rest encoded with base32:
+	4 bytes big endian protocol version
+	CMC
+Server replies:
+	4 chars:
+		VACK (version ok), followed by login challenge
+		VNAK (version differs), followed by server protocol version
+		VFUL (server has no free slots), followed by max users
+	4 byte value: means login challenge/server protocol version/max users
+	1 byte userid of the new user, or any byte if not VACK
+	
+Login:
+Client sends:
+	First byte l or L
+	Rest encoded with base32:
+	1 byte userid
+	16 bytes MD5 hash of: (first 32 bytes of password) xor (8 repetitions of login challenge)
+	CMC
+Server replies:
+	LNAK means not accepted
+	x.x.x.x-y.y.y.y-mtu-netmask means accepted (server ip, client ip, mtu, netmask bits)
+
+Case check:
+Client sends: 
+	First byte z or Z
+	Lots of data that should not be decoded
+Server replies:
+	The requested domain copied raw
+
+Switch codec:
+Client sends:
+	First byte s or S
+	5 bits coded as Base32 char, meaning userid
+	5 bits coded as Base32 char, with value 5 or 6, representing number of raw
+	bits per encoded byte
+Server sends:
+	Name of codec if accepted. After this all upstream data packets must 
+	be encoded with the new codec.
+	BADCODEC if not accepted. Client must then revert to Base32
+
+Probe downstream fragment size:
+Client sends:
+	First byte r or R
+	15 bits coded as 3 Base32 chars: UUUUF FFFFF FFFFF
+		meaning 4 bits userid, 11 bits fragment size
+	Then follows a long random query which contents does not matter
+Server sends:
+	Requested number of bytes as a response. The first two bytes contains
+	the requested length. Rest of message can be any data.
+	BADFRAG if requested length not accepted.
+
+Set downstream fragment size:
+Client sends:
+	First byte n or N
+	Rest encoded with base32:
+	1 byte userid
+	2 bytes new downstream fragment size
+	CMC
+Server sends:
+	2 bytes new downstream fragment size. After this all downstream
+	payloads will be max (fragsize + 2) bytes long.
+	BADFRAG if not accepted.
+
+Data:
+Upstream data header:
+	 3210 432 10 43 210 4321 0
+	+----+---+--+--+---+----+-+
+	|UUUU|SSS|FF|FF|DDD|GGGG|L|
+	+----+---+--+--+---+----+-+
+
+Downstream data header:
+	 7 654 3210 765 4321 0
+	+-+---+----+---+----+-+
+	|C|SSS|FFFF|DDD|GGGG|L|
+	+-+---+----+---+----+-+
+
+UUUU = Userid
+L = Last fragment in packet flag
+SS = Upstream packet sequence number
+FFFF = Upstream fragment number
+DDD = Downstream packet sequence number
+GGGG = Downstream fragment number
+C = Compression enabled for downstream packet
+
+Upstream data packet starts with 1 byte ASCII hex coded user byte, then 3 bytes 
+Base32 encoded header, then comes the payload data, encoded with chosen codec.
+
+Downstream data starts with 2 byte header. Then payload data, which may be
+compressed.
+
+Ping:
+Client sends:
+	First byte p or P
+	Rest encoded with Base32:
+	1 byte with 4 bits userid
+	1 byte with:
+		3 bits downstream seqno
+		4 bits downstream fragment
+	CMC
+
+The server response to Ping and Data packets is a DNS NULL type response:
+If server has nothing to send, data length is 0 bytes.
+If server has something to send, it will send a downstream data packet, 
+prefixed with 2 bytes header as shown above.
