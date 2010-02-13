@@ -101,12 +101,8 @@ help() {
 
 static void
 version() {
-	char *svnver;
-
-	svnver = "$Rev$ from $Date$";
-
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
-	fprintf(stderr, "SVN version: %s\n", svnver);
+	fprintf(stderr, "version: 0.6.0-rc1 from 2010-02-13\n");
 
 	exit(0);
 }

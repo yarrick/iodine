@@ -5,7 +5,7 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
-20xx-xx-xx: x.y.z "Hotspotify"
+2010-02-13: 0.6.0-rc1 "Hotspotify"
 	- Fixed tunnel not working on Windows.
 	- Any device name is now supported on Windows, fixes #47.
 	- Multiple installed TAP32 interfaces are now supported, fixes #46.
