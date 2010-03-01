@@ -90,7 +90,7 @@ users_get_first_ip()
 {
 	struct in_addr ip;
 	ip.s_addr = users[0].tun_ip;
-	return inet_ntoa(ip);
+	return strdup(inet_ntoa(ip));
 }
 
 int
