@@ -426,7 +426,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 }
 
 int
-tun_setip(const char *ip, const char *remoteip, int netbits)
+tun_setip(const char *ip, const char *other_ip, int netbits)
 {
 	char cmdline[512];
 	int netmask;
@@ -459,7 +459,7 @@ tun_setip(const char *ip, const char *remoteip, int netbits)
 			if_name,
 			ip,
 #ifdef FREEBSD
-			remoteip, /* FreeBSD wants other IP as second IP */
+			other_ip, /* FreeBSD wants other IP as second IP */
 #else
 			ip,
 #endif

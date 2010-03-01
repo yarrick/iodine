@@ -2414,10 +2414,13 @@ main(int argc, char **argv)
 		goto cleanup0;
 	}
 	if (!skipipconfig) {
-		if (tun_setip(argv[0], users_get_first_ip(), netmask) != 0 || tun_setmtu(mtu) != 0) {
+		const char *other_ip = users_get_first_ip();
+		if (tun_setip(argv[0], other_ip, netmask) != 0 || tun_setmtu(mtu) != 0) {
 			retval = 1;
+			free((void*) other_ip);
 			goto cleanup1;
 		}
+		free((void*) other_ip);
 	}
 	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
 		retval = 1;
