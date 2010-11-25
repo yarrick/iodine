@@ -1567,7 +1567,7 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	struct query q;
 	int read;
 	int domain_len;
-	int inside_topdomain;
+	int inside_topdomain = 0;
 
 	if ((read = read_dns(dns_fd, tun_fd, &q)) <= 0)
 		return 0;
