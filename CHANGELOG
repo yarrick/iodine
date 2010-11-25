@@ -30,6 +30,7 @@ CHANGES:
 	- Merged low-latency patch from Anne Bezemer, fixes #76.
 	- Resolve client nameserver argument if given as hostname, fixes #82.
 	- Open log before chroot, fixes #86: logging on FreeBSD.
+	- Fix DNS tunneling bug caused by uninitialized variable, #94
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
