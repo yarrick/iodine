@@ -219,7 +219,7 @@ do_detach()
 void
 read_password(char *buf, size_t len)
 {
-	char pwd[80];
+	char pwd[80] = {0};
 #ifndef WINDOWS32
 	struct termios old;
 	struct termios tp;
@@ -236,7 +236,7 @@ read_password(char *buf, size_t len)
 	fprintf(stderr, "Enter password: ");
 	fflush(stderr);
 #ifndef WINDOWS32
-	scanf("%79s", pwd);
+	fscanf(stdin, "%79[^\n]", pwd);
 #else
 	for (i = 0; i < sizeof(pwd); i++) {
 		pwd[i] = getch();
