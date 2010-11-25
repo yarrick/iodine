@@ -132,6 +132,7 @@ main(int argc, char **argv)
 	int lazymode;
 	int selecttimeout;
 	int hostname_maxlen;
+	int rtable = 0;
 
 	nameserv_addr = NULL;
 	topdomain = NULL;
@@ -170,7 +171,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhru:t:d:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -193,6 +194,9 @@ main(int argc, char **argv)
 			break;
 		case 'd':
 			device = optarg;
+			break;
+		case 'R':
+			rtable = atoi(optarg);
 			break;
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
@@ -321,6 +325,10 @@ main(int argc, char **argv)
 		retval = 1;
 		goto cleanup2;
 	}
+#ifdef OPENBSD
+	if (rtable > 0)
+		socket_setrtable(dns_fd, rtable);
+#endif
 
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);

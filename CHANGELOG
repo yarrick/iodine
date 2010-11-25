@@ -33,6 +33,8 @@ CHANGES:
 	- Fix DNS tunneling bug caused by uninitialized variable, #94
 	- Handle spaces when entering password interactively, fixes #93.
 		Patch by Hagar.
+	- Add -R option to set OpenBSD routing domain for the DNS socket.
+		Patch by laurent at gouloum fr, fixes #95.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57

@@ -17,6 +17,8 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I chrootdir
 .B ] [-d
 .I device
+.B ] [-R
+.I rdomain
 .B ] [-m
 .I fragsize
 .B ] [-M
@@ -128,6 +130,9 @@ Create 'pidfile' and write process id in it.
 Skip raw UDP mode. If not used, iodine will try getting the public IP address
 of the iodined host and test if it is reachable directly. If it is, traffic
 will be sent to the server instead of the DNS relay.
+.TP
+.B -R rdomain
+Use OpenBSD routing domain 'rdomain' for the DNS connection.
 .TP
 .B -m fragsize
 Force maximum downstream fragment size. Not setting this will cause the
