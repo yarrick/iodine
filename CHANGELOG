@@ -31,6 +31,8 @@ CHANGES:
 	- Resolve client nameserver argument if given as hostname, fixes #82.
 	- Open log before chroot, fixes #86: logging on FreeBSD.
 	- Fix DNS tunneling bug caused by uninitialized variable, #94
+	- Handle spaces when entering password interactively, fixes #93.
+		Patch by Hagar.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
