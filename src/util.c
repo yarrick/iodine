@@ -67,3 +67,11 @@ get_resolvconf_addr()
 	return rv;
 }
 
+#ifdef OPENBSD
+void
+socket_setrtable(int fd, int rtable)
+{
+	if (setsockopt (fd, IPPROTO_IP, SO_RTABLE, &rtable, sizeof(rtable)) == -1)
+	    err(1, "Failed to set routing table %d", rtable);
+}
+#endif
