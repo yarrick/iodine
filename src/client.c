@@ -31,6 +31,9 @@
 #include "windows.h"
 #include <winsock2.h>
 #else
+#ifdef ANDROID
+#include "android_dns.h"
+#endif
 #include <arpa/nameser.h>
 #ifdef DARWIN
 #define BIND_8_COMPAT
@@ -148,6 +151,32 @@ client_get_conn()
 void
 client_set_nameserver(const char *cp, int port) 
 {
+#ifdef ANDROID
+	struct addrinfo hints, *result, *p;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+
+	char sport[10];
+	sprintf(sport, "%d", port);
+
+	getaddrinfo(cp, sport, &hints, &result);
+	if (result == NULL)
+		errx(1, "Cannot resolve %s:%s (no network?)",  cp, sport);
+	else {
+		for (p = result;p != NULL; p = p->ai_next) {
+			if (p->ai_family == AF_INET) { /* IPv4 */
+				struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+				memset(&nameserv, 0, sizeof(nameserv));
+				nameserv.sin_family = AF_INET;
+				nameserv.sin_port = htons(port);
+				nameserv.sin_addr = ipv4->sin_addr;
+				freeaddrinfo(result);
+				return;
+			}
+		}
+		freeaddrinfo(result);
+	}
+#endif
 	struct in_addr addr;
 
 	if (inet_aton(cp, &addr) != 1) {

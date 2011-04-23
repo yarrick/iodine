@@ -73,7 +73,7 @@ struct user {
 #endif
 };
 
-extern struct user users[USERS];
+extern struct user *users;
 
 int init_users(in_addr_t, int);
 const char* users_get_first_ip();

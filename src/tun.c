@@ -24,6 +24,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#ifndef IFCONFIGPATH
+#define IFCONFIGPATH "/sbin/"
+#endif
+
 #ifdef WINDOWS32
 #include <winsock2.h>
 #include <winioctl.h>
@@ -71,7 +75,11 @@ open_tun(const char *tun_device)
 	int i;
 	int tun_fd;
 	struct ifreq ifreq;
+#ifdef ANDROID
+	char *tunnel = "/dev/tun";
+#else
 	char *tunnel = "/dev/net/tun";
+#endif
 
 	if ((tun_fd = open(tunnel, O_RDWR)) < 0) {
 		warn("open_tun: %s: %s", tunnel, strerror(errno));
@@ -455,7 +463,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	}
 #ifndef WINDOWS32
 	snprintf(cmdline, sizeof(cmdline), 
-			"/sbin/ifconfig %s %s %s netmask %s",
+			IFCONFIGPATH "ifconfig %s %s %s netmask %s",
 			if_name,
 			ip,
 #ifdef FREEBSD
@@ -522,7 +530,7 @@ tun_setmtu(const unsigned mtu)
 
 	if (mtu > 200 && mtu <= 1500) {
 		snprintf(cmdline, sizeof(cmdline), 
-				"/sbin/ifconfig %s mtu %u",
+				IFCONFIGPATH "ifconfig %s mtu %u",
 				if_name,
 				mtu);
 		

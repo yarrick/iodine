@@ -54,7 +54,7 @@
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
 
 /* daemon(3) exists only in 4.4BSD or later, and in GNU libc */
-#if !defined(WINDOWS32) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
+#if !defined(ANDROID) && !defined(WINDOWS32) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
 static int daemon(int nochdir, int noclose)
 {
  	int fd, i;
@@ -276,13 +276,15 @@ check_topdomain(char *str)
        return 0;
 }
 
-#ifdef WINDOWS32
+#if defined(WINDOWS32) || defined(ANDROID)
+#ifndef ANDROID
 int
 inet_aton(const char *cp, struct in_addr *inp)
 {
  inp->s_addr = inet_addr(cp);
  return inp->s_addr != INADDR_ANY;
 }
+#endif
 
 void
 warn(const char *fmt, ...)
@@ -291,11 +293,13 @@ warn(const char *fmt, ...)
 
 	va_start(list, fmt);
 	if (fmt) fprintf(stderr, fmt, list);
+#ifndef ANDROID
 	if (errno == 0) {
 		fprintf(stderr, ": WSA error %d\n", WSAGetLastError()); 
 	} else {
 		fprintf(stderr, ": %s\n", strerror(errno));
 	}
+#endif
 	va_end(list);
 }
 

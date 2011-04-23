@@ -119,8 +119,10 @@ void read_password(char*, size_t);
 
 int check_topdomain(char *);
 
-#ifdef WINDOWS32
+#if defined(WINDOWS32) || defined(ANDROID)
+#ifndef ANDROID
 int inet_aton(const char *cp, struct in_addr *inp);
+#endif
 
 void err(int eval, const char *fmt, ...);
 void warn(const char *fmt, ...);

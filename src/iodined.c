@@ -1655,7 +1655,7 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
 		   requests during heavy upstream traffic.
 		   20msec: ~8 packs every 1/50sec = ~400 DNSreq/sec,
 		   or ~1200bytes every 1/50sec = ~0.5 Mbit/sec upstream */
-		for (userid = 0; userid < USERS; userid++) {
+		for (userid = 0; userid < created_users; userid++) {
 			if (users[userid].active && !users[userid].disabled &&
 			    users[userid].last_pkt + 60 > time(NULL)) {
 				users[userid].q_sendrealsoon_new = 0;
@@ -1707,7 +1707,7 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
 		}
 
 		/* Send realsoon's if tun or dns didn't already */
-		for (userid = 0; userid < USERS; userid++)
+		for (userid = 0; userid < created_users; userid++)
 			if (users[userid].active && !users[userid].disabled &&
 			    users[userid].last_pkt + 60 > time(NULL) &&
 			    users[userid].q_sendrealsoon.id != 0 &&

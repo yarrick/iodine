@@ -25,6 +25,9 @@
 #ifdef WINDOWS32
 #include "windows.h"
 #else
+#ifdef ANDROID
+#include "android_dns.h"
+#endif
 #include <arpa/nameser.h>
 #ifdef DARWIN
 #define BIND_8_COMPAT

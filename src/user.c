@@ -33,7 +33,8 @@
 #include "encoding.h"
 #include "user.h"
 
-struct user users[USERS];
+struct user *users;
+unsigned usercount;
 
 int
 init_users(in_addr_t my_ip, int netbits)
@@ -41,7 +42,6 @@ init_users(in_addr_t my_ip, int netbits)
 	int i;
 	int skip = 0;
 	char newip[16];
-	int created_users = 0;
 
 	int maxusers;
 
@@ -57,9 +57,10 @@ init_users(in_addr_t my_ip, int netbits)
 	ipstart.s_addr = my_ip & net.s_addr;
 
 	maxusers = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
+	usercount = MIN(maxusers, USERS);
 	
-	memset(users, 0, USERS * sizeof(struct user));
-	for (i = 0; i < USERS; i++) {
+	users = calloc(usercount, sizeof(struct user));
+	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
 		users[i].id = i;
 		snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
@@ -72,17 +73,12 @@ init_users(in_addr_t my_ip, int netbits)
 		}
 		users[i].tun_ip = ip;
 		net.s_addr = ip;
-		if (maxusers--  < 1) {
-			users[i].disabled = 1;
-		} else {
-			users[i].disabled = 0;
-			created_users++;
-		}
+		users[i].disabled = 0;
 		users[i].active = 0;
  		/* Rest is reset on login ('V' packet) */
 	}
 
-	return created_users;
+	return usercount;
 }
 
 const char*
@@ -100,7 +96,7 @@ users_waiting_on_reply()
 	int i;
 
 	ret = 0;
-	for (i = 0; i < USERS; i++) {
+	for (i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled && 
 			users[i].last_pkt + 60 > time(NULL) &&
 			users[i].q.id != 0 && users[i].conn == CONN_DNS_NULL) {
@@ -118,7 +114,7 @@ find_user_by_ip(uint32_t ip)
 	int i;
 
 	ret = -1;
-	for (i = 0; i < USERS; i++) {
+	for (i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled &&
 			users[i].last_pkt + 60 > time(NULL) &&
 			ip == users[i].tun_ip) {
@@ -143,7 +139,7 @@ all_users_waiting_to_send()
 
 	ret = 1;
 	now = time(NULL);
-	for (i = 0; i < USERS; i++) {
+	for (i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled &&
 			users[i].last_pkt + 60 > now &&
 			((users[i].conn == CONN_RAW_UDP) || 
@@ -167,7 +163,7 @@ find_available_user()
 {
 	int ret = -1;
 	int i;
-	for (i = 0; i < USERS; i++) {
+	for (i = 0; i < usercount; i++) {
 		/* Not used at all or not used in one minute */
 		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
 			users[i].active = 1;
@@ -184,7 +180,7 @@ find_available_user()
 void
 user_switch_codec(int userid, struct encoder *enc)
 {
-	if (userid < 0 || userid >= USERS)
+	if (userid < 0 || userid >= usercount)
 		return;
 	
 	users[userid].encoder = enc;
@@ -193,7 +189,7 @@ user_switch_codec(int userid, struct encoder *enc)
 void
 user_set_conn_type(int userid, enum connection c)
 {
-	if (userid < 0 || userid >= USERS)
+	if (userid < 0 || userid >= usercount)
 		return;
 
 	if (c < 0 || c >= CONN_MAX)

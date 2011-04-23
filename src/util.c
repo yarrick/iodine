@@ -25,6 +25,16 @@ get_resolvconf_addr()
 #ifndef WINDOWS32
 	char buf[80];
 	FILE *fp;
+#ifdef ANDROID
+	fp = popen("getprop net.dns1", "r");
+	if (fp == NULL)
+		err(1, "getprop net.dns1 failed");
+	if (fgets(buf, sizeof(buf), fp) == NULL)
+		err(1, "read getprop net.dns1 failed");
+	if (sscanf(buf, "%15s", addr) == 1)
+		rv = addr;
+	pclose(fp);
+#else
 	
 	rv = NULL;
 
@@ -41,6 +51,7 @@ get_resolvconf_addr()
 	}
 	
 	fclose(fp);
+#endif
 #else /* !WINDOWS32 */
 	FIXED_INFO  *fixed_info;
 	ULONG       buflen;
