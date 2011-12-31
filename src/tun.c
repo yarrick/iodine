@@ -372,8 +372,8 @@ write_tun(int tun_fd, unsigned char *data, size_t len)
 #ifdef LINUX
 	data[0] = 0x00;
 	data[1] = 0x00;
-	data[2] = 0x86;
-	data[3] = 0xdd;
+	data[2] = 0x08;
+	data[3] = 0x00;
 #else /* OPENBSD */
 	data[0] = 0x00;
 	data[1] = 0x00;
