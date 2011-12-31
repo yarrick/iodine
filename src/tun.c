@@ -88,7 +88,7 @@ open_tun(const char *tun_device)
 
 	memset(&ifreq, 0, sizeof(ifreq));
 
-	ifreq.ifr_flags = IFF_TUN | IFF_NO_PI;
+	ifreq.ifr_flags = IFF_TUN;
 
 	if (tun_device != NULL) {
 		strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
