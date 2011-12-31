@@ -22,6 +22,6 @@ void close_tun(int);
 int write_tun(int, char *, size_t);
 ssize_t read_tun(int, char *, size_t);
 int tun_setip(const char *, const char *, int);
-int tun_setmtu(const unsigned);
+int tun_setmtu(unsigned);
 
 #endif /* _TUN_H_ */

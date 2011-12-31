@@ -1519,12 +1519,6 @@ handshake_login(int dns_fd, int seed)
 					return 1;
 				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d", 
 					server, client, &mtu, &netmask) == 4) {
-					
-					/**
-					 * Todo: Correct?
-					 */
-					if(mtu < 1280)
-						mtu = 1280;
 
 					server[64] = 0;
 					client[64] = 0;
