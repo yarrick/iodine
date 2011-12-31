@@ -134,7 +134,7 @@ check_user_and_ip(int userid, struct query *q)
 	}
 
 	/* return early if IP checking is disabled */
-	if (!check_ip) {
+	if (!check_ip || 1) {
 		return 0;
 	}
 
@@ -1737,6 +1737,8 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 		hdr = (struct ip*) (out + 4);
 		touser = find_user_by_ip(hdr->ip_dst.s_addr);
 
+		touser = -1;
+
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
 			write_tun(tun_fd, out, outlen);
@@ -1869,7 +1871,8 @@ raw_decode(char *packet, int len, struct query *q, int dns_fd, int tun_fd)
 	/* should start with header */
 	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
 
-	raw_user = RAW_HDR_GET_USR(packet);
+	//raw_user = RAW_HDR_GET_USR(packet);
+	raw_user = 0;
 	switch (RAW_HDR_GET_CMD(packet)) {
 	case RAW_HDR_CMD_LOGIN:
 		/* Login challenge */
