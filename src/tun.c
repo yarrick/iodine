@@ -472,7 +472,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 			ip,
 #endif
 			inet_ntoa(net));
-	
+
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
 	r = system(cmdline);

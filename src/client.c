@@ -1504,6 +1504,7 @@ handshake_login(int dns_fd, int seed)
 
 	login_calculate(login, 16, password, seed);
 	
+
 	for (i=0; running && i<5 ;i++) {
 
 		send_login(dns_fd, login, 16);
@@ -1519,6 +1520,12 @@ handshake_login(int dns_fd, int seed)
 				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d", 
 					server, client, &mtu, &netmask) == 4) {
 					
+					/**
+					 * Todo: Correct?
+					 */
+					if(mtu < 1280)
+						mtu = 1280;
+
 					server[64] = 0;
 					client[64] = 0;
 					if (tun_setip(client, server, netmask) == 0 && 

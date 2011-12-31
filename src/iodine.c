@@ -138,7 +138,8 @@ main(int argc, char **argv)
 	int hostname_maxlen;
 	int rtable = 0;
 
-	printf("***MODIFIED***");
+	printf("***MODIFIED***\n");
+	fflush(stdout);
 
 	nameserv_addr = NULL;
 	topdomain = NULL;
@@ -327,10 +328,12 @@ main(int argc, char **argv)
 		retval = 1;
 		goto cleanup1;
 	}
+
 	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1) {
 		retval = 1;
 		goto cleanup2;
 	}
+
 #ifdef OPENBSD
 	if (rtable > 0)
 		socket_setrtable(dns_fd, rtable);
@@ -346,7 +349,7 @@ main(int argc, char **argv)
 		retval = 1;
 		goto cleanup2;
 	}
-	
+
 	if (client_get_conn() == CONN_RAW_UDP) {
 		fprintf(stderr, "Sending raw traffic directly to %s\n", client_get_raw_addr());
 	}
