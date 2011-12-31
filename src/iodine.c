@@ -138,6 +138,8 @@ main(int argc, char **argv)
 	int hostname_maxlen;
 	int rtable = 0;
 
+	printf("***MODIFIED***");
+
 	nameserv_addr = NULL;
 	topdomain = NULL;
 #ifndef WINDOWS32
