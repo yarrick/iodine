@@ -352,3 +352,16 @@ int recent_seqno(int ourseqno, int gotseqno)
 	}
 	return 0;
 }
+
+void inet6_addr_add(struct in6_addr *addr, uint8_t amount) {
+	char i;
+	for (i = 15; i >= 0; --i) {
+		uint16_t next = addr->__in6_u.__u6_addr8[i];
+		next = next + amount;
+		addr->__in6_u.__u6_addr8[i] = next;
+		if(next & 0xff00)
+			amount = 1;
+		else
+			break;
+	}
+}

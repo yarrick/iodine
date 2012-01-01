@@ -433,6 +433,18 @@ read_tun(int tun_fd, char *buf, size_t len)
 #endif /* !FREEBSD */
 }
 
+int tun_setip6(char const *ip6, char netmask6) {
+	char cmdline[512];
+
+	snprintf(cmdline, sizeof(cmdline),
+			IFCONFIGPATH "ifconfig %s inet6 add %s/%d",
+			if_name,
+			ip6,
+			netmask6);
+
+	return system(cmdline);
+}
+
 int
 tun_setip(const char *ip, const char *other_ip, int netbits)
 {

@@ -76,7 +76,7 @@ struct user {
 
 extern struct user *users;
 
-int init_users(in_addr_t, int);
+int init_users(in_addr_t my_ip, int netbits, struct in6_addr my_net6);
 const char* users_get_first_ip();
 int users_waiting_on_reply();
 int find_user_by_ip(uint32_t);

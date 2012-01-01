@@ -78,7 +78,7 @@ static int created_users;
 static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
-static struct in6_addr my_ip6;
+static struct in6_addr my_net6;
 static int netmask;
 static char netmask6;
 
@@ -2339,23 +2339,23 @@ main(int argc, char **argv)
 	 * Todo: Fix ;-)
 	 */
 	if (v6) {
-		if (inet_pton(AF_INET6, "2001:4242:4242:4242:4242:4242:4242:1", &my_ip6)
+		if (inet_pton(AF_INET6, "2001:4242:4242:4242:4242:4242:4242:0000", &my_net6)
 				!= 1) {
 			warnx("Bad IPv6 address to use inside tunnel.");
 			usage();
 		}
+		netmask6 = 112;
 
-		printf("IPv6 address: ");
+		printf("IPv6 net: ");
 		char i;
 		for (i = 0; i < 8; ++i)
-			printf("%04x%s", ntohs(my_ip6.__in6_u.__u6_addr16[i]), i < 7 ? ":"
+			printf("%04x%s", ntohs(my_net6.__in6_u.__u6_addr16[i]), i < 7 ? ":"
 					: "\n");
 
 		if (my_ip == INADDR_NONE) {
 			warnx("Bad IP address to use inside tunnel.");
 			usage();
 		}
-		netmask6 = 112;
 	}
 
 	topdomain = strdup(argv[1]);
@@ -2437,7 +2437,7 @@ main(int argc, char **argv)
 			read_password(password, sizeof(password));
 	}
 
-	created_users = init_users(my_ip, netmask);
+	created_users = init_users(my_ip, netmask, my_net6);
 
 	if ((tun_fd = open_tun(device)) == -1) {
 		retval = 1;
@@ -2449,6 +2449,20 @@ main(int argc, char **argv)
 			retval = 1;
 			free((void*) other_ip);
 			goto cleanup1;
+		}
+		if (v6) {
+			struct in6_addr my_ip6;
+			memcpy(&my_ip6, &my_net6, sizeof(my_net6));
+			inet6_addr_add(&my_ip6, 1);
+
+			char buf[41];
+			inet_ntop(AF_INET6, &my_ip6, buf, sizeof(buf));
+			if (tun_setip6(buf, netmask6) != 0) {
+
+				retval = 1;
+				free((void*) other_ip);
+				goto cleanup1;
+			}
 		}
 		free((void*) other_ip);
 	}

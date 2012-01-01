@@ -39,6 +39,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include <err.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stdint.h>
 #endif
 
 #define DNS_PORT 53
@@ -131,5 +132,7 @@ void warnx(const char *fmt, ...);
 #endif
 
 int recent_seqno(int , int);
+
+void inet6_addr_add(struct in6_addr *addr, uint8_t amount);
 
 #endif
