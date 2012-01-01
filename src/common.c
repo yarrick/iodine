@@ -367,23 +367,10 @@ void inet6_addr_add(struct in6_addr *addr, uint8_t amount) {
 }
 
 char inet6_addr_equals(struct in6_addr *a, struct in6_addr *b) {
-	printf("a: ");
 	char i;
-	for (i = 0; i < 8; ++i)
-		printf("%04x%s", ntohs((*a).__in6_u.__u6_addr16[i]), i < 7 ? ":"
-				: "\n");
-
-	printf("b: ");
-	for (i = 0; i < 8; ++i)
-		printf("%04x%s", ntohs((*b).__in6_u.__u6_addr16[i]), i < 7 ? ":"
-				: "\n");
-
-//	char i;
 	for (i = 3; i >= 0; --i)
 		if(a->__in6_u.__u6_addr32[i] != b->__in6_u.__u6_addr32[i])
 			return 0;
-
-	printf("true!\n");
 
 	return 1;
 }
