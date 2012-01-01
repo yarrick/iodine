@@ -121,8 +121,6 @@ find_user_by_ip(uint32_t ip)
 	int ret;
 	int i;
 
-	return 0;
-
 	ret = -1;
 	for (i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled &&
