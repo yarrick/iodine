@@ -571,6 +571,12 @@ tunnel_tun(int tun_fd, int dns_fd)
 		userid = find_user_by_ip6(header6->ip6_dst);
 	}
 
+	printf("header6->ip6_dst: ");
+	char i;
+	for (i = 0; i < 8; ++i)
+		printf("%04x%s", ntohs((header6->ip6_dst).__in6_u.__u6_addr16[i]), i < 7 ? ":"
+				: "\n");
+
 	printf("tunnel_tun() - userid = %d, ntohs(header_info[1]) = %d\n", userid, ntohs(header_info[1]));
 
 	if (userid < 0)
