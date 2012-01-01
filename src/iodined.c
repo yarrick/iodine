@@ -571,7 +571,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 		userid = find_user_by_ip6(header6->ip6_dst);
 	}
 
-	printf("tunnel_tun() - userid = %d\n", userid);
+	printf("tunnel_tun() - userid = %d, ntohs(header_info[1]) = %d\n", userid, ntohs(header_info[1]));
 
 	if (userid < 0)
 		return 0;
