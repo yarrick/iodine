@@ -1521,19 +1521,20 @@ handshake_login(int dns_fd, int seed)
 				if (strncmp("LNAK", in, 4) == 0) {
 					fprintf(stderr, "Bad password\n");
 					return 1;
-				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d-%64[^-]-%d",
-					server, client, &mtu, &netmask, server6, client6, &netmask6) == 4) {
-
-					fprintf(stderr, "Server tunnel IPv6 is %s\n", server6);
-					fprintf(stderr, "Client tunnel IPv6 is %s\n", client6);
-					fprintf(stderr, "Tunnel netmask is %d\n", netmask6);
+				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d-%64[^-]-%64[^-]-%d",
+					server, client, &mtu, &netmask, server6, client6, &netmask6) == 7) {
 
 					server[64] = 0;
 					client[64] = 0;
 					if (tun_setip(client, server, netmask) == 0 && 
-						tun_setmtu(mtu) == 0) {
+						tun_setmtu(mtu) == 0 && !tun_setip6(client6, netmask6)) {
 
 						fprintf(stderr, "Server tunnel IP is %s\n", server);
+
+						fprintf(stderr, "Server tunnel IPv6 is %s\n", server6);
+						fprintf(stderr, "Client tunnel IPv6 is %s\n", client6);
+						fprintf(stderr, "Tunnel netmask6 is %d\n", netmask6);
+
 						return 0;
 					} else {
 						errx(4, "Failed to set IP and MTU");

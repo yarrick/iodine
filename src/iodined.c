@@ -803,6 +803,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				read = snprintf(out, sizeof(out), "%s-%s-%d-%d-%s-%s-%d",
 						tmp[0], tmp[1], my_mtu, netmask, server6, client6, netmask6);
 
+				printf("%s\n", out);
+
 				write_dns(dns_fd, q, out, read, users[userid].downenc);
 				q->id = 0;
 				syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
