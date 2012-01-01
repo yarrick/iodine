@@ -1770,6 +1770,14 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 			touser = find_user_by_ip6(hdr->ip6_dst);
 		}
 
+		struct ip6_hdr *h6;
+		h6 = (struct ip6_hdr*) (out + 4);
+		printf("hdr->ip6_dst: ");
+		char i;
+		for (i = 0; i < 8; ++i)
+			printf("%04x%s", ntohs((h6->ip6_dst).__in6_u.__u6_addr16[i]), i < 7 ? ":"
+					: "\n");
+
 		printf("handle_full_packet() - touser = %d, version = %d\n", touser, hdr->ip_v);
 
 		if (touser == -1) {
