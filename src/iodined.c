@@ -561,7 +561,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 		return 0;
 
 	uint16_t *header_info = (uint16_t*)in;
-	if(ntohs(header_info[1]) == 0x0008) {
+	if(header_info[1] == 0x0008) {
 		/* find target ip in packet, in is padded with 4 bytes TUN header */
 		header = (struct ip*) (in + 4);
 		userid = find_user_by_ip(header->ip_dst.s_addr);
@@ -577,7 +577,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 		printf("%04x%s", ntohs((header6->ip6_dst).__in6_u.__u6_addr16[i]), i < 7 ? ":"
 				: "\n");
 
-	printf("tunnel_tun() - userid = %d, ntohs(header_info[1]) = %d\n", userid, ntohs(header_info[1]));
+	printf("tunnel_tun() - userid = %d, header_info[1] = %d\n", userid, header_info[1]);
 
 	if (userid < 0)
 		return 0;
