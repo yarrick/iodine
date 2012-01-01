@@ -789,8 +789,19 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				tempip.s_addr = users[userid].tun_ip;
 				tmp[1] = strdup(inet_ntoa(tempip));
 
-				read = snprintf(out, sizeof(out), "%s-%s-%d-%d",
-						tmp[0], tmp[1], my_mtu, netmask);
+				struct in6_addr ip6;
+
+				memcpy(&ip6, &my_net6, sizeof(my_net6));
+				inet6_addr_add(&ip6, 1);
+				char server6[41];
+				inet_ntop(AF_INET6, &ip6, server6, sizeof(server6));
+
+				memcpy(&ip6, &(users[userid].tun_ip6), sizeof(my_net6));
+				char client6[41];
+				inet_ntop(AF_INET6, &ip6, client6, sizeof(client6));
+
+				read = snprintf(out, sizeof(out), "%s-%s-%d-%d-%s-%s-%d",
+						tmp[0], tmp[1], my_mtu, netmask, server6, client6, netmask6);
 
 				write_dns(dns_fd, q, out, read, users[userid].downenc);
 				q->id = 0;

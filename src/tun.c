@@ -442,6 +442,8 @@ int tun_setip6(char const *ip6, char netmask6) {
 			ip6,
 			netmask6);
 
+	fprintf(stderr, "Setting IPv6 of %s to %s/%d\n", if_name, ip6, netmask6);
+
 	return system(cmdline);
 }
 
