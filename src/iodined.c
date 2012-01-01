@@ -567,8 +567,8 @@ tunnel_tun(int tun_fd, int dns_fd)
 		userid = find_user_by_ip(header->ip_dst.s_addr);
 	}
 	else {
-		header = (struct ip6_hdr*) (in + 4);
-		userid = find_user_by_ip6(header->ip6_dst);
+		header6 = (struct ip6_hdr*) (in + 4);
+		userid = find_user_by_ip6(header6->ip6_dst);
 	}
 
 	if (userid < 0)
@@ -1758,13 +1758,10 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 
 	if (ret == Z_OK) {
 
-		uint16_t *header_info = (uint16_t*)out;
-		if(ntohs(header_info[1]) == 0x0008) {
-			struct ip *hdr;
-
-			hdr = (struct ip*) (out + 4);
+		struct ip *hdr;
+		hdr = (struct ip*) (out + 4);
+		if(hdr->ip_v == 0x04)
 			touser = find_user_by_ip(hdr->ip_dst.s_addr);
-		}
 		else {
 			struct ip6_hdr *hdr;
 			hdr = (struct ip6_hdr*) (out + 4);
@@ -1773,7 +1770,7 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
-			write_tun(tun_fd, out, outlen);
+			write_tun(tun_fd, out, outlen, hdr->ip_v);
 		} else {
 			/* send the compressed(!) packet to other client */
 		/*XXX START adjust indent 1 tab forward*/

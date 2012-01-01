@@ -363,17 +363,24 @@ close_tun(int tun_fd)
 }
 
 int 
-write_tun(int tun_fd, unsigned char *data, size_t len)
+write_tun(int tun_fd, unsigned char *data, size_t len, char version)
 {
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	data += 4;
 	len -= 4;
 #else /* !FREEBSD/DARWIN */
 #ifdef LINUX
-	data[0] = 0x00;
-	data[1] = 0x00;
-	data[2] = 0x86;
-	data[3] = 0xdd;
+	if (version == 6) {
+		data[0] = 0x00;
+		data[1] = 0x00;
+		data[2] = 0x86;
+		data[3] = 0xdd;
+	} else {
+		data[0] = 0x00;
+		data[1] = 0x00;
+		data[2] = 0x08;
+		data[3] = 0x00;
+	}
 #else /* OPENBSD */
 	data[0] = 0x00;
 	data[1] = 0x00;

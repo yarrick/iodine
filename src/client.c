@@ -42,6 +42,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <netdb.h>
+#include <netinet/ip.h>
 #endif
 
 #include "common.h"
@@ -715,7 +716,10 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 		r -= RAW_HDR_LEN;
 		datalen = sizeof(buf);
 		if (uncompress((uint8_t*)buf, &datalen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
-			write_tun(tun_fd, buf, datalen);
+			struct ip *hdr;
+			hdr = (struct ip*) (buf + 4);
+
+			write_tun(tun_fd, buf, datalen, hdr->ip_v);
 		}
 
 		/* don't process any further */
@@ -1069,7 +1073,10 @@ tunnel_dns(int tun_fd, int dns_fd)
 			/* RE-USES buf[] */
 			datalen = sizeof(buf);
 			if (uncompress((uint8_t*)buf, &datalen, (uint8_t*) inpkt.data, inpkt.len) == Z_OK) {
-				write_tun(tun_fd, buf, datalen);
+				struct ip *hdr;
+				hdr = (struct ip*) (buf + 4);
+
+				write_tun(tun_fd, buf, datalen, hdr->ip_v);
 			}
 			inpkt.len = 0;
 			/* Keep .seqno and .fragment as is, so that we won't
