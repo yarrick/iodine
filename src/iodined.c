@@ -40,6 +40,7 @@
 #define _XPG4_2
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <grp.h>
 #include <sys/uio.h>
 #include <pwd.h>
@@ -136,7 +137,7 @@ check_user_and_ip(int userid, struct query *q)
 	}
 
 	/* return early if IP checking is disabled */
-	if (!check_ip || 1) {
+	if (!check_ip) {
 		return 0;
 	}
 
@@ -550,6 +551,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 {
 	unsigned long outlen;
 	struct ip *header;
+	struct ip6_hdr *header6;
 	char out[64*1024];
 	char in[64*1024];
 	int userid;
@@ -558,9 +560,17 @@ tunnel_tun(int tun_fd, int dns_fd)
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return 0;
 
-	/* find target ip in packet, in is padded with 4 bytes TUN header */
-	header = (struct ip*) (in + 4);
-	userid = find_user_by_ip(header->ip_dst.s_addr);
+	uint16_t *header_info = (uint16_t*)in;
+	if(ntohs(header_info[1]) == 0x0008) {
+		/* find target ip in packet, in is padded with 4 bytes TUN header */
+		header = (struct ip*) (in + 4);
+		userid = find_user_by_ip(header->ip_dst.s_addr);
+	}
+	else {
+		header = (struct ip6_hdr*) (in + 4);
+		userid = find_user_by_ip6(header->ip6_dst);
+	}
+
 	if (userid < 0)
 		return 0;
 
@@ -1747,12 +1757,19 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 		   (uint8_t*)users[userid].inpacket.data, users[userid].inpacket.len);
 
 	if (ret == Z_OK) {
-		struct ip *hdr;
 
-		hdr = (struct ip*) (out + 4);
-		touser = find_user_by_ip(hdr->ip_dst.s_addr);
+		uint16_t *header_info = (uint16_t*)out;
+		if(ntohs(header_info[1]) == 0x0008) {
+			struct ip *hdr;
 
-		touser = -1;
+			hdr = (struct ip*) (out + 4);
+			touser = find_user_by_ip(hdr->ip_dst.s_addr);
+		}
+		else {
+			struct ip6_hdr *hdr;
+			hdr = (struct ip6_hdr*) (out + 4);
+			touser = find_user_by_ip6(hdr->ip6_dst);
+		}
 
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
@@ -1886,8 +1903,7 @@ raw_decode(char *packet, int len, struct query *q, int dns_fd, int tun_fd)
 	/* should start with header */
 	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
 
-	//raw_user = RAW_HDR_GET_USR(packet);
-	raw_user = 0;
+	raw_user = RAW_HDR_GET_USR(packet);
 	switch (RAW_HDR_GET_CMD(packet)) {
 	case RAW_HDR_CMD_LOGIN:
 		/* Login challenge */

@@ -365,3 +365,11 @@ void inet6_addr_add(struct in6_addr *addr, uint8_t amount) {
 			break;
 	}
 }
+
+char inet6_addr_equals(struct in6_addr *a, struct in6_addr *b) {
+	char i;
+	for (i = 4; i >= 0; --i)
+		if(a->__in6_u.__u6_addr32[i] != b->__in6_u.__u6_addr32[i])
+			return 0;
+	return 1;
+}

@@ -134,5 +134,6 @@ void warnx(const char *fmt, ...);
 int recent_seqno(int , int);
 
 void inet6_addr_add(struct in6_addr *addr, uint8_t amount);
+char inet6_addr_equals(struct in6_addr *a, struct in6_addr *b);
 
 #endif

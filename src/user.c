@@ -136,6 +136,26 @@ find_user_by_ip(uint32_t ip)
 }
 
 int
+find_user_by_ip6(struct in6_addr ip)
+{
+	int ret;
+	int i;
+
+	return 0;
+
+	ret = -1;
+	for (i = 0; i < usercount; i++) {
+		if (users[i].active && !users[i].disabled &&
+			users[i].last_pkt + 60 > time(NULL) &&
+			inet6_addr_equals(&ip, &(users[i].tun_ip6))) {
+			ret = i;
+			break;
+		}
+	}
+	return ret;
+}
+
+int
 all_users_waiting_to_send()
 /* If this returns true, then reading from tun device is blocked.
    So only return true when all clients have at least one packet in
