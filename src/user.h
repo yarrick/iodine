@@ -40,6 +40,7 @@ struct user {
 	time_t last_pkt;
 	int seed;
 	in_addr_t tun_ip;
+	struct in6_addr tun_ip6;
 	struct in_addr host;
 	struct query q;
 	struct query q_sendrealsoon;
