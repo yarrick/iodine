@@ -571,6 +571,8 @@ tunnel_tun(int tun_fd, int dns_fd)
 		userid = find_user_by_ip6(header6->ip6_dst);
 	}
 
+	pritnf("tunnel_tun() - userid = %d", userid);
+
 	if (userid < 0)
 		return 0;
 
@@ -1767,6 +1769,8 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 			hdr = (struct ip6_hdr*) (out + 4);
 			touser = find_user_by_ip6(hdr->ip6_dst);
 		}
+
+		printf("handle_full_packet() - touser = %d, version = %d", touser, hdr->ip_v);
 
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
