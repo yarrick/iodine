@@ -373,7 +373,7 @@ char inet6_addr_equals(struct in6_addr *a, struct in6_addr *b) {
 		printf("%04x%s", ntohs((*a).__in6_u.__u6_addr16[i]), i < 7 ? ":"
 				: "\n");
 
-	printf("a: ");
+	printf("b: ");
 	for (i = 0; i < 8; ++i)
 		printf("%04x%s", ntohs((*b).__in6_u.__u6_addr16[i]), i < 7 ? ":"
 				: "\n");
@@ -382,5 +382,8 @@ char inet6_addr_equals(struct in6_addr *a, struct in6_addr *b) {
 	for (i = 4; i >= 0; --i)
 		if(a->__in6_u.__u6_addr32[i] != b->__in6_u.__u6_addr32[i])
 			return 0;
+
+	printf("true!\n");
+
 	return 1;
 }
