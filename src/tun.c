@@ -365,7 +365,7 @@ close_tun(int tun_fd)
 int 
 write_tun(int tun_fd, unsigned char *data, size_t len, char version)
 {
-	printf("write_tun() - version = %d", version);
+	printf("write_tun() - version = %d\n", version);
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	data += 4;
 	len -= 4;
