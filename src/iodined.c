@@ -2365,7 +2365,7 @@ main(int argc, char **argv)
 
 	check_superuser(usage);
 
-	if (argc != 2)
+	if (argc != 3)
 		usage();
 
 	netsize = strchr(argv[0], '/');
