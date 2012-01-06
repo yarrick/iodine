@@ -558,11 +558,12 @@ tunnel_tun(int tun_fd, int dns_fd)
 	char in[64*1024];
 	int userid;
 	int read;
+	uint16_t *header_info;
 
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return 0;
 
-	uint16_t *header_info = (uint16_t*)in;
+	header_info = (uint16_t*)in;
 	if(header_info[1] == 0x0008) {
 		/* find target ip in packet, in is padded with 4 bytes TUN header */
 		header = (struct ip*) (in + 4);
@@ -573,7 +574,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 		userid = find_user_by_ip6(header6->ip6_dst);
 	}
 
-//	printf("tunnel_tun() - userid = %d, header_info[1] = %d\n", userid, header_info[1]);
+/*	printf("tunnel_tun() - userid = %d, header_info[1] = %d\n", userid, header_info[1]); */
 
 	if (userid < 0)
 		return 0;
@@ -688,6 +689,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 	char *tmp[2];
 	int userid;
 	int read;
+	char server6[41];
+	char client6[41];
 
 	userid = -1;
 
@@ -808,11 +811,9 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 					memcpy(&ip6, &my_net6, sizeof(my_net6));
 					ipv6_addr_add(&ip6, 1);
-					char server6[41];
 					inet_ntop(AF_INET6, &ip6, server6, sizeof(server6));
 
 					memcpy(&ip6, &(users[userid].tun_ip6), sizeof(my_net6));
-					char client6[41];
 					inet_ntop(AF_INET6, &ip6, client6, sizeof(client6));
 
 					read = snprintf(out, sizeof(out), "%s-%s-%d-%d-%s-%s-%d",
@@ -822,7 +823,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 					read = snprintf(out, sizeof(out), "%s-%s-%d-%d", tmp[0],
 							tmp[1], my_mtu, netmask);
 
-				//printf("%s\n", out);
+				/* printf("%s\n", out); */
 
 				write_dns(dns_fd, q, out, read, users[userid].downenc);
 				q->id = 0;
@@ -1757,7 +1758,7 @@ static void
 handle_full_packet(int tun_fd, int dns_fd, int userid)
 {
 	unsigned long outlen;
-	char out[64*1024];
+	unsigned char out[64*1024];
 	int touser;
 	int ret;
 
@@ -1777,6 +1778,7 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 			touser = find_user_by_ip6(hdr->ip6_dst);
 		}
 
+		/*
 		struct ip6_hdr *h6;
 		h6 = (struct ip6_hdr*) (out + 4);
 		printf("hdr->ip6_dst: ");
@@ -1786,6 +1788,7 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 					: "\n");
 
 		printf("handle_full_packet() - touser = %d, version = %d\n", touser, hdr->ip_v);
+		*/
 
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
@@ -2252,6 +2255,7 @@ main(int argc, char **argv)
 	int skipipconfig;
 	char *netsize;
 	int retval;
+	char buf[41];
 
 #ifndef WINDOWS32
 	pw = NULL;
@@ -2512,7 +2516,7 @@ main(int argc, char **argv)
 			memcpy(&my_ip6, &my_net6, sizeof(my_net6));
 			ipv6_addr_add(&my_ip6, 1);
 
-			char buf[41];
+
 			inet_ntop(AF_INET6, &my_ip6, buf, sizeof(buf));
 			if (tun_setip6(buf, netmask6) != 0) {
 
