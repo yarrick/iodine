@@ -88,6 +88,8 @@ static in_addr_t ns_ip;
 static int bind_port;
 static int debug;
 
+static char v6;
+
 #if !defined(BSD) && !defined(__GLIBC__)
 static char *__progname;
 #endif
@@ -801,21 +803,27 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				tempip.s_addr = users[userid].tun_ip;
 				tmp[1] = strdup(inet_ntoa(tempip));
 
-				struct in6_addr ip6;
+				if (v6) {
+					struct in6_addr ip6;
 
-				memcpy(&ip6, &my_net6, sizeof(my_net6));
-				ipv6_addr_add(&ip6, 1);
-				char server6[41];
-				inet_ntop(AF_INET6, &ip6, server6, sizeof(server6));
+					memcpy(&ip6, &my_net6, sizeof(my_net6));
+					ipv6_addr_add(&ip6, 1);
+					char server6[41];
+					inet_ntop(AF_INET6, &ip6, server6, sizeof(server6));
 
-				memcpy(&ip6, &(users[userid].tun_ip6), sizeof(my_net6));
-				char client6[41];
-				inet_ntop(AF_INET6, &ip6, client6, sizeof(client6));
+					memcpy(&ip6, &(users[userid].tun_ip6), sizeof(my_net6));
+					char client6[41];
+					inet_ntop(AF_INET6, &ip6, client6, sizeof(client6));
 
-				read = snprintf(out, sizeof(out), "%s-%s-%d-%d-%s-%s-%d",
-						tmp[0], tmp[1], my_mtu, netmask, server6, client6, netmask6);
+					read = snprintf(out, sizeof(out), "%s-%s-%d-%d-%s-%s-%d",
+							tmp[0], tmp[1], my_mtu, netmask, server6, client6,
+							netmask6);
+				}
 
-				printf("%s\n", out);
+				read = snprintf(out, sizeof(out), "%s-%s-%d-%d",
+						tmp[0], tmp[1], my_mtu, netmask);
+
+				//printf("%s\n", out);
 
 				write_dns(dns_fd, q, out, read, users[userid].downenc);
 				q->id = 0;
@@ -2245,8 +2253,6 @@ main(int argc, char **argv)
 	int skipipconfig;
 	char *netsize;
 	int retval;
-
-	char v6;
 
 #ifndef WINDOWS32
 	pw = NULL;

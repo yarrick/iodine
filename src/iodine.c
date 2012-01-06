@@ -179,7 +179,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhru6:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "6vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
