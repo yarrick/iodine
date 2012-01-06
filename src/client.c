@@ -727,7 +727,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 			struct ip *hdr;
 			hdr = (struct ip*) (buf + 4);
 
-			write_tun(tun_fd, buf, datalen, hdr->ip_v);
+			write_tun(tun_fd, (unsigned char*)buf, datalen, hdr->ip_v);
 		}
 
 		/* don't process any further */
@@ -1084,7 +1084,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 				struct ip *hdr;
 				hdr = (struct ip*) (buf + 4);
 
-				write_tun(tun_fd, buf, datalen, hdr->ip_v);
+				write_tun(tun_fd, (unsigned char*)buf, datalen, hdr->ip_v);
 			}
 			inpkt.len = 0;
 			/* Keep .seqno and .fragment as is, so that we won't
