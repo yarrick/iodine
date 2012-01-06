@@ -818,10 +818,9 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 					read = snprintf(out, sizeof(out), "%s-%s-%d-%d-%s-%s-%d",
 							tmp[0], tmp[1], my_mtu, netmask, server6, client6,
 							netmask6);
-				}
-
-				read = snprintf(out, sizeof(out), "%s-%s-%d-%d",
-						tmp[0], tmp[1], my_mtu, netmask);
+				} else
+					read = snprintf(out, sizeof(out), "%s-%s-%d-%d", tmp[0],
+							tmp[1], my_mtu, netmask);
 
 				//printf("%s\n", out);
 
@@ -2299,7 +2298,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
-	while ((choice = getopt(argc, argv, "vcsfhD6u:t:d:m:l:p:n:b:P:z:F:")) != -1) {
+	while ((choice = getopt(argc, argv, "6vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -2371,7 +2370,7 @@ main(int argc, char **argv)
 
 	check_superuser(usage);
 
-	if (argc != 3)
+	if (argc != 2 + v6)
 		usage();
 
 	netsize = strchr(argv[0], '/');
