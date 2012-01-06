@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +23,9 @@ void close_tun(int);
 int write_tun(int, unsigned char *, size_t, char version);
 ssize_t read_tun(int, char *, size_t);
 int tun_setip(const char *, const char *, int);
+#ifdef LINUX
 int tun_setip6(char const *ip6, char netmask6);
+#endif
 int tun_setmtu(unsigned);
 
 #endif /* _TUN_H_ */

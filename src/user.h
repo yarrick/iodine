@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -80,7 +81,9 @@ int init_users(in_addr_t my_ip, int netbits, struct in6_addr my_net6);
 const char* users_get_first_ip();
 int users_waiting_on_reply();
 int find_user_by_ip(uint32_t);
+#ifdef LINUX
 int find_user_by_ip6(struct in6_addr ip);
+#endif
 int all_users_waiting_to_send();
 int find_available_user();
 void user_switch_codec(int userid, struct encoder *enc);

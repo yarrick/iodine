@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -60,9 +61,15 @@ static void
 usage() {
 	extern char *__progname;
 
+#ifdef LINUX
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-6] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+#elif
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
+			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+#endif
 	exit(2);
 }
 
@@ -71,9 +78,15 @@ help() {
 	extern char *__progname;
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
+#ifdef LINUX
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-6] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+#elif
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
+			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+#endif
 	fprintf(stderr, "Options to try if connection doesn't work:\n");
 	fprintf(stderr, "  -T force dns type: NULL, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
 	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
@@ -84,7 +97,9 @@ help() {
 	fprintf(stderr, "  -M max size of upstream hostnames (~100-255, default: 255)\n");
 	fprintf(stderr, "  -r to skip raw UDP mode attempt\n");
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+#ifdef LINUX
 	fprintf(stderr, "  -6 use IPv6 (make sure to use this option consistently on client and server)\n");
+#endif
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
@@ -137,7 +152,9 @@ main(int argc, char **argv)
 	int lazymode;
 	int selecttimeout;
 	int hostname_maxlen;
+#ifdef LINUX
 	char v6;
+#endif
 	int rtable = 0;
 
 	nameserv_addr = NULL;
@@ -162,7 +179,9 @@ main(int argc, char **argv)
 	selecttimeout = 4;
 	hostname_maxlen = 0xFF;
 
+#ifdef LINUX
 	v6 = 0;
+#endif
 
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
@@ -179,7 +198,11 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
+#ifdef LINUX
 	while ((choice = getopt(argc, argv, "6vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+#elif
+	while ((choice = getopt(argc, argv, "vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+#endif
 		switch(choice) {
 		case 'v':
 			version();
@@ -250,9 +273,11 @@ main(int argc, char **argv)
 			if (selecttimeout < 1)
 				selecttimeout = 1;
 			break;
+#ifdef LINUX
 		case '6':
 			v6 = 1;
 			break;
+#endif
 		default:
 			usage();
 			/* NOTREACHED */
@@ -308,7 +333,9 @@ main(int argc, char **argv)
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
+#ifdef LINUX
 	client_set_v6(v6);
+#endif
 	
 	if (username != NULL) {
 #ifndef WINDOWS32

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -441,6 +442,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 #endif /* !FREEBSD */
 }
 
+#ifdef LINUX
 int tun_setip6(char const *ip6, char netmask6) {
 	char cmdline[512];
 
@@ -454,6 +456,7 @@ int tun_setip6(char const *ip6, char netmask6) {
 
 	return system(cmdline);
 }
+#endif
 
 int
 tun_setip(const char *ip, const char *other_ip, int netbits)

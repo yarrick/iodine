@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -133,6 +134,7 @@ find_user_by_ip(uint32_t ip)
 	return ret;
 }
 
+#ifdef LINUX
 int
 find_user_by_ip6(struct in6_addr ip)
 {
@@ -150,6 +152,7 @@ find_user_by_ip6(struct in6_addr ip)
 	}
 	return ret;
 }
+#endif
 
 int
 all_users_waiting_to_send()

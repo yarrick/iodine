@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -40,7 +41,9 @@
 #define _XPG4_2
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#ifdef LINUX
 #include <netinet/ip6.h>
+#endif
 #include <grp.h>
 #include <sys/uio.h>
 #include <pwd.h>
@@ -79,7 +82,9 @@ static int created_users;
 static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
+#ifdef LINUX
 static struct in6_addr my_net6;
+#endif
 static int netmask;
 static char netmask6;
 
@@ -88,7 +93,9 @@ static in_addr_t ns_ip;
 static int bind_port;
 static int debug;
 
+#ifdef LINUX
 static char v6;
+#endif
 
 #if !defined(BSD) && !defined(__GLIBC__)
 static char *__progname;
@@ -553,7 +560,9 @@ tunnel_tun(int tun_fd, int dns_fd)
 {
 	unsigned long outlen;
 	struct ip *header;
+#ifdef LINUX
 	struct ip6_hdr *header6;
+#endif
 	char out[64*1024];
 	char in[64*1024];
 	int userid;
@@ -563,16 +572,20 @@ tunnel_tun(int tun_fd, int dns_fd)
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return 0;
 
+#ifdef LINUX
 	header_info = (uint16_t*)in;
 	if(header_info[1] == 0x0008) {
+#endif
 		/* find target ip in packet, in is padded with 4 bytes TUN header */
 		header = (struct ip*) (in + 4);
 		userid = find_user_by_ip(header->ip_dst.s_addr);
+#ifdef LINUX
 	}
 	else {
 		header6 = (struct ip6_hdr*) (in + 4);
 		userid = find_user_by_ip6(header6->ip6_dst);
 	}
+#endif
 
 /*	printf("tunnel_tun() - userid = %d, header_info[1] = %d\n", userid, header_info[1]); */
 
@@ -806,6 +819,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				tempip.s_addr = users[userid].tun_ip;
 				tmp[1] = strdup(inet_ntoa(tempip));
 
+#ifdef LINUX
 				if (v6) {
 					struct in6_addr ip6;
 
@@ -820,6 +834,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 							tmp[0], tmp[1], my_mtu, netmask, server6, client6,
 							netmask6);
 				} else
+#endif
 					read = snprintf(out, sizeof(out), "%s-%s-%d-%d", tmp[0],
 							tmp[1], my_mtu, netmask);
 
@@ -1768,15 +1783,19 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 
 	if (ret == Z_OK) {
 
+#ifdef LINUX
 		struct ip *hdr;
 		hdr = (struct ip*) (out + 4);
 		if(hdr->ip_v == 0x04)
+#endif
 			touser = find_user_by_ip(hdr->ip_dst.s_addr);
+#ifdef LINUX
 		else {
 			struct ip6_hdr *hdr;
 			hdr = (struct ip6_hdr*) (out + 4);
 			touser = find_user_by_ip6(hdr->ip6_dst);
 		}
+#endif
 
 		/*
 		struct ip6_hdr *h6;
@@ -2172,11 +2191,19 @@ static void
 usage() {
 	extern char *__progname;
 
+#ifdef LINUX
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] "
 		"[-b dnsport] [-P password] [-F pidfile] "
 		"tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
+#elif
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
+		"[-l ip address to listen on] [-p port] [-n external ip] "
+		"[-b dnsport] [-P password] [-F pidfile] "
+		"tunnel_ip[/netmask] topdomain\n", __progname);
+#endif
 	exit(2);
 }
 
@@ -2185,10 +2212,17 @@ help() {
 	extern char *__progname;
 
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
+#ifdef LINUX
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
 		"[-F pidfile] tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
+#elif
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
+		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
+		"[-F pidfile] tunnel_ip[/netmask] topdomain\n", __progname);
+#endif
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
@@ -2197,7 +2231,9 @@ help() {
 	fprintf(stderr, "  -f to keep running in foreground\n");
 	fprintf(stderr, "  -D to increase debug level\n");
 	fprintf(stderr, "     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n");
+#ifdef LINUX
 	fprintf(stderr, "  -6 use IPv6 (make sure to use this option consistently on client and server)\n");
+#endif
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
@@ -2277,7 +2313,9 @@ main(int argc, char **argv)
 	debug = 0;
 	netmask = 27;
 	pidfile = NULL;
+#ifdef LINUX
 	v6 = 0;
+#endif
 
 	b32 = get_base32_encoder();
 	b64 = get_base64_encoder();
@@ -2302,7 +2340,11 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
+#ifdef LINUX
 	while ((choice = getopt(argc, argv, "6vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
+#elif
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
+#endif
 		switch(choice) {
 		case 'v':
 			version();
@@ -2360,9 +2402,11 @@ main(int argc, char **argv)
 		case 'z':
 			context = optarg;
 			break;
+#ifdef LINUX
 		case '6':
 			v6 = 1;
 			break;
+#endif
 		default:
 			usage();
 			break;
@@ -2374,7 +2418,11 @@ main(int argc, char **argv)
 
 	check_superuser(usage);
 
+#ifdef LINUX
 	if (argc != 2 + v6)
+#elif
+	if (argc != 2)
+#endif
 		usage();
 
 	netsize = strchr(argv[0], '/');
@@ -2391,6 +2439,7 @@ main(int argc, char **argv)
 		usage();
 	}
 
+#ifdef LINUX
 	if (v6) {
 		netsize = strchr(argv[1], '/');
 		if (netsize) {
@@ -2418,8 +2467,13 @@ main(int argc, char **argv)
 		fprintf(stderr, "IPv6 network: ");
 		ipv6_print(&my_net6, netmask6);
 	}
+#endif
 
+#ifdef LINUX
 	topdomain = strdup(argv[1 + v6]);
+#elif
+	topdomain = strdup(argv[1]);
+#endif
 	if (strlen(topdomain) <= 128) {
 		if(check_topdomain(topdomain)) {
 			warnx("Topdomain contains invalid characters.");
@@ -2511,6 +2565,7 @@ main(int argc, char **argv)
 			free((void*) other_ip);
 			goto cleanup1;
 		}
+#ifdef LINUX
 		if (v6) {
 			struct in6_addr my_ip6;
 			memcpy(&my_ip6, &my_net6, sizeof(my_net6));
@@ -2525,6 +2580,7 @@ main(int argc, char **argv)
 				goto cleanup1;
 			}
 		}
+#endif
 		free((void*) other_ip);
 	}
 	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
