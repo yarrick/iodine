@@ -550,14 +550,6 @@ tun_setmtu(unsigned mtu)
 #ifndef WINDOWS32
 	char cmdline[512];
 
-	/**
-	 * Todo: Correct?
-	 */
-	if(mtu < 1280) {
-		fprintf(stderr, "Increasing MTU from %u to 1280 (as needed by IPv6)\n", mtu);
-		mtu = 1280;
-	}
-
 	if (mtu > 200 && mtu <= 1500) {
 		snprintf(cmdline, sizeof(cmdline), 
 				IFCONFIGPATH "ifconfig %s mtu %u",

@@ -2406,6 +2406,11 @@ main(int argc, char **argv)
 			usage();
 		}
 
+		if(mtu < 1280) {
+			fprintf(stderr, "Increasing MTU from %u to 1280 (as needed by IPv6)\n", mtu);
+			mtu = 1280;
+		}
+
 		fprintf(stderr, "IPv6 network: ");
 		ipv6_print(&my_net6, netmask6);
 	}

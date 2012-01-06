@@ -1548,6 +1548,11 @@ handshake_login(int dns_fd, int seed)
 				} else if (handshake_login_info_check(in, server, client, &mtu, &netmask,
 					server6, client6, &netmask6)) {
 
+					if(_v6 && mtu < 1280) {
+						fprintf(stderr, "Increasing MTU from %u to 1280 (as needed by IPv6)\n", mtu);
+						mtu = 1280;
+					}
+
 					server[64] = 0;
 					client[64] = 0;
 					if (tun_setip(client, server, netmask) == 0 && 
