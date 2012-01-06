@@ -2410,7 +2410,7 @@ main(int argc, char **argv)
 		ipv6_print(&my_net6, netmask6);
 	}
 
-	topdomain = strdup(argv[2]);
+	topdomain = strdup(argv[1 + v6]);
 	if (strlen(topdomain) <= 128) {
 		if(check_topdomain(topdomain)) {
 			warnx("Topdomain contains invalid characters.");
