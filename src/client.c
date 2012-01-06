@@ -68,6 +68,8 @@ static const char *topdomain;
 
 static uint16_t rand_seed;
 
+static char _v6;
+
 /* Current up/downstream IP packet */
 static struct packet outpkt;
 static struct packet inpkt;
@@ -297,6 +299,12 @@ client_set_hostname_maxlen(int i)
 {
 	if (i <= 0xFF)
 		hostname_maxlen = i;
+}
+
+void
+client_set_v6(char v6)
+{
+	_v6 = v6;
 }
 
 const char *
@@ -1537,9 +1545,11 @@ handshake_login(int dns_fd, int seed)
 
 						fprintf(stderr, "Server tunnel IP is %s\n", server);
 
+						if (_v6) {
 						fprintf(stderr, "Server tunnel IPv6 is %s\n", server6);
 						fprintf(stderr, "Client tunnel IPv6 is %s\n", client6);
 						fprintf(stderr, "Tunnel netmask6 is %d\n", netmask6);
+					}
 
 						return 0;
 					} else {

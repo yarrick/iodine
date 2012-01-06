@@ -137,9 +137,8 @@ main(int argc, char **argv)
 	int lazymode;
 	int selecttimeout;
 	int hostname_maxlen;
+	char v6;
 	int rtable = 0;
-
-	printf("***MODIFIED***\n");
 
 	nameserv_addr = NULL;
 	topdomain = NULL;
@@ -163,6 +162,8 @@ main(int argc, char **argv)
 	selecttimeout = 4;
 	hostname_maxlen = 0xFF;
 
+	v6 = 0;
+
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
 #endif
@@ -178,7 +179,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "vfhru6:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -249,6 +250,9 @@ main(int argc, char **argv)
 			if (selecttimeout < 1)
 				selecttimeout = 1;
 			break;
+		case '6':
+			v6 = 1;
+			break;
 		default:
 			usage();
 			/* NOTREACHED */
@@ -304,6 +308,7 @@ main(int argc, char **argv)
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
+	client_set_v6(v6);
 	
 	if (username != NULL) {
 #ifndef WINDOWS32
