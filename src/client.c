@@ -1505,6 +1505,16 @@ handshake_version(int dns_fd, int *seed)
 	return 1;
 }
 
+static char handshake_login_info_check(char *in, char *server, char *client,
+		int *mtu, int *netmask, char *server6, char *client6, int *netmask6) {
+	if (_v6)
+		return sscanf(in, "%64[^-]-%64[^-]-%d-%d-%64[^-]-%64[^-]-%d", server,
+				client, mtu, netmask, server6, client6, netmask6) == 7;
+	else
+		return sscanf(in, "%64[^-]-%64[^-]-%d-%d", server, client, mtu, netmask)
+				== 4;
+}
+
 static int
 handshake_login(int dns_fd, int seed)
 {
@@ -1535,13 +1545,13 @@ handshake_login(int dns_fd, int seed)
 				if (strncmp("LNAK", in, 4) == 0) {
 					fprintf(stderr, "Bad password\n");
 					return 1;
-				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d-%64[^-]-%64[^-]-%d",
-					server, client, &mtu, &netmask, server6, client6, &netmask6) == 7) {
+				} else if (handshake_login_info_check(in, server, client, &mtu, &netmask,
+					server6, client6, &netmask6)) {
 
 					server[64] = 0;
 					client[64] = 0;
 					if (tun_setip(client, server, netmask) == 0 && 
-						tun_setmtu(mtu) == 0 && !tun_setip6(client6, netmask6)) {
+						tun_setmtu(mtu) == 0 && (!_v6 || !tun_setip6(client6, netmask6))) {
 
 						fprintf(stderr, "Server tunnel IP is %s\n", server);
 
@@ -1549,7 +1559,7 @@ handshake_login(int dns_fd, int seed)
 						fprintf(stderr, "Server tunnel IPv6 is %s\n", server6);
 						fprintf(stderr, "Client tunnel IPv6 is %s\n", client6);
 						fprintf(stderr, "Tunnel netmask6 is %d\n", netmask6);
-					}
+						}
 
 						return 0;
 					} else {
