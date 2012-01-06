@@ -61,7 +61,7 @@ usage() {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-P password] [-6] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 	exit(2);
 }
@@ -72,7 +72,7 @@ help() {
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-P password] [-6] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 	fprintf(stderr, "Options to try if connection doesn't work:\n");
 	fprintf(stderr, "  -T force dns type: NULL, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
@@ -84,6 +84,7 @@ help() {
 	fprintf(stderr, "  -M max size of upstream hostnames (~100-255, default: 255)\n");
 	fprintf(stderr, "  -r to skip raw UDP mode attempt\n");
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "  -6 use IPv6 (make sure to use this option consistently on client and server)\n");
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
@@ -139,7 +140,6 @@ main(int argc, char **argv)
 	int rtable = 0;
 
 	printf("***MODIFIED***\n");
-	fflush(stdout);
 
 	nameserv_addr = NULL;
 	topdomain = NULL;

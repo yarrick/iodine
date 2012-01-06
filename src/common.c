@@ -353,8 +353,8 @@ int recent_seqno(int ourseqno, int gotseqno)
 	return 0;
 }
 
-void inet6_addr_add(struct in6_addr *addr, uint8_t amount) {
-	char i;
+void ipv6_addr_add(struct in6_addr *addr, uint8_t amount) {
+	int i;
 	for (i = 15; i >= 0; --i) {
 		uint16_t next = addr->__in6_u.__u6_addr8[i];
 		next = next + amount;
@@ -366,11 +366,38 @@ void inet6_addr_add(struct in6_addr *addr, uint8_t amount) {
 	}
 }
 
-char inet6_addr_equals(struct in6_addr *a, struct in6_addr *b) {
-	char i;
+char ipv6_addr_equals(struct in6_addr *a, struct in6_addr *b) {
+	int i;
 	for (i = 3; i >= 0; --i)
 		if(a->__in6_u.__u6_addr32[i] != b->__in6_u.__u6_addr32[i])
 			return 0;
 
 	return 1;
+}
+
+char ipv6_net_check(struct in6_addr *net, char netmask) {
+	uint32_t netmask_full[4];
+	int i;
+
+	for (i = 0; i < 4; ++i)
+		if(32*(i + 1) <= netmask)
+			netmask_full[i] = 0xffffffff;
+		else if(32*i >= netmask)
+			netmask_full[i] = 0x00000000;
+		else
+			netmask_full[i] = ~((1 << (netmask - 32*i)) - 1);
+
+	for (i = 3; i >= 0; --i)
+		if((net->__in6_u.__u6_addr32[i] & netmask_full[i]) != net->__in6_u.__u6_addr32[i])
+			return 0;
+
+	return 1;
+}
+
+void ipv6_print(struct in6_addr *ip, char netmask6) {
+	int i;
+	for (i = 0; i < 8; ++i)
+		fprintf(stderr, "%04x%s", ntohs(ip->__in6_u.__u6_addr16[i]), i < 7 ? ":"
+				: "/");
+	printf("%d\n", netmask6);
 }

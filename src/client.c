@@ -1412,7 +1412,6 @@ send_codec_switch(int fd, int userid, int bits)
 	send_query(fd, buf);
 }
 
-
 static void
 send_downenc_switch(int fd, int userid)
 {
@@ -2347,7 +2346,6 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 	/* notreached */
 	return 1;
 }
-
 
 static int
 handshake_autoprobe_fragsize(int dns_fd)

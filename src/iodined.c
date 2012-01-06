@@ -810,7 +810,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				struct in6_addr ip6;
 
 				memcpy(&ip6, &my_net6, sizeof(my_net6));
-				inet6_addr_add(&ip6, 1);
+				ipv6_addr_add(&ip6, 1);
 				char server6[41];
 				inet_ntop(AF_INET6, &ip6, server6, sizeof(server6));
 
@@ -2168,11 +2168,11 @@ static void
 usage() {
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] "
 		"[-b dnsport] [-P password] [-F pidfile] "
-		"tunnel_ip[/netmask] topdomain\n", __progname);
+		"tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
 	exit(2);
 }
 
@@ -2181,10 +2181,10 @@ help() {
 	extern char *__progname;
 
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
-	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
-		"[-F pidfile] tunnel_ip[/netmask] topdomain\n", __progname);
+		"[-F pidfile] tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
@@ -2193,6 +2193,7 @@ help() {
 	fprintf(stderr, "  -f to keep running in foreground\n");
 	fprintf(stderr, "  -D to increase debug level\n");
 	fprintf(stderr, "     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n");
+	fprintf(stderr, "  -6 use IPv6 (make sure to use this option consistently on client and server)\n");
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
@@ -2207,6 +2208,8 @@ help() {
 	fprintf(stderr, "  -F pidfile to write pid to a file\n");
 	fprintf(stderr, "tunnel_ip is the IP number of the local tunnel interface.\n");
 	fprintf(stderr, "   /netmask sets the size of the tunnel network.\n");
+	fprintf(stderr, "tunnel_net6 is the IPv6 network for the tunnel (2001:4242:: for example).\n");
+	fprintf(stderr, "   /netmask6 sets the size of the tunnel IPv6 network.\n");
 	fprintf(stderr, "topdomain is the FQDN that is delegated to this server.\n");
 	exit(0);
 }
@@ -2249,10 +2252,7 @@ main(int argc, char **argv)
 	char *netsize;
 	int retval;
 
-	/**
-	 * Todo: fix
-	 */
-	char v6 = 1;
+	char v6;
 
 #ifndef WINDOWS32
 	pw = NULL;
@@ -2274,6 +2274,7 @@ main(int argc, char **argv)
 	debug = 0;
 	netmask = 27;
 	pidfile = NULL;
+	v6 = 0;
 
 	b32 = get_base32_encoder();
 	b64 = get_base64_encoder();
@@ -2298,7 +2299,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
-	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhD6u:t:d:m:l:p:n:b:P:z:F:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -2356,6 +2357,9 @@ main(int argc, char **argv)
 		case 'z':
 			context = optarg;
 			break;
+		case '6':
+			v6 = 1;
+			break;
 		default:
 			usage();
 			break;
@@ -2365,7 +2369,10 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	check_superuser(usage);
+	/*
+	 * Todo: Uncomment
+	 */
+//	check_superuser(usage);
 
 	if (argc != 2)
 		usage();
@@ -2379,27 +2386,32 @@ main(int argc, char **argv)
 
 	my_ip = inet_addr(argv[0]);
 
-	/**
-	 * Todo: Fix ;-)
-	 */
+	if (my_ip == INADDR_NONE) {
+		warnx("Bad IP address to use inside tunnel.");
+		usage();
+	}
+
 	if (v6) {
-		if (inet_pton(AF_INET6, "2001:4242:4242:4242:4242:4242:4242:0000", &my_net6)
+		netsize = strchr(argv[1], '/');
+		if (netsize) {
+			*netsize = 0;
+			netsize++;
+			netmask6 = atoi(netsize);
+		}
+
+		if (inet_pton(AF_INET6, argv[1], &my_net6)
 				!= 1) {
 			warnx("Bad IPv6 address to use inside tunnel.");
 			usage();
 		}
-		netmask6 = 112;
 
-		printf("IPv6 net: ");
-		char i;
-		for (i = 0; i < 8; ++i)
-			printf("%04x%s", ntohs(my_net6.__in6_u.__u6_addr16[i]), i < 7 ? ":"
-					: "\n");
-
-		if (my_ip == INADDR_NONE) {
-			warnx("Bad IP address to use inside tunnel.");
+		if (!ipv6_net_check(&my_net6, netmask6)) {
+			warnx("Bad IPv6 network and netmask6 combination.");
 			usage();
 		}
+
+		fprintf(stderr, "IPv6 network: ");
+		ipv6_print(&my_net6, netmask6);
 	}
 
 	topdomain = strdup(argv[1]);
@@ -2497,7 +2509,7 @@ main(int argc, char **argv)
 		if (v6) {
 			struct in6_addr my_ip6;
 			memcpy(&my_ip6, &my_net6, sizeof(my_net6));
-			inet6_addr_add(&my_ip6, 1);
+			ipv6_addr_add(&my_ip6, 1);
 
 			char buf[41];
 			inet_ntop(AF_INET6, &my_ip6, buf, sizeof(buf));
