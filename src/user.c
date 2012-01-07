@@ -40,7 +40,7 @@ unsigned usercount;
 int
 #ifdef LINUX
 init_users(in_addr_t my_ip, int netbits, struct in6_addr my_net6)
-#elif
+#else
 init_users(in_addr_t my_ip, int netbits)
 #endif
 {

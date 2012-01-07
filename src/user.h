@@ -81,7 +81,7 @@ extern struct user *users;
 
 #ifdef LINUX
 int init_users(in_addr_t my_ip, int netbits, struct in6_addr my_net6);
-#elif
+#else
 int init_users(in_addr_t my_ip, int netbits);
 #endif
 const char* users_get_first_ip();

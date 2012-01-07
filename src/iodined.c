@@ -2197,7 +2197,7 @@ usage() {
 		"[-l ip address to listen on] [-p port] [-n external ip] "
 		"[-b dnsport] [-P password] [-F pidfile] "
 		"tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
-#elif
+#else
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] "
@@ -2217,7 +2217,7 @@ help() {
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
 		"[-F pidfile] tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
-#elif
+#else
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
@@ -2342,7 +2342,7 @@ main(int argc, char **argv)
 
 #ifdef LINUX
 	while ((choice = getopt(argc, argv, "6vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
-#elif
+#else
 	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
 #endif
 		switch(choice) {
@@ -2420,7 +2420,7 @@ main(int argc, char **argv)
 
 #ifdef LINUX
 	if (argc != 2 + v6)
-#elif
+#else
 	if (argc != 2)
 #endif
 		usage();
@@ -2471,7 +2471,7 @@ main(int argc, char **argv)
 
 #ifdef LINUX
 	topdomain = strdup(argv[1 + v6]);
-#elif
+#else
 	topdomain = strdup(argv[1]);
 #endif
 	if (strlen(topdomain) <= 128) {
