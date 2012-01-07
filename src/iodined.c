@@ -726,7 +726,11 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 					   ((unpacked[3] & 0xff)));
 		}
 
+#ifdef LINUX
+		if (version == v6 ? VERSION_V6 : VERSION) {
+#else
 		if (version == VERSION) {
+#endif
 			userid = find_available_user();
 			if (userid >= 0) {
 				int i;
@@ -787,7 +791,12 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 					inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			}
 		} else {
-			send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
+#ifdef LINUX
+			if (v6)
+				send_version_response(dns_fd, VERSION_NACK, VERSION_V6, 0, q);
+			else
+#endif
+				send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
 			syslog(LOG_INFO, "dropped user from %s, sent bad version %08X",
 				inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr), version);
 		}

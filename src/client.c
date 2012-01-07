@@ -1473,7 +1473,12 @@ handshake_version(int dns_fd, int *seed)
 
 	for (i = 0; running && i < 5; i++) {
 
-		send_version(dns_fd, VERSION);
+#ifdef LINUX
+		if(_v6)
+			send_version(dns_fd, VERSION_V6);
+		else
+#endif
+			send_version(dns_fd, VERSION);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'v', 'V', i+1);
 
@@ -1493,7 +1498,15 @@ handshake_version(int dns_fd, int *seed)
 					fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
 					return 0;
 				} else if (strncmp("VNAK", in, 4) == 0) {
-					warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
+#ifdef LINUX
+					if (_v6)
+					warnx(
+							"You use protocol v 0x%08x, server uses v 0x%08x. Giving up",
+							VERSION_V6, payload);
+				else
+#endif
+					warnx(
+							"You use protocol v 0x%08x, server uses v 0x%08x. Giving up",
 							VERSION, payload);
 					return 1;
 				} else if (strncmp("VFUL", in, 4) == 0) {
