@@ -727,7 +727,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		}
 
 #ifdef LINUX
-		if (version == v6 ? VERSION_V6 : VERSION) {
+		if (version == (v6 ? VERSION_V6 : VERSION)) {
 #else
 		if (version == VERSION) {
 #endif
