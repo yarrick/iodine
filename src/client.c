@@ -1495,7 +1495,14 @@ handshake_version(int dns_fd, int *seed)
 					userid_char = hex[userid & 15];
 					userid_char2 = hex2[userid & 15];
 
-					fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
+#ifdef LINUX
+					if(_v6)
+						fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION_V6, userid);
+					else
+#endif
+						fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
+
+
 					return 0;
 				} else if (strncmp("VNAK", in, 4) == 0) {
 #ifdef LINUX
