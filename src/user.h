@@ -41,7 +41,9 @@ struct user {
 	time_t last_pkt;
 	int seed;
 	in_addr_t tun_ip;
+#ifdef LINUX
 	struct in6_addr tun_ip6;
+#endif
 	struct in_addr host;
 	struct query q;
 	struct query q_sendrealsoon;
@@ -77,7 +79,11 @@ struct user {
 
 extern struct user *users;
 
+#ifdef LINUX
 int init_users(in_addr_t my_ip, int netbits, struct in6_addr my_net6);
+#elif
+int init_users(in_addr_t my_ip, int netbits);
+#endif
 const char* users_get_first_ip();
 int users_waiting_on_reply();
 int find_user_by_ip(uint32_t);

@@ -38,7 +38,11 @@ struct user *users;
 unsigned usercount;
 
 int
+#ifdef LINUX
 init_users(in_addr_t my_ip, int netbits, struct in6_addr my_net6)
+#elif
+init_users(in_addr_t my_ip, int netbits)
+#endif
 {
 	int i;
 	int skip = 0;
@@ -50,9 +54,11 @@ init_users(in_addr_t my_ip, int netbits, struct in6_addr my_net6)
 	struct in_addr net;
 	struct in_addr ipstart;
 
+#ifdef LINUX
 	struct in6_addr next_v6;
 	memcpy(&next_v6, &my_net6, sizeof(my_net6));
 	ipv6_addr_add(&next_v6, 1);
+#endif
 
 	for (i = 0; i < netbits; i++) {
 		netmask = (netmask << 1) | 1;
@@ -81,8 +87,10 @@ init_users(in_addr_t my_ip, int netbits, struct in6_addr my_net6)
 		users[i].disabled = 0;
 		users[i].active = 0;
 
+#ifdef LINUX
 		ipv6_addr_add(&next_v6, 1);
 		memcpy(&(users[i].tun_ip6), &next_v6, sizeof(struct in6_addr));
+#endif
 
  		/* Rest is reset on login ('V' packet) */
 	}

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -133,9 +134,11 @@ void warnx(const char *fmt, ...);
 
 int recent_seqno(int , int);
 
+#ifdef LINUX
 void ipv6_addr_add(struct in6_addr *addr, uint8_t amount);
 char ipv6_addr_equals(struct in6_addr *a, struct in6_addr *b);
 char ipv6_net_check(struct in6_addr *net, char netmask);
 void ipv6_print(struct in6_addr *ip, char netmask6);
+#endif
 
 #endif

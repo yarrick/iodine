@@ -1,5 +1,6 @@
 /* Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
  * Copyright (c) 2007 Albert Lee <trisk@acm.jhu.edu>.
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -353,6 +354,7 @@ int recent_seqno(int ourseqno, int gotseqno)
 	return 0;
 }
 
+#ifdef LINUX
 void ipv6_addr_add(struct in6_addr *addr, uint8_t amount) {
 	int i;
 	for (i = 15; i >= 0; --i) {
@@ -401,3 +403,4 @@ void ipv6_print(struct in6_addr *ip, char netmask6) {
 				: "/");
 	printf("%d\n", netmask6);
 }
+#endif

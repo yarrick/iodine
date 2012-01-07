@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2011-2012 Julian Kranz <julian@juliankranz.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -68,7 +69,9 @@ static const char *topdomain;
 
 static uint16_t rand_seed;
 
+#ifdef LINUX
 static char _v6;
+#endif
 
 /* Current up/downstream IP packet */
 static struct packet outpkt;
@@ -301,11 +304,13 @@ client_set_hostname_maxlen(int i)
 		hostname_maxlen = i;
 }
 
+#ifdef LINUX
 void
 client_set_v6(char v6)
 {
 	_v6 = v6;
 }
+#endif
 
 const char *
 client_get_raw_addr()
@@ -1507,10 +1512,12 @@ handshake_version(int dns_fd, int *seed)
 
 static char handshake_login_info_check(char *in, char *server, char *client,
 		int *mtu, int *netmask, char *server6, char *client6, int *netmask6) {
+#ifdef LINUX
 	if (_v6)
 		return sscanf(in, "%64[^-]-%64[^-]-%d-%d-%64[^-]-%64[^-]-%d", server,
 				client, mtu, netmask, server6, client6, netmask6) == 7;
 	else
+#endif
 		return sscanf(in, "%64[^-]-%64[^-]-%d-%d", server, client, mtu, netmask)
 				== 4;
 }
@@ -1548,23 +1555,31 @@ handshake_login(int dns_fd, int seed)
 				} else if (handshake_login_info_check(in, server, client, &mtu, &netmask,
 					server6, client6, &netmask6)) {
 
+#ifdef LINUX
 					if(_v6 && mtu < 1280) {
 						fprintf(stderr, "Increasing MTU from %u to 1280 (as needed by IPv6)\n", mtu);
 						mtu = 1280;
 					}
+#endif
 
 					server[64] = 0;
 					client[64] = 0;
 					if (tun_setip(client, server, netmask) == 0 && 
-						tun_setmtu(mtu) == 0 && (!_v6 || !tun_setip6(client6, netmask6))) {
+						tun_setmtu(mtu) == 0
+#ifdef LINUX
+						&& (!_v6 || !tun_setip6(client6, netmask6))
+#endif
+					) {
 
 						fprintf(stderr, "Server tunnel IP is %s\n", server);
 
+#ifdef LINUX
 						if (_v6) {
 						fprintf(stderr, "Server tunnel IPv6 is %s\n", server6);
 						fprintf(stderr, "Client tunnel IPv6 is %s\n", client6);
 						fprintf(stderr, "Tunnel netmask6 is %d\n", netmask6);
 						}
+#endif
 
 						return 0;
 					} else {
