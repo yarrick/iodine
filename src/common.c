@@ -155,6 +155,49 @@ open_dns(int localport, in_addr_t listen_ip)
 	return fd;
 }
 
+int
+open_dns_ipv6(int localport, struct in6_addr listen_ip6)
+{
+	struct sockaddr_in6 addr;
+	int flag = 1;
+	int fd;
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sin6_family = AF_INET6;
+	addr.sin6_port = htons(localport);
+	/* listen_ip already in network byte order from inet_addr, or 0 */
+	addr.sin6_addr = listen_ip6;
+
+	if ((fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+		fprintf(stderr, "got fd %d\n", fd);
+		err(1, "socket");
+	}
+
+	flag = 1;
+#ifdef SO_REUSEPORT
+	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (const void*) &flag, sizeof(flag));
+#endif
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
+
+#ifndef WINDOWS32
+	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
+	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+#endif
+
+#ifdef IP_OPT_DONT_FRAG
+	/* Set dont-fragment ip header flag */
+	flag = DONT_FRAG_VALUE;
+	setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
+#endif
+
+	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+		err(1, "bind");
+
+	fprintf(stderr, "Opened IPv6 UDP socket\n");
+
+	return fd;
+}
+
 void
 close_dns(int fd)
 {

@@ -2289,6 +2289,9 @@ main(int argc, char **argv)
 	int dnsd_fd;
 	int tun_fd;
 
+	int v6_listen;
+
+
 	/* settings for forwarding normal DNS to 
 	 * local real DNS server */
 	int bind_fd;
@@ -2324,6 +2327,7 @@ main(int argc, char **argv)
 	pidfile = NULL;
 #ifdef LINUX
 	v6 = 0;
+	v6_listen = 1;
 #endif
 
 	b32 = get_base32_encoder();
@@ -2592,10 +2596,13 @@ main(int argc, char **argv)
 #endif
 		free((void*) other_ip);
 	}
-	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
+	if ((dnsd_fd = v6_listen ? open_dns_ipv6(port, in6addr_any) : open_dns(port, listen_ip)) == -1) {
 		retval = 1;
 		goto cleanup2;
 	}
+	/**
+	 * Todo: IPv6?
+	 */
 	if (bind_enable) {
 		if ((bind_fd = open_dns(0, INADDR_ANY)) == -1) {
 			retval = 1;

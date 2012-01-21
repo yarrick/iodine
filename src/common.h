@@ -110,6 +110,7 @@ enum connection {
 
 void check_superuser(void (*usage_fn)(void));
 int open_dns(int, in_addr_t);
+int open_dns_ipv6(int localport, struct in6_addr listen_ip6);
 void close_dns(int);
 
 void do_chroot(char *);
