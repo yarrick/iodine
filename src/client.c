@@ -65,12 +65,14 @@ static const char *password;
 
 static struct sockaddr_in nameserv;
 static struct sockaddr_in raw_serv;
+static struct sockaddr_in6 raw_serv6;
 static const char *topdomain;
 
 static uint16_t rand_seed;
 
 #ifdef LINUX
 static char _v6;
+static char _v6_connect = 1;
 #endif
 
 /* Current up/downstream IP packet */
@@ -395,7 +397,12 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd)
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv, sizeof(raw_serv));
+	if (_v6_connect)
+		sendto(fd, packet, len, 0, (struct sockaddr*) &raw_serv6,
+				sizeof(raw_serv));
+	else
+		sendto(fd, packet, len, 0, (struct sockaddr*) &raw_serv,
+				sizeof(raw_serv));
 }
 
 static void
@@ -1670,6 +1677,10 @@ handshake_raw_udp(int dns_fd, int seed)
 	raw_serv.sin_family = AF_INET;
 	raw_serv.sin_port = htons(53);
 	raw_serv.sin_addr = server;
+
+	raw_serv6.sin6_family = AF_INET6;
+	raw_serv6.sin6_port = htons(53);
+	inet_pton(AF_INET6, "2001:4ca0:2001:0018:0216:3eff:fe99:4d2b", &(raw_serv6.sin6_addr));
 
 	/* do login against port 53 on remote server 
 	 * based on the old seed. If reply received,

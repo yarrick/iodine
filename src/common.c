@@ -161,6 +161,7 @@ open_dns_ipv6(int localport, struct in6_addr listen_ip6)
 	struct sockaddr_in6 addr;
 	int flag = 1;
 	int fd;
+	int false = 0;
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin6_family = AF_INET6;
@@ -172,6 +173,8 @@ open_dns_ipv6(int localport, struct in6_addr listen_ip6)
 		fprintf(stderr, "got fd %d\n", fd);
 		err(1, "socket");
 	}
+
+	setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&false, sizeof(false));
 
 	flag = 1;
 #ifdef SO_REUSEPORT
