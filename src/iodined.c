@@ -1997,6 +1997,9 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 	msg.msg_flags = 0;
 
 	r = recvmsg(fd, &msg, 0);
+
+	printf("[DEBUG] read_dns() - Received message...\n");
+
 #else
 	addrlen = sizeof(struct sockaddr);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
