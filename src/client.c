@@ -64,6 +64,7 @@ static int running;
 static const char *password;
 
 static struct sockaddr_in nameserv;
+static struct sockaddr_in6 nameserv6;
 static struct sockaddr_in raw_serv;
 static struct sockaddr_in6 raw_serv6;
 static const char *topdomain;
@@ -226,6 +227,11 @@ setaddr:
 	nameserv.sin_family = AF_INET;
 	nameserv.sin_port = htons(port);
 	nameserv.sin_addr = addr;
+
+	memset(&nameserv6, 0, sizeof(nameserv6));
+	nameserv6.sin6_family = AF_INET6;
+	nameserv6.sin6_port = htons(port);
+	inet_pton(AF_INET6, "::1", &(nameserv6.sin6_addr));
 }
 
 void
@@ -347,7 +353,10 @@ send_query(int fd, char *hostname)
 	fprintf(stderr, "  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
 #endif
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
+	if(_v6_connect)
+		sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv6, sizeof(nameserv6));
+	else
+		sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
 
 	/* There are DNS relays that time out quickly but don't send anything
 	   back on timeout.
@@ -1680,7 +1689,7 @@ handshake_raw_udp(int dns_fd, int seed)
 
 	raw_serv6.sin6_family = AF_INET6;
 	raw_serv6.sin6_port = htons(53);
-	inet_pton(AF_INET6, "2001:4ca0:2001:0018:0216:3eff:fe99:4d2b", &(raw_serv6.sin6_addr));
+	inet_pton(AF_INET6, "::1", &(raw_serv6.sin6_addr));
 
 	/* do login against port 53 on remote server 
 	 * based on the old seed. If reply received,

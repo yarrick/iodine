@@ -361,7 +361,14 @@ main(int argc, char **argv)
 		goto cleanup1;
 	}
 
-	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1) {
+	/**
+	 * Todo: Fix
+	 */
+//	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1) {
+//		retval = 1;
+//		goto cleanup2;
+//	}
+	if ((dns_fd = open_dns_ipv6(0, in6addr_any)) == -1) {
 		retval = 1;
 		goto cleanup2;
 	}

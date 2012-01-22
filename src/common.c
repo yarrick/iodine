@@ -174,7 +174,7 @@ open_dns_ipv6(int localport, struct in6_addr listen_ip6)
 		err(1, "socket");
 	}
 
-	setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&false, sizeof(false));
+	setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&flag, sizeof(flag));
 
 	flag = 1;
 #ifdef SO_REUSEPORT

@@ -95,6 +95,7 @@ static int debug;
 
 #ifdef LINUX
 static char v6;
+static char v6_listen;
 #endif
 
 #if !defined(BSD) && !defined(__GLIBC__)
@@ -1975,6 +1976,7 @@ static int
 read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw_decode() below */
 {
 	struct sockaddr_in from;
+	struct sockaddr_in6 from6;
 	socklen_t addrlen;
 	char packet[64*1024];
 	int r;
@@ -1988,8 +1990,13 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 	iov.iov_base = packet;
 	iov.iov_len = sizeof(packet);
 
-	msg.msg_name = (caddr_t) &from;
-	msg.msg_namelen = (unsigned) addrlen;
+	if (v6_listen) {
+		msg.msg_name = (caddr_t) &from6;
+		msg.msg_namelen = sizeof(from6);
+	} else {
+		msg.msg_name = (caddr_t) &from;
+		msg.msg_namelen = (unsigned) addrlen;
+	}
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = address;
@@ -2006,8 +2013,15 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 #endif /* !WINDOWS32 */
 
 	if (r > 0) {
-		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
-		q->fromlen = addrlen;
+		if (v6_listen) {
+			memcpy((struct sockaddr*) &q->from, (struct sockaddr*) &from6,
+					sizeof(struct sockaddr_in6));
+			q->fromlen = sizeof(struct sockaddr_in6);
+		} else {
+			memcpy((struct sockaddr*) &q->from, (struct sockaddr*) &from,
+					addrlen);
+			q->fromlen = addrlen;
+		}
 
 		/* TODO do not handle raw packets here! */
 		if (raw_decode(packet, r, q, fd, tun_fd)) {
@@ -2029,7 +2043,6 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 			}
 		}
 #endif
-
 		return strlen(q->name);
 	} else if (r < 0) {
 		/* Error */
@@ -2291,8 +2304,6 @@ main(int argc, char **argv)
 	char *pidfile;
 	int dnsd_fd;
 	int tun_fd;
-
-	int v6_listen;
 
 
 	/* settings for forwarding normal DNS to 
