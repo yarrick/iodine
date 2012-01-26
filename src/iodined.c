@@ -2220,7 +2220,10 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 			inet_ntoa(tempin->sin_addr), q->type, q->name, datalen);
 	}
 
-	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
+//	printf("write_dns()");
+//	ipv6_print(&q->from.v6)
+
+	sendto(fd, buf, len, 0, (struct sockaddr*)&(q->from.v6), q->fromlen);
 }
 
 static void
