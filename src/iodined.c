@@ -2023,6 +2023,8 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 			q->fromlen = addrlen;
 		}
 
+		ipv6_print(&(from6.sin6_addr), 42);
+
 		/* TODO do not handle raw packets here! */
 		if (raw_decode(packet, r, q, fd, tun_fd)) {
 			return 0;
