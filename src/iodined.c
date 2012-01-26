@@ -178,7 +178,13 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 			inet_ntoa(tempin->sin_addr), cmd, len);
 	}
 
-	sendto(fd, packet, len, 0, &q->from, q->fromlen);
+	printf("send_raw()");
+	ipv6_print(&q->from.v6.sin6_addr, 66);
+
+	if(v6_listen)
+		sendto(fd, packet, len, 0, &q->from.v6, q->fromlen);
+	else
+		sendto(fd, packet, len, 0, &q->from.v4, q->fromlen);
 }
 
 
