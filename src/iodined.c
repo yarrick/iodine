@@ -2023,11 +2023,11 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 
 	if (r > 0) {
 		if (v6_listen) {
-			memcpy((struct sockaddr*) &q->from, (struct sockaddr*) &from6,
+			memcpy(&q->from.v6, &from6,
 					sizeof(struct sockaddr_in6));
 			q->fromlen = sizeof(struct sockaddr_in6);
 		} else {
-			memcpy((struct sockaddr*) &q->from, (struct sockaddr*) &from,
+			memcpy((struct sockaddr*) &q->from.v4, (struct sockaddr*) &from,
 					addrlen);
 			q->fromlen = addrlen;
 		}
@@ -2223,7 +2223,7 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 	printf("write_dns()\n");
 	ipv6_print(&q->from.v6.sin6_addr, 44);
 
-	sendto(fd, buf, len, 0, (struct sockaddr*)&(q->from.v6), q->fromlen);
+	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
 
 static void
