@@ -1654,10 +1654,8 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	if (domain_len >= 1 && q.name[domain_len - 1] != '.')
 		inside_topdomain = 0;
 
-	/**
-	 * Todo: Fix v6
-	 */
-	if (inside_topdomain || 1) {
+
+	if (inside_topdomain) {
 		/* This is a query we can handle */
 
 		/* Handle A-type query for ns.topdomain, possibly caused
