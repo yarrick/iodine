@@ -1638,6 +1638,8 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	if ((read = read_dns(dns_fd, tun_fd, &q)) <= 0)
 		return 0;
 
+	printf("DEBUG - 0\n");
+
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q.from);
@@ -1652,7 +1654,10 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	if (domain_len >= 1 && q.name[domain_len - 1] != '.')
 		inside_topdomain = 0;
 
-	if (inside_topdomain) {
+	/**
+	 * Todo: Fix v6
+	 */
+	if (inside_topdomain || 1) {
 		/* This is a query we can handle */
 
 		/* Handle A-type query for ns.topdomain, possibly caused
