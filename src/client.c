@@ -186,9 +186,39 @@ client_set_nameserver(const char *cp, int port)
 		freeaddrinfo(result);
 	}
 #endif
-	struct in_addr addr;
 
-	if (inet_aton(cp, &addr) != 1) {
+	struct in_addr addr;
+	struct in6_addr ipv6addr;
+
+	if(_v6_connect) {
+		struct addrinfo hints, *servinfo, *p;
+		int rv;
+
+		memset(&hints, 0, sizeof(struct addrinfo));
+		hints.ai_family = AF_INET6;
+
+		if ((rv = getaddrinfo(cp, NULL, &hints, &servinfo)) != 0) {
+		    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+		    errx(1, "error resolving nameserver '%s'...", cp);
+		}
+
+		for(p = servinfo; p != NULL; p = p->ai_next) {
+			if(p->ai_family == AF_INET6)
+				break;
+		}
+
+		//Resolved ordns.he.net to Segmentation fault
+
+		if (p == NULL)
+			errx(1, "error resolving nameserver '%s'...", cp);
+
+		memcpy(&ipv6addr, &((struct sockaddr_in6*)p->ai_addr)->sin6_addr, sizeof(ipv6addr));
+
+		fprintf(stderr, "Resolved %s to ", cp);
+		ipv6_print(&ipv6addr, 0);
+
+		freeaddrinfo(servinfo);
+	} else if (inet_aton(cp, &addr) != 1) {
 		/* try resolving if a domain is given */
 		struct hostent *host;
 		const char *err;
@@ -231,7 +261,8 @@ setaddr:
 	memset(&nameserv6, 0, sizeof(nameserv6));
 	nameserv6.sin6_family = AF_INET6;
 	nameserv6.sin6_port = htons(port);
-	inet_pton(AF_INET6, "2620:0:ccc::2", &(nameserv6.sin6_addr));
+	nameserv6.sin6_addr = ipv6addr;
+	//inet_pton(AF_INET6, "2620:0:ccc::2", &(nameserv6.sin6_addr));
 }
 
 void

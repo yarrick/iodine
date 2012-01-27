@@ -315,6 +315,11 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
+#ifdef LINUX
+	client_set_v6(v6);
+	client_set_v6_connect(v6_connect);
+#endif
+
 	if (nameserv_addr) {
 		client_set_nameserver(nameserv_addr, DNS_PORT);
 	} else {
@@ -339,10 +344,6 @@ main(int argc, char **argv)
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
-#ifdef LINUX
-	client_set_v6(v6);
-	client_set_v6_connect(v6_connect);
-#endif
 	
 	if (username != NULL) {
 #ifndef WINDOWS32
