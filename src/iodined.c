@@ -187,7 +187,6 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 		sendto(fd, packet, len, 0, &q->from.v4, q->fromlen);
 }
 
-
 static void
 start_new_outpacket(int userid, char *data, int datalen)
 /* Copies data to .outpacket and resets all counters.
@@ -2231,9 +2230,9 @@ usage() {
 	extern char *__progname;
 
 #ifdef LINUX
-	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-u user] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-7] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ip address to listen on] [-p port] [-n external ip] "
+		"[-l ip address to listen on] [-r ipv6 address to listen on] [-p port] [-n external ip] "
 		"[-b dnsport] [-P password] [-F pidfile] "
 		"tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
 #else
@@ -2252,9 +2251,9 @@ help() {
 
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
 #ifdef LINUX
-	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-u user] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-7] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
+		"[-l ip address to listen on] [-r ipv6 address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
 		"[-F pidfile] tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
 #else
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
@@ -2271,7 +2270,8 @@ help() {
 	fprintf(stderr, "  -D to increase debug level\n");
 	fprintf(stderr, "     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n");
 #ifdef LINUX
-	fprintf(stderr, "  -6 use IPv6 (make sure to use this option consistently on client and server)\n");
+	fprintf(stderr, "  -6 use IPv6 inside the tunnel (make sure to use this option consistently on client and server)\n");
+	fprintf(stderr, "  -7 enable IPv6 outside the tunnel\n");
 #endif
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
@@ -2280,6 +2280,10 @@ help() {
 	fprintf(stderr, "  -z context to apply SELinux context after initialization\n");
 	fprintf(stderr, "  -l ip address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n");
+#ifdef LINUX
+	fprintf(stderr, "  -r ipv6 address to listen on for incoming dns traffic "
+		"(default in6addr_any)\n");
+#endif
 	fprintf(stderr, "  -p port to listen on for incoming dns traffic (default 53)\n");
 	fprintf(stderr, "  -n ip to respond with to NS queries\n");
 	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
@@ -2307,6 +2311,9 @@ main(int argc, char **argv)
 {
 	extern char *__progname;
 	in_addr_t listen_ip;
+#ifdef LINUX
+	struct in6_addr listen_ip6;
+#endif
 #ifndef WINDOWS32
 	struct passwd *pw;
 #endif
@@ -2318,7 +2325,6 @@ main(int argc, char **argv)
 	char *pidfile;
 	int dnsd_fd;
 	int tun_fd;
-
 
 	/* settings for forwarding normal DNS to 
 	 * local real DNS server */
@@ -2346,6 +2352,7 @@ main(int argc, char **argv)
 	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
 			   higher for NULL; tun/zlib adds ~17 bytes. */
 	listen_ip = INADDR_ANY;
+	listen_ip6 = in6addr_any;
 	port = 53;
 	ns_ip = INADDR_ANY;
 	check_ip = 1;
@@ -2355,7 +2362,7 @@ main(int argc, char **argv)
 	pidfile = NULL;
 #ifdef LINUX
 	v6 = 0;
-	v6_listen = 1;
+	v6_listen = 0;
 #endif
 
 	b32 = get_base32_encoder();
@@ -2382,7 +2389,7 @@ main(int argc, char **argv)
 	fw_query_init();
 
 #ifdef LINUX
-	while ((choice = getopt(argc, argv, "6vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
+	while ((choice = getopt(argc, argv, "67vcsfhDu:t:d:m:l:r:p:n:b:P:z:F:")) != -1) {
 #else
 	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
 #endif
@@ -2420,6 +2427,14 @@ main(int argc, char **argv)
 		case 'l':
 			listen_ip = inet_addr(optarg);
 			break;
+#ifdef LINUX
+		case 'r':
+			if (inet_pton(AF_INET6, optarg, &listen_ip6) != 1) {
+					warnx("Bad IP address to listen on.");
+					usage();
+				}
+			break;
+#endif
 		case 'p':
 			port = atoi(optarg);
 			break;
@@ -2446,6 +2461,9 @@ main(int argc, char **argv)
 #ifdef LINUX
 		case '6':
 			v6 = 1;
+			break;
+		case '7':
+			v6_listen = 1;
 			break;
 #endif
 		default:
@@ -2557,6 +2575,9 @@ main(int argc, char **argv)
 			usage();
 			/* NOTREACHED */
 		}
+		/**
+		 * Todo: IPv6
+		 */
 		fprintf(stderr, "Requests for domains outside of %s will be forwarded to port %d\n",
 			topdomain, bind_port);
 	}
@@ -2624,7 +2645,11 @@ main(int argc, char **argv)
 #endif
 		free((void*) other_ip);
 	}
-	if ((dnsd_fd = v6_listen ? open_dns_ipv6(port, in6addr_any) : open_dns(port, listen_ip)) == -1) {
+#ifdef LINUX
+	if ((dnsd_fd = v6_listen ? open_dns_ipv6(port, listen_ip6) : open_dns(port, listen_ip)) == -1) {
+#else
+	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
+#endif
 		retval = 1;
 		goto cleanup2;
 	}
