@@ -63,7 +63,7 @@ usage() {
 
 #ifdef LINUX
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-6] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-P password] [-6] [-7] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 #else
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
@@ -80,7 +80,7 @@ help() {
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 #ifdef LINUX
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-6] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
+			"[-P password] [-6] [-7] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 #else
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
@@ -99,6 +99,7 @@ help() {
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
 #ifdef LINUX
 	fprintf(stderr, "  -6 use IPv6 (make sure to use this option consistently on client and server)\n");
+	fprintf(stderr, "  -7 enable IPv6 outside the tunnel\n");
 #endif
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");
@@ -154,6 +155,7 @@ main(int argc, char **argv)
 	int hostname_maxlen;
 #ifdef LINUX
 	char v6;
+	char v6_connect;
 #endif
 	int rtable = 0;
 
@@ -181,6 +183,7 @@ main(int argc, char **argv)
 
 #ifdef LINUX
 	v6 = 0;
+	v6_connect = 0;
 #endif
 
 #ifdef WINDOWS32
@@ -199,7 +202,7 @@ main(int argc, char **argv)
 #endif
 
 #ifdef LINUX
-	while ((choice = getopt(argc, argv, "6vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "67vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
 #else
 	while ((choice = getopt(argc, argv, "vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
 #endif
@@ -277,6 +280,9 @@ main(int argc, char **argv)
 		case '6':
 			v6 = 1;
 			break;
+		case '7':
+			v6_connect = 1;
+			break;
 #endif
 		default:
 			usage();
@@ -335,6 +341,7 @@ main(int argc, char **argv)
 	client_set_hostname_maxlen(hostname_maxlen);
 #ifdef LINUX
 	client_set_v6(v6);
+	client_set_v6_connect(v6_connect);
 #endif
 	
 	if (username != NULL) {
@@ -361,14 +368,16 @@ main(int argc, char **argv)
 		goto cleanup1;
 	}
 
-	/**
-	 * Todo: Fix
-	 */
+
 //	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1) {
 //		retval = 1;
 //		goto cleanup2;
 //	}
-	if ((dns_fd = open_dns_ipv6(0, in6addr_any)) == -1) {
+#ifdef LINUX
+	if ((dns_fd = v6_connect ? open_dns_ipv6(0, in6addr_any) : open_dns(0, INADDR_ANY)) == -1) {
+#else
+	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1) {
+#endif
 		retval = 1;
 		goto cleanup2;
 	}

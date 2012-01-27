@@ -73,7 +73,7 @@ static uint16_t rand_seed;
 
 #ifdef LINUX
 static char _v6;
-static char _v6_connect = 1;
+static char _v6_connect;
 #endif
 
 /* Current up/downstream IP packet */
@@ -317,6 +317,12 @@ void
 client_set_v6(char v6)
 {
 	_v6 = v6;
+}
+
+void
+client_set_v6_connect(char v6_connect)
+{
+	_v6_connect = v6_connect;
 }
 #endif
 

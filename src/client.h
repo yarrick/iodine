@@ -35,6 +35,7 @@ void client_set_lazymode(int lazy_mode);
 void client_set_hostname_maxlen(int i);
 #ifdef LINUX
 void client_set_v6(char v6);
+void client_set_v6_connect(char v6);
 #endif
 
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize);
