@@ -154,6 +154,12 @@ check_user_and_ip(int userid, struct query *q)
 		return 0;
 	}
 
+	/**
+	 * Todo: IPv6
+	 */
+
+	return 0;
+
 	tempin = (struct sockaddr_in *) &(q->from);
 	return memcmp(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
 }
@@ -886,7 +892,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				return; /* illegal id */
 			}
 
-			if (memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
+			if (0 && memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
 				/* If set, use assigned external ip (-n option) */
 				memcpy(&replyaddr, &ns_ip6, sizeof(struct in6_addr));
 			} else {
@@ -897,6 +903,10 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			reply[0] = 'I';
 			for(i = 0; i < sizeof(struct in6_addr); i++)
 				reply[i + 1] = replyaddr.__in6_u.__u6_addr8[i];
+
+			printf("tuuuut:\n");
+			ipv6_print((void*)reply + 1, 0);
+
 			write_dns(dns_fd, q, reply, sizeof(reply), 'T');
 		} else {
 #endif
@@ -1524,7 +1534,7 @@ handle_ns_request(int dns_fd, struct query *q)
 
 #ifdef LINUX
 	if (v6_listen) {
-		if(memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr)))
+		if(0 && memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr)))
 			memcpy(&q->destination.v6, &ns_ip6, sizeof(struct in6_addr));
 	} else
 #endif
@@ -1562,7 +1572,7 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	if (v6_listen) {
 		if (fakeip)
 			memcpy(&q->destination.v6, &in6addr_loopback, sizeof(in_addr_t));
-		else if (memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
+		else if (0 && memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
 			/* If ns_ip set, overwrite destination addr with it.
 			 * Destination addr will be sent as additional record (A, IN) */
 			memcpy(&q->destination.v4.s_addr, &ns_ip6, sizeof(struct in6_addr));
@@ -2096,6 +2106,8 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 		}
 
 #ifndef WINDOWS32
+		memcpy(&q->destination.v6, &in6addr_loopback, sizeof(struct in6_addr));
+
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 

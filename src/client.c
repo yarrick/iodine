@@ -1729,7 +1729,10 @@ handshake_raw_udp(int dns_fd, int seed)
 	if (!running)
 		return 0;
 	
-	if (!remoteaddr) {
+	/**
+	 * Todo: Fix ipv6
+	 */
+	if (!remoteaddr && !_v6_connect) {
 		fprintf(stderr, "Failed to get raw server IP, will use DNS mode.\n");
 		return 0;
 	}
