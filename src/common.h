@@ -94,11 +94,10 @@ struct query {
 	unsigned short type;
 	unsigned short rcode;
 	unsigned short id;
-//	union {
-//		struct in_addr v4;
-//		struct in6_addr v6;
-//	} destination;
-	struct in_addr destination;
+	union {
+		struct in_addr v4;
+		struct in6_addr v6;
+	} destination;
 	union {
 		struct sockaddr v4;
 		struct sockaddr_in6 v6;

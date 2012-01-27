@@ -158,7 +158,7 @@ client_get_conn()
 }
 
 void
-client_set_nameserver(const char *cp, int port) 
+client_set_nameserver(const char *cp, int port)
 {
 #ifdef ANDROID
 	struct addrinfo hints, *result, *p;
@@ -1687,6 +1687,9 @@ handshake_raw_udp(int dns_fd, int seed)
 	int len;
 	unsigned remoteaddr = 0;
 	struct in_addr server;
+#ifdef LINUX
+	struct in6_addr server6;
+#endif
 
 	fprintf(stderr, "Testing raw UDP data to the server (skip with -r)");
 	for (i=0; running && i<3 ;i++) {
@@ -1708,6 +1711,15 @@ handshake_raw_udp(int dns_fd, int seed)
 				server.s_addr = ntohl(remoteaddr);
 				break;
 			}
+#ifdef LINUX
+			if (len == 17 && in[0] == 'I') {
+				/* Received IP address */
+				int i;
+				for (i = 0; i < sizeof(struct in6_addr); ++i)
+					server6.__in6_u.__u6_addr8[i] = in[i + 1];
+				break;
+			}
+#endif
 		/*XXX END adjust indent 1 tab back*/
 
 		fprintf(stderr, ".");
@@ -1732,7 +1744,10 @@ handshake_raw_udp(int dns_fd, int seed)
 
 	raw_serv6.sin6_family = AF_INET6;
 	raw_serv6.sin6_port = htons(53);
-	inet_pton(AF_INET6, "2001:470:0:473::473", &(raw_serv6.sin6_addr));
+	raw_serv6.sin6_addr = server6;
+	//	inet_pton(AF_INET6, "2001:470:0:473::473", &(raw_serv6.sin6_addr));
+
+	ipv6_print(&server6, 00);
 
 	/* do login against port 53 on remote server 
 	 * based on the old seed. If reply received,

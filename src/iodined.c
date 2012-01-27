@@ -873,31 +873,61 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		return;
 	} else if(in[0] == 'I' || in[0] == 'i') {
 		/* Request for IP number */
-		in_addr_t replyaddr;
-		unsigned addr;
-		char reply[5];
+		int i;
 
-		userid = b32_8to5(in[1]);
-		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
-		}
+#ifdef LINUX
+		if (v6_listen) {
+			struct in6_addr replyaddr;
+			char reply[sizeof(struct in6_addr) + 1];
 
-		if (ns_ip != INADDR_ANY) {
-			/* If set, use assigned external ip (-n option) */
-			replyaddr = ns_ip;
+			userid = b32_8to5(in[1]);
+			if (check_user_and_ip(userid, q) != 0) {
+				write_dns(dns_fd, q, "BADIP", 5, 'T');
+				return; /* illegal id */
+			}
+
+			if (memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
+				/* If set, use assigned external ip (-n option) */
+				memcpy(&replyaddr, &ns_ip6, sizeof(struct in6_addr));
+			} else {
+				/* otherwise return destination ip from packet */
+				memcpy(&replyaddr, &q->destination.v6, sizeof(struct in6_addr));
+			}
+
+			reply[0] = 'I';
+			for(i = 0; i < sizeof(struct in6_addr); i++)
+				reply[i + 1] = replyaddr.__in6_u.__u6_addr8[i];
+			write_dns(dns_fd, q, reply, sizeof(reply), 'T');
 		} else {
-			/* otherwise return destination ip from packet */
-			memcpy(&replyaddr, &q->destination.s_addr, sizeof(in_addr_t));
-		}
+#endif
+			in_addr_t replyaddr;
+			unsigned addr;
+			char reply[5];
 
-		addr = htonl(replyaddr);
-		reply[0] = 'I';
-		reply[1] = (addr >> 24) & 0xFF;
-		reply[2] = (addr >> 16) & 0xFF;
-		reply[3] = (addr >>  8) & 0xFF;
-		reply[4] = (addr >>  0) & 0xFF;
-		write_dns(dns_fd, q, reply, sizeof(reply), 'T');
+			userid = b32_8to5(in[1]);
+			if (check_user_and_ip(userid, q) != 0) {
+				write_dns(dns_fd, q, "BADIP", 5, 'T');
+				return; /* illegal id */
+			}
+
+			if (ns_ip != INADDR_ANY) {
+				/* If set, use assigned external ip (-n option) */
+				replyaddr = ns_ip;
+			} else {
+				/* otherwise return destination ip from packet */
+				memcpy(&replyaddr, &q->destination.v4.s_addr, sizeof(in_addr_t));
+			}
+
+			addr = htonl(replyaddr);
+			reply[0] = 'I';
+			reply[1] = (addr >> 24) & 0xFF;
+			reply[2] = (addr >> 16) & 0xFF;
+			reply[3] = (addr >> 8) & 0xFF;
+			reply[4] = (addr >> 0) & 0xFF;
+			write_dns(dns_fd, q, reply, sizeof(reply), 'T');
+#ifdef LINUX
+		}
+#endif
 	} else if(in[0] == 'Z' || in[0] == 'z') {
 		/* Check for case conservation and chars not allowed according to RFC */
 
@@ -1492,10 +1522,16 @@ handle_ns_request(int dns_fd, struct query *q)
 	char buf[64*1024];
 	int len;
 
+#ifdef LINUX
+	if (v6_listen) {
+		if(memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr)))
+			memcpy(&q->destination.v6, &ns_ip6, sizeof(struct in6_addr));
+	} else
+#endif
 	if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
-		memcpy(&q->destination.s_addr, &ns_ip, sizeof(in_addr_t));
+		memcpy(&q->destination.v4.s_addr, &ns_ip, sizeof(in_addr_t));
 	}
 
 	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
@@ -1522,15 +1558,30 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	char buf[64*1024];
 	int len;
 
-	if (fakeip) {
-		in_addr_t ip = inet_addr("127.0.0.1");
-		memcpy(&q->destination.s_addr, &ip, sizeof(in_addr_t));
-
-	} else if (ns_ip != INADDR_ANY) {
-		/* If ns_ip set, overwrite destination addr with it.
-		 * Destination addr will be sent as additional record (A, IN) */
-		memcpy(&q->destination.s_addr, &ns_ip, sizeof(in_addr_t));
+#ifdef LINUX
+	if (v6_listen) {
+		if (fakeip)
+			memcpy(&q->destination.v6, &in6addr_loopback, sizeof(in_addr_t));
+		else if (memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
+			/* If ns_ip set, overwrite destination addr with it.
+			 * Destination addr will be sent as additional record (A, IN) */
+			memcpy(&q->destination.v4.s_addr, &ns_ip6, sizeof(struct in6_addr));
+		}
 	}
+#endif
+	else {
+		if (fakeip) {
+			in_addr_t ip = inet_addr("127.0.0.1");
+			memcpy(&q->destination.v4.s_addr, &ip, sizeof(in_addr_t));
+		} else if (ns_ip != INADDR_ANY) {
+			/* If ns_ip set, overwrite destination addr with it.
+			 * Destination addr will be sent as additional record (A, IN) */
+			memcpy(&q->destination.v4.s_addr, &ns_ip, sizeof(in_addr_t));
+		}
+#ifdef LINUX
+	}
+#endif
+
 
 	len = dns_encode_a_response(buf, sizeof(buf), q);
 	if (len < 1) {
@@ -2051,7 +2102,14 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 			if (cmsg->cmsg_level == IPPROTO_IP &&
 				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
 
-				q->destination = *dstaddr(cmsg);
+				q->destination.v4 = *dstaddr(cmsg);
+				break;//	printf("write_dns()\n");
+				//	ipv6_print(&q->from.v6, 44);
+			}
+			if (cmsg->cmsg_level == IPPROTO_IPV6 &&
+				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
+
+				memcpy(&q->destination.v6, dstaddr(cmsg), sizeof(struct in6_addr));
 				break;//	printf("write_dns()\n");
 				//	ipv6_print(&q->from.v6, 44);
 			}
