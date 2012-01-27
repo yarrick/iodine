@@ -190,35 +190,41 @@ client_set_nameserver(const char *cp, int port)
 	struct in_addr addr;
 	struct in6_addr ipv6addr;
 
-	if(_v6_connect) {
-		struct addrinfo hints, *servinfo, *p;
-		int rv;
+#ifdef LINUX
+	if (_v6_connect) {
+		if (inet_pton(AF_INET6, cp, &ipv6addr) != 1) {
+			struct addrinfo hints, *servinfo, *p;
+			int rv;
 
-		memset(&hints, 0, sizeof(struct addrinfo));
-		hints.ai_family = AF_INET6;
+			memset(&hints, 0, sizeof(struct addrinfo));
+			hints.ai_family = AF_INET6;
 
-		if ((rv = getaddrinfo(cp, NULL, &hints, &servinfo)) != 0) {
-		    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		    errx(1, "error resolving nameserver '%s'...", cp);
+			if ((rv = getaddrinfo(cp, NULL, &hints, &servinfo)) != 0) {
+				fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+				errx(1, "error resolving nameserver '%s'...", cp);
+			}
+
+			for (p = servinfo; p != NULL; p = p->ai_next) {
+				if (p->ai_family == AF_INET6)
+					break;
+			}
+
+			//Resolved ordns.he.net to Segmentation fault
+
+			if (p == NULL)
+				errx(1, "error resolving nameserver '%s'...", cp);
+
+			memcpy(&ipv6addr, &((struct sockaddr_in6*) p->ai_addr)->sin6_addr,
+					sizeof(ipv6addr));
+
+			fprintf(stderr, "Resolved %s to ", cp);
+			ipv6_print(&ipv6addr, 0);
+
+			freeaddrinfo(servinfo);
 		}
-
-		for(p = servinfo; p != NULL; p = p->ai_next) {
-			if(p->ai_family == AF_INET6)
-				break;
-		}
-
-		//Resolved ordns.he.net to Segmentation fault
-
-		if (p == NULL)
-			errx(1, "error resolving nameserver '%s'...", cp);
-
-		memcpy(&ipv6addr, &((struct sockaddr_in6*)p->ai_addr)->sin6_addr, sizeof(ipv6addr));
-
-		fprintf(stderr, "Resolved %s to ", cp);
-		ipv6_print(&ipv6addr, 0);
-
-		freeaddrinfo(servinfo);
-	} else if (inet_aton(cp, &addr) != 1) {
+	} else
+#endif
+		if (inet_aton(cp, &addr) != 1) {
 		/* try resolving if a domain is given */
 		struct hostent *host;
 		const char *err;
