@@ -89,6 +89,9 @@ static int netmask;
 static char netmask6;
 
 static in_addr_t ns_ip;
+#ifdef LINUX
+static struct in6_addr ns_ip6;
+#endif
 
 static int bind_port;
 static int debug;
@@ -2049,7 +2052,8 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
 
 				q->destination = *dstaddr(cmsg);
-				break;
+				break;//	printf("write_dns()\n");
+				//	ipv6_print(&q->from.v6, 44);
 			}
 		}
 #endif
@@ -2219,10 +2223,10 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 			inet_ntoa(tempin->sin_addr), q->type, q->name, datalen);
 	}
 
-	printf("write_dns()\n");
-	ipv6_print(&q->from.v6, 44);
+//	printf("write_dns()\n");
+//	ipv6_print(&q->from.v6, 44);
 
-	sendto(fd, buf, len, 0, (struct sockaddr*)&(q->from.v6), q->fromlen);
+	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
 
 static void
@@ -2352,7 +2356,9 @@ main(int argc, char **argv)
 	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
 			   higher for NULL; tun/zlib adds ~17 bytes. */
 	listen_ip = INADDR_ANY;
+#ifdef LINUX
 	listen_ip6 = in6addr_any;
+#endif
 	port = 53;
 	ns_ip = INADDR_ANY;
 	check_ip = 1;
