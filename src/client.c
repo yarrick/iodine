@@ -231,7 +231,7 @@ setaddr:
 	memset(&nameserv6, 0, sizeof(nameserv6));
 	nameserv6.sin6_family = AF_INET6;
 	nameserv6.sin6_port = htons(port);
-	inet_pton(AF_INET6, "2001:4ca0:2001:18:216:3eff:fe99:4d2b", &(nameserv6.sin6_addr));
+	inet_pton(AF_INET6, "2620:0:ccc::2", &(nameserv6.sin6_addr));
 }
 
 void
@@ -1689,7 +1689,7 @@ handshake_raw_udp(int dns_fd, int seed)
 
 	raw_serv6.sin6_family = AF_INET6;
 	raw_serv6.sin6_port = htons(53);
-	inet_pton(AF_INET6, "2001:4ca0:2001:18:216:3eff:fe99:4d2b", &(raw_serv6.sin6_addr));
+	inet_pton(AF_INET6, "2001:470:0:473::473", &(raw_serv6.sin6_addr));
 
 	/* do login against port 53 on remote server 
 	 * based on the old seed. If reply received,
