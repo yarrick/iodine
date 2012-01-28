@@ -451,7 +451,7 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd)
 
 	if (_v6_connect)
 		sendto(fd, packet, len, 0, (struct sockaddr*) &raw_serv6,
-				sizeof(raw_serv));
+				sizeof(raw_serv6));
 	else
 		sendto(fd, packet, len, 0, (struct sockaddr*) &raw_serv,
 				sizeof(raw_serv));
@@ -1748,7 +1748,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	raw_serv6.sin6_family = AF_INET6;
 	raw_serv6.sin6_port = htons(53);
 	raw_serv6.sin6_addr = server6;
-	//	inet_pton(AF_INET6, "2001:470:0:473::473", &(raw_serv6.sin6_addr));
+//	inet_pton(AF_INET6, "::1", &(raw_serv6.sin6_addr));
 
 	ipv6_print(&server6, 00);
 
@@ -1758,6 +1758,9 @@ handshake_raw_udp(int dns_fd, int seed)
 	for (i=0; running && i<4 ;i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
+
+		printf("Sending login...\n");
+		sleep(5);
 
 		send_raw_udp_login(dns_fd, userid, seed);
 		

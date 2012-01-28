@@ -2106,7 +2106,8 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 		}
 
 #ifndef WINDOWS32
-		memcpy(&q->destination.v6, &in6addr_loopback, sizeof(struct in6_addr));
+		//memcpy(&q->destination.v6, &in6addr_loopback, sizeof(struct in6_addr));
+		inet_pton(AF_INET6, "2001:4ca0:2001:18:216:3eff:fe99:4d2b", &q->destination.v6);
 
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) {
