@@ -363,10 +363,22 @@ client_set_v6_connect(char v6_connect)
 }
 #endif
 
-const char *
+char *
 client_get_raw_addr()
 {
-	return inet_ntoa(raw_serv.sin_addr);
+#ifdef LINUX
+	if(_v6_connect) {
+		return ipv6_str(&raw_serv6.sin6_addr);
+	} else {
+#endif
+		char *str = inet_ntoa(raw_serv.sin_addr);
+		size_t size = strlen(str) + 1;
+		char *ret = (char*) malloc(size);
+		memcpy(ret, str, size);
+		return ret;
+#ifdef LINUX
+	}
+#endif
 }
 
 static void
@@ -1736,7 +1748,14 @@ handshake_raw_udp(int dns_fd, int seed)
 		fprintf(stderr, "Failed to get raw server IP, will use DNS mode.\n");
 		return 0;
 	}
-	fprintf(stderr, "Server is at %s, trying raw login: ", inet_ntoa(server));
+#ifdef LINUX
+	if(_v6_connect) {
+		char *str = ipv6_str(&server6);
+		fprintf(stderr, "Server is at %s, trying raw login: ", str);
+		free(str);
+	} else
+#endif
+		fprintf(stderr, "Server is at %s, trying raw login: ", inet_ntoa(server));
 	fflush(stderr);
 
 	/* Store address to iodined server */
@@ -1745,12 +1764,11 @@ handshake_raw_udp(int dns_fd, int seed)
 	raw_serv.sin_port = htons(53);
 	raw_serv.sin_addr = server;
 
+#ifdef LINUX
 	raw_serv6.sin6_family = AF_INET6;
 	raw_serv6.sin6_port = htons(53);
 	raw_serv6.sin6_addr = server6;
-//	inet_pton(AF_INET6, "::1", &(raw_serv6.sin6_addr));
-
-	ipv6_print(&server6, 00);
+#endif
 
 	/* do login against port 53 on remote server 
 	 * based on the old seed. If reply received,

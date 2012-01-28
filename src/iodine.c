@@ -400,7 +400,9 @@ main(int argc, char **argv)
 	}
 
 	if (client_get_conn() == CONN_RAW_UDP) {
-		fprintf(stderr, "Sending raw traffic directly to %s\n", client_get_raw_addr());
+		char *str = client_get_raw_addr();
+		fprintf(stderr, "Sending raw traffic directly to %s\n", str);
+		free(str);
 	}
 
 	fprintf(stderr, "Connection setup complete, transmitting data.\n");

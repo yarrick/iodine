@@ -147,6 +147,7 @@ void ipv6_addr_add(struct in6_addr *addr, uint8_t amount);
 char ipv6_addr_equals(struct in6_addr *a, struct in6_addr *b);
 char ipv6_net_check(struct in6_addr *net, char netmask);
 void ipv6_print(struct in6_addr *ip, char netmask6);
+char *ipv6_str(struct in6_addr *ip);
 #endif
 
 #endif

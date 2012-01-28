@@ -191,8 +191,8 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 			inet_ntoa(tempin->sin_addr), cmd, len);
 	}
 
-	printf("send_raw()");
-	ipv6_print(&q->from.v6.sin6_addr, 66);
+//	printf("send_raw()");
+//	ipv6_print(&q->from.v6.sin6_addr, 66);
 
 	if(v6_listen)
 		sendto(fd, packet, len, 0, &q->from.v6, q->fromlen);
@@ -916,9 +916,6 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			reply[0] = 'I';
 			for(i = 0; i < sizeof(struct in6_addr); i++)
 				reply[i + 1] = replyaddr.__in6_u.__u6_addr8[i];
-
-			printf("tuuuut:\n");
-			ipv6_print((void*)reply + 1, 0);
 
 			write_dns(dns_fd, q, reply, sizeof(reply), 'T');
 		} else {
@@ -2108,15 +2105,19 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 #endif /* !WINDOWS32 */
 
 	if (r > 0) {
+#ifdef LINUX
 		if (v6_listen) {
 			memcpy((struct sockaddr*) &q->from, (struct sockaddr*) &from6,
 					sizeof(struct sockaddr_in6));
 			q->fromlen = sizeof(struct sockaddr_in6);
 		} else {
+#endif
 			memcpy((struct sockaddr*) &q->from, (struct sockaddr*) &from,
 					addrlen);
 			q->fromlen = addrlen;
+#ifdef LINUX
 		}
+#endif
 
 		ipv6_print(&(from6.sin6_addr), 42);
 
@@ -2129,15 +2130,8 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 		}
 
 #ifndef WINDOWS32
-		//memcpy(&q->destination.v6, &in6addr_loopback, sizeof(struct in6_addr));
-		//inet_pton(AF_INET6, "2001:4ca0:2001:18:216:3eff:fe99:4d2b", &q->destination.v6);
-
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) {
-
-			printf("cmsg != NULL!\n");
-			printf("Vaavvaaaa\n");
-			ipv6_print(cmsg->__cmsg_data, 00);
 
 			if (cmsg->cmsg_level == IPPROTO_IP &&
 				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
@@ -2146,17 +2140,16 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 				break;//	printf("write_dns()\n");
 				//	ipv6_print(&q->from.v6, 44);
 			}
+#ifdef LINUX
 			if (cmsg->cmsg_level == IPPROTO_IPV6 &&
 				cmsg->cmsg_type == IPV6_PKTINFO) {
 
 				memcpy(&q->destination.v6, cmsg->__cmsg_data, sizeof(struct in6_addr));
 
-				printf("hallo\n");
-				ipv6_print(&q->destination.v6, 0);
-
 				break;//	printf("write_dns()\n");
 				//	ipv6_print(&q->from.v6, 44);
 			}
+#endif
 		}
 #endif
 		return strlen(q->name);

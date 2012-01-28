@@ -449,4 +449,16 @@ void ipv6_print(struct in6_addr *ip, char netmask6) {
 				: "/");
 	printf("%d\n", netmask6);
 }
+
+char *ipv6_str(struct in6_addr *ip) {
+	size_t size = 8*4 + 7 + 1;
+	char *str = (char*)malloc(size);
+	int i;
+	size_t position = 0;
+	for (i = 0; i < 8; ++i)
+		 position += sprintf(str + position, "%04x%s", ntohs(ip->__in6_u.__u6_addr16[i]), i < 7 ? ":"
+				: "/");
+	str[size - 1] = 0;
+	return str;
+}
 #endif
