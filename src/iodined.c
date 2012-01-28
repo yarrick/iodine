@@ -922,7 +922,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				return; /* illegal id */
 			}
 
-			if (0 && memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
+			if (memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
 				/* If set, use assigned external ip (-n option) */
 				memcpy(&replyaddr, &ns_ip6, sizeof(struct in6_addr));
 			} else {
@@ -1561,7 +1561,7 @@ handle_ns_request(int dns_fd, struct query *q)
 
 #ifdef LINUX
 	if (v6_listen) {
-		if(0 && memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr)))
+		if(memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr)))
 			memcpy(&q->destination.v6, &ns_ip6, sizeof(struct in6_addr));
 	} else
 #endif
@@ -1599,7 +1599,7 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	if (v6_listen) {
 		if (fakeip)
 			memcpy(&q->destination.v6, &in6addr_loopback, sizeof(in_addr_t));
-		else if (0 && memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
+		else if (memcmp(&ns_ip6, &in6addr_any, sizeof(struct in6_addr))) {
 			/* If ns_ip set, overwrite destination addr with it.
 			 * Destination addr will be sent as additional record (A, IN) */
 			memcpy(&q->destination.v4.s_addr, &ns_ip6, sizeof(struct in6_addr));
@@ -2343,7 +2343,7 @@ usage() {
 #ifdef LINUX
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-7] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ip address to listen on] [-r ipv6 address to listen on] [-p port] [-n external ip] "
+		"[-l ip address to listen on] [-r ipv6 address to listen on] [-p port] [-n external ip] [-q external ip6] "
 		"[-b dnsport] [-P password] [-F pidfile] "
 		"tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
 #else
@@ -2364,7 +2364,7 @@ help() {
 #ifdef LINUX
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-6] [-7] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ip address to listen on] [-r ipv6 address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
+		"[-l ip address to listen on] [-r ipv6 address to listen on] [-p port] [-n external ip] [-q external ip6] [-b dnsport] [-P password] "
 		"[-F pidfile] tunnel_ip[/netmask] [tunnel_net6/netmask6] topdomain\n", __progname);
 #else
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
@@ -2397,6 +2397,9 @@ help() {
 #endif
 	fprintf(stderr, "  -p port to listen on for incoming dns traffic (default 53)\n");
 	fprintf(stderr, "  -n ip to respond with to NS queries\n");
+#ifdef LINUX
+	fprintf(stderr, "  -q ipv6 to respond with to NS queries\n");
+#endif
 	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
 	fprintf(stderr, "  -F pidfile to write pid to a file\n");
@@ -2505,7 +2508,7 @@ main(int argc, char **argv)
 	fw_query_init();
 
 #ifdef LINUX
-	while ((choice = getopt(argc, argv, "67vcsfhDu:t:d:m:l:r:p:n:b:P:z:F:")) != -1) {
+	while ((choice = getopt(argc, argv, "67vcsfhDu:t:d:m:l:q:r:p:n:b:P:z:F:")) != -1) {
 #else
 	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
 #endif
@@ -2546,7 +2549,7 @@ main(int argc, char **argv)
 #ifdef LINUX
 		case 'r':
 			if (inet_pton(AF_INET6, optarg, &listen_ip6) != 1) {
-					warnx("Bad IP address to listen on.");
+					warnx("Bad IPv6 address to listen on.");
 					usage();
 				}
 			break;
@@ -2557,6 +2560,13 @@ main(int argc, char **argv)
 		case 'n':
 			ns_ip = inet_addr(optarg);
 			break;
+#ifdef LINUX
+		case 'q':
+			if (inet_pton(AF_INET6, optarg, &ns_ip6) != 1) {
+					warnx("Bad external IPv6 address.");
+					usage();
+				}
+#endif
 		case 'b':
 			bind_enable = 1;
 			bind_port = atoi(optarg);
