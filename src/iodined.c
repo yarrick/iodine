@@ -191,13 +191,10 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 			inet_ntoa(tempin->sin_addr), cmd, len);
 	}
 
-//	printf("send_raw()");
-//	ipv6_print(&q->from.v6.sin6_addr, 66);
-
 	if(v6_listen)
-		sendto(fd, packet, len, 0, &q->from.v6, q->fromlen);
+		sendto(fd, packet, len, 0, (struct sockaddr *)&q->from.v6, q->fromlen);
 	else
-		sendto(fd, packet, len, 0, &q->from.v4, q->fromlen);
+		sendto(fd, packet, len, 0, (struct sockaddr *)&q->from.v4, q->fromlen);
 }
 
 static void
@@ -2112,7 +2109,7 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 
 	r = recvmsg(fd, &msg, 0);
 
-//	printf("[DEBUG] read_dns() - Received message...\n");
+/*	printf("[DEBUG] read_dns() - Received message...\n"); */
 
 #else
 	addrlen = sizeof(struct sockaddr);
@@ -2149,8 +2146,7 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
 
 				q->destination.v4 = *dstaddr(cmsg);
-				break;//	printf("write_dns()\n");
-				//	ipv6_print(&q->from.v6, 44);
+				break;
 			}
 #ifdef LINUX
 			if (cmsg->cmsg_level == IPPROTO_IPV6 &&
@@ -2158,8 +2154,7 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 
 				memcpy(&q->destination.v6, cmsg->__cmsg_data, sizeof(struct in6_addr));
 
-				break;//	printf("write_dns()\n");
-				//	ipv6_print(&q->from.v6, 44);
+				break;
 			}
 #endif
 		}
@@ -2329,9 +2324,6 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes data\n",
 			inet_ntoa(tempin->sin_addr), q->type, q->name, datalen);
 	}
-
-//	printf("write_dns()\n");
-//	ipv6_print(&q->from.v6, 44);
 
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }

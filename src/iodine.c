@@ -369,11 +369,6 @@ main(int argc, char **argv)
 		goto cleanup1;
 	}
 
-
-//	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1) {
-//		retval = 1;
-//		goto cleanup2;
-//	}
 #ifdef LINUX
 	if ((dns_fd = v6_connect ? open_dns_ipv6(0, in6addr_any) : open_dns(0, INADDR_ANY)) == -1) {
 #else

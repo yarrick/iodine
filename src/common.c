@@ -161,7 +161,7 @@ open_dns_ipv6(int localport, struct in6_addr listen_ip6)
 	struct sockaddr_in6 addr;
 	int flag = 1;
 	int fd;
-	int false = 0;
+/*	int false = 0; */
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin6_family = AF_INET6;
