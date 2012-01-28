@@ -209,7 +209,7 @@ client_set_nameserver(const char *cp, int port)
 					break;
 			}
 
-			//Resolved ordns.he.net to Segmentation fault
+			/* Resolved ordns.he.net to Segmentation fault */
 
 			if (p == NULL)
 				errx(1, "error resolving nameserver '%s'...", cp);
@@ -268,7 +268,6 @@ setaddr:
 	nameserv6.sin6_family = AF_INET6;
 	nameserv6.sin6_port = htons(port);
 	nameserv6.sin6_addr = ipv6addr;
-	//inet_pton(AF_INET6, "2620:0:ccc::2", &(nameserv6.sin6_addr));
 }
 
 void
