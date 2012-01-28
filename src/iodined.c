@@ -763,7 +763,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 					memcpy(&(users[userid].host.v6), &q->from.v6, sizeof(struct in6_addr));
 				else {
 #endif
-					tempin = (struct sockaddr_in *) &(q->from);
+					tempin = (struct sockaddr_in *) &(q->from.v4);
 					memcpy(&(users[userid].host.v4), &(tempin->sin_addr), sizeof(struct in_addr));
 #ifdef LINUX
 				}
@@ -773,8 +773,16 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				users[userid].encoder = get_base32_encoder();
 				users[userid].downenc = 'T';
 				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
-				syslog(LOG_INFO, "accepted version for user #%d from %s",
-					userid, inet_ntoa(tempin->sin_addr));
+#ifdef LINUX
+				if (v6_listen) {
+					char *str = ipv6_str(&q->from.v6.sin6_addr);
+					syslog(LOG_INFO, "accepted version for user #%d from %s",
+							userid, str);
+					free(str);
+				} else
+#endif
+					syslog(LOG_INFO, "accepted version for user #%d from %s",
+							userid, inet_ntoa(tempin->sin_addr));
 				users[userid].q.id = 0;
 				users[userid].q.id2 = 0;
 				users[userid].q_sendrealsoon.id = 0;
@@ -815,8 +823,17 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			} else {
 				/* No space for another user */
 				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
-				syslog(LOG_INFO, "dropped user from %s, server full",
-					inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
+
+#ifdef LINUX
+				if (v6_listen) {
+					char *str = ipv6_str(&q->from.v6.sin6_addr);
+					syslog(LOG_INFO, "dropped user from %s, server full",
+						str);
+					free(str);
+				} else
+#endif
+					syslog(LOG_INFO, "dropped user from %s, server full",
+						inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
 			}
 		} else {
 #ifdef LINUX
