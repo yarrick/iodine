@@ -125,7 +125,7 @@ sigint(int sig)
 #define	LOG_INFO	6
 #define	LOG_DEBUG	7
 static void
-syslog(int a, const char *str, ...)
+syslog(int a, const char *str, ...)10.42.22.2
 {
 	/* TODO: implement (add to event log), move to common.c */
 	;
@@ -161,7 +161,7 @@ check_user_and_ip(int userid, struct query *q)
 	} else {
 #endif
 		tempin = (struct sockaddr_in *) &(q->from);
-		return memcmp(&(users[userid].host), &(tempin->sin_addr),
+		return memcmp(&(users[userid].host.v4), &(tempin->sin_addr),
 				sizeof(struct in_addr));
 #ifdef LINUX
 	}
@@ -756,9 +756,18 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				struct sockaddr_in *tempin;
 
 				users[userid].seed = rand();
+
 				/* Store remote IP number */
-				tempin = (struct sockaddr_in *) &(q->from);
-				memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+#ifdef LINUX
+				if(v6_listen)
+					memcpy(&(users[userid].host.v6), &q->from.v6, sizeof(struct in6_addr));
+				else {
+#endif
+					tempin = (struct sockaddr_in *) &(q->from);
+					memcpy(&(users[userid].host.v4), &(tempin->sin_addr), sizeof(struct in_addr));
+#ifdef LINUX
+				}
+#endif
 
 				memcpy(&(users[userid].q), q, sizeof(struct query));
 				users[userid].encoder = get_base32_encoder();
@@ -1964,8 +1973,18 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 		memcpy(&(users[userid].q), q, sizeof(struct query));
 
 		/* Store remote IP number */
-		tempin = (struct sockaddr_in *) &(q->from);
-		memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+#ifdef LINUX
+		if (v6_listen)
+			memcpy(&(users[userid].host.v6), &q->from.v6,
+					sizeof(struct in6_addr));
+		else {
+#endif
+			tempin = (struct sockaddr_in *) &(q->from);
+			memcpy(&(users[userid].host.v4), &(tempin->sin_addr),
+					sizeof(struct in_addr));
+#ifdef LINUX
+		}
+#endif
 
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
