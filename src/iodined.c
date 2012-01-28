@@ -2124,9 +2124,12 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 				//	ipv6_print(&q->from.v6, 44);
 			}
 			if (cmsg->cmsg_level == IPPROTO_IPV6 &&
-				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
+				cmsg->cmsg_type == IPV6_PKTINFO) {
 
 				memcpy(&q->destination.v6, cmsg->__cmsg_data, sizeof(struct in6_addr));
+
+				printf("hallo\n");
+				ipv6_print(&q->destination.v6, 0);
 
 				break;//	printf("write_dns()\n");
 				//	ipv6_print(&q->from.v6, 44);
