@@ -1719,6 +1719,7 @@ handshake_raw_udp(int dns_fd, int seed)
 				int i;
 				for (i = 0; i < sizeof(struct in6_addr); ++i)
 					server6.__in6_u.__u6_addr8[i] = in[i + 1];
+				remoteaddr = 1;
 				break;
 			}
 #endif
@@ -1731,10 +1732,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	if (!running)
 		return 0;
 	
-	/**
-	 * Todo: Fix ipv6
-	 */
-	if (!remoteaddr && !_v6_connect) {
+	if (!remoteaddr) {
 		fprintf(stderr, "Failed to get raw server IP, will use DNS mode.\n");
 		return 0;
 	}
