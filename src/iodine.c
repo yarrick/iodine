@@ -99,7 +99,7 @@ help() {
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
 #ifdef LINUX
 	fprintf(stderr, "  -6 use IPv6 (make sure to use this option consistently on client and server)\n");
-	fprintf(stderr, "  -7 enable IPv6 outside the tunnel\n");
+	fprintf(stderr, "  -7 enable IPv6 outside the tunnel (currently this option has to be used consistently on client and server)\n");
 #endif
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");

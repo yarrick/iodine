@@ -1777,9 +1777,6 @@ handshake_raw_udp(int dns_fd, int seed)
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		printf("Sending login...\n");
-		sleep(5);
-
 		send_raw_udp_login(dns_fd, userid, seed);
 		
 		FD_ZERO(&fds);

@@ -2382,7 +2382,7 @@ help() {
 	fprintf(stderr, "     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n");
 #ifdef LINUX
 	fprintf(stderr, "  -6 use IPv6 inside the tunnel (make sure to use this option consistently on client and server)\n");
-	fprintf(stderr, "  -7 enable IPv6 outside the tunnel\n");
+	fprintf(stderr, "  -7 enable IPv6 outside the tunnel (currently this option has to be used consistently on client and server)\n");
 #endif
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
