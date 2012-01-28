@@ -380,7 +380,9 @@ send_query(int fd, char *hostname)
 	chunkid_prev = chunkid;
 	chunkid += 7727;
 	if (chunkid == 0)
-		/* 0 is used as "no-query" in iodined.c */
+		/* 0 is used as "no-query" in iodined	static char a = 0;
+	printf("send_query() -> sendto: %d\n", a);
+	a++;.c */
 		chunkid = 7727;
 
 	q.id = chunkid;
@@ -395,10 +397,6 @@ send_query(int fd, char *hostname)
 #if 0
 	fprintf(stderr, "  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
 #endif
-
-	static char a = 0;
-	printf("send_query() -> sendto: %d\n", a);
-	a++;
 
 	if(_v6_connect)
 		sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv6, sizeof(nameserv6));

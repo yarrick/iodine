@@ -154,14 +154,18 @@ check_user_and_ip(int userid, struct query *q)
 		return 0;
 	}
 
-	/**
-	 * Todo: IPv6
-	 */
-
-	return 0;
-
-	tempin = (struct sockaddr_in *) &(q->from);
-	return memcmp(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+#ifdef LINUX
+	if (v6_listen) {
+		return memcmp(&(users[userid].host.v6), &q->from.v6,
+				sizeof(struct in6_addr));
+	} else {
+#endif
+		tempin = (struct sockaddr_in *) &(q->from);
+		return memcmp(&(users[userid].host), &(tempin->sin_addr),
+				sizeof(struct in_addr));
+#ifdef LINUX
+	}
+#endif
 }
 
 static void

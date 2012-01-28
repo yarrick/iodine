@@ -44,7 +44,10 @@ struct user {
 #ifdef LINUX
 	struct in6_addr tun_ip6;
 #endif
-	struct in_addr host;
+	union {
+			struct in_addr v4;
+			struct in6_addr v6;
+	} host;
 	struct query q;
 	struct query q_sendrealsoon;
 	int q_sendrealsoon_new;
