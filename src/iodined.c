@@ -2116,6 +2116,8 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 
 			printf("cmsg != NULL!\n");
+			printf("Vaavvaaaa\n");
+			ipv6_print(cmsg->__cmsg_data, 00);
 
 			if (cmsg->cmsg_level == IPPROTO_IP &&
 				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
@@ -2132,9 +2134,6 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 				break;//	printf("write_dns()\n");
 				//	ipv6_print(&q->from.v6, 44);
 			}
-
-			printf("Vaavvaaaa\n");
-			ipv6_print(cmsg->__cmsg_data, 00);
 		}
 #endif
 		return strlen(q->name);
