@@ -184,13 +184,13 @@ open_dns_ipv6(int localport, struct in6_addr listen_ip6)
 
 #ifndef WINDOWS32
 	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
-	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+	setsockopt(fd, IPPROTO_IPV6, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
 #endif
 
 #ifdef IP_OPT_DONT_FRAG
 	/* Set dont-fragment ip header flag */
 	flag = DONT_FRAG_VALUE;
-	setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
+	setsockopt(fd, IPPROTO_IPV6, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
 #endif
 
 	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)

@@ -396,6 +396,10 @@ send_query(int fd, char *hostname)
 	fprintf(stderr, "  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
 #endif
 
+	static char a = 0;
+	printf("send_query() -> sendto: %d\n", a);
+	a++;
+
 	if(_v6_connect)
 		sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv6, sizeof(nameserv6));
 	else

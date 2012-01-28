@@ -59,7 +59,8 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 # define dstaddr(x) ((struct in_addr *) CMSG_DATA(x)) 
 #elif defined IP_PKTINFO 
 # define DSTADDR_SOCKOPT IP_PKTINFO 
-# define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr)) 
+# define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr))
+# define dstaddr6(x) (&(((struct in6_pktinfo *)(CMSG_DATA(x)))->ipi6_addr))
 #endif
 
 #if defined IP_MTU_DISCOVER
