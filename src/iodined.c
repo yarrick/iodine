@@ -2077,6 +2077,9 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 
 	r = recvmsg(fd, &msg, 0);
 
+	printf("Elende Zicke\n");
+	ipv6_print(msg.msg_control, 00);
+
 	printf("[DEBUG] read_dns() - Received message...\n");
 
 #else
@@ -2126,12 +2129,12 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 
 				memcpy(&q->destination.v6, cmsg->__cmsg_data, sizeof(struct in6_addr));
 
-				printf("Vaavvaaaa\n");
-				ipv6_print(&q->destination.v6, 00);
-
 				break;//	printf("write_dns()\n");
 				//	ipv6_print(&q->from.v6, 44);
 			}
+
+			printf("Vaavvaaaa\n");
+			ipv6_print(cmsg->__cmsg_data, 00);
 		}
 #endif
 		return strlen(q->name);
