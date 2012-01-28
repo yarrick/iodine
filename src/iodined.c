@@ -2468,6 +2468,9 @@ main(int argc, char **argv)
 #endif
 	port = 53;
 	ns_ip = INADDR_ANY;
+#ifdef LINUX
+	memcpy(&ns_ip6, &in6addr_any, sizeof(in6addr_any));
+#endif
 	check_ip = 1;
 	skipipconfig = 0;
 	debug = 0;
