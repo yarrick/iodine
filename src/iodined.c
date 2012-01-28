@@ -2077,9 +2077,6 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 
 	r = recvmsg(fd, &msg, 0);
 
-	printf("Elende Zicke\n");
-	ipv6_print(msg.msg_control, 00);
-
 	printf("[DEBUG] read_dns() - Received message...\n");
 
 #else

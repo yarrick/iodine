@@ -184,7 +184,7 @@ open_dns_ipv6(int localport, struct in6_addr listen_ip6)
 
 #ifndef WINDOWS32
 	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
-	setsockopt(fd, IPPROTO_IPV6, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+	setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const void*) &flag, sizeof(flag));
 #endif
 
 #ifdef IP_OPT_DONT_FRAG
