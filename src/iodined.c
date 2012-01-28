@@ -1728,8 +1728,6 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 	if ((read = read_dns(dns_fd, tun_fd, &q)) <= 0)
 		return 0;
 
-	printf("DEBUG - 0\n");
-
 	if (debug >= 2) {
 		struct sockaddr_in *tempin;
 		tempin = (struct sockaddr_in *) &(q.from);
@@ -2114,7 +2112,7 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 
 	r = recvmsg(fd, &msg, 0);
 
-	printf("[DEBUG] read_dns() - Received message...\n");
+//	printf("[DEBUG] read_dns() - Received message...\n");
 
 #else
 	addrlen = sizeof(struct sockaddr);
@@ -2135,9 +2133,6 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 #ifdef LINUX
 		}
 #endif
-
-		ipv6_print(&(from6.sin6_addr), 42);
-
 		/* TODO do not handle raw packets here! */
 		if (raw_decode(packet, r, q, fd, tun_fd)) {
 			return 0;

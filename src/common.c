@@ -457,7 +457,7 @@ char *ipv6_str(struct in6_addr *ip) {
 	size_t position = 0;
 	for (i = 0; i < 8; ++i)
 		 position += sprintf(str + position, "%04x%s", ntohs(ip->__in6_u.__u6_addr16[i]), i < 7 ? ":"
-				: "/");
+				: "");
 	str[size - 1] = 0;
 	return str;
 }
