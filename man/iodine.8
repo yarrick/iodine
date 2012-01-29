@@ -11,7 +11,7 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I user
 .B ] [-P
 .I password
-.B ] [-m
+.B ] [-6] [-7] [-m
 .I fragsize
 .B ] [-t
 .I chrootdir
@@ -45,7 +45,7 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodined [-h]
 
-.B iodined [-c] [-s] [-f] [-D] [-u
+.B iodined [-c] [-s] [-f] [-D] [-6] [-7] [-u
 .I user
 .B ] [-t
 .I chrootdir
@@ -55,10 +55,14 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I mtu
 .B ] [-l
 .I listen_ip
+.B ] [-r
+.I listen_ip6
 .B ] [-p
 .I port
 .B ] [-n
 .I external_ip
+.B ] [-q
+.I external_ip6
 .B ] [-b
 .I dnsport
 .B ] [-P
@@ -72,10 +76,14 @@ iodine, iodined \- tunnel IPv4 over DNS
 .B [
 .I /netmask
 .B ]
+.I tunnel_net6
+.B [
+.I /netmask6
+.B ]
 .I topdomain
 .SH DESCRIPTION
 .B iodine
-lets you tunnel IPv4 data through a DNS 
+lets you tunnel IPv4 or IPv6 data through a DNS 
 server. This can be useful in situations where Internet access is firewalled,
 but DNS queries are allowed. It needs a TUN/TAP device to operate. The 
 bandwidth is asymmetrical,
@@ -100,6 +108,16 @@ Print version info and exit.
 .TP
 .B -h
 Print usage info and exit.
+.TP
+.B -6
+Use IPv6. This enbles IPv6 packets to be sent on top of the DNS protocol.
+Otherwise IPv4 will be used. Make sure to provide this option for both,
+the client and the server. It is only available on Linux systems.
+.TP
+.B -7
+Establish tunnel using IPv6. This enables the DNS packets to be sent on top
+of IPv6. Otherwise IPv4 will be used. Make sure to provide this option for both,
+the client and the server. It is only available on Linux systems.
 .TP
 .B -f
 Keep running in foreground.
@@ -251,7 +269,11 @@ automatically fragmented when needed.
 .TP
 .B -l listen_ip
 Make the server listen only on 'listen_ip' for incoming requests.
+Use -r to provide an IPv6 address.
 By default, incoming requests are accepted from all interfaces.
+.TP
+.B -r listen_ip6
+Make the server listen only on 'listen_ip6' for incoming requests.
 .TP
 .B -p port
 Make the server listen on 'port' instead of 53 for traffic. 
@@ -259,7 +281,11 @@ Make the server listen on 'port' instead of 53 for traffic.
 You must make sure the dns requests are forwarded to this port yourself.
 .TP
 .B -n external_ip
-The IP address to return in NS responses. Default is to return the address used
+The IPv4 address to return in NS responses. Default is to return the address used
+as destination in the query.
+.TP
+.B -q external_ip6
+The IPv6 address to return in NS responses. Default is to return the address used
 as destination in the query.
 .TP
 .B -b dnsport
@@ -288,10 +314,14 @@ must be the same on both the client and the server.
 .SS Server Arguments:
 .TP
 .B tunnel_ip[/netmask]
-This is the server's ip address on the tun interface. The client will be
-given the next ip number in the range. It is recommended to use the 
+This is the server's IPv4 address on the tun interface. The client will be
+given the next IPv4 number in the range. It is recommended to use the 
 10.0.0.0 or 172.16.0.0 ranges. The default netmask is /27, can be overriden
 by specifying it here. Using a smaller network will limit the number of
+concurrent users.
+.B tunnel_net6/netmask6
+This is the server's IPv6 network address on the tun interface. The client will be
+given an IPV6 number from this range. Using a smaller network will limit the number of
 concurrent users.
 .TP
 .B topdomain
