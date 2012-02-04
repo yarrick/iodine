@@ -19,6 +19,24 @@ TARGETOS = `uname`
 all: 
 	@(cd src; $(MAKE) TARGETOS=$(TARGETOS) all)
 
+cross-android:
+	@(cd src; $(MAKE) base64u.c base64u.h)
+	@(cd src; ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk)
+
+cross-android-dist:
+	@rm -rf iodine-latest-android*
+	@mkdir -p iodine-latest-android/armeabi iodine-latest-android/x86
+	@$(MAKE) cross-android TARGET_ARCH_ABI=armeabi
+	@cp src/libs/armeabi/* iodine-latest-android/armeabi
+	@$(MAKE) cross-android TARGET_ARCH_ABI=x86
+	@cp src/libs/x86/* iodine-latest-android/x86
+	@cp README README-android.txt CH* TO* iodine-latest-android
+	@echo "Create date: " > iodine-latest-android/VERSION
+	@date >> iodine-latest-android/VERSION
+	@echo "Git version: " >> iodine-latest-android/VERSION
+	@git rev-parse HEAD >> iodine-latest-android/VERSION
+	@zip -r iodine-latest-android.zip iodine-latest-android
+
 cross-mingw: 
 	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-mingw32-gcc all)
 
@@ -27,11 +45,11 @@ cross-mingw-dist: cross-mingw
 	@mkdir -p iodine-latest-win32/bin
 	@for i in `ls bin`; do cp bin/$$i iodine-latest-win32/bin/$$i.exe; done
 	@cp /usr/i686-mingw32/usr/bin/zlib1.dll iodine-latest-win32/bin
-	@cp README* CH* TO* iodine-latest-win32
+	@cp README README-win32.txt CH* TO* iodine-latest-win32
 	@echo "Create date: " > iodine-latest-win32/VERSION
 	@date >> iodine-latest-win32/VERSION
-	@echo "SVN version: " >> iodine-latest-win32/VERSION
-	@svnversion >> iodine-latest-win32/VERSION
+	@echo "Git version: " >> iodine-latest-win32/VERSION
+	@git rev-parse HEAD >> iodine-latest-win32/VERSION
 	@zip -r iodine-latest-win32.zip iodine-latest-win32
 
 install: all
@@ -58,5 +76,5 @@ clean:
 	@echo "Cleaning..."
 	@(cd src; $(MAKE) clean)
 	@(cd tests; $(MAKE) clean)
-	@rm -rf bin iodine-latest-win32*
+	@rm -rf bin iodine-latest-win32* iodine-latest-android*
 

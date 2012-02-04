@@ -43,4 +43,5 @@ base64u.h: base64.h
 clean:
 	@echo "Cleaning src/"
 	@rm -f $(CLIENT){,.exe} $(SERVER){,.exe} *~ *.o *.core base64u.*
+	@rm -rf obj libs #android stuff
 

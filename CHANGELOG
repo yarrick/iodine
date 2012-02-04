@@ -35,6 +35,8 @@ CHANGES:
 		Patch by Hagar.
 	- Add -R option to set OpenBSD routing domain for the DNS socket.
 		Patch by laurent at gouloum fr, fixes #95.
+	- Add android patches and makefile, from Marcel Bokhorst, fixes #105.
+	- Added missing break in iodine.c, by Pavel Pergamenshchik, #108.
 
 2009-06-01: 0.5.2 "WifiFree"
 	- Fixed client segfault on OS X, #57
