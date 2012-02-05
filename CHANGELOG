@@ -30,6 +30,7 @@ CHANGES:
 	- Merged low-latency patch from Anne Bezemer, fixes #76.
 	- Resolve client nameserver argument if given as hostname, fixes #82.
 	- Open log before chroot, fixes #86: logging on FreeBSD.
+	- Merged big bugfix patch from Anne Bezemer, #88.
 	- Fix DNS tunneling bug caused by uninitialized variable, #94
 	- Handle spaces when entering password interactively, fixes #93.
 		Patch by Hagar.
