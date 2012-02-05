@@ -5,7 +5,7 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
-2010-02-13: 0.6.0-rc1 "Hotspotify"
+20xx-xx-xx: 0.6.Y "Hotspotify"
 	- Fixed tunnel not working on Windows.
 	- Any device name is now supported on Windows, fixes #47.
 	- Multiple installed TAP32 interfaces are now supported, fixes #46.
@@ -30,6 +30,7 @@ CHANGES:
 	- Merged low-latency patch from Anne Bezemer, fixes #76.
 	- Resolve client nameserver argument if given as hostname, fixes #82.
 	- Open log before chroot, fixes #86: logging on FreeBSD.
+	Since rc1:
 	- Fix DNS tunneling bug caused by uninitialized variable, #94
 	- Handle spaces when entering password interactively, fixes #93.
 		Patch by Hagar.
