@@ -207,15 +207,13 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 		   (even CNAME/A/MX, 255+255+header would be >512) */
 		if (dnsc_use_edns0) {
 			header->arcount = htons(1);
-			/*XXX START adjust indent 1 tab forward*/
-		CHECKLEN(11);
-		putbyte(&p, 0x00);    /* Root */
-		putshort(&p, 0x0029); /* OPT */
-		putshort(&p, 0x1000); /* Payload size: 4096 */
-		putshort(&p, 0x0000); /* Higher bits/edns version */
-		putshort(&p, 0x8000); /* Z */
-		putshort(&p, 0x0000); /* Data length */
-			/*XXX END adjust indent 1 tab forward*/
+			CHECKLEN(11);
+			putbyte(&p, 0x00);    /* Root */
+			putshort(&p, 0x0029); /* OPT */
+			putshort(&p, 0x1000); /* Payload size: 4096 */
+			putshort(&p, 0x0000); /* Higher bits/edns version */
+			putshort(&p, 0x8000); /* Z */
+			putshort(&p, 0x0000); /* Data length */
 		}
 
 		break;

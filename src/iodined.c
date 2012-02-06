@@ -1742,31 +1742,29 @@ handle_full_packet(int tun_fd, int dns_fd, int userid)
 			write_tun(tun_fd, out, outlen);
 		} else {
 			/* send the compressed(!) packet to other client */
-		/*XXX START adjust indent 1 tab forward*/
-		if (users[touser].conn == CONN_DNS_NULL) {
-			if (users[touser].outpacket.len == 0) {
-				start_new_outpacket(touser,
-					users[userid].inpacket.data,
-					users[userid].inpacket.len);
+			if (users[touser].conn == CONN_DNS_NULL) {
+				if (users[touser].outpacket.len == 0) {
+					start_new_outpacket(touser,
+						users[userid].inpacket.data,
+						users[userid].inpacket.len);
 
-				/* Start sending immediately if query is waiting */
-				if (users[touser].q_sendrealsoon.id != 0)
-					send_chunk_or_dataless(dns_fd, touser, &users[touser].q_sendrealsoon);
-				else if (users[touser].q.id != 0)
-					send_chunk_or_dataless(dns_fd, touser, &users[touser].q);
+					/* Start sending immediately if query is waiting */
+					if (users[touser].q_sendrealsoon.id != 0)
+						send_chunk_or_dataless(dns_fd, touser, &users[touser].q_sendrealsoon);
+					else if (users[touser].q.id != 0)
+						send_chunk_or_dataless(dns_fd, touser, &users[touser].q);
 #ifdef OUTPACKETQ_LEN
-			} else {
-				save_to_outpacketq(touser,
-					users[userid].inpacket.data,
-					users[userid].inpacket.len);
+				} else {
+					save_to_outpacketq(touser,
+						users[userid].inpacket.data,
+						users[userid].inpacket.len);
 #endif
+				}
+			} else{ /* CONN_RAW_UDP */
+				send_raw(dns_fd, users[userid].inpacket.data,
+					 users[userid].inpacket.len, touser,
+					 RAW_HDR_CMD_DATA, &users[touser].q);
 			}
-		} else{ /* CONN_RAW_UDP */
-			send_raw(dns_fd, users[userid].inpacket.data,
-				 users[userid].inpacket.len, touser,
-				 RAW_HDR_CMD_DATA, &users[touser].q);
-		}
-		/*XXX END adjust indent 1 tab forward*/
 		}
 	} else {
 		if (debug >= 1)

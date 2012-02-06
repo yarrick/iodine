@@ -1458,32 +1458,30 @@ handshake_version(int dns_fd, int *seed)
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'v', 'V', i+1);
 
-		/*XXX START adjust indent 1 tab back*/
-			if (read >= 9) {
-				payload =  (((in[4] & 0xff) << 24) |
-						((in[5] & 0xff) << 16) |
-						((in[6] & 0xff) << 8) |
-						((in[7] & 0xff)));
+		if (read >= 9) {
+			payload =  (((in[4] & 0xff) << 24) |
+					((in[5] & 0xff) << 16) |
+					((in[6] & 0xff) << 8) |
+					((in[7] & 0xff)));
 
-				if (strncmp("VACK", in, 4) == 0) {
-					*seed = payload;
-					userid = in[8];
-					userid_char = hex[userid & 15];
-					userid_char2 = hex2[userid & 15];
+			if (strncmp("VACK", in, 4) == 0) {
+				*seed = payload;
+				userid = in[8];
+				userid_char = hex[userid & 15];
+				userid_char2 = hex2[userid & 15];
 
-					fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
-					return 0;
-				} else if (strncmp("VNAK", in, 4) == 0) {
-					warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
-							VERSION, payload);
-					return 1;
-				} else if (strncmp("VFUL", in, 4) == 0) {
-					warnx("Server full, all %d slots are taken. Try again later", payload);
-					return 1;
-				}
-			} else if (read > 0)
-				warnx("did not receive proper login challenge");
-		/*XXX END adjust indent 1 tab back*/
+				fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
+				return 0;
+			} else if (strncmp("VNAK", in, 4) == 0) {
+				warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
+						VERSION, payload);
+				return 1;
+			} else if (strncmp("VFUL", in, 4) == 0) {
+				warnx("Server full, all %d slots are taken. Try again later", payload);
+				return 1;
+			}
+		} else if (read > 0)
+			warnx("did not receive proper login challenge");
 		
 		fprintf(stderr, "Retrying version check...\n");
 	}
@@ -1510,30 +1508,28 @@ handshake_login(int dns_fd, int seed)
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'l', 'L', i+1);
 
-		/*XXX START adjust indent 1 tab back*/
-			if (read > 0) {
-				int netmask;
-				if (strncmp("LNAK", in, 4) == 0) {
-					fprintf(stderr, "Bad password\n");
-					return 1;
-				} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d", 
-					server, client, &mtu, &netmask) == 4) {
-					
-					server[64] = 0;
-					client[64] = 0;
-					if (tun_setip(client, server, netmask) == 0 && 
-						tun_setmtu(mtu) == 0) {
+		if (read > 0) {
+			int netmask;
+			if (strncmp("LNAK", in, 4) == 0) {
+				fprintf(stderr, "Bad password\n");
+				return 1;
+			} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d",
+				server, client, &mtu, &netmask) == 4) {
 
-						fprintf(stderr, "Server tunnel IP is %s\n", server);
-						return 0;
-					} else {
-						errx(4, "Failed to set IP and MTU");
-					}
+				server[64] = 0;
+				client[64] = 0;
+				if (tun_setip(client, server, netmask) == 0 &&
+					tun_setmtu(mtu) == 0) {
+
+					fprintf(stderr, "Server tunnel IP is %s\n", server);
+					return 0;
 				} else {
-					fprintf(stderr, "Received bad handshake\n");
+					errx(4, "Failed to set IP and MTU");
 				}
+			} else {
+				fprintf(stderr, "Received bad handshake\n");
 			}
-		/*XXX END adjust indent 1 tab back*/
+		}
 
 		fprintf(stderr, "Retrying login...\n");
 	}
@@ -1560,20 +1556,18 @@ handshake_raw_udp(int dns_fd, int seed)
 
 		len = handshake_waitdns(dns_fd, in, sizeof(in), 'i', 'I', i+1);
 
-		/*XXX START adjust indent 1 tab back*/
-			if (len == 5 && in[0] == 'I') {
-				/* Received IP address */
-				remoteaddr = (in[1] & 0xff);
-				remoteaddr <<= 8;
-				remoteaddr |= (in[2] & 0xff);
-				remoteaddr <<= 8;
-				remoteaddr |= (in[3] & 0xff);
-				remoteaddr <<= 8;
-				remoteaddr |= (in[4] & 0xff);
-				server.s_addr = ntohl(remoteaddr);
-				break;
-			}
-		/*XXX END adjust indent 1 tab back*/
+		if (len == 5 && in[0] == 'I') {
+			/* Received IP address */
+			remoteaddr = (in[1] & 0xff);
+			remoteaddr <<= 8;
+			remoteaddr |= (in[2] & 0xff);
+			remoteaddr <<= 8;
+			remoteaddr |= (in[3] & 0xff);
+			remoteaddr <<= 8;
+			remoteaddr |= (in[4] & 0xff);
+			server.s_addr = ntohl(remoteaddr);
+			break;
+		}
 
 		fprintf(stderr, ".");
 		fflush(stderr);
@@ -2098,24 +2092,22 @@ handshake_switch_codec(int dns_fd, int bits)
 		
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 's', 'S', i+1);
 
-		/*XXX START adjust indent 1 tab back*/			
-			if (read > 0) {
-				if (strncmp("BADLEN", in, 6) == 0) {
-					fprintf(stderr, "Server got bad message length. ");
-					goto codec_revert;
-				} else if (strncmp("BADIP", in, 5) == 0) {
-					fprintf(stderr, "Server rejected sender IP address. ");
-					goto codec_revert;
-				} else if (strncmp("BADCODEC", in, 8) == 0) {
-					fprintf(stderr, "Server rejected the selected codec. ");
-					goto codec_revert;
-				}
-				in[read] = 0; /* zero terminate */
-				fprintf(stderr, "Server switched upstream to codec %s\n", in);
-				dataenc = tempenc;
-				return;
+		if (read > 0) {
+			if (strncmp("BADLEN", in, 6) == 0) {
+				fprintf(stderr, "Server got bad message length. ");
+				goto codec_revert;
+			} else if (strncmp("BADIP", in, 5) == 0) {
+				fprintf(stderr, "Server rejected sender IP address. ");
+				goto codec_revert;
+			} else if (strncmp("BADCODEC", in, 8) == 0) {
+				fprintf(stderr, "Server rejected the selected codec. ");
+				goto codec_revert;
 			}
-		/*XXX END adjust indent 1 tab back*/
+			in[read] = 0; /* zero terminate */
+			fprintf(stderr, "Server switched upstream to codec %s\n", in);
+			dataenc = tempenc;
+			return;
+		}
 
 		fprintf(stderr, "Retrying codec switch...\n");
 	}
@@ -2153,23 +2145,21 @@ handshake_switch_downenc(int dns_fd)
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', i+1);
 
-		/*XXX START adjust indent 1 tab back*/
-			if (read > 0) {
-				if (strncmp("BADLEN", in, 6) == 0) {
-					fprintf(stderr, "Server got bad message length. ");
-					goto codec_revert;
-				} else if (strncmp("BADIP", in, 5) == 0) {
-					fprintf(stderr, "Server rejected sender IP address. ");
-					goto codec_revert;
-				} else if (strncmp("BADCODEC", in, 8) == 0) {
-					fprintf(stderr, "Server rejected the selected codec. ");
-					goto codec_revert;
-				}
-				in[read] = 0; /* zero terminate */
-				fprintf(stderr, "Server switched downstream to codec %s\n", in);
-				return;
+		if (read > 0) {
+			if (strncmp("BADLEN", in, 6) == 0) {
+				fprintf(stderr, "Server got bad message length. ");
+				goto codec_revert;
+			} else if (strncmp("BADIP", in, 5) == 0) {
+				fprintf(stderr, "Server rejected sender IP address. ");
+				goto codec_revert;
+			} else if (strncmp("BADCODEC", in, 8) == 0) {
+				fprintf(stderr, "Server rejected the selected codec. ");
+				goto codec_revert;
 			}
-		/*XXX END adjust indent 1 tab back*/
+			in[read] = 0; /* zero terminate */
+			fprintf(stderr, "Server switched downstream to codec %s\n", in);
+			return;
+		}
 
 		fprintf(stderr, "Retrying codec switch...\n");
 	}
@@ -2196,24 +2186,22 @@ handshake_try_lazy(int dns_fd)
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', i+1);
 
-		/*XXX START adjust indent 1 tab back*/
-			if (read > 0) {
-				if (strncmp("BADLEN", in, 6) == 0) {
-					fprintf(stderr, "Server got bad message length. ");
-					goto codec_revert;
-				} else if (strncmp("BADIP", in, 5) == 0) {
-					fprintf(stderr, "Server rejected sender IP address. ");
-					goto codec_revert;
-				} else if (strncmp("BADCODEC", in, 8) == 0) {
-					fprintf(stderr, "Server rejected lazy mode. ");
-					goto codec_revert;
-				} else if (strncmp("Lazy", in, 4) == 0) {
-					fprintf(stderr, "Server switched to lazy mode\n");
-					lazymode = 1;
-					return;
-				}
+		if (read > 0) {
+			if (strncmp("BADLEN", in, 6) == 0) {
+				fprintf(stderr, "Server got bad message length. ");
+				goto codec_revert;
+			} else if (strncmp("BADIP", in, 5) == 0) {
+				fprintf(stderr, "Server rejected sender IP address. ");
+				goto codec_revert;
+			} else if (strncmp("BADCODEC", in, 8) == 0) {
+				fprintf(stderr, "Server rejected lazy mode. ");
+				goto codec_revert;
+			} else if (strncmp("Lazy", in, 4) == 0) {
+				fprintf(stderr, "Server switched to lazy mode\n");
+				lazymode = 1;
+				return;
 			}
-		/*XXX END adjust indent 1 tab back*/
+		}
 
 		fprintf(stderr, "Retrying lazy mode switch...\n");
 	}
@@ -2242,14 +2230,12 @@ handshake_lazyoff(int dns_fd)
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', 1);
 
-		/*XXX START adjust indent 2 tabs back*/
-				if (read == 9 && strncmp("Immediate", in, 9) == 0) {
-					warnx("Server switched back to legacy mode.\n");
-					lazymode = 0;
-					selecttimeout = 1;
-					return;
-				}
-		/*XXX END adjust indent 2 tabs back*/
+		if (read == 9 && strncmp("Immediate", in, 9) == 0) {
+			warnx("Server switched back to legacy mode.\n");
+			lazymode = 0;
+			selecttimeout = 1;
+			return;
+		}
 	}
 	if (!running)
 		return;
@@ -2304,28 +2290,26 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 	okay = 1;
 	v = in[3] & 0xff;
 
-	/*XXX START adjust indent 1 tab back*/
-		for (i = 3; i < read; i++, v = (v + 107) & 0xff)
-			if ((in[i] & 0xff) != v) {
-				okay = 0;
-				break;
-			}
-
-		if (okay) {
-			fprintf(stderr, "%d ok.. ", acked_fragsize);
-			fflush(stderr);
-			*max_fragsize = acked_fragsize;
-			return 1;
-		} else {
-			if (downenc != ' ' && downenc != 'T') {
-				fprintf(stderr, "%d corrupted at %d.. (Try -O Base32)\n", acked_fragsize, i);
-			} else {
-				fprintf(stderr, "%d corrupted at %d.. ", acked_fragsize, i);
-			}
-			fflush(stderr);
-			return 1;
+	for (i = 3; i < read; i++, v = (v + 107) & 0xff)
+		if ((in[i] & 0xff) != v) {
+			okay = 0;
+			break;
 		}
-	/*XXX END adjust indent 1 tab back*/
+
+	if (okay) {
+		fprintf(stderr, "%d ok.. ", acked_fragsize);
+		fflush(stderr);
+		*max_fragsize = acked_fragsize;
+		return 1;
+	} else {
+		if (downenc != ' ' && downenc != 'T') {
+			fprintf(stderr, "%d corrupted at %d.. (Try -O Base32)\n", acked_fragsize, i);
+		} else {
+			fprintf(stderr, "%d corrupted at %d.. ", acked_fragsize, i);
+		}
+		fflush(stderr);
+		return 1;
+	}
 
 	/* notreached */
 	return 1;
@@ -2352,13 +2336,11 @@ handshake_autoprobe_fragsize(int dns_fd)
 
 			read = handshake_waitdns(dns_fd, in, sizeof(in), 'r', 'R', 1);
 				
-			/*XXX START adjust indent 1 tab back*/
-				if (read > 0) {
-					/* We got a reply */
-					if (fragsize_check(in, read, proposed_fragsize, &max_fragsize) == 1)
-						break;
-				}
-			/*XXX END adjust indent 1 tab back*/
+			if (read > 0) {
+				/* We got a reply */
+				if (fragsize_check(in, read, proposed_fragsize, &max_fragsize) == 1)
+					break;
+			}
 
 			fprintf(stderr, ".");
 			fflush(stderr);
@@ -2422,22 +2404,20 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'n', 'N', i+1);
 
-		/*XXX START adjust indent 1 tab back*/			
-			if (read > 0) {
-				int accepted_fragsize;
+		if (read > 0) {
+			int accepted_fragsize;
 
-				if (strncmp("BADFRAG", in, 7) == 0) {
-					fprintf(stderr, "Server rejected fragsize. Keeping default.");
-					return;
-				} else if (strncmp("BADIP", in, 5) == 0) {
-					fprintf(stderr, "Server rejected sender IP address.\n");
-					return;
-				}
-
-				accepted_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
+			if (strncmp("BADFRAG", in, 7) == 0) {
+				fprintf(stderr, "Server rejected fragsize. Keeping default.");
+				return;
+			} else if (strncmp("BADIP", in, 5) == 0) {
+				fprintf(stderr, "Server rejected sender IP address.\n");
 				return;
 			}
-		/*XXX END adjust indent 1 tab back*/
+
+			accepted_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
+			return;
+		}
 
 		fprintf(stderr, "Retrying set fragsize...\n");
 	}
