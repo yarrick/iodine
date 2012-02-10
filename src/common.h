@@ -37,8 +37,8 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <err.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #endif
 
 #define DNS_PORT 53

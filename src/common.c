@@ -39,8 +39,8 @@
 #endif
 #include <termios.h>
 #include <err.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <syslog.h>
 #endif
 

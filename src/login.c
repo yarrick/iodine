@@ -20,6 +20,7 @@
 #ifdef WINDOWS32
 #include "windows.h"
 #else
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
 

@@ -33,6 +33,7 @@
 #define BIND_8_COMPAT
 #include <arpa/nameser_compat.h>
 #endif
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <err.h>
 #endif

@@ -51,8 +51,8 @@ static void get_name(char *ifname, int namelen, char *dev_name);
 #define NET_CFG_INST_ID "NetCfgInstanceId"
 #else
 #include <err.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define TUN_MAX_TRY 50
 #endif
