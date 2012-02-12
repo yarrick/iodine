@@ -93,7 +93,6 @@ START_TEST(test_base64_decode)
 	len = sizeof(buf);
 	val = b64->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
-	fail_unless(buf != NULL, "buf == NULL");
 	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
 			"'%s' != '%s'", buf, testpairs[_i].a);
 }
