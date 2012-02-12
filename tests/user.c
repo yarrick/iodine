@@ -19,8 +19,8 @@
 #include <string.h>
 #include <time.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "common.h"
 #include "encoding.h"
