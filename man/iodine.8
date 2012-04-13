@@ -1,5 +1,5 @@
 .\" groff -man -Tascii iodine.8
-.TH IODINE 8 "DEC 2009" "User Manuals"
+.TH IODINE 8 "APR 2012" "User Manuals"
 .SH NAME
 iodine, iodined \- tunnel IPv4 over DNS
 .SH SYNOPSIS
@@ -255,6 +255,8 @@ By default, incoming requests are accepted from all interfaces.
 .TP
 .B -p port
 Make the server listen on 'port' instead of 53 for traffic. 
+If 'listen_ip' does not include localhost, this 'port' can be the same
+as 'dnsport'.
 .B Note:
 You must make sure the dns requests are forwarded to this port yourself.
 .TP
@@ -265,6 +267,8 @@ as destination in the query.
 .B -b dnsport
 If this port is specified, all incoming requests not inside the tunnel domain
 will be forwarded to this port on localhost, to be handled by a real dns.
+If 'listen_ip' does not include localhost, this 'dnsport' can be the
+same as 'port'.
 .B Note:
 The forwarding is not fully transparent, and not advised for use
 in production environments.
