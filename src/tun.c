@@ -25,7 +25,7 @@
 #include <fcntl.h>
 
 #ifndef IFCONFIGPATH
-#define IFCONFIGPATH "/sbin/"
+#define IFCONFIGPATH "PATH=/sbin:/bin "
 #endif
 
 #ifdef WINDOWS32
