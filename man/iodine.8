@@ -58,7 +58,11 @@ iodine, iodined \- tunnel IPv4 over DNS
 .B ] [-p
 .I port
 .B ] [-n
+(
+.B auto
+|
 .I external_ip
+)
 .B ] [-b
 .I dnsport
 .B ] [-P
@@ -260,9 +264,11 @@ as 'dnsport'.
 .B Note:
 You must make sure the dns requests are forwarded to this port yourself.
 .TP
-.B -n external_ip
+.B -n auto|external_ip
 The IP address to return in NS responses. Default is to return the address used
 as destination in the query.
+If external_ip is 'auto', iodined will use externalip.net web service to
+retrieve the external IP of the host and use that for NS responses.
 .TP
 .B -b dnsport
 If this port is specified, all incoming requests not inside the tunnel domain

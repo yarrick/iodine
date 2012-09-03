@@ -6,6 +6,7 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 trunk:
+	- Add automated lookup of external ip (via -n auto).
 
 2010-02-06: 0.6.0-rc1 "Hotspotify"
 	- Fixed tunnel not working on Windows.

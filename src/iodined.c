@@ -93,6 +93,54 @@ static int read_dns(int, int, struct query *);
 static void write_dns(int, struct query *, char *, int, char);
 static void handle_full_packet(int, int, int);
 
+/* Ask externalip.net webservice to get external ip */
+static int get_external_ip(struct in_addr *ip)
+{
+	int sock;
+	struct addrinfo *addr;
+	int res;
+	const char *getstr = "GET /ip/ HTTP/1.1\r\nHost: api.externalip.net\r\n\r\n";
+	char buf[512];
+	char *b;
+	int len;
+
+	res = getaddrinfo("api.externalip.net", "80", NULL, &addr);
+	if (res < 0) return 1;
+
+	sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+	if (sock < 0) {
+		freeaddrinfo(addr);
+		return 2;
+	}
+
+	res = connect(sock, addr->ai_addr, addr->ai_addrlen);
+	freeaddrinfo(addr);
+	if (res < 0) return 3;
+
+	res = write(sock, getstr, strlen(getstr));
+	if (res != strlen(getstr)) return 4;
+
+	res = read(sock, buf, sizeof(buf));
+	if (res < 0) return 5;
+	len = res;
+
+	res = close(sock);
+	if (res < 0) return 6;
+
+	b = buf;
+	while (len > 9) {
+		/* Look for split between headers and data */
+		if (strncmp("\r\n\r\n", b, 4) == 0) break;
+		b++;
+		len--;
+	}
+	if (len < 10) return 7;
+	b += 4;
+
+	res = inet_aton(b, ip);
+	return (res == 0);
+}
+
 static void
 sigint(int sig) 
 {
@@ -2196,6 +2244,7 @@ main(int argc, char **argv)
 	int mtu;
 	int skipipconfig;
 	char *netsize;
+	int ns_get_externalip;
 	int retval;
 
 #ifndef WINDOWS32
@@ -2213,6 +2262,7 @@ main(int argc, char **argv)
 	listen_ip = INADDR_ANY;
 	port = 53;
 	ns_ip = INADDR_ANY;
+	ns_get_externalip = 0;
 	check_ip = 1;
 	skipipconfig = 0;
 	debug = 0;
@@ -2281,7 +2331,11 @@ main(int argc, char **argv)
 			port = atoi(optarg);
 			break;
 		case 'n':
-			ns_ip = inet_addr(optarg);
+			if (optarg && strcmp("auto", optarg) == 0) {
+				ns_get_externalip = 1;
+			} else {
+				ns_ip = inet_addr(optarg);
+			}
 			break;
 		case 'b':
 			bind_enable = 1;
@@ -2391,6 +2445,17 @@ main(int argc, char **argv)
 		usage();
 	}
 	
+	if (ns_get_externalip) {
+		struct in_addr extip;
+		int res = get_external_ip(&extip);
+		if (res) {
+			fprintf(stderr, "Failed to get external IP via web service.\n");
+			exit(3);
+		}
+		ns_ip = extip.s_addr;
+		fprintf(stderr, "Using %s as external IP.\n", inet_ntoa(extip));
+	}
+
 	if (ns_ip == INADDR_NONE) {
 		warnx("Bad IP address to return as nameserver.");
 		usage();
