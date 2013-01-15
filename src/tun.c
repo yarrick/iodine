@@ -475,15 +475,19 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
+	struct in_addr netip;
+	netip.s_addr = inet_addr(ip);
+	netip.s_addr = netip.s_addr & net.s_addr;
 	r = system(cmdline);
 	if(r != 0) {
 		return r;
 	} else {
+		
 		snprintf(cmdline, sizeof(cmdline),
 				"/sbin/route add %s/%d %s",
-				ip, netbits, ip);
+				inet_ntoa(netip), netbits, ip);
 	}
-	fprintf(stderr, "Adding route %s/%d to %s\n", ip, netbits, ip);
+	fprintf(stderr, "Adding route %s/%d to %s\n", inet_ntoa(netip), netbits, ip);
 #endif
 	return system(cmdline);
 #else /* WINDOWS32 */
