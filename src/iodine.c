@@ -136,7 +136,9 @@ main(int argc, char **argv)
 	int lazymode;
 	int selecttimeout;
 	int hostname_maxlen;
+#ifdef OPENBSD
 	int rtable = 0;
+#endif
 
 	nameserv_addr = NULL;
 	topdomain = NULL;
@@ -200,9 +202,11 @@ main(int argc, char **argv)
 		case 'd':
 			device = optarg;
 			break;
+#ifdef OPENBSD
 		case 'R':
 			rtable = atoi(optarg);
 			break;
+#endif
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
 			password[sizeof(password)-1] = 0;
