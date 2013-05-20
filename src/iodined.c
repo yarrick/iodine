@@ -1589,8 +1589,10 @@ tunnel_bind(int bind_fd, int dns_fd)
 
 	/* Get sockaddr from id */
 	fw_query_get(id, &query);
-	if (!query && debug >= 2) {
-		fprintf(stderr, "Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
+	if (!query) {
+		if (debug >= 2) {
+			fprintf(stderr, "Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
+		}
 		return 0;
 	}
 
