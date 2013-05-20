@@ -449,6 +449,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	struct in_addr addr;
 	DWORD len;
 #endif
+	const char *display_ip;
 
 	netmask = 0;
 	for (i = 0; i < netbits; i++) {
@@ -462,15 +463,16 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		return 1;
 	}
 #ifndef WINDOWS32
+# ifdef FREEBSD
+	display_ip = other_ip; /* FreeBSD wants other IP as second IP */
+# else
+	display_ip = ip;
+# endif
 	snprintf(cmdline, sizeof(cmdline), 
 			IFCONFIGPATH "ifconfig %s %s %s netmask %s",
 			if_name,
 			ip,
-#ifdef FREEBSD
-			other_ip, /* FreeBSD wants other IP as second IP */
-#else
-			ip,
-#endif
+			display_ip,
 			inet_ntoa(net));
 	
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
