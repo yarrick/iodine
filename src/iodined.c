@@ -2023,7 +2023,7 @@ write_dns_nameenc(char *buf, size_t buflen, char *data, int datalen, char downen
 	space = MIN(0xFF, buflen) - 4 - 2;
 	/* -1 encoding type, -3 ".xy", -2 for safety */
 
-	memset(buf, 0, sizeof(buf));
+	memset(buf, 0, buflen);
 
 	if (downenc == 'S') {
 		buf[0] = 'i';
