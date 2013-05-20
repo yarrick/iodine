@@ -115,9 +115,6 @@ readlong(char *packet, char **src, uint32_t *dst)
 int
 readdata(char *packet, char **src, char *dst, size_t len)
 {
-	if (len < 0)
-		return 0;
-
 	memcpy(dst, *src, len);
 
 	(*src) += len;
@@ -232,9 +229,6 @@ putlong(char **dst, uint32_t value)
 int
 putdata(char **dst, char *data, size_t len)
 {
-	if (len < 0)
-		return 0;
-
 	memcpy(*dst, data, len);
 	
 	(*dst) += len;
