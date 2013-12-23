@@ -1,0 +1,8 @@
+[Unit]
+Description=Iodine socket
+
+[Socket]
+ListenDatagram=53
+
+[Install]
+WantedBy=sockets.target
