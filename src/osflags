@@ -17,7 +17,10 @@ link)
 			echo '-lws2_32 -liphlpapi';
 		;;
 		Linux)
-			[ -e /usr/include/selinux/selinux.h ] && echo '-lselinux';
+			FLAGS="";
+			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -lselinux";
+			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS -lsystemd-daemon";
+			echo $FLAGS;
 		;;
 	esac
 	;;
@@ -30,7 +33,10 @@ cflags)
 			echo '-Dsocklen_t=int';
 		;;
 		Linux)
-			[ -e /usr/include/selinux/selinux.h ] && echo '-DHAVE_SETCON';
+			FLAGS="";
+			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -DHAVE_SETCON";
+			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS -DHAVE_SYSTEMD";
+			echo $FLAGS;
 		;;
 	esac
 ;;

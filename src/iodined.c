@@ -59,6 +59,10 @@
 #include "fw_query.h"
 #include "version.h"
 
+#ifdef HAVE_SYSTEMD
+# include <systemd/sd-daemon.h>
+#endif
+
 #ifdef WINDOWS32
 WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
@@ -2246,6 +2250,9 @@ main(int argc, char **argv)
 	char *netsize;
 	int ns_get_externalip;
 	int retval;
+#ifdef HAVE_SYSTEMD
+	int nb_fds;
+#endif
 
 #ifndef WINDOWS32
 	pw = NULL;
@@ -2487,10 +2494,23 @@ main(int argc, char **argv)
 		}
 		free((void*) other_ip);
 	}
-	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
+#ifdef HAVE_SYSTEMD
+	nb_fds = sd_listen_fds(0);
+	if (nb_fds > 1) {
 		retval = 1;
-		goto cleanup2;
+		warnx("Too many file descriptors received!\n");
+		goto cleanup1;
+	} else if (nb_fds == 1) {
+		dnsd_fd = SD_LISTEN_FDS_START;
+	} else {
+#endif
+		if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
+			retval = 1;
+			goto cleanup2;
+		}
+#ifdef HAVE_SYSTEMD
 	}
+#endif
 	if (bind_enable) {
 		if ((bind_fd = open_dns(0, INADDR_ANY)) == -1) {
 			retval = 1;
