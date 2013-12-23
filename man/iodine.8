@@ -71,6 +71,8 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I context
 .B ] [-F
 .I pidfile
+.B ] [-i
+.I max_idle_time
 .B ]
 .I tunnel_ip
 .B [
@@ -278,6 +280,10 @@ same as 'port'.
 .B Note:
 The forwarding is not fully transparent, and not advised for use
 in production environments.
+.TP
+.B -i max_idle_time
+Make the server stop itself after max_idle_time seconds if no traffic have been received.
+This should be combined with systemd or upstart on demand activation for being effective.
 .SS Client Arguments:
 .TP
 .B nameserver
