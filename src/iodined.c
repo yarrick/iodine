@@ -2228,10 +2228,8 @@ help() {
 
 static void
 version() {
-	char *svnver;
-	svnver = "$Rev$ from $Date$";
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
-	fprintf(stderr, "SVN version: %s\n", svnver);
+	fprintf(stderr, "Git version: %s\n", GITREVISION);
 	exit(0);
 }
 

@@ -6,10 +6,11 @@ SERVER = ../bin/iodined
 
 OS = `echo $(TARGETOS) | tr "a-z" "A-Z"`
 ARCH = `uname -m`
+HEAD_COMMIT = `git rev-parse --short HEAD`
 
 LIBPATH = -L.
 LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
-CFLAGS += -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags`
+CFLAGS += -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
 
 all: stateos $(CLIENT) $(SERVER)
 
