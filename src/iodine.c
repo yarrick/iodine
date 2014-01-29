@@ -333,6 +333,8 @@ main(int argc, char **argv)
 #ifdef OPENBSD
 	if (rtable > 0)
 		socket_setrtable(dns_fd, rtable);
+#else
+	(void) rtable;
 #endif
 
 	signal(SIGINT, sighandler);
