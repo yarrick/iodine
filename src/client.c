@@ -2405,7 +2405,6 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'n', 'N', i+1);
 
 		if (read > 0) {
-			int accepted_fragsize;
 
 			if (strncmp("BADFRAG", in, 7) == 0) {
 				fprintf(stderr, "Server rejected fragsize. Keeping default.");
@@ -2415,7 +2414,8 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 				return;
 			}
 
-			accepted_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
+			/* The server returns the accepted fragsize:
+			accepted_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff) */
 			return;
 		}
 
