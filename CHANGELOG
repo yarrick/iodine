@@ -6,8 +6,9 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 master:
-	- Add socket activation for systemd, by mscherer
+	- Add socket activation for systemd, by Michael Scherer.
 	- Add automated lookup of external ip (via -n auto).
+	- Bugfix for OS X (Can't assign requested address)
 
 2010-02-06: 0.6.0-rc1 "Hotspotify"
 	- Fixed tunnel not working on Windows.
