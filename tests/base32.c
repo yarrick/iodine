@@ -50,6 +50,7 @@ START_TEST(test_base32_encode)
 	len = sizeof(buf);
 	val = b32->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
+	fail_unless(val == strlen(testpairs[_i].b));
 	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
 			"'%s' != '%s'", buf, testpairs[_i].b);
 }
@@ -67,6 +68,7 @@ START_TEST(test_base32_decode)
 	len = sizeof(buf);
 	val = b32->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
+	fail_unless(val == strlen(testpairs[_i].a));
 	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
 			"'%s' != '%s'", buf, testpairs[_i].a);
 }
