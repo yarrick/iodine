@@ -23,7 +23,6 @@ build_hostname(char *buf, size_t buflen,
 		const char *data, const size_t datalen, 
 		const char *topdomain, struct encoder *encoder, int maxlen)
 {
-	int encsize;
 	size_t space;
 	char *b;
 
@@ -35,7 +34,7 @@ build_hostname(char *buf, size_t buflen,
 
 	memset(buf, 0, buflen);
 	
-	encsize = encoder->encode(buf, &space, data, datalen);
+	encoder->encode(buf, &space, data, datalen);
 
 	if (!encoder->places_dots())
 		inline_dotify(buf, buflen);
