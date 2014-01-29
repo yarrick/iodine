@@ -96,6 +96,7 @@ START_TEST(test_read_name_empty_loop)
 	data = (char*) emptyloop + sizeof(HEADER);
 	buf[1023] = 'A';
 	rv = readname((char *) emptyloop, sizeof(emptyloop), &data, buf, 1023);
+	fail_unless(rv == 0);
 	fail_unless(buf[1023] == 'A');
 }
 END_TEST
@@ -113,6 +114,7 @@ START_TEST(test_read_name_inf_loop)
 	data = (char*) infloop + sizeof(HEADER);
 	buf[4] = '\a';
 	rv = readname((char*) infloop, sizeof(infloop), &data, buf, 4);
+	fail_unless(rv == 3);
 	fail_unless(buf[4] == '\a');
 }
 END_TEST
@@ -136,6 +138,7 @@ START_TEST(test_read_name_longname)
 	data = (char*) longname + sizeof(HEADER);
 	buf[256] = '\a';
 	rv = readname((char*) longname, sizeof(longname), &data, buf, 256);
+	fail_unless(rv == 256);
 	fail_unless(buf[256] == '\a');
 }
 END_TEST
@@ -213,10 +216,7 @@ START_TEST(test_putname)
 	char buf[256];
 	char *domain = "BADGER.BADGER.KRYO.SE";
 	char *b;
-	int len;
 	int ret;
-
-	len = 256;
 
 	memset(buf, 0, 256);
 	b = buf;
@@ -234,10 +234,7 @@ START_TEST(test_putname_nodot)
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	char *b;
-	int len;
 	int ret;
-
-	len = 256;
 
 	memset(buf, 0, 256);
 	b = buf;
@@ -259,10 +256,7 @@ START_TEST(test_putname_toolong)
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ."
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ.ABCDEFGHIJKLMNOPQRSTUVWXYZ.";
 	char *b;
-	int len;
 	int ret;
-
-	len = 256;
 
 	memset(buf, 0, 256);
 	b = buf;
