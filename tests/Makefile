@@ -6,8 +6,8 @@ SRCOBJS = ../src/base32.o  ../src/base64.o ../src/read.o ../src/dns.o ../src/enc
 OS = `uname | tr "a-z" "A-Z"`
 
 CHECK_PATH = /usr/local
-LDFLAGS = -L$(CHECK_PATH)/lib -lcheck `../src/osflags link`
-CFLAGS = -g -Wall -D$(OS) -I../src -I$(CHECK_PATH)/include -pedantic `../src/osflags cflags`
+LDFLAGS = -L$(CHECK_PATH)/lib `pkg-config check --libs` -lpthread
+CFLAGS = -g -Wall -D$(OS) `pkg-config check --cflags` -I../src -I$(CHECK_PATH)/include -pedantic
 
 all: $(TEST)
 	@LD_LIBRARY_PATH=${CHECK_PATH}/lib ./$(TEST)
@@ -19,7 +19,6 @@ $(TEST): $(OBJS) $(SRCOBJS)
 .c.o: 
 	@echo CC $<
 	@$(CC) $(CFLAGS) -c $<
-
 
 clean:
 	@echo "Cleaning tests/"
