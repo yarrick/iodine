@@ -59,6 +59,10 @@
 #include "fw_query.h"
 #include "version.h"
 
+#ifdef HAVE_SYSTEMD
+# include <systemd/sd-daemon.h>
+#endif
+
 #ifdef WINDOWS32
 WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
@@ -1684,12 +1688,13 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 }
 
 static int
-tunnel(int tun_fd, int dns_fd, int bind_fd)
+tunnel(int tun_fd, int dns_fd, int bind_fd, int max_idle_time)
 {
 	struct timeval tv;
 	fd_set fds;
 	int i;
 	int userid;
+	time_t last_action = time(NULL);
 
 	while (running) {
 		int maxfd;
@@ -1740,8 +1745,20 @@ tunnel(int tun_fd, int dns_fd, int bind_fd)
 			return 1;
 		}
 
- 		if (i==0) {	
-			/* timeout; whatever; doesn't matter anymore */
+		if (i==0) {
+			if (max_idle_time) {
+				/* only trigger the check if that's worth ( ie, no need to loop over if there
+				is something to send */
+				if (last_action + max_idle_time < time(NULL)) {
+					for (userid = 0; userid < created_users; userid++) {
+						last_action = ( users[userid].last_pkt > last_action ) ? users[userid].last_pkt : last_action;
+					}
+					if (last_action + max_idle_time < time(NULL)) {
+						fprintf(stderr, "Idling since too long, shutting down...\n");
+						running = 0;
+					}
+				}
+			}
  		} else {
  			if (FD_ISSET(tun_fd, &fds)) {
  				tunnel_tun(tun_fd, dns_fd);
@@ -2168,7 +2185,7 @@ usage() {
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ip address to listen on] [-p port] [-n external ip] "
-		"[-b dnsport] [-P password] [-F pidfile] "
+		"[-b dnsport] [-P password] [-F pidfile] [-i max idle time] "
 		"tunnel_ip[/netmask] topdomain\n", __progname);
 	exit(2);
 }
@@ -2202,6 +2219,7 @@ help() {
 	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
 	fprintf(stderr, "  -F pidfile to write pid to a file\n");
+	fprintf(stderr, "  -i maximum idle time before shutting down\n");
 	fprintf(stderr, "tunnel_ip is the IP number of the local tunnel interface.\n");
 	fprintf(stderr, "   /netmask sets the size of the tunnel network.\n");
 	fprintf(stderr, "topdomain is the FQDN that is delegated to this server.\n");
@@ -2246,6 +2264,10 @@ main(int argc, char **argv)
 	char *netsize;
 	int ns_get_externalip;
 	int retval;
+	int max_idle_time = 0;
+#ifdef HAVE_SYSTEMD
+	int nb_fds;
+#endif
 
 #ifndef WINDOWS32
 	pw = NULL;
@@ -2292,7 +2314,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 	
-	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:i:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -2344,6 +2366,9 @@ main(int argc, char **argv)
 		case 'F':
 			pidfile = optarg;
 			break;    
+		case 'i':
+			max_idle_time = atoi(optarg);
+			break;
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
 			password[sizeof(password)-1] = 0;
@@ -2487,10 +2512,23 @@ main(int argc, char **argv)
 		}
 		free((void*) other_ip);
 	}
-	if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
+#ifdef HAVE_SYSTEMD
+	nb_fds = sd_listen_fds(0);
+	if (nb_fds > 1) {
 		retval = 1;
-		goto cleanup2;
+		warnx("Too many file descriptors received!\n");
+		goto cleanup1;
+	} else if (nb_fds == 1) {
+		dnsd_fd = SD_LISTEN_FDS_START;
+	} else {
+#endif
+		if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
+			retval = 1;
+			goto cleanup2;
+		}
+#ifdef HAVE_SYSTEMD
 	}
+#endif
 	if (bind_enable) {
 		if ((bind_fd = open_dns(0, INADDR_ANY)) == -1) {
 			retval = 1;
@@ -2539,7 +2577,7 @@ main(int argc, char **argv)
 
 	syslog(LOG_INFO, "started, listening on port %d", port);
 	
-	tunnel(tun_fd, dnsd_fd, bind_fd);
+	tunnel(tun_fd, dnsd_fd, bind_fd, max_idle_time);
 
 	syslog(LOG_INFO, "stopping");
 cleanup3:
