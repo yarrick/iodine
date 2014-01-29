@@ -103,7 +103,9 @@ static int get_external_ip(struct in_addr *ip)
 	int sock;
 	struct addrinfo *addr;
 	int res;
-	const char *getstr = "GET /ip/ HTTP/1.1\r\nHost: api.externalip.net\r\n\r\n";
+	const char *getstr = "GET /ip/ HTTP/1.0\r\n"
+		/* HTTP 1.0 to avoid chunked transfer coding */
+		"Host: api.externalip.net\r\n\r\n";
 	char buf[512];
 	char *b;
 	int len;
@@ -124,7 +126,9 @@ static int get_external_ip(struct in_addr *ip)
 	res = write(sock, getstr, strlen(getstr));
 	if (res != strlen(getstr)) return 4;
 
-	res = read(sock, buf, sizeof(buf));
+	/* Zero buf before receiving, leave at least one zero at the end */
+	memset(buf, 0, sizeof(buf));
+	res = read(sock, buf, sizeof(buf) - 1);
 	if (res < 0) return 5;
 	len = res;
 
