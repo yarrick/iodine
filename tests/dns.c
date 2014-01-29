@@ -159,8 +159,8 @@ START_TEST(test_decode_response)
 	memset(&buf, 0, sizeof(buf));
 
 	ret = dns_decode(buf, len, &q, QR_ANSWER, answer_packet, sizeof(answer_packet)-1);
-	fail_unless(strncmp(msgData, buf, sizeof(msgData)) == 0, "Did not extract expected data");
 	fail_unless(ret == strlen(msgData), "Bad data length: %d, expected %d", ret, strlen(msgData));
+	fail_unless(strncmp(msgData, buf, strlen(msgData)) == 0, "Did not extract expected data");
 	fail_unless(q.id == 0x0539);
 }
 END_TEST
@@ -176,8 +176,8 @@ START_TEST(test_decode_response_with_high_trans_id)
 	memset(&buf, 0, sizeof(buf));
 
 	ret = dns_decode(buf, len, &q, QR_ANSWER, answer_packet_high_trans_id, sizeof(answer_packet_high_trans_id)-1);
-	fail_unless(strncmp(msgData, buf, sizeof(msgData)) == 0, "Did not extract expected data");
 	fail_unless(ret == strlen(msgData), "Bad data length: %d, expected %d", ret, strlen(msgData));
+	fail_unless(strncmp(msgData, buf, strlen(msgData)) == 0, "Did not extract expected data");
 	fail_unless(q.id == 0x8539, "q.id was %08X instead of %08X!", q.id, 0x8539);
 }
 END_TEST
