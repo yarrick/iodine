@@ -125,7 +125,12 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = addr_family;
+#ifdef WINDOWS32
+	/* AI_ADDRCONFIG misbehaves on windows */
+	hints.ai_flags = flags;
+#else
 	hints.ai_flags = AI_ADDRCONFIG | flags;
+#endif
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
 
