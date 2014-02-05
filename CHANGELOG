@@ -6,6 +6,10 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 master:
+	- IPv6 support (in progress, #107)
+	   Client can connect to iodined through an IPv6 nameserver.
+	   Server only supports IPv4 for now.
+	   Traffic inside tunnel is IPv4.
 	- Add socket activation for systemd, by Michael Scherer.
 	- Add automated lookup of external ip (via -n auto).
 	- Bugfix for OS X (Can't assign requested address)
