@@ -29,7 +29,6 @@
 
 #ifdef WINDOWS32
 #include "windows.h"
-#include <winsock2.h>
 #else
 #ifdef ANDROID
 #include "android_dns.h"
@@ -61,7 +60,7 @@ static void handshake_lazyoff(int dns_fd);
 static int running;
 static const char *password;
 
-static struct sockaddr_in nameserv;
+static struct sockaddr_storage nameserv;
 static struct sockaddr_in raw_serv;
 static const char *topdomain;
 
@@ -149,75 +148,9 @@ client_get_conn()
 }
 
 void
-client_set_nameserver(const char *cp, int port) 
+client_set_nameserver(struct sockaddr_storage *addr, int addrlen)
 {
-#ifdef ANDROID
-	struct addrinfo hints, *result, *p;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-
-	char sport[10];
-	sprintf(sport, "%d", port);
-
-	getaddrinfo(cp, sport, &hints, &result);
-	if (result == NULL)
-		errx(1, "Cannot resolve %s:%s (no network?)",  cp, sport);
-	else {
-		for (p = result;p != NULL; p = p->ai_next) {
-			if (p->ai_family == AF_INET) { /* IPv4 */
-				struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
-				memset(&nameserv, 0, sizeof(nameserv));
-				nameserv.sin_family = AF_INET;
-				nameserv.sin_port = htons(port);
-				nameserv.sin_addr = ipv4->sin_addr;
-				freeaddrinfo(result);
-				return;
-			}
-		}
-		freeaddrinfo(result);
-	}
-#endif
-	struct in_addr addr;
-
-	if (inet_aton(cp, &addr) != 1) {
-		/* try resolving if a domain is given */
-		struct hostent *host;
-		const char *err;
-		host = gethostbyname(cp);
-		if (host != NULL && h_errno > 0) {
-			int i = 0;
-			while (host->h_addr_list[i] != 0) {
-				addr = *(struct in_addr *) host->h_addr_list[i++];
-				fprintf(stderr, "Resolved %s to %s\n", cp, inet_ntoa(addr));
-				goto setaddr;
-			}
-		}
-#ifndef WINDOWS32
-		err = hstrerror(h_errno);
-#else
-		{
-			DWORD wserr = WSAGetLastError();
-			switch (wserr) {
-			case WSAHOST_NOT_FOUND:
-				err = "Host not found";
-				break;
-			case WSANO_DATA:
-				err = "No data record found";
-				break;
-			default:
-				err = "Unknown error";
-				break;
-			}
-		}
-#endif /* !WINDOWS32 */
-		errx(1, "error resolving nameserver '%s': %s", cp, err);
-	}
-
-setaddr:
-	memset(&nameserv, 0, sizeof(nameserv));
-	nameserv.sin_family = AF_INET;
-	nameserv.sin_port = htons(port);
-	nameserv.sin_addr = addr;
+	memcpy(&nameserv, addr, addrlen);
 }
 
 void
@@ -625,12 +558,12 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
    Returns >0 on correct replies; value is #valid bytes in *buf.
 */
 {
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	char data[64*1024];
 	socklen_t addrlen;
 	int r;
 
-	addrlen = sizeof(struct sockaddr);
+	addrlen = sizeof(from);
 	if ((r = recvfrom(dns_fd, data, sizeof(data), 0, 
 			  (struct sockaddr*)&from, &addrlen)) < 0) {
 		warn("recvfrom");

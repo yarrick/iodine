@@ -221,7 +221,7 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 			inet_ntoa(tempin->sin_addr), cmd, len);
 	}
 
-	sendto(fd, packet, len, 0, &q->from, q->fromlen);
+	sendto(fd, packet, len, 0, (struct sockaddr *) &q->from, q->fromlen);
 }
 
 
@@ -2241,7 +2241,7 @@ int
 main(int argc, char **argv)
 {
 	extern char *__progname;
-	in_addr_t listen_ip;
+	char *listen_ip;
 #ifndef WINDOWS32
 	struct passwd *pw;
 #endif
@@ -2267,6 +2267,8 @@ main(int argc, char **argv)
 	int ns_get_externalip;
 	int retval;
 	int max_idle_time = 0;
+	struct sockaddr_storage dnsaddr;
+	int dnsaddr_len;
 #ifdef HAVE_SYSTEMD
 	int nb_fds;
 #endif
@@ -2283,7 +2285,7 @@ main(int argc, char **argv)
 	bind_fd = 0;
 	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
 			   higher for NULL; tun/zlib adds ~17 bytes. */
-	listen_ip = INADDR_ANY;
+	listen_ip = NULL;
 	port = 53;
 	ns_ip = INADDR_ANY;
 	ns_get_externalip = 0;
@@ -2349,7 +2351,7 @@ main(int argc, char **argv)
 			mtu = atoi(optarg);
 			break;
 		case 'l':
-			listen_ip = inet_addr(optarg);
+			listen_ip = optarg;
 			break;
 		case 'p':
 			port = atoi(optarg);
@@ -2439,23 +2441,6 @@ main(int argc, char **argv)
 		usage();
 	}
 	
-	if(bind_enable) {
-		if (bind_port < 1 || bind_port > 65535) {
-			warnx("Bad DNS server port number given.");
-			usage();
-			/* NOTREACHED */
-		}
-		/* Avoid forwarding loops */
-		if (bind_port == port && (listen_ip == INADDR_ANY || listen_ip == htonl(0x7f000001L))) {
-			warnx("Forward port is same as listen port (%d), will create a loop!", bind_port);
-			fprintf(stderr, "Use -l to set listen ip to avoid this.\n");
-			usage();
-			/* NOTREACHED */
-		}
-		fprintf(stderr, "Requests for domains outside of %s will be forwarded to port %d\n",
-			topdomain, bind_port);
-	}
-	
 	if (port != 53) {
 		fprintf(stderr, "ALERT! Other dns servers expect you to run on port 53.\n");
 		fprintf(stderr, "You must manually forward port 53 to port %d for things to work.\n", port);
@@ -2467,11 +2452,30 @@ main(int argc, char **argv)
 		foreground = 1;
 	}
 
-	if (listen_ip == INADDR_NONE) {
+	dnsaddr_len = get_addr(listen_ip, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dnsaddr);
+	if (dnsaddr_len < 0) {
 		warnx("Bad IP address to listen on.");
 		usage();
 	}
-	
+
+	if(bind_enable) {
+		in_addr_t dns_ip = ((struct sockaddr_in *) &dnsaddr)->sin_addr.s_addr;
+		if (bind_port < 1 || bind_port > 65535) {
+			warnx("Bad DNS server port number given.");
+			usage();
+			/* NOTREACHED */
+		}
+		/* Avoid forwarding loops */
+		if (bind_port == port && (dns_ip == INADDR_ANY || dns_ip == htonl(0x7f000001L))) {
+			warnx("Forward port is same as listen port (%d), will create a loop!", bind_port);
+			fprintf(stderr, "Use -l to set listen ip to avoid this.\n");
+			usage();
+			/* NOTREACHED */
+		}
+		fprintf(stderr, "Requests for domains outside of %s will be forwarded to port %d\n",
+			topdomain, bind_port);
+	}
+
 	if (ns_get_externalip) {
 		struct in_addr extip;
 		int res = get_external_ip(&extip);
@@ -2524,7 +2528,7 @@ main(int argc, char **argv)
 		dnsd_fd = SD_LISTEN_FDS_START;
 	} else {
 #endif
-		if ((dnsd_fd = open_dns(port, listen_ip)) == -1) {
+		if ((dnsd_fd = open_dns(&dnsaddr, dnsaddr_len)) < 0) {
 			retval = 1;
 			goto cleanup2;
 		}
@@ -2532,7 +2536,7 @@ main(int argc, char **argv)
 	}
 #endif
 	if (bind_enable) {
-		if ((bind_fd = open_dns(0, INADDR_ANY)) == -1) {
+		if ((bind_fd = open_dns_from_host(NULL, 0, AF_INET, 0)) < 0) {
 			retval = 1;
 			goto cleanup3;
 		}

@@ -29,9 +29,8 @@
 #endif
 
 #ifdef WINDOWS32
-#include <winsock2.h>
-#include <winioctl.h>
 #include "windows.h"
+#include <winioctl.h>
 
 HANDLE dev_handle;
 struct tun_data data;
@@ -300,7 +299,7 @@ DWORD WINAPI tun_reader(LPVOID arg)
 			WaitForSingleObject(olpd.hEvent, INFINITE);
 			res = GetOverlappedResult(dev_handle, &olpd, (LPDWORD) &len, FALSE);
 			res = sendto(sock, buf, len, 0, (struct sockaddr*) &(tun->addr), 
-				sizeof(struct sockaddr_in));
+				tun->addrlen);
 		}
 	}
 
@@ -313,7 +312,8 @@ open_tun(const char *tun_device)
 	char adapter[256];
 	char tapfile[512];
 	int tunfd;
-	in_addr_t local;
+	struct sockaddr_storage localsock;
+	int localsock_len;
 
 	memset(adapter, 0, sizeof(adapter));
 	memset(if_name, 0, sizeof(if_name));
@@ -341,14 +341,12 @@ open_tun(const char *tun_device)
 	 * A thread does blocking reads on tun device and 
 	 * sends data as udp to this socket */
 	
-	local = htonl(0x7f000001); /* 127.0.0.1 */
-	tunfd = open_dns(55353, local);
+	localsock_len = get_addr("127.0.0.1", 55353, AF_INET, 0, &localsock);
+	tunfd = open_dns(&localsock, localsock_len);
 
 	data.tun = dev_handle;
-	memset(&(data.addr), 0, sizeof(data.addr));
-	data.addr.sin_family = AF_INET;
-	data.addr.sin_port = htons(55353);
-	data.addr.sin_addr.s_addr = local;
+	memcpy(&(data.addr), &localsock, localsock_len);
+	data.addrlen = localsock_len;
 	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)tun_reader, &data, 0, NULL);
 	
 	return tunfd;

@@ -42,6 +42,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <syslog.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #endif
 
 #ifdef HAVE_SETCON
@@ -111,21 +113,40 @@ check_superuser(void (*usage_fn)(void))
 #endif
 }
 
-int 
-open_dns(int localport, in_addr_t listen_ip) 
+int
+get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_storage *out)
 {
-	struct sockaddr_in addr;
+	struct addrinfo hints, *addr;
+	int res;
+	char portnum[8];
+
+	memset(portnum, 0, sizeof(portnum));
+	snprintf(portnum, sizeof(portnum) - 1, "%d", port);
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = addr_family;
+	hints.ai_flags = AI_ADDRCONFIG | flags;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+
+	res = getaddrinfo(host, portnum, &hints, &addr);
+	if (res == 0) {
+		int addrlen = addr->ai_addrlen;
+		/* Grab first result */
+		memcpy(out, addr->ai_addr, addr->ai_addrlen);
+		freeaddrinfo(addr);
+		return addrlen;
+	}
+	return res;
+}
+
+int 
+open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
+{
 	int flag = 1;
 	int fd;
 
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(localport);
-	/* listen_ip already in network byte order from inet_addr, or 0 */
-	addr.sin_addr.s_addr = listen_ip; 
-
-	if ((fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
-		fprintf(stderr, "got fd %d\n", fd);
+	if ((fd = socket(sockaddr->ss_family, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		err(1, "socket");
 	}
 
@@ -146,12 +167,25 @@ open_dns(int localport, in_addr_t listen_ip)
 	setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
 #endif
 
-	if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
+	if(bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
 		err(1, "bind");
 
-	fprintf(stderr, "Opened UDP socket\n");
+	fprintf(stderr, "Opened IPv%d UDP socket\n", sockaddr->ss_family == AF_INET6 ? 6 : 4);
 
 	return fd;
+}
+
+int
+open_dns_from_host(char *host, int port, int addr_family, int flags)
+{
+	struct sockaddr_storage addr;
+	int addrlen;
+
+	addrlen = get_addr(host, port, addr_family, flags, &addr);
+	if (addrlen < 0)
+		return addrlen;
+
+	return open_dns(&addr, addrlen);
 }
 
 void

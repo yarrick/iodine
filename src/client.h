@@ -23,7 +23,7 @@ void client_stop();
 enum connection client_get_conn();
 const char *client_get_raw_addr();
 
-void client_set_nameserver(const char *cp, int port);
+void client_set_nameserver(struct sockaddr_storage *, int);
 void client_set_topdomain(const char *cp);
 void client_set_password(const char *cp);
 void set_qtype(char *qtype);

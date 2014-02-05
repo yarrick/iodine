@@ -32,6 +32,7 @@
 #else
 #include <grp.h>
 #include <pwd.h>
+#include <netdb.h>
 #endif
 
 #include "common.h"
@@ -111,7 +112,7 @@ version() {
 int
 main(int argc, char **argv)
 {
-	char *nameserv_addr;
+	char *nameserv_host;
 	char *topdomain;
 #ifndef WINDOWS32
 	struct passwd *pw;
@@ -134,8 +135,10 @@ main(int argc, char **argv)
 	int selecttimeout;
 	int hostname_maxlen;
 	int rtable = 0;
+	struct sockaddr_storage nameservaddr;
+	int nameservaddr_len;
 
-	nameserv_addr = NULL;
+	nameserv_host = NULL;
 	topdomain = NULL;
 #ifndef WINDOWS32
 	pw = NULL;
@@ -257,11 +260,11 @@ main(int argc, char **argv)
 
 	switch (argc) {
 	case 1:
-		nameserv_addr = get_resolvconf_addr();
+		nameserv_host = get_resolvconf_addr();
 		topdomain = strdup(argv[0]);
 		break;
 	case 2:
-		nameserv_addr = argv[0];
+		nameserv_host = argv[0];
 		topdomain = strdup(argv[1]);
 		break;
 	default:
@@ -275,8 +278,13 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
-	if (nameserv_addr) {
-		client_set_nameserver(nameserv_addr, DNS_PORT);
+	if (nameserv_host) {
+		nameservaddr_len = get_addr(nameserv_host, DNS_PORT, AF_UNSPEC, 0, &nameservaddr);
+		if (nameservaddr_len < 0) {
+			errx(1, "Cannot lookup nameserver '%s': %s ",
+				nameserv_host, gai_strerror(nameservaddr_len));
+		}
+		client_set_nameserver(&nameservaddr, nameservaddr_len);
 	} else {
 		warnx("No nameserver found - not connected to any network?\n");
 		usage();
@@ -323,7 +331,7 @@ main(int argc, char **argv)
 		retval = 1;
 		goto cleanup1;
 	}
-	if ((dns_fd = open_dns(0, INADDR_ANY)) == -1) {
+	if ((dns_fd = open_dns_from_host(NULL, 53, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
 		retval = 1;
 		goto cleanup2;
 	}
@@ -338,7 +346,7 @@ main(int argc, char **argv)
 	signal(SIGTERM, sighandler);
 
 	fprintf(stderr, "Sending DNS queries for %s to %s\n",
-		topdomain, nameserv_addr);
+		topdomain, nameserv_host);
 
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
 		retval = 1;
