@@ -120,17 +120,16 @@ format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len)
 
 	memset(dst, 0, sizeof(dst));
 	if (sockaddr->ss_family == AF_INET && sockaddr_len >= sizeof(struct sockaddr_in)) {
-		struct sockaddr_in *addr = (struct sockaddr_in *) sockaddr;
-		inet_ntop(addr->sin_family, &addr->sin_addr, dst, sizeof(dst) - 1);
+		getnameinfo((struct sockaddr *)sockaddr, sockaddr_len, dst, sizeof(dst) - 1, NULL, 0, NI_NUMERICHOST);
 	} else if (sockaddr->ss_family == AF_INET6 && sockaddr_len >= sizeof(struct sockaddr_in6)) {
 		struct sockaddr_in6 *addr = (struct sockaddr_in6 *) sockaddr;
 		if (IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr)) {
 			struct in_addr ia;
 			/* Get mapped v4 addr from last 32bit field */
 			memcpy(&ia.s_addr, &addr->sin6_addr.s6_addr[12], sizeof(ia));
-			inet_ntop(AF_INET, &ia, dst, sizeof(dst) - 1);
+			strcpy(dst, inet_ntoa(ia));
 		} else {
-			inet_ntop(addr->sin6_family, &addr->sin6_addr, dst, sizeof(dst) - 1);
+			getnameinfo((struct sockaddr *)sockaddr, sockaddr_len, dst, sizeof(dst) - 1, NULL, 0, NI_NUMERICHOST);
 		}
 	} else {
 		dst[0] = '?';

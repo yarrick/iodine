@@ -26,6 +26,9 @@ link)
 	;;
 cflags)
 	case $1 in
+		windows32)
+			echo '-DWINVER=0x0501';
+		;;
 		BeOS)
 			echo '-Dsocklen_t=int';
 		;;

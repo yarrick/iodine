@@ -9,7 +9,7 @@ Extra README file for Win32 related stuff
 
 == Running iodine on Windows:
 
-0. After iodine 0.6, you need Windows Vista or newer to run.
+0. After iodine 0.6, you need Windows XP or newer to run.
 
 1. Install the TAP32 driver 
    http://openvpn.net/index.php/open-source/downloads.html

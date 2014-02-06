@@ -17,15 +17,6 @@
 #ifndef __FIX_WINDOWS_H__
 #define __FIX_WINDOWS_H__
 
-#include <w32api.h>
-/* Need Vista or Later to get IPv6 support */
-#undef WINVER
-#undef _WIN32_WINDOWS
-#undef _WIN32_WINNT
-#define WINVER                  WindowsVista
-#define _WIN32_WINDOWS          WindowsVista
-#define _WIN32_WINNT            WindowsVista
-
 typedef unsigned int in_addr_t;
 
 #include <winsock2.h>
