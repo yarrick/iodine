@@ -38,7 +38,7 @@ cross-android-dist:
 	@zip -r iodine-latest-android.zip iodine-latest-android
 
 cross-mingw: 
-	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-w64-mingw32-gcc all)
+	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-mingw32-gcc all)
 
 cross-mingw-dist: cross-mingw
 	@rm -rf iodine-latest-win32*
