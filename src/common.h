@@ -107,6 +107,7 @@ enum connection {
 };
 
 void check_superuser(void (*usage_fn)(void));
+char *format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len);
 int get_addr(char *, int, int, int, struct sockaddr_storage *);
 int open_dns(struct sockaddr_storage *, size_t);
 int open_dns_from_host(char *host, int port, int addr_family, int flags);

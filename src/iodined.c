@@ -215,10 +215,8 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
 	if (debug >= 2) {
-		struct sockaddr_in *tempin;
-		tempin = (struct sockaddr_in *) &(q->from);
 		fprintf(stderr, "TX-raw: client %s, cmd %d, %d bytes\n", 
-			inet_ntoa(tempin->sin_addr), cmd, len);
+			format_addr(&q->from, q->fromlen), cmd, len);
 	}
 
 	sendto(fd, packet, len, 0, (struct sockaddr *) &q->from, q->fromlen);
@@ -766,7 +764,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				users[userid].downenc = 'T';
 				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
 				syslog(LOG_INFO, "accepted version for user #%d from %s",
-					userid, inet_ntoa(tempin->sin_addr));
+					userid, format_addr(&q->from, q->fromlen));
 				users[userid].q.id = 0;
 				users[userid].q.id2 = 0;
 				users[userid].q_sendrealsoon.id = 0;
@@ -808,12 +806,12 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 				/* No space for another user */
 				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
 				syslog(LOG_INFO, "dropped user from %s, server full", 
-					inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
+					format_addr(&q->from, q->fromlen));
 			}
 		} else {
 			send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
 			syslog(LOG_INFO, "dropped user from %s, sent bad version %08X", 
-				inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr), version);
+				format_addr(&q->from, q->fromlen), version);
 		}
 		return;
 	} else if(in[0] == 'L' || in[0] == 'l') {
@@ -829,7 +827,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
-				userid, inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
+				userid, format_addr(&q->from, q->fromlen));
 			return;
 		} else {
 			users[userid].last_pkt = time(NULL);
@@ -855,7 +853,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			} else {
 				write_dns(dns_fd, q, "LNAK", 4, 'T');
 				syslog(LOG_WARNING, "rejected login request from user #%d from %s, bad password",
-					userid, inet_ntoa(((struct sockaddr_in *) &q->from)->sin_addr));
+					userid, format_addr(&q->from, q->fromlen));
 			}
 		}
 		return;
@@ -1493,10 +1491,8 @@ handle_ns_request(int dns_fd, struct query *q)
 	}
 	
 	if (debug >= 2) {
-		struct sockaddr_in *tempin;
-		tempin = (struct sockaddr_in *) &(q->from);
 		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes NS reply\n", 
-			inet_ntoa(tempin->sin_addr), q->type, q->name, len);
+			format_addr(&q->from, q->fromlen), q->type, q->name, len);
 	}
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("ns reply send error");
@@ -1527,10 +1523,8 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	}
 	
 	if (debug >= 2) {
-		struct sockaddr_in *tempin;
-		tempin = (struct sockaddr_in *) &(q->from);
 		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes A reply\n",
-			inet_ntoa(tempin->sin_addr), q->type, q->name, len);
+			format_addr(&q->from, q->fromlen), q->type, q->name, len);
 	}
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("a reply send error");
@@ -1576,7 +1570,7 @@ static int
 tunnel_bind(int bind_fd, int dns_fd)
 {
 	char packet[64*1024];
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	socklen_t fromlen;
 	struct fw_query *query;
 	unsigned short id;
@@ -1603,10 +1597,8 @@ tunnel_bind(int bind_fd, int dns_fd)
 	}
 
 	if (debug >= 2) {
-		struct sockaddr_in *in;
-		in = (struct sockaddr_in *) &(query->addr);
 		fprintf(stderr, "TX: client %s id %u, %d bytes\n",
-			inet_ntoa(in->sin_addr), (id & 0xffff), r);
+			format_addr(&query->addr, query->addrlen), (id & 0xffff), r);
 	}
 	
 	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr), 
@@ -1629,10 +1621,8 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 		return 0;
 
 	if (debug >= 2) {
-		struct sockaddr_in *tempin;
-		tempin = (struct sockaddr_in *) &(q.from);
 		fprintf(stderr, "RX: client %s, type %d, name %s\n", 
-			inet_ntoa(tempin->sin_addr), q.type, q.name);
+			format_addr(&q.from, q.fromlen), q.type, q.name);
 	}
 
 	domain_len = strlen(q.name) - strlen(topdomain);
@@ -2173,10 +2163,8 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 	}
 	
 	if (debug >= 2) {
-		struct sockaddr_in *tempin;
-		tempin = (struct sockaddr_in *) &(q->from);
 		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes data\n", 
-			inet_ntoa(tempin->sin_addr), q->type, q->name, datalen);
+			format_addr(&q->from, q->fromlen), q->type, q->name, datalen);
 	}
 
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);

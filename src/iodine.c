@@ -346,7 +346,7 @@ main(int argc, char **argv)
 	signal(SIGTERM, sighandler);
 
 	fprintf(stderr, "Sending DNS queries for %s to %s\n",
-		topdomain, nameserv_host);
+		topdomain, format_addr(&nameservaddr, nameservaddr_len));
 
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
 		retval = 1;

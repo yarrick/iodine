@@ -28,7 +28,7 @@
 #define FW_QUERY_CACHE_SIZE 16
 
 struct fw_query {
-	struct sockaddr addr;
+	struct sockaddr_storage addr;
 	int addrlen;
 	unsigned short id;
 };
