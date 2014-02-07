@@ -19,6 +19,7 @@
 
 TCase *test_base32_create_tests();
 TCase *test_base64_create_tests();
+TCase *test_common_create_tests();
 TCase *test_dns_create_tests();
 TCase *test_encoding_create_tests();
 TCase *test_read_create_tests();
