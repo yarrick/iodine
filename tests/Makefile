@@ -6,8 +6,8 @@ SRCOBJS = ../src/base32.o  ../src/base64.o ../src/common.o ../src/read.o ../src/
 OS = `uname | tr "a-z" "A-Z"`
 
 CHECK_PATH = /usr/local
-LDFLAGS = -L$(CHECK_PATH)/lib `pkg-config check --libs` -lpthread
-CFLAGS = -g -Wall -D$(OS) `pkg-config check --cflags` -I../src -I$(CHECK_PATH)/include -pedantic
+LDFLAGS = -L$(CHECK_PATH)/lib `pkg-config check --libs` -lpthread `sh ../src/osflags $(TARGETOS) link`
+CFLAGS = -g -Wall -D$(OS) `pkg-config check --cflags` -I../src -I$(CHECK_PATH)/include -pedantic `sh ../src/osflags $(TARGETOS) cflags`
 
 all: $(TEST)
 	@LD_LIBRARY_PATH=${CHECK_PATH}/lib ./$(TEST)
