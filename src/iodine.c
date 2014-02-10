@@ -137,6 +137,7 @@ main(int argc, char **argv)
 	int rtable = 0;
 	struct sockaddr_storage nameservaddr;
 	int nameservaddr_len;
+	int nameserv_family;
 
 	nameserv_host = NULL;
 	topdomain = NULL;
@@ -159,6 +160,7 @@ main(int argc, char **argv)
 	lazymode = 1;
 	selecttimeout = 4;
 	hostname_maxlen = 0xFF;
+	nameserv_family = AF_UNSPEC;
 
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
@@ -175,8 +177,14 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
+		case '4':
+			nameserv_family = AF_INET;
+			break;
+		case '6':
+			nameserv_family = AF_INET6;
+			break;
 		case 'v':
 			version();
 			/* NOTREACHED */
@@ -279,7 +287,7 @@ main(int argc, char **argv)
 	}
 
 	if (nameserv_host) {
-		nameservaddr_len = get_addr(nameserv_host, DNS_PORT, AF_UNSPEC, 0, &nameservaddr);
+		nameservaddr_len = get_addr(nameserv_host, DNS_PORT, nameserv_family, 0, &nameservaddr);
 		if (nameservaddr_len < 0) {
 			errx(1, "Cannot lookup nameserver '%s': %s ",
 				nameserv_host, gai_strerror(nameservaddr_len));

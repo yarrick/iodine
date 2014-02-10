@@ -104,11 +104,13 @@ end of the tunnel. In this case, ping 192.168.99.1 from the iodine client, and
 MISC. INFO:
 
 IPv6:
-At the moment the iodined server only supports IPv4. The client can use
-IPv4 or IPv6 nameservers to connect, and the relay nameservers will translate
-between protocols automatically if needed. If the server hostname has an AAAA
-record registered IPv6 mode will not work - in this case the client must be
-configured with an IPv4 nameserver. The data inside the tunnel is IPv4 only.
+At the moment the iodined server only supports IPv4. The data inside the tunnel
+is IPv4 only.
+
+The client can use IPv4 or IPv6 nameservers to connect to iodined. The relay
+nameservers will translate between protocols automatically if needed. Use
+options -4 or -6 to force the client to use a specific IP version for its DNS
+queries.
 
 Routing:
 It is possible to route all traffic through the DNS tunnel. To do this, first
