@@ -14,7 +14,7 @@ MKDIR_FLAGS=-p
 RM=rm
 RM_FLAGS=-f
 
-TARGETOS = `uname`
+TARGETOS := $(shell uname)
 
 all: 
 	@(cd src; $(MAKE) TARGETOS=$(TARGETOS) all)
