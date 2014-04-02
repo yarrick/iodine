@@ -156,7 +156,7 @@ Usable range ca. 100 to 255.
 Use this option to scale back upstream bandwidth in favor of downstream
 bandwidth.
 Also useful for DNS servers that perform unreliably when using full-length
-hostnames, noticable when fragment size autoprobe returns very
+hostnames, noticeable when fragment size autoprobe returns very
 different results each time.
 .TP
 .B -T dnstype
@@ -235,7 +235,7 @@ connection after 60 seconds of inactivity.
 .TP
 .B -c
 Disable checking the client IP address on all incoming requests.
-By default, requests originating from non-matching IP adresses will be
+By default, requests originating from non-matching IP addresses will be
 rejected, however this will cause problems when requests are routed
 via a cluster of DNS servers.
 .TP
@@ -312,7 +312,7 @@ must be the same on both the client and the server.
 .B tunnel_ip[/netmask]
 This is the server's ip address on the tun interface. The client will be
 given the next ip number in the range. It is recommended to use the 
-10.0.0.0 or 172.16.0.0 ranges. The default netmask is /27, can be overriden
+10.0.0.0 or 172.16.0.0 ranges. The default netmask is /27, can be overridden
 by specifying it here. Using a smaller network will limit the number of
 concurrent users.
 .TP
