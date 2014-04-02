@@ -251,6 +251,7 @@ quence, assuming at most one client will be connected at any time. A small
 DNSCACHE_LEN is still advised, preferably 2 or higher, however you can also
 undefine it to save a few more kilobytes.
 
+For systemd support on Debian, compile with libsystemd-daemon-dev installed.
 
 PERFORMANCE:
 
