@@ -26,7 +26,7 @@ build_hostname(char *buf, size_t buflen,
 	size_t space;
 	char *b;
 
-	space = MIN(maxlen, buflen) - strlen(topdomain) - 8;
+	space = MIN((size_t)maxlen, buflen) - strlen(topdomain) - 8;
 	/* 8 = 5 max header length + 1 dot before topdomain + 2 safety */
 
 	if (!encoder->places_dots())
