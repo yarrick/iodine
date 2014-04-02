@@ -230,8 +230,9 @@ do_chroot(char *newroot)
 	if (chroot(newroot) != 0 || chdir("/") != 0)
 		err(1, "%s", newroot);
 
-	seteuid(geteuid());
-	setuid(getuid());
+	if (seteuid(geteuid()) != 0 || setuid(getuid()) != 0) {
+		err(1, "set[e]uid()");
+	}
 #else
 	warnx("chroot not available");
 #endif
