@@ -25,6 +25,8 @@ link)
 	esac
 	;;
 cflags)
+	;;
+cppflags)
 	case $1 in
 		windows32)
 			echo '-DWINVER=0x0501';

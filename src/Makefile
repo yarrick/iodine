@@ -4,45 +4,40 @@ CLIENT = ../bin/iodine
 SERVEROBJS = iodined.o user.o fw_query.o
 SERVER = ../bin/iodined
 
-OS = `echo $(TARGETOS) | tr "a-z" "A-Z"`
-ARCH = `uname -m`
-HEAD_COMMIT = `git rev-parse --short HEAD`
+OS := $(shell echo $(TARGETOS) | tr "a-z" "A-Z")
+ARCH := $(shell uname -m)
+HEAD_COMMIT := $(shell git rev-parse --short HEAD)
 
 LIBPATH = -L.
-LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
-CFLAGS += -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
+OS_CPPFLAGS := $(shell sh osflags $(TARGETOS) cppflags)
+OS_CFLAGS   := $(shell sh osflags $(TARGETOS) cflags)
+OS_LDFLAGS  := $(shell sh osflags $(TARGETOS) link)
+CPPFLAGS = -D$(OS) -DGITREVISION=\"$(HEAD_COMMIT)\" $(OS_CPPFLAGS)
+CFLAGS += -g -Wall -pedantic $(OS_CFLAGS)
+LDFLAGS +=  -lz $(OS_LDFLAGS) $(LIBPATH)
 
 all: stateos $(CLIENT) $(SERVER)
 
 stateos:
 	@echo OS is $(OS), arch is $(ARCH)
 
-$(CLIENT): $(COMMONOBJS) $(CLIENTOBJS)
-	@echo LD $@
-	@mkdir -p ../bin
-	@$(CC) $(COMMONOBJS) $(CLIENTOBJS) -o $(CLIENT) $(LDFLAGS)
-
-$(SERVER): $(COMMONOBJS) $(SERVEROBJS)
-	@echo LD $@
-	@mkdir -p ../bin
-	@$(CC) $(COMMONOBJS) $(SERVEROBJS) -o $(SERVER) $(LDFLAGS)
-
-.c.o: 
-	@echo CC $<
-	@$(CC) $(CFLAGS) $< -o $@
+iodine:  $(COMMONOBJS) $(CLIENTOBJS)
+iodined: $(COMMONOBJS) $(SERVEROBJS)
+$(CLIENT): iodine;  mkdir -p ../bin && cp -a $< $@
+$(SERVER): iodined; mkdir -p ../bin && cp -a $< $@
 
 base64u.o client.o iodined.o: base64u.h
 base64u.c: base64.c
 	@echo Making $@
-	@echo '/* No use in editing, produced by Makefile! */' > $@
-	@sed -e 's/\([Bb][Aa][Ss][Ee]64\)/\1u/g ; s/0123456789+/0123456789_/' < base64.c >> $@
+	echo '/* No use in editing, produced by Makefile! */' > $@
+	sed -e 's/\([Bb][Aa][Ss][Ee]64\)/\1u/g ; s/0123456789+/0123456789_/' < base64.c >> $@
 base64u.h: base64.h
 	@echo Making $@
-	@echo '/* No use in editing, produced by Makefile! */' > $@
-	@sed -e 's/\([Bb][Aa][Ss][Ee]64\)/\1u/g ; s/0123456789+/0123456789_/' < base64.h >> $@
+	echo '/* No use in editing, produced by Makefile! */' > $@
+	sed -e 's/\([Bb][Aa][Ss][Ee]64\)/\1u/g ; s/0123456789+/0123456789_/' < base64.h >> $@
 
 clean:
 	@echo "Cleaning src/"
-	@rm -f $(CLIENT){,.exe} $(SERVER){,.exe} *~ *.o *.core base64u.*
-	@rm -rf obj libs #android stuff
-
+	rm -f iodine iodined
+	rm -f $(CLIENT){,.exe} $(SERVER){,.exe} *~ *.o *.core base64u.*
+	rm -rf obj libs #android stuff

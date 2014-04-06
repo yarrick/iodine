@@ -33,7 +33,7 @@
 #include "encoding.h"
 #include "user.h"
 
-struct tun_user *users;
+struct _user *users;
 unsigned usercount;
 
 int
@@ -59,7 +59,7 @@ init_users(in_addr_t my_ip, int netbits)
 	maxusers = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
 	usercount = MIN(maxusers, USERS);
 	
-	users = calloc(usercount, sizeof(struct tun_user));
+	users = calloc(usercount, sizeof(struct _user));
 	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
 		users[i].id = i;

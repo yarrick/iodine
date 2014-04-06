@@ -1,5 +1,7 @@
-bin/*
+/bin/
 *.o
-src/base64u.c
-src/base64u.h
-tests/test
+/src/base64u.c
+/src/base64u.h
+/tests/test
+/src/iodine
+/src/iodined
