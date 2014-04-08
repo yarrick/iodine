@@ -110,7 +110,8 @@ is IPv4 only.
 The client can use IPv4 or IPv6 nameservers to connect to iodined. The relay
 nameservers will translate between protocols automatically if needed. Use
 options -4 or -6 to force the client to use a specific IP version for its DNS
-queries.
+queries. The client has to force IPv4 if it has dual-stack connectivity and
+the hostname handling the tunnel domain has both A and AAAA records.
 
 Routing:
 It is possible to route all traffic through the DNS tunnel. To do this, first
