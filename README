@@ -8,6 +8,17 @@ server. This can be usable in different situations where internet access is
 firewalled, but DNS queries are allowed.
 
 
+COMPILING:
+
+Iodine has no configure script. There are two optional features for Linux
+(SELinux and systemd support) that will be enabled automatically if the
+relevant header files are found in /usr/include. (See script at ./src/osflags)
+
+Run 'make' to compile the server and client binaries.
+Run 'make install' to copy binaries and manpage to the destination directory.
+Run 'make test' to compile and run the unit tests. (Requires the check library)
+
+
 QUICKSTART:
 
 Try it out within your own LAN! Follow these simple steps:
