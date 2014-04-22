@@ -24,6 +24,10 @@
 #include <netinet/in.h>
 #include <sys/stat.h>
 #include <arpa/nameser.h>
+#ifdef DARWIN
+#define BIND_8_COMPAT
+#include <arpa/nameser_compat.h>
+#endif
 
 #include "common.h"
 #include "dns.h"
