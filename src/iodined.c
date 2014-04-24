@@ -415,7 +415,7 @@ save_to_qmem_pingordata(int userid, struct query *q)
 		size_t cmcsize = sizeof(cmc);
 		char *cp = strchr(q->name, '.');
 
-		if (cp == NULL)
+		if (!cp)
 			return;  /* illegal hostname; shouldn't happen */
 
 		/* We already unpacked in handle_null_request(), but that's
@@ -1993,9 +1993,7 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 		}
 		
 #ifndef WINDOWS32
-		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; 
-			cmsg = CMSG_NXTHDR(&msg, cmsg)) { 
-			
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 			if (cmsg->cmsg_level == IPPROTO_IP && 
 				cmsg->cmsg_type == DSTADDR_SOCKOPT) { 
 				
@@ -2298,7 +2296,7 @@ main(int argc, char **argv)
 
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
-	if (__progname == NULL)
+	if (!__progname)
 		__progname = argv[0];
 	else
 		__progname++;
@@ -2412,9 +2410,9 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (username != NULL) {
+	if (username) {
 #ifndef WINDOWS32
-		if ((pw = getpwnam(username)) == NULL) {
+		if (!(pw = getpwnam(username))) {
 			warnx("User %s does not exist!", username);
 			usage();
 		}
@@ -2543,7 +2541,7 @@ main(int argc, char **argv)
 	if (foreground == 0) 
 		do_detach();
 	
-	if (pidfile != NULL)
+	if (pidfile)
 		do_pidfile(pidfile);
 
 #ifdef FREEBSD
@@ -2553,11 +2551,11 @@ main(int argc, char **argv)
 	openlog( __progname, LOG_NDELAY, LOG_DAEMON );
 #endif
 
-	if (newroot != NULL)
+	if (newroot)
 		do_chroot(newroot);
 
 	signal(SIGINT, sigint);
-	if (username != NULL) {
+	if (username) {
 #ifndef WINDOWS32
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
@@ -2568,7 +2566,7 @@ main(int argc, char **argv)
 #endif
 	}
 
-	if (context != NULL)
+	if (context)
 		do_setcon(context);
 
 	syslog(LOG_INFO, "started, listening on port %d", port);

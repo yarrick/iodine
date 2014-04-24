@@ -27,9 +27,9 @@ get_resolvconf_addr(void)
 	FILE *fp;
 #ifdef ANDROID
 	fp = popen("getprop net.dns1", "r");
-	if (fp == NULL)
+	if (!fp)
 		err(1, "getprop net.dns1 failed");
-	if (fgets(buf, sizeof(buf), fp) == NULL)
+	if (!fgets(buf, sizeof(buf), fp))
 		err(1, "read getprop net.dns1 failed");
 	if (sscanf(buf, "%15s", addr) == 1)
 		rv = addr;
@@ -38,7 +38,7 @@ get_resolvconf_addr(void)
 	
 	rv = NULL;
 
-	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL) 
+	if (!(fp = fopen("/etc/resolv.conf", "r")))
 		err(1, "/etc/resolv.conf");
 	
 	while (feof(fp) == 0) {

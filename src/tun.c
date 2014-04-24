@@ -89,7 +89,7 @@ open_tun(const char *tun_device)
 
 	ifreq.ifr_flags = IFF_TUN; 
 
-	if (tun_device != NULL) {
+	if (tun_device) {
 		strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
 		ifreq.ifr_name[IFNAMSIZ-1] = '\0';
 		strncpy(if_name, tun_device, sizeof(if_name));
@@ -135,7 +135,7 @@ open_tun(const char *tun_device)
 	int tun_fd;
 	char tun_name[50];
 
-	if (tun_device != NULL) {
+	if (tun_device) {
 		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
 		strncpy(if_name, tun_device, sizeof(if_name));
 		if_name[sizeof(if_name)-1] = '\0';

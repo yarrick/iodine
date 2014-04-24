@@ -173,7 +173,7 @@ main(int argc, char **argv)
 	
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
-	if (__progname == NULL)
+	if (!__progname)
 		__progname = argv[0];
 	else
 		__progname++;
@@ -320,9 +320,9 @@ main(int argc, char **argv)
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
 	
-	if (username != NULL) {
+	if (username) {
 #ifndef WINDOWS32
-		if ((pw = getpwnam(username)) == NULL) {
+		if (!(pw = getpwnam(username))) {
 			warnx("User %s does not exist!\n", username);
 			usage();
 			/* NOTREACHED */
@@ -331,7 +331,7 @@ main(int argc, char **argv)
 	}
 	
 	if (strlen(password) == 0) {
-		if (NULL != getenv(PASSWORD_ENV_VAR))
+		if (getenv(PASSWORD_ENV_VAR))
 			snprintf(password, sizeof(password), "%s", getenv(PASSWORD_ENV_VAR));
 		else
 			read_password(password, sizeof(password));
@@ -372,13 +372,13 @@ main(int argc, char **argv)
 	if (foreground == 0) 
 		do_detach();
 	
-	if (pidfile != NULL)
+	if (pidfile)
 		do_pidfile(pidfile);
 
-	if (newroot != NULL)
+	if (newroot)
 		do_chroot(newroot);
 	
-	if (username != NULL) {
+	if (username) {
 #ifndef WINDOWS32
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
@@ -390,7 +390,7 @@ main(int argc, char **argv)
 #endif
 	}
 
-	if (context != NULL)
+	if (context)
 		do_setcon(context);
 
 	client_tunnel(tun_fd, dns_fd);
