@@ -39,7 +39,6 @@ unsigned usercount;
 int
 init_users(in_addr_t my_ip, int netbits)
 {
-	int i;
 	int skip = 0;
 	char newip[16];
 
@@ -49,7 +48,7 @@ init_users(in_addr_t my_ip, int netbits)
 	struct in_addr net;
 	struct in_addr ipstart;
 
-	for (i = 0; i < netbits; i++) {
+	for (int i = 0; i < netbits; i++) {
 		netmask = (netmask << 1) | 1;
 	}
 	netmask <<= (32 - netbits);
@@ -60,7 +59,7 @@ init_users(in_addr_t my_ip, int netbits)
 	usercount = MIN(maxusers, USERS);
 	
 	users = calloc(usercount, sizeof(struct tun_user));
-	for (i = 0; i < usercount; i++) {
+	for (int i = 0; i < usercount; i++) {
 		in_addr_t ip;
 		users[i].id = i;
 		snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
@@ -92,11 +91,9 @@ users_get_first_ip(void)
 int
 users_waiting_on_reply(void)
 {
-	int ret;
-	int i;
+	int ret = 0;
 
-	ret = 0;
-	for (i = 0; i < usercount; i++) {
+	for (int i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled && 
 			users[i].last_pkt + 60 > time(NULL) &&
 			users[i].q.id != 0 && users[i].conn == CONN_DNS_NULL) {
@@ -110,11 +107,9 @@ users_waiting_on_reply(void)
 int
 find_user_by_ip(uint32_t ip)
 {
-	int ret;
-	int i;
+	int ret = -1;
 
-	ret = -1;
-	for (i = 0; i < usercount; i++) {
+	for (int i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled &&
 			users[i].last_pkt + 60 > time(NULL) &&
 			ip == users[i].tun_ip) {
@@ -134,12 +129,10 @@ all_users_waiting_to_send(void)
 */
 {
 	time_t now;
-	int ret;
-	int i;
-
-	ret = 1;
+	int ret = 1;
 	now = time(NULL);
-	for (i = 0; i < usercount; i++) {
+
+	for (int i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled &&
 			users[i].last_pkt + 60 > now &&
 			((users[i].conn == CONN_RAW_UDP) || 
@@ -162,8 +155,8 @@ int
 find_available_user(void)
 {
 	int ret = -1;
-	int i;
-	for (i = 0; i < usercount; i++) {
+
+	for (int i = 0; i < usercount; i++) {
 		/* Not used at all or not used in one minute */
 		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
 			users[i].active = 1;

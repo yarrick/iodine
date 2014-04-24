@@ -74,12 +74,11 @@ base32_blksize_enc(void)
 inline static void
 base32_reverse_init(void)
 {
-	int i;
 	unsigned char c;
 
 	if (!reverse_init) {
 		memset (rev32, 0, 256);
-		for (i = 0; i < 32; i++) {
+		for (int i = 0; i < 32; i++) {
 			c = cb32[i];
 			rev32[(int) c] = i;
 			c = cb32_ucase[i];

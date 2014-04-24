@@ -1835,7 +1835,6 @@ handshake_qtypetest(int dns_fd, int timeout)
 	char *s = DOWNCODECCHECK1;
         int slen = DOWNCODECCHECK1_LEN;
 	int trycodec;
-	int k;
 
 	if (do_qtype == T_NULL)
 		trycodec = 'R';
@@ -1852,7 +1851,7 @@ handshake_qtypetest(int dns_fd, int timeout)
 	if (read != slen)
 		return 0;	/* incorrect */
 
-	for (k = 0; k < slen; k++) {
+	for (int k = 0; k < slen; k++) {
 		if (in[k] != s[k]) {
 			/* corrupted */
 			return 0;
@@ -1885,8 +1884,6 @@ handshake_qtype_autodetect(int dns_fd)
 */
 {
 	int highestworking = 100;
-	int timeout;
-	int qtypenum;
 
 	fprintf(stderr, "Autodetecting DNS query type (use -T to override)");
 	fflush(stderr);
@@ -1901,8 +1898,8 @@ handshake_qtype_autodetect(int dns_fd)
 	   to see if things will start working after a while.
 	 */
 
-	for (timeout = 1; running && timeout <= 3; timeout++) {
-		for (qtypenum = 0; running && qtypenum < highestworking; qtypenum++) {
+	for (int timeout = 1; running && timeout <= 3; timeout++) {
+		for (int qtypenum = 0; running && qtypenum < highestworking; qtypenum++) {
 			do_qtype = handshake_qtype_numcvt(qtypenum);
 			if (do_qtype == T_UNSET)
 				break;	/* this round finished */
@@ -1957,7 +1954,6 @@ handshake_edns0_check(int dns_fd)
 */
 {
 	char in[4096];
-	int i;
 	int read;
 	char *s = DOWNCODECCHECK1;
         int slen = DOWNCODECCHECK1_LEN;
@@ -1968,7 +1964,7 @@ handshake_edns0_check(int dns_fd)
 	else
 		trycodec = 'T';
 
-	for (i=0; running && i<3 ;i++) {
+	for (int i=0; running && i<3 ;i++) {
 
 		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
 
@@ -1981,8 +1977,7 @@ handshake_edns0_check(int dns_fd)
 			return 0;	/* reply incorrect = unreliable */
 
 		if (read > 0) {
-			int k;
-			for (k = 0; k < slen; k++) {
+			for (int k = 0; k < slen; k++) {
 				if (in[k] != s[k]) {
 					/* Definitely not reliable */
 					return 0;
@@ -2003,7 +1998,6 @@ static void
 handshake_switch_codec(int dns_fd, int bits)
 {
 	char in[4096];
-	int i;
 	int read;
 	struct encoder *tempenc;
 
@@ -2019,7 +2013,7 @@ handshake_switch_codec(int dns_fd, int bits)
 
 	fprintf(stderr, "Switching upstream to codec %s\n", tempenc->name);
 
-	for (i=0; running && i<5 ;i++) {
+	for (int i=0; running && i<5 ;i++) {
 
 		send_codec_switch(dns_fd, userid, bits);
 		
@@ -2057,7 +2051,6 @@ static void
 handshake_switch_downenc(int dns_fd)
 {
 	char in[4096];
-	int i;
 	int read;
 	char *dname;
 
@@ -2072,7 +2065,7 @@ handshake_switch_downenc(int dns_fd)
 		dname = "Raw";
 
 	fprintf(stderr, "Switching downstream to codec %s\n", dname);
-	for (i=0; running && i<5 ;i++) {
+	for (int i=0; running && i<5 ;i++) {
 
 		send_downenc_switch(dns_fd, userid);
 
@@ -2109,11 +2102,10 @@ static void
 handshake_try_lazy(int dns_fd)
 {
 	char in[4096];
-	int i;
 	int read;
 
 	fprintf(stderr, "Switching to lazy mode for low-latency\n");
-	for (i=0; running && i<5; i++) {
+	for (int i=0; running && i<5; i++) {
 
 		send_lazy_switch(dns_fd, userid);
 
@@ -2154,10 +2146,9 @@ handshake_lazyoff(int dns_fd)
 /* Used in the middle of data transfer, timing is different and no error msgs */
 {
 	char in[4096];
-	int i;
 	int read;
 
-	for (i=0; running && i<5; i++) {
+	for (int i=0; running && i<5; i++) {
 
 		send_lazy_switch(dns_fd, userid);
 
@@ -2182,8 +2173,8 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 {
 	int acked_fragsize = ((in[0] & 0xff) << 8) | (in[1] & 0xff);
 	int okay;
-	int i;
 	unsigned int v;
+	int i;
 
 	if (read >= 5 && strncmp("BADIP", in, 5) == 0) {
 		fprintf(stderr, "got BADIP (Try iodined -c)..\n");
@@ -2253,7 +2244,6 @@ static int
 handshake_autoprobe_fragsize(int dns_fd)
 {
 	char in[4096];
-	int i;
 	int read;
 	int proposed_fragsize = 768;
 	int range = 768;
@@ -2263,7 +2253,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
 	while (running && range > 0 && (range >= 8 || max_fragsize < 300)) {
 		/* stop the slow probing early when we have enough bytes anyway */
-		for (i=0; running && i<3 ;i++) {
+		for (int i=0; running && i<3 ;i++) {
 
 			send_fragsize_probe(dns_fd, proposed_fragsize);
 
@@ -2327,11 +2317,10 @@ static void
 handshake_set_fragsize(int dns_fd, int fragsize)
 {
 	char in[4096];
-	int i;
 	int read;
 
 	fprintf(stderr, "Setting downstream fragment size to max %d...\n", fragsize);
-	for (i=0; running && i<5 ;i++) {
+	for (int i=0; running && i<5 ;i++) {
 
 		send_set_downstream_fragsize(dns_fd, fragsize);
 

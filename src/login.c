@@ -35,7 +35,6 @@ login_calculate(char *buf, int buflen, const char *pass, int seed)
 	unsigned char temp[32];
 	md5_state_t ctx;
 	int *ix;
-	int i;
 	int k;
 
 	if (buflen < 16) 
@@ -44,7 +43,7 @@ login_calculate(char *buf, int buflen, const char *pass, int seed)
 	memcpy(temp, pass, 32);
 	ix = (int*) temp;
 
-	for (i = 0; i < 8; i++) {
+	for (int i = 0; i < 8; i++) {
 		k = ntohl(*ix);
 		k ^= seed;
 		*ix++ = htonl(k);

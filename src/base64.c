@@ -75,12 +75,11 @@ base64_blksize_enc(void)
 inline static void
 base64_reverse_init(void)
 {
-	int i;
 	unsigned char c;
 
 	if (!reverse_init) {
 		memset (rev64, 0, 256);
-		for (i = 0; i < 64; i++) {
+		for (int i = 0; i < 64; i++) {
 			c = cb64[i];
 			rev64[(int) c] = i;
 		}

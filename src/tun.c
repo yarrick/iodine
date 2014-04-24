@@ -437,7 +437,6 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	char cmdline[512];
 	int netmask;
 	struct in_addr net;
-	int i;
 #ifndef LINUX
 	int r;
 #endif
@@ -450,7 +449,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	const char *display_ip;
 
 	netmask = 0;
-	for (i = 0; i < netbits; i++) {
+	for (int i = 0; i < netbits; i++) {
 		netmask = (netmask << 1) | 1;
 	}
 	netmask <<= (32 - netbits);

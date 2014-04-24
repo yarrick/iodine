@@ -508,11 +508,10 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			char names[250][QUERY_NAME_SIZE];
 			char *rdatastart;
 			short pref;
-			int i;
 			int offset;
 
 			memset(names, 0, sizeof(names));
-
+			int i;
 			for (i=0; i < ancount; i++) {
 				readname(packet, packetlen, &data, name, sizeof(name));
 				CHECKLEN(12);
