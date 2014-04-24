@@ -70,38 +70,37 @@ static struct encoder base128_encoder =
 };
 
 struct encoder
-*get_base128_encoder()
+*get_base128_encoder(void)
 {
 	return &base128_encoder;
 }
 
 static int 
-base128_handles_dots()
+base128_handles_dots(void)
 {
 	return 0;
 }
 
 static int 
-base128_blksize_raw()
+base128_blksize_raw(void)
 {
 	return BLKSIZE_RAW;
 }
 
 static int 
-base128_blksize_enc()
+base128_blksize_enc(void)
 {
 	return BLKSIZE_ENC;
 }
 
 inline static void
-base128_reverse_init()
+base128_reverse_init(void)
 {
-	int i;
 	unsigned char c;
 
 	if (!reverse_init) {
 		memset (rev128, 0, 256);
-		for (i = 0; i < 128; i++) {
+		for (int i = 0; i < 128; i++) {
 			c = cb128[i];
 			rev128[(int) c] = i;
 		}

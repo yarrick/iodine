@@ -59,7 +59,7 @@ const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
 #if !defined(ANDROID) && !defined(WINDOWS32) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__)
 static int daemon(int nochdir, int noclose)
 {
- 	int fd, i;
+ 	int fd;
  
  	switch (fork()) {
  		case 0:
@@ -80,7 +80,7 @@ static int daemon(int nochdir, int noclose)
  	
  	if (!noclose) {
  		if ((fd = open("/dev/null", O_RDWR)) >= 0) {
- 			for (i = 0; i < 3; i++) {
+ 			for (int i = 0; i < 3; i++) {
  				dup2(fd, i);
  			}
  			if (fd > 2) {
@@ -196,7 +196,7 @@ open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
 	setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
 #endif
 
-	if(bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
+	if(bind(fd, (struct sockaddr*) sockaddr, (unsigned) sockaddr_len) < 0)
 		err(1, "bind");
 
 	fprintf(stderr, "Opened IPv%d UDP socket\n", sockaddr->ss_family == AF_INET6 ? 6 : 4);
@@ -255,7 +255,7 @@ do_pidfile(char *pidfile)
 #ifndef WINDOWS32
 	FILE *file;
 
-	if ((file = fopen(pidfile, "w")) == NULL) {
+	if (!(file = fopen(pidfile, "w"))) {
 		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
 		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
 	} else {
@@ -268,7 +268,7 @@ do_pidfile(char *pidfile)
 }
 
 void
-do_detach()
+do_detach(void)
 {
 #ifndef WINDOWS32
 	fprintf(stderr, "Detaching from terminal...\n");
@@ -293,8 +293,6 @@ read_password(char *buf, size_t len)
 	
 	tp.c_lflag &= (~ECHO);
 	tcsetattr(0, TCSANOW, &tp);
-#else
-	int i;
 #endif
 
 	fprintf(stderr, "Enter password: ");
@@ -302,7 +300,7 @@ read_password(char *buf, size_t len)
 #ifndef WINDOWS32
 	fscanf(stdin, "%79[^\n]", pwd);
 #else
-	for (i = 0; i < sizeof(pwd); i++) {
+	for (int i = 0; i < sizeof(pwd); i++) {
 		pwd[i] = getch();
 		if (pwd[i] == '\r' || pwd[i] == '\n') {
 			pwd[i] = 0;
@@ -326,12 +324,10 @@ read_password(char *buf, size_t len)
 int
 check_topdomain(char *str)
 {
-       int i;
-
        if(str[0] == '.') /* special case */
                return 1;
 
-       for( i = 0; i < strlen(str); i++) {
+       for(int i = 0; i < strlen(str); i++) {
                if( isalpha(str[i]) || isdigit(str[i]) || str[i] == '-' || str[i] == '.' )
                        continue;
                else 
@@ -407,8 +403,7 @@ int recent_seqno(int ourseqno, int gotseqno)
    Return 0 if gotseqno is new (or very old).
 */
 {
-	int i;
-	for (i = 0; i < 4; i++, ourseqno--) {
+	for (int i = 0; i < 4; i++, ourseqno--) {
 		if (ourseqno < 0)
 			ourseqno = 7;
 		if (gotseqno == ourseqno)

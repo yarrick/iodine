@@ -123,12 +123,12 @@ static int get_external_ip(struct in_addr *ip)
 	freeaddrinfo(addr);
 	if (res < 0) return 3;
 
-	res = write(sock, getstr, strlen(getstr));
+	res = (int) write(sock, getstr, strlen(getstr));
 	if (res != strlen(getstr)) return 4;
 
 	/* Zero buf before receiving, leave at least one zero at the end */
 	memset(buf, 0, sizeof(buf));
-	res = read(sock, buf, sizeof(buf) - 1);
+	res = (int) read(sock, buf, sizeof(buf) - 1);
 	if (res < 0) return 5;
 	len = res;
 
@@ -415,7 +415,7 @@ save_to_qmem_pingordata(int userid, struct query *q)
 		size_t cmcsize = sizeof(cmc);
 		char *cp = strchr(q->name, '.');
 
-		if (cp == NULL)
+		if (!cp)
 			return;  /* illegal hostname; shouldn't happen */
 
 		/* We already unpacked in handle_null_request(), but that's
@@ -607,7 +607,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 	int userid;
 	int read;
 
-	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
+	if ((read = (int) read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return 0;
 	
 	/* find target ip in packet, in is padded with 4 bytes TUN header */
@@ -625,12 +625,12 @@ tunnel_tun(int tun_fd, int dns_fd)
 		   If the queue is full, drop the packet. TCP will hopefully notice
 		   and reduce the packet rate. */
 		if (users[userid].outpacket.len > 0) {
-			save_to_outpacketq(userid, out, outlen);
+			save_to_outpacketq(userid, out, (int) outlen);
 			return 0;
 		}
 #endif
 
-		start_new_outpacket(userid, out, outlen);
+		start_new_outpacket(userid, out, (int) outlen);
 
 		/* Start sending immediately if query is waiting */
 		if (users[userid].q_sendrealsoon.id != 0)
@@ -638,10 +638,10 @@ tunnel_tun(int tun_fd, int dns_fd)
 		else if (users[userid].q.id != 0)
 			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
 
-		return outlen;
+		return (int) outlen;
 	} else { /* CONN_RAW_UDP */
-		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].q);
-		return outlen;
+		send_raw(dns_fd, out, (int) outlen, userid, RAW_HDR_CMD_DATA, &users[userid].q);
+		return (int) outlen;
 	}
 }
 
@@ -1993,9 +1993,7 @@ read_dns(int fd, int tun_fd, struct query *q) /* FIXME: tun_fd is because of raw
 		}
 		
 #ifndef WINDOWS32
-		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; 
-			cmsg = CMSG_NXTHDR(&msg, cmsg)) { 
-			
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 			if (cmsg->cmsg_level == IPPROTO_IP && 
 				cmsg->cmsg_type == DSTADDR_SOCKOPT) { 
 				
@@ -2173,7 +2171,7 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 }
 
 static void
-usage() {
+usage(void) {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
@@ -2185,7 +2183,7 @@ usage() {
 }
 
 static void
-help() {
+help(void) {
 	extern char *__progname;
 
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
@@ -2221,7 +2219,7 @@ help() {
 }
 
 static void
-version() {
+version(void) {
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
 	fprintf(stderr, "Git version: %s\n", GITREVISION);
 	exit(0);
@@ -2298,7 +2296,7 @@ main(int argc, char **argv)
 
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
-	if (__progname == NULL)
+	if (!__progname)
 		__progname = argv[0];
 	else
 		__progname++;
@@ -2412,9 +2410,9 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (username != NULL) {
+	if (username) {
 #ifndef WINDOWS32
-		if ((pw = getpwnam(username)) == NULL) {
+		if (!(pw = getpwnam(username))) {
 			warnx("User %s does not exist!", username);
 			usage();
 		}
@@ -2543,7 +2541,7 @@ main(int argc, char **argv)
 	if (foreground == 0) 
 		do_detach();
 	
-	if (pidfile != NULL)
+	if (pidfile)
 		do_pidfile(pidfile);
 
 #ifdef FREEBSD
@@ -2553,11 +2551,11 @@ main(int argc, char **argv)
 	openlog( __progname, LOG_NDELAY, LOG_DAEMON );
 #endif
 
-	if (newroot != NULL)
+	if (newroot)
 		do_chroot(newroot);
 
 	signal(SIGINT, sigint);
-	if (username != NULL) {
+	if (username) {
 #ifndef WINDOWS32
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
@@ -2568,7 +2566,7 @@ main(int argc, char **argv)
 #endif
 	}
 
-	if (context != NULL)
+	if (context)
 		do_setcon(context);
 
 	syslog(LOG_INFO, "started, listening on port %d", port);

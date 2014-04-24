@@ -431,7 +431,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		
 	rlen = 0;
 
-	if (q != NULL) 
+	if (q)
 		q->rcode = header->rcode;
 
 	switch (qr) {
@@ -441,7 +441,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			return -1;
 		}
 
-		if (q != NULL) 
+		if (q)
 			q->id = id;
 
 		/* Read name even if no answer, to give better error message */
@@ -451,7 +451,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		readshort(packet, &data, &class);
 		
 		/* if CHECKLEN okay, then we're sure to have a proper name */
-		if (q != NULL) {
+		if (q) {
 			/* We only need the first char to check it */
 			q->name[0] = name[0];
 			q->name[1] = '\0';
@@ -508,11 +508,10 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			char names[250][QUERY_NAME_SIZE];
 			char *rdatastart;
 			short pref;
-			int i;
 			int offset;
 
 			memset(names, 0, sizeof(names));
-
+			int i;
 			for (i=0; i < ancount; i++) {
 				readname(packet, packetlen, &data, name, sizeof(name));
 				CHECKLEN(12);
@@ -577,7 +576,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		}
 
 		/* Here type is the answer type (note A->CNAME) */
-		if (q != NULL)
+		if (q)
 			q->type = type;
 		break;
 	case QR_QUERY:
@@ -593,7 +592,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		readshort(packet, &data, &type);
 		readshort(packet, &data, &class);
 
-		if (q == NULL) {
+		if (!q) {
 			rv = 0;
 			break;
 		}

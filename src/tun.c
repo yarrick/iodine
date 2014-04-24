@@ -89,7 +89,7 @@ open_tun(const char *tun_device)
 
 	ifreq.ifr_flags = IFF_TUN; 
 
-	if (tun_device != NULL) {
+	if (tun_device) {
 		strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
 		ifreq.ifr_name[IFNAMSIZ-1] = '\0';
 		strncpy(if_name, tun_device, sizeof(if_name));
@@ -135,7 +135,7 @@ open_tun(const char *tun_device)
 	int tun_fd;
 	char tun_name[50];
 
-	if (tun_device != NULL) {
+	if (tun_device) {
 		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
 		strncpy(if_name, tun_device, sizeof(if_name));
 		if_name[sizeof(if_name)-1] = '\0';
@@ -437,7 +437,6 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	char cmdline[512];
 	int netmask;
 	struct in_addr net;
-	int i;
 #ifndef LINUX
 	int r;
 #endif
@@ -450,7 +449,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	const char *display_ip;
 
 	netmask = 0;
-	for (i = 0; i < netbits; i++) {
+	for (int i = 0; i < netbits; i++) {
 		netmask = (netmask << 1) | 1;
 	}
 	netmask <<= (32 - netbits);

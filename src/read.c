@@ -119,7 +119,7 @@ readdata(char *packet, char **src, char *dst, size_t len)
 
 	(*src) += len;
 
-	return len;
+	return (int) len;
 }
 
 int
@@ -160,7 +160,7 @@ putname(char **buf, size_t buflen, const char *host)
 	char *p;
 
 	h = strdup(host);
-	left = buflen;
+	left = (int) buflen;
 	p = *buf;
 	
 	word = strtok(h, ".");
@@ -183,7 +183,7 @@ putname(char **buf, size_t buflen, const char *host)
 	free(h);
 
 	*buf = p;
-	return buflen - left;
+	return (int) (buflen - left);
 }
 
 int
@@ -232,7 +232,7 @@ putdata(char **dst, char *data, size_t len)
 	memcpy(*dst, data, len);
 	
 	(*dst) += len;
-	return len;
+	return (int) len;
 }
 
 int
@@ -246,7 +246,7 @@ puttxtbin(char **buf, size_t bufremain, char *from, size_t fromremain)
 
 	while (fromremain > 0)
 	{
-		tocopy = fromremain;
+		tocopy = (int) fromremain;
 		if (tocopy > 252)
 			tocopy = 252;	/* allow off-by-1s in caches etc */
 		if (tocopy + 1 > bufremain)

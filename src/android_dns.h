@@ -20,12 +20,7 @@ typedef struct {
 	unsigned arcount :16;
 } HEADER;
 
-#define NOERROR		0
-#define FORMERR		1
-#define SERVFAIL	2
-#define NXDOMAIN	3
-#define NOTIMP		4
-#define REFUSED		5
+typedef enum {NOERROR, FORMERR, SERVFAIL, NXDOMAIN, NOTIMP, REFUSED} Error;
 
 #define C_IN		1
 

@@ -25,10 +25,8 @@
 #define BLKSIZE_RAW 5
 #define BLKSIZE_ENC 8
 
-static const char cb32[] = 
-	"abcdefghijklmnopqrstuvwxyz012345";
-static const char cb32_ucase[] = 
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
+static const char cb32[] = "abcdefghijklmnopqrstuvwxyz012345";
+static const char cb32_ucase[] =  "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
 static unsigned char rev32[256];
 static int reverse_init = 0;
 
@@ -50,38 +48,37 @@ static struct encoder base32_encoder =
 };
 
 struct encoder
-*get_base32_encoder()
+*get_base32_encoder(void)
 {
 	return &base32_encoder;
 }
 
 static int 
-base32_handles_dots()
+base32_handles_dots(void)
 {
 	return 0;
 }
 
 static int 
-base32_blksize_raw()
+base32_blksize_raw(void)
 {
 	return BLKSIZE_RAW;
 }
 
 static int 
-base32_blksize_enc()
+base32_blksize_enc(void)
 {
 	return BLKSIZE_ENC;
 }
 
 inline static void
-base32_reverse_init()
+base32_reverse_init(void)
 {
-	int i;
 	unsigned char c;
 
 	if (!reverse_init) {
 		memset (rev32, 0, 256);
-		for (i = 0; i < 32; i++) {
+		for (int i = 0; i < 32; i++) {
 			c = cb32[i];
 			rev32[(int) c] = i;
 			c = cb32_ucase[i];
@@ -213,7 +210,7 @@ base32_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 	int iout = 0;	/* to-be-filled output byte */
 	int iin = 0;	/* next input char to use in decoding */
 
-	base32_reverse_init ();
+	base32_reverse_init();
 
 	/* Note: Don't bother to optimize manually. GCC optimizes
 	   better(!) when using simplistic array indexing. */

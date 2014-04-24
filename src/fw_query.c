@@ -20,7 +20,7 @@
 static struct fw_query fwq[FW_QUERY_CACHE_SIZE];
 static int fwq_ix;
 
-void fw_query_init()
+void fw_query_init(void)
 {
 	memset(fwq, 0, sizeof(struct fw_query) * FW_QUERY_CACHE_SIZE);
 	fwq_ix = 0;
@@ -37,10 +37,8 @@ void fw_query_put(struct fw_query *fw_query)
 
 void fw_query_get(unsigned short query_id, struct fw_query **fw_query)
 {
-	int i;
-
 	*fw_query = NULL;
-	for (i = 0; i < FW_QUERY_CACHE_SIZE; i++) {
+	for (int i = 0; i < FW_QUERY_CACHE_SIZE; i++) {
 		if (fwq[i].id == query_id) {
 			*fw_query = &(fwq[i]);
 			return;
