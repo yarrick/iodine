@@ -148,7 +148,7 @@ main(int argc, char **argv)
 #endif
 	username = NULL;
 	memset(password, 0, 33);
-	srand(time(NULL));
+	srand((unsigned) time(NULL));
 	foreground = 0;
 	newroot = NULL;
 	context = NULL;
