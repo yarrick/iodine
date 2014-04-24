@@ -1387,7 +1387,7 @@ handshake_version(int dns_fd, int *seed)
 
 	for (i = 0; running && i < 5; i++) {
 
-		send_version(dns_fd, VERSION);
+		send_version(dns_fd, PROTOCOL_VERSION);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'v', 'V', i+1);
 
@@ -1403,11 +1403,12 @@ handshake_version(int dns_fd, int *seed)
 				userid_char = hex[userid & 15];
 				userid_char2 = hex2[userid & 15];
 
-				fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
+				fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n",
+					PROTOCOL_VERSION, userid);
 				return 0;
 			} else if (strncmp("VNAK", in, 4) == 0) {
 				warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
-						VERSION, payload);
+						PROTOCOL_VERSION, payload);
 				return 1;
 			} else if (strncmp("VFUL", in, 4) == 0) {
 				warnx("Server full, all %d slots are taken. Try again later", payload);

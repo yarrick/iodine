@@ -748,7 +748,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 					   ((unpacked[3] & 0xff)));
 		}
 
-		if (version == VERSION) {
+		if (version == PROTOCOL_VERSION) {
 			userid = find_available_user();
 			if (userid >= 0) {
 				int i;
@@ -809,7 +809,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 					format_addr(&q->from, q->fromlen));
 			}
 		} else {
-			send_version_response(dns_fd, VERSION_NACK, VERSION, 0, q);
+			send_version_response(dns_fd, VERSION_NACK, PROTOCOL_VERSION, 0, q);
 			syslog(LOG_INFO, "dropped user from %s, sent bad version %08X", 
 				format_addr(&q->from, q->fromlen), version);
 		}
