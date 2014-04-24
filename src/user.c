@@ -82,7 +82,7 @@ init_users(in_addr_t my_ip, int netbits)
 }
 
 const char*
-users_get_first_ip()
+users_get_first_ip(void)
 {
 	struct in_addr ip;
 	ip.s_addr = users[0].tun_ip;
@@ -90,7 +90,7 @@ users_get_first_ip()
 }
 
 int
-users_waiting_on_reply()
+users_waiting_on_reply(void)
 {
 	int ret;
 	int i;
@@ -126,7 +126,7 @@ find_user_by_ip(uint32_t ip)
 }
 
 int
-all_users_waiting_to_send()
+all_users_waiting_to_send(void)
 /* If this returns true, then reading from tun device is blocked.
    So only return true when all clients have at least one packet in
    the outpacket-queue, so that sending back-to-back is possible
@@ -159,7 +159,7 @@ all_users_waiting_to_send()
 }
 
 int
-find_available_user()
+find_available_user(void)
 {
 	int ret = -1;
 	int i;

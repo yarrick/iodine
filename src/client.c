@@ -110,7 +110,7 @@ static long send_query_recvcnt = 0;
 static int hostname_maxlen = 0xFF;
 
 void
-client_init()
+client_init(void)
 {
 	running = 1;
 	b32 = get_base32_encoder();
@@ -136,13 +136,13 @@ client_init()
 }
 
 void
-client_stop()
+client_stop(void)
 {
 	running = 0;
 }
 
 enum connection
-client_get_conn()
+client_get_conn(void)
 {
 	return conn;
 }
@@ -232,7 +232,7 @@ client_set_hostname_maxlen(int i)
 }
 
 const char *
-client_get_raw_addr()
+client_get_raw_addr(void)
 {
 	return inet_ntoa(raw_serv.sin_addr);
 }
@@ -338,7 +338,7 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 }
 
 static inline int
-is_sending()
+is_sending(void)
 {
 	return (outpkt.len != 0);
 }

@@ -27,8 +27,7 @@
 
 /* Note: the "unofficial" char is last here, which means that the \377 pattern
    in DOWNCODECCHECK1 ('Y' request) will properly test it. */
-static const char cb64[] = 
-	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789+";
+static const char cb64[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789+";
 static unsigned char rev64[256];
 static int reverse_init = 0;
 
@@ -50,31 +49,31 @@ static struct encoder base64_encoder =
 };
 
 struct encoder
-*get_base64_encoder()
+*get_base64_encoder(void)
 {
 	return &base64_encoder;
 }
 
 static int 
-base64_handles_dots()
+base64_handles_dots(void)
 {
 	return 0;
 }
 
 static int 
-base64_blksize_raw()
+base64_blksize_raw(void)
 {
 	return BLKSIZE_RAW;
 }
 
 static int 
-base64_blksize_enc()
+base64_blksize_enc(void)
 {
 	return BLKSIZE_ENC;
 }
 
 inline static void
-base64_reverse_init()
+base64_reverse_init(void)
 {
 	int i;
 	unsigned char c;

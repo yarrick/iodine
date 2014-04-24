@@ -58,7 +58,7 @@ sighandler(int sig)
 }
 
 static void
-usage() {
+usage(void) {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
@@ -68,7 +68,7 @@ usage() {
 }
 
 static void
-help() {
+help(void) {
 	extern char *__progname;
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
@@ -101,7 +101,7 @@ help() {
 }
 
 static void
-version() {
+version(void) {
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Git version: %s\n", GITREVISION);

@@ -51,7 +51,7 @@ build_hostname(char *buf, size_t buflen,
 
 	strncpy(b, topdomain, strlen(topdomain)+1);
 
-	return space;
+	return (int) space;
 }
 
 int
@@ -70,7 +70,7 @@ inline_dotify(char *buf, size_t buflen)
 	unsigned total;
 	char *reader, *writer;
 
-	total = strlen(buf);
+	total = (int) strlen(buf);
 	dots = total / 57;
 
 	writer = buf;
@@ -81,7 +81,7 @@ inline_dotify(char *buf, size_t buflen)
 	if (strlen(buf) + dots > buflen) {
 		writer = buf;
 		writer += buflen;
-		total = buflen;
+		total = (int) buflen;
 	}
 
 	reader = writer - dots;
@@ -125,5 +125,5 @@ inline_undotify(char *buf, size_t len)
 	}
 	
 	/* return new length of string */
-	return len - dots;
+	return (int)(len - dots);
 }

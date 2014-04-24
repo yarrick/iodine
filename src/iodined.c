@@ -2173,7 +2173,7 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 }
 
 static void
-usage() {
+usage(void) {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
@@ -2185,7 +2185,7 @@ usage() {
 }
 
 static void
-help() {
+help(void) {
 	extern char *__progname;
 
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
@@ -2221,7 +2221,7 @@ help() {
 }
 
 static void
-version() {
+version(void) {
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
 	fprintf(stderr, "Git version: %s\n", GITREVISION);
 	exit(0);

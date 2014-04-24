@@ -18,7 +18,7 @@
 #include "common.h"
 
 char *
-get_resolvconf_addr()
+get_resolvconf_addr(void)
 {
 	static char addr[16];
 	char *rv;
