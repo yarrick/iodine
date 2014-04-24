@@ -255,7 +255,7 @@ do_pidfile(char *pidfile)
 #ifndef WINDOWS32
 	FILE *file;
 
-	if ((file = fopen(pidfile, "w"))) {
+	if (!(file = fopen(pidfile, "w"))) {
 		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
 		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
 	} else {
