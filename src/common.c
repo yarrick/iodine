@@ -326,18 +326,34 @@ read_password(char *buf, size_t len)
 int
 check_topdomain(char *str)
 {
-       int i;
+	int i;
+	int dots = 0;
+	int chunklen = 0;
 
-       if(str[0] == '.') /* special case */
-               return 1;
+	if (strlen(str) < 3)
+		return 1;
+	if (strlen(str) > 128)
+		return 1;
 
-       for( i = 0; i < strlen(str); i++) {
-               if( isalpha(str[i]) || isdigit(str[i]) || str[i] == '-' || str[i] == '.' )
-                       continue;
-               else 
-		       return 1;
-       }
-       return 0;
+	for( i = 0; i < strlen(str); i++) {
+		if(str[i] == '.') {
+			dots++;
+			/* This will also catch the case where topdomain starts with a dot */
+			if (chunklen == 0 || chunklen > 63)
+				return 1;
+			chunklen = 0;
+		} else
+			chunklen++;
+		if( isalpha(str[i]) || isdigit(str[i]) || str[i] == '-' || str[i] == '.' )
+			continue;
+		else
+			return 1;
+	}
+
+	if (chunklen == 0 || chunklen > 63 || dots == 0)
+		return 1;
+
+	return 0;
 }
 
 #if defined(WINDOWS32) || defined(ANDROID)

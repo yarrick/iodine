@@ -4,6 +4,65 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+START_TEST(test_topdomain_ok)
+{
+	fail_if(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com"));
+
+	/* Not allowed to start with dot */
+	fail_unless(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com"));
+}
+END_TEST
+
+START_TEST(test_topdomain_length)
+{
+	/* Test empty and too short */
+	fail_unless(check_topdomain(""));
+	fail_unless(check_topdomain("a"));
+	fail_unless(check_topdomain(".a"));
+	fail_unless(check_topdomain("a."));
+	fail_unless(check_topdomain("ab"));
+	fail_if(check_topdomain("a.b"));
+
+	/* Test too long (over 128, need rest of space for data) */
+	fail_unless(check_topdomain(
+		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
+		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
+		"abcd12345.abcd12345.foo129xxx"));
+	fail_if(check_topdomain(
+		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
+		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
+		"abcd12345.abcd12345.foo128xx"));
+}
+END_TEST
+
+START_TEST(test_topdomain_chunks)
+{
+	/* Must have at least one dot */
+	fail_if(check_topdomain("abcde.gh"));
+	fail_unless(check_topdomain("abcdefgh"));
+
+	/* Not two consecutive dots */
+	fail_unless(check_topdomain("abc..defgh"));
+
+	/* Not end with a dots */
+	fail_unless(check_topdomain("abc.defgh."));
+
+	/* No chunk longer than 63 chars */
+	fail_unless(check_topdomain("123456789012345678901234567890"
+		"1234567890123456789012345678904444.com"));
+	fail_if(check_topdomain("123456789012345678901234567890"
+		"123456789012345678901234567890333.com"));
+	fail_unless(check_topdomain("abc.123456789012345678901234567890"
+		"1234567890123456789012345678904444.com"));
+	fail_if(check_topdomain("abc.123456789012345678901234567890"
+		"123456789012345678901234567890333.com"));
+	fail_unless(check_topdomain("abc.123456789012345678901234567890"
+		"1234567890123456789012345678904444"));
+	fail_if(check_topdomain("abc.123456789012345678901234567890"
+		"123456789012345678901234567890333"));
+}
+END_TEST
+
 START_TEST(test_parse_format_ipv4)
 {
 	char *host = "192.168.2.10";
@@ -102,6 +161,9 @@ test_common_create_tests()
 	int sock;
 
 	tc = tcase_create("Common");
+	tcase_add_test(tc, test_topdomain_ok);
+	tcase_add_test(tc, test_topdomain_length);
+	tcase_add_test(tc, test_topdomain_chunks);
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 
