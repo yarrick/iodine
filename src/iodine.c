@@ -57,6 +57,12 @@ sighandler(int sig)
 	client_stop();
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+/* mark as no return to help some compilers to avoid warnings
+ * about use of uninitialized variables */
+static void usage() __attribute__((noreturn));
+#endif
+
 static void
 usage() {
 	extern char *__progname;
