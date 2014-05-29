@@ -1,4 +1,3 @@
-CC = gcc
 TEST = test
 OBJS = test.o base32.o base64.o common.o read.o dns.o encoding.o login.o user.o fw_query.o
 SRCOBJS = ../src/base32.o  ../src/base64.o ../src/common.o ../src/read.o ../src/dns.o ../src/encoding.o ../src/login.o ../src/md5.o ../src/user.o ../src/fw_query.o
