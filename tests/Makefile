@@ -6,7 +6,7 @@ OS = `uname | tr "a-z" "A-Z"`
 
 CHECK_PATH = /usr/local
 LDFLAGS = -L$(CHECK_PATH)/lib `pkg-config check --libs` -lpthread `sh ../src/osflags $(TARGETOS) link`
-CFLAGS = -g -Wall -D$(OS) `pkg-config check --cflags` -I../src -I$(CHECK_PATH)/include -pedantic `sh ../src/osflags $(TARGETOS) cflags`
+CFLAGS = -std=c99 -g -Wall -D$(OS) `pkg-config check --cflags` -I../src -I$(CHECK_PATH)/include -pedantic `sh ../src/osflags $(TARGETOS) cflags`
 
 all: $(TEST)
 	@LD_LIBRARY_PATH=${CHECK_PATH}/lib ./$(TEST)

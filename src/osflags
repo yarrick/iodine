@@ -33,7 +33,7 @@ cflags)
 			echo '-Dsocklen_t=int';
 		;;
 		Linux)
-			FLAGS="";
+			FLAGS="-D_GNU_SOURCE"
 			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -DHAVE_SETCON";
 			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS -DHAVE_SYSTEMD";
 			echo $FLAGS;
