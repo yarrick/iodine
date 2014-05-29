@@ -440,6 +440,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	int i;
 #ifndef LINUX
 	int r;
+	struct in_addr netip;
 #endif
 #ifdef WINDOWS32
 	DWORD status;
@@ -475,7 +476,6 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
-	struct in_addr netip;
 	netip.s_addr = inet_addr(ip);
 	netip.s_addr = netip.s_addr & net.s_addr;
 	r = system(cmdline);
