@@ -6,9 +6,9 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 master:
-	- IPv6 support (in progress, #107)
-	   Client can connect to iodined through an IPv6 nameserver.
-	   Server only supports IPv4 for now.
+	- Partial IPv6 support (#107)
+	   Client can connect to iodined through an relaying IPv6
+	   nameserver. Server only supports IPv4 for now.
 	   Traffic inside tunnel is IPv4.
 	- Add socket activation for systemd, by Michael Scherer.
 	- Add automated lookup of external ip (via -n auto).
@@ -20,6 +20,9 @@ master:
 		Patch by laurent at gouloum fr, fixes #95.
 	- Add android patches and makefile, from Marcel Bokhorst, fixes #105.
 	- Added missing break in iodine.c, by Pavel Pergamenshchik, #108.
+	- A number of minor patches from Frank Denis, Gregor Herrmann and
+		Barak A. Pearlmutter.
+	- Testcase compilation fixes for OS X and FreeBSD
 
 2010-02-06: 0.6.0-rc1 "Hotspotify"
 	- Fixed tunnel not working on Windows.
