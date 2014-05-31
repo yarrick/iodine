@@ -120,6 +120,7 @@ main(int argc, char **argv)
 {
 	char *nameserv_host;
 	char *topdomain;
+	char *errormsg;
 #ifndef WINDOWS32
 	struct passwd *pw;
 #endif
@@ -149,6 +150,7 @@ main(int argc, char **argv)
 
 	nameserv_host = NULL;
 	topdomain = NULL;
+	errormsg = NULL;
 #ifndef WINDOWS32
 	pw = NULL;
 #endif
@@ -309,14 +311,8 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}	
 
-	if (strlen(topdomain) <= 128) {
-		if(check_topdomain(topdomain)) {
-			warnx("Topdomain contains invalid characters.\n");
-			usage();
-			/* NOTREACHED */
-		}
-	} else {
-		warnx("Use a topdomain max 128 chars long.\n");
+	if(check_topdomain(topdomain, &errormsg)) {
+		warnx("Invalid topdomain: %s", errormsg);
 		usage();
 		/* NOTREACHED */
 	}

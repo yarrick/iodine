@@ -6,60 +6,85 @@
 
 START_TEST(test_topdomain_ok)
 {
-	fail_if(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com"));
+	char *error;
+
+	fail_if(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", &error));
 
 	/* Not allowed to start with dot */
-	fail_unless(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com"));
+	fail_unless(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", &error));
+	fail_if(strcmp("Starts with a dot", error));
+
+	/* Test missing error msg ptr */
+	fail_unless(check_topdomain(".foo", NULL));
 }
 END_TEST
 
 START_TEST(test_topdomain_length)
 {
+	char *error;
+
 	/* Test empty and too short */
-	fail_unless(check_topdomain(""));
-	fail_unless(check_topdomain("a"));
-	fail_unless(check_topdomain(".a"));
-	fail_unless(check_topdomain("a."));
-	fail_unless(check_topdomain("ab"));
-	fail_if(check_topdomain("a.b"));
+	fail_unless(check_topdomain("", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_unless(check_topdomain("a", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_unless(check_topdomain(".a", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_unless(check_topdomain("a.", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_unless(check_topdomain("ab", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_if(check_topdomain("a.b", &error));
+	fail_if(strcmp("Too short (< 3)", error));
 
 	/* Test too long (over 128, need rest of space for data) */
 	fail_unless(check_topdomain(
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
-		"abcd12345.abcd12345.foo129xxx"));
+		"abcd12345.abcd12345.foo129xxx", &error));
+	fail_if(strcmp("Too long (> 128)", error));
 	fail_if(check_topdomain(
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
-		"abcd12345.abcd12345.foo128xx"));
+		"abcd12345.abcd12345.foo128xx", &error));
 }
 END_TEST
 
 START_TEST(test_topdomain_chunks)
 {
+	char *error;
+
 	/* Must have at least one dot */
-	fail_if(check_topdomain("abcde.gh"));
-	fail_unless(check_topdomain("abcdefgh"));
+	fail_if(check_topdomain("abcde.gh", &error));
+	fail_unless(check_topdomain("abcdefgh", &error));
+	fail_if(strcmp("No dots", error));
 
 	/* Not two consecutive dots */
-	fail_unless(check_topdomain("abc..defgh"));
+	fail_unless(check_topdomain("abc..defgh", &error));
+	fail_if(strcmp("Consecutive dots", error));
 
 	/* Not end with a dots */
-	fail_unless(check_topdomain("abc.defgh."));
+	fail_unless(check_topdomain("abc.defgh.", &error));
+	fail_if(strcmp("Ends with a dot", error));
 
 	/* No chunk longer than 63 chars */
-	fail_unless(check_topdomain("123456789012345678901234567890"
-		"1234567890123456789012345678904444.com"));
 	fail_if(check_topdomain("123456789012345678901234567890"
-		"123456789012345678901234567890333.com"));
-	fail_unless(check_topdomain("abc.123456789012345678901234567890"
-		"1234567890123456789012345678904444.com"));
+		"123456789012345678901234567890333.com", &error));
+	fail_unless(check_topdomain("123456789012345678901234567890"
+		"1234567890123456789012345678904444.com", &error));
+	fail_if(strcmp("Too long domain part (> 63)", error));
+
 	fail_if(check_topdomain("abc.123456789012345678901234567890"
-		"123456789012345678901234567890333.com"));
+		"123456789012345678901234567890333.com", &error));
 	fail_unless(check_topdomain("abc.123456789012345678901234567890"
-		"1234567890123456789012345678904444"));
+		"1234567890123456789012345678904444.com", &error));
+	fail_if(strcmp("Too long domain part (> 63)", error));
+
 	fail_if(check_topdomain("abc.123456789012345678901234567890"
-		"123456789012345678901234567890333"));
+		"123456789012345678901234567890333", &error));
+	fail_unless(check_topdomain("abc.123456789012345678901234567890"
+		"1234567890123456789012345678904444", &error));
+	fail_if(strcmp("Too long domain part (> 63)", error));
 }
 END_TEST
 

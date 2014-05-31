@@ -324,34 +324,62 @@ read_password(char *buf, size_t len)
 }
 
 int
-check_topdomain(char *str)
+check_topdomain(char *str, char **errormsg)
 {
 	int i;
 	int dots = 0;
 	int chunklen = 0;
 
-	if (strlen(str) < 3)
+	if (strlen(str) < 3) {
+		if (errormsg) *errormsg = "Too short (< 3)";
 		return 1;
-	if (strlen(str) > 128)
+	}
+	if (strlen(str) > 128) {
+		if (errormsg) *errormsg = "Too long (> 128)";
 		return 1;
+	}
+
+	if (str[0] == '.') {
+		if (errormsg) *errormsg = "Starts with a dot";
+		return 1;
+	}
 
 	for( i = 0; i < strlen(str); i++) {
 		if(str[i] == '.') {
 			dots++;
-			/* This will also catch the case where topdomain starts with a dot */
-			if (chunklen == 0 || chunklen > 63)
+			if (chunklen == 0) {
+				if (errormsg) *errormsg = "Consecutive dots";
 				return 1;
+			}
+			if (chunklen > 63) {
+				if (errormsg) *errormsg = "Too long domain part (> 63)";
+				return 1;
+			}
 			chunklen = 0;
-		} else
+		} else {
 			chunklen++;
-		if( isalpha(str[i]) || isdigit(str[i]) || str[i] == '-' || str[i] == '.' )
+		}
+		if( (str[i] >= 'a' && str[i] <= 'z') || (str[i] >= 'A' && str[i] <= 'Z') || 
+				isdigit(str[i]) || str[i] == '-' || str[i] == '.' ) {
 			continue;
-		else
+		} else {
+			if (errormsg) *errormsg = "Contains illegal character (allowed: [a-zA-Z0-9-.])";
 			return 1;
+		}
 	}
 
-	if (chunklen == 0 || chunklen > 63 || dots == 0)
+	if (dots == 0) {
+		if (errormsg) *errormsg = "No dots";
 		return 1;
+	}
+	if (chunklen == 0) {
+		if (errormsg) *errormsg = "Ends with a dot";
+		return 1;
+	}
+	if (chunklen > 63) {
+		if (errormsg) *errormsg = "Too long domain part (> 63)";
+		return 1;
+	}
 
 	return 0;
 }

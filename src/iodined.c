@@ -2233,6 +2233,7 @@ main(int argc, char **argv)
 {
 	extern char *__progname;
 	char *listen_ip;
+	char *errormsg;
 #ifndef WINDOWS32
 	struct passwd *pw;
 #endif
@@ -2267,6 +2268,7 @@ main(int argc, char **argv)
 #ifndef WINDOWS32
 	pw = NULL;
 #endif
+	errormsg = NULL;
 	username = NULL;
 	newroot = NULL;
 	context = NULL;
@@ -2403,14 +2405,10 @@ main(int argc, char **argv)
 	}
 
 	topdomain = strdup(argv[1]);
-	if (strlen(topdomain) <= 128) {
-		if(check_topdomain(topdomain)) {
-			warnx("Topdomain contains invalid characters.");
-			usage();
-		}
-	} else {
-		warnx("Use a topdomain max 128 chars long.");
+	if(check_topdomain(topdomain, &errormsg)) {
+		warnx("Invalid topdomain: %s", errormsg);
 		usage();
+		/* NOTREACHED */
 	}
 
 	if (username != NULL) {
