@@ -17,7 +17,7 @@ RM_FLAGS=-f
 TARGETOS = `uname`
 
 all: 
-	@$(MAKE) -C src/ TARGETOS=$(TARGETOS) all
+	@(cd src; $(MAKE) TARGETOS=$(TARGETOS) all)
 
 install: all
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(sbindir)
@@ -37,12 +37,12 @@ uninstall:
 test: all
 	@echo "!! The check library is required for compiling and running the tests"
 	@echo "!! Get it at http://check.sf.net"
-	@$(MAKE) -C tests/ TARGETOS=$(TARGETOS) all
+	@(cd tests; $(MAKE) TARGETOS=$(TARGETOS) all)
 
 clean:
 	@echo "Cleaning..."
-	@$(MAKE) -C src/ clean
-	@$(MAKE) -C tests/ clean
+	@(cd src; $(MAKE) clean)
+	@(cd tests; $(MAKE) clean)
 	@rm -rf bin iodine-latest*
 
 #Helper target for windows/android zipfiles
@@ -57,8 +57,8 @@ iodine-latest:
 	@unix2dos iodine-latest/*
 
 cross-android:
-	@$(MAKE) -C src/ base64u.c base64u.h
-	@ndk-build -C src/ NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk
+	@(cd src; $(MAKE) base64u.c base64u.h)
+	@(cd src; ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk)
 
 iodine-latest-android.zip: iodine-latest
 	@mv iodine-latest iodine-latest-android
@@ -71,19 +71,19 @@ iodine-latest-android.zip: iodine-latest
 	@zip -r iodine-latest-android.zip iodine-latest-android
 
 cross-mingw32:
-	@$(MAKE) -C src/ TARGETOS=windows32 CC=i686-w64-mingw32-gcc all
+	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-w64-mingw32-gcc all)
 
 cross-mingw64:
-	@$(MAKE) -C src/ TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc all
+	@(cd src; $(MAKE) TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc all)
 
 iodine-latest-windows.zip: iodine-latest
 	@mv iodine-latest iodine-latest-windows
 	@mkdir -p iodine-latest-windows/64bit iodine-latest-windows/32bit
-	@$(MAKE) -C src/ TARGETOS=windows32 CC=i686-w64-mingw32-gcc clean all
+	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-w64-mingw32-gcc clean all)
 	@i686-w64-mingw32-strip bin/iodine*
 	@for i in `ls bin`; do cp bin/$$i iodine-latest-windows/32bit/$$i.exe; done
 	@cp /usr/i686-w64-mingw32/bin/zlib1.dll iodine-latest-windows/32bit
-	@$(MAKE) -C src/ TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc clean all
+	@(cd src; $(MAKE) TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc clean all)
 	@x86_64-w64-mingw32-strip bin/iodine*
 	@for i in `ls bin`; do cp bin/$$i iodine-latest-windows/64bit/$$i.exe; done
 	@cp /usr/x86_64-w64-mingw32/bin/zlib1.dll iodine-latest-windows/64bit
@@ -91,7 +91,7 @@ iodine-latest-windows.zip: iodine-latest
 	@zip -r iodine-latest-windows.zip iodine-latest-windows
 
 cross-mingw:
-	@$(MAKE) -C src/ TARGETOS=windows32 CC=i686-mingw32-gcc all
+	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-mingw32-gcc all)
 
 iodine-latest-win32.zip: cross-mingw iodine-latest
 	@mv iodine-latest iodine-latest-win32
