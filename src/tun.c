@@ -285,12 +285,9 @@ DWORD WINAPI tun_reader(LPVOID arg)
 	int len;
 	int res;
 	OVERLAPPED olpd;
-	struct sockaddr_storage addr;
-	int addr_len;
 	int sock;
 
-	addr_len = get_addr("127.0.0.1", 0, AF_INET, 0, &addr);
-	sock = open_dns(&addr, addr_len);
+	sock = open_dns_from_host("127.0.0.1", 0, AF_INET, 0);
 
 	olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
