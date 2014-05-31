@@ -345,7 +345,7 @@ main(int argc, char **argv)
 		retval = 1;
 		goto cleanup1;
 	}
-	if ((dns_fd = open_dns_from_host(NULL, 53, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
+	if ((dns_fd = open_dns_from_host(NULL, 0, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
 		retval = 1;
 		goto cleanup2;
 	}
