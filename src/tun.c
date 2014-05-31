@@ -440,15 +440,18 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	int i;
 #ifndef LINUX
 	int r;
-	struct in_addr netip;
 #endif
 #ifdef WINDOWS32
 	DWORD status;
 	DWORD ipdata[3];
 	struct in_addr addr;
 	DWORD len;
-#endif
+#else
 	const char *display_ip;
+#ifndef LINUX
+	struct in_addr netip;
+#endif
+#endif
 
 	netmask = 0;
 	for (i = 0; i < netbits; i++) {
