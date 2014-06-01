@@ -69,8 +69,8 @@ char if_name[250];
 #include <net/if.h>
 #include <linux/if_tun.h>
 
-int 
-open_tun(const char *tun_device) 
+int
+open_tun(const char *tun_device)
 {
 	int i;
 	int tun_fd;
@@ -88,7 +88,7 @@ open_tun(const char *tun_device)
 
 	memset(&ifreq, 0, sizeof(ifreq));
 
-	ifreq.ifr_flags = IFF_TUN; 
+	ifreq.ifr_flags = IFF_TUN;
 
 	if (tun_device != NULL) {
 		strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
@@ -129,8 +129,8 @@ open_tun(const char *tun_device)
 
 #else /* BSD */
 
-int 
-open_tun(const char *tun_device) 
+int
+open_tun(const char *tun_device)
 {
 	int i;
 	int tun_fd;
@@ -184,7 +184,7 @@ get_device(char *device, int device_len, const char *wanted_dev)
 		warnx("Error opening registry key " TAP_ADAPTER_KEY );
 		return;
 	}
-	
+
 	while (TRUE) {
 		char name[256];
 		char unit[256];
@@ -222,7 +222,7 @@ get_device(char *device, int device_len, const char *wanted_dev)
 			strncmp(TAP_VERSION_ID_0901, component, strlen(TAP_VERSION_ID_0901)) == 0) {
 			/* We found a TAP32 device, get its NetCfgInstanceId */
 			char iid_string[256] = NET_CFG_INST_ID;
-			
+
 			status = RegQueryValueEx(device_key, iid_string, NULL, &datatype, (LPBYTE) device, (DWORD *) &device_len);
 			if (status != ERROR_SUCCESS || datatype != REG_SZ) {
 				warnx("Error reading registry key %s\\%s on TAP device", unit, iid_string);
@@ -299,7 +299,7 @@ DWORD WINAPI tun_reader(LPVOID arg)
 		if (!res) {
 			WaitForSingleObject(olpd.hEvent, INFINITE);
 			res = GetOverlappedResult(dev_handle, &olpd, (LPDWORD) &len, FALSE);
-			res = sendto(sock, buf, len, 0, (struct sockaddr*) &(tun->addr), 
+			res = sendto(sock, buf, len, 0, (struct sockaddr*) &(tun->addr),
 				tun->addrlen);
 		}
 	}
@@ -307,8 +307,8 @@ DWORD WINAPI tun_reader(LPVOID arg)
 	return 0;
 }
 
-int 
-open_tun(const char *tun_device) 
+int
+open_tun(const char *tun_device)
 {
 	char adapter[256];
 	char tapfile[512];
@@ -328,7 +328,7 @@ open_tun(const char *tun_device)
 		}
 		return -1;
 	}
-	
+
 	fprintf(stderr, "Opening device %s\n", if_name);
 	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
 	dev_handle = CreateFile(tapfile, GENERIC_WRITE | GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM | FILE_FLAG_OVERLAPPED, NULL);
@@ -339,9 +339,9 @@ open_tun(const char *tun_device)
 
 	/* Use a UDP connection to forward packets from tun,
 	 * so we can still use select() in main code.
-	 * A thread does blocking reads on tun device and 
+	 * A thread does blocking reads on tun device and
 	 * sends data as udp to this socket */
-	
+
 	localsock_len = get_addr("127.0.0.1", 55353, AF_INET, 0, &localsock);
 	tunfd = open_dns(&localsock, localsock_len);
 
@@ -349,20 +349,20 @@ open_tun(const char *tun_device)
 	memcpy(&(data.addr), &localsock, localsock_len);
 	data.addrlen = localsock_len;
 	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)tun_reader, &data, 0, NULL);
-	
+
 	return tunfd;
 }
-#endif 
+#endif
 
-void 
-close_tun(int tun_fd) 
+void
+close_tun(int tun_fd)
 {
 	if (tun_fd >= 0)
 		close(tun_fd);
 }
 
-int 
-write_tun(int tun_fd, char *data, size_t len) 
+int
+write_tun(int tun_fd, char *data, size_t len)
 {
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	data += 4;
@@ -409,7 +409,7 @@ write_tun(int tun_fd, char *data, size_t len)
 }
 
 ssize_t
-read_tun(int tun_fd, char *buf, size_t len) 
+read_tun(int tun_fd, char *buf, size_t len)
 {
 #if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
 	/* FreeBSD/Darwin/NetBSD has no header */
@@ -471,13 +471,13 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 # else
 	display_ip = ip;
 # endif
-	snprintf(cmdline, sizeof(cmdline), 
+	snprintf(cmdline, sizeof(cmdline),
 			IFCONFIGPATH "ifconfig %s %s %s netmask %s",
 			if_name,
 			ip,
 			display_ip,
 			inet_ntoa(net));
-	
+
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
 	netip.s_addr = inet_addr(ip);
@@ -486,7 +486,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	if(r != 0) {
 		return r;
 	} else {
-		
+
 		snprintf(cmdline, sizeof(cmdline),
 				"/sbin/route add %s/%d %s",
 				inet_ntoa(netip), netbits, ip);
@@ -499,13 +499,13 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	/* Set device as connected */
 	fprintf(stderr, "Enabling interface '%s'\n", if_name);
 	status = 1;
-	r = DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, 
+	r = DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status,
 		sizeof(status), &status, sizeof(status), &len, NULL);
 	if (!r) {
 		fprintf(stderr, "Failed to enable interface\n");
 		return -1;
 	}
-	
+
 	if (inet_aton(ip, &addr)) {
 		ipdata[0] = (DWORD) addr.s_addr;   /* local ip addr */
 		ipdata[1] = net.s_addr & ipdata[0]; /* network addr */
@@ -515,7 +515,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	}
 
 	/* Tell ip/networkaddr/netmask to device for arp use */
-	r = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata, 
+	r = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata,
 		sizeof(ipdata), &ipdata, sizeof(ipdata), &len, NULL);
 	if (!r) {
 		fprintf(stderr, "Failed to set interface in TUN mode\n");
@@ -530,18 +530,18 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 #endif
 }
 
-int 
+int
 tun_setmtu(const unsigned mtu)
 {
 #ifndef WINDOWS32
 	char cmdline[512];
 
 	if (mtu > 200 && mtu <= 1500) {
-		snprintf(cmdline, sizeof(cmdline), 
+		snprintf(cmdline, sizeof(cmdline),
 				IFCONFIGPATH "ifconfig %s mtu %u",
 				if_name,
 				mtu);
-		
+
 		fprintf(stderr, "Setting MTU of %s to %u\n", if_name, mtu);
 		return system(cmdline);
 	} else {

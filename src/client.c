@@ -93,10 +93,10 @@ static struct encoder *b128;
 /* The encoder used for data packets
  * Defaults to Base32, can be changed after handshake */
 static struct encoder *dataenc;
-  
+
 /* The encoder to use for downstream data */
 static char downenc = ' ';
- 
+
 /* set query type to send */
 static unsigned short do_qtype = T_UNSET;
 
@@ -214,7 +214,7 @@ set_downenc(char *encoding)
 		downenc = 'R';
 }
 
-void 
+void
 client_set_selecttimeout(int select_timeout)
 {
 	selecttimeout = select_timeout;
@@ -333,7 +333,7 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 	char buf[4096];
 
 	buf[0] = cmd;
-	
+
 	build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain,
 		       b32, hostname_maxlen);
 	send_query(fd, buf);
@@ -366,7 +366,7 @@ send_chunk(int fd)
 	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
 
 	buf[0] = userid_char;		/* First byte is hex userid */
-  
+
 	code = ((outpkt.seqno & 7) << 2) | ((outpkt.fragment & 15) >> 2);
 	buf[1] = b32_5to8(code); /* Second byte is 3 bits seqno, 2 upper bits fragment count */
 
@@ -380,7 +380,7 @@ send_chunk(int fd)
 	datacmc++;
 	if (datacmc >= 36)
 		datacmc = 0;
-  
+
 #if 0
 	fprintf(stderr, "  Send: down %d/%d up %d/%d, %d bytes\n",
 		inpkt.seqno, inpkt.fragment, outpkt.seqno, outpkt.fragment,
@@ -395,12 +395,12 @@ send_ping(int fd)
 {
 	if (conn == CONN_DNS_NULL) {
 		char data[4];
-		
+
 		data[0] = userid;
 		data[1] = ((inpkt.seqno & 7) << 4) | (inpkt.fragment & 15);
 		data[2] = (rand_seed >> 8) & 0xff;
 		data[3] = (rand_seed >> 0) & 0xff;
-		
+
 		rand_seed++;
 
 #if 0
@@ -566,7 +566,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 	int r;
 
 	addrlen = sizeof(from);
-	if ((r = recvfrom(dns_fd, data, sizeof(data), 0, 
+	if ((r = recvfrom(dns_fd, data, sizeof(data), 0,
 			  (struct sockaddr*)&from, &addrlen)) < 0) {
 		warn("recvfrom");
 		return -1;
@@ -588,9 +588,9 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 			/*
 			 * buf is a hostname or txt stream that we still need to
 			 * decode to binary
-			 * 
+			 *
 			 * also update rv with the number of valid bytes
-			 * 
+			 *
 			 * data is unused here, and will certainly hold the smaller binary
 			 */
 
@@ -1131,11 +1131,11 @@ client_tunnel(int tun_fd, int dns_fd)
  			warnx("No downstream data received in 60 seconds, shutting down.");
  			running = 0;
  		}
-		
+
 		if (running == 0)
 			break;
 
-		if (i < 0) 
+		if (i < 0)
 			err(1, "select");
 
 		if (i == 0) {
@@ -1178,7 +1178,7 @@ client_tunnel(int tun_fd, int dns_fd)
 			if (FD_ISSET(dns_fd, &fds)) {
 				if (tunnel_dns(tun_fd, dns_fd) <= 0)
 					continue;
-			} 
+			}
 		}
 	}
 
@@ -1196,7 +1196,7 @@ send_login(int fd, char *login, int len)
 
 	data[17] = (rand_seed >> 8) & 0xff;
 	data[18] = (rand_seed >> 0) & 0xff;
-	
+
 	rand_seed++;
 
 	send_packet(fd, 'l', data, sizeof(data));
@@ -1235,23 +1235,23 @@ static void
 send_set_downstream_fragsize(int fd, int fragsize)
 {
 	char data[5];
-	
+
 	data[0] = userid;
 	data[1] = (fragsize & 0xff00) >> 8;
 	data[2] = (fragsize & 0x00ff);
 	data[3] = (rand_seed >> 8) & 0xff;
 	data[4] = (rand_seed >> 0) & 0xff;
-	
+
 	rand_seed++;
 
 	send_packet(fd, 'n', data, sizeof(data));
 }
 
-static void 
+static void
 send_version(int fd, uint32_t version)
 {
 	char data[6];
- 
+
 	data[0] = (version >> 24) & 0xff;
 	data[1] = (version >> 16) & 0xff;
 	data[2] = (version >> 8) & 0xff;
@@ -1259,7 +1259,7 @@ send_version(int fd, uint32_t version)
 
 	data[4] = (rand_seed >> 8) & 0xff;
 	data[5] = (rand_seed >> 0) & 0xff;
-	
+
 	rand_seed++;
 
 	send_packet(fd, 'v', data, sizeof(data));
@@ -1270,7 +1270,7 @@ send_ip_request(int fd, int userid)
 {
 	char buf[512] = "i____.";
 	buf[1] = b32_5to8(userid);
-	
+
 	buf[2] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[3] = b32_5to8((rand_seed >> 5) & 0x1f);
 	buf[4] = b32_5to8((rand_seed ) & 0x1f);
@@ -1294,7 +1294,7 @@ send_upenctest(int fd, char *s)
 /* NOTE: String may be at most 63-4=59 chars to fit in 1 dns chunk. */
 {
 	char buf[512] = "z___";
-	
+
 	buf[1] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[2] = b32_5to8((rand_seed >> 5) & 0x1f);
 	buf[3] = b32_5to8((rand_seed ) & 0x1f);
@@ -1330,7 +1330,7 @@ send_codec_switch(int fd, int userid, int bits)
 	char buf[512] = "s_____.";
 	buf[1] = b32_5to8(userid);
 	buf[2] = b32_5to8(bits);
-	
+
 	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
 	buf[5] = b32_5to8((rand_seed ) & 0x1f);
@@ -1408,7 +1408,7 @@ handshake_version(int dns_fd, int *seed)
 				fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n", VERSION, userid);
 				return 0;
 			} else if (strncmp("VNAK", in, 4) == 0) {
-				warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up", 
+				warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up",
 						VERSION, payload);
 				return 1;
 			} else if (strncmp("VFUL", in, 4) == 0) {
@@ -1417,7 +1417,7 @@ handshake_version(int dns_fd, int *seed)
 			}
 		} else if (read > 0)
 			warnx("did not receive proper login challenge");
-		
+
 		fprintf(stderr, "Retrying version check...\n");
 	}
 	warnx("couldn't connect to server (maybe other -T options will work)");
@@ -1436,7 +1436,7 @@ handshake_login(int dns_fd, int seed)
 	int read;
 
 	login_calculate(login, 16, password, seed);
-	
+
 	for (i=0; running && i<5 ;i++) {
 
 		send_login(dns_fd, login, 16);
@@ -1510,7 +1510,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	fprintf(stderr, "\n");
 	if (!running)
 		return 0;
-	
+
 	if (!remoteaddr) {
 		fprintf(stderr, "Failed to get raw server IP, will use DNS mode.\n");
 		return 0;
@@ -1524,7 +1524,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	raw_serv.sin_port = htons(53);
 	raw_serv.sin_addr = server;
 
-	/* do login against port 53 on remote server 
+	/* do login against port 53 on remote server
 	 * based on the old seed. If reply received,
 	 * switch to raw udp mode */
 	for (i=0; running && i<4 ;i++) {
@@ -1532,7 +1532,7 @@ handshake_raw_udp(int dns_fd, int seed)
 		tv.tv_usec = 0;
 
 		send_raw_udp_login(dns_fd, userid, seed);
-		
+
 		FD_ZERO(&fds);
 		FD_SET(dns_fd, &fds);
 
@@ -1545,7 +1545,7 @@ handshake_raw_udp(int dns_fd, int seed)
 				char hash[16];
 				login_calculate(hash, 16, password, seed - 1);
 				if (memcmp(in, raw_header, RAW_HDR_IDENT_LEN) == 0
-					&& RAW_HDR_GET_CMD(in) == RAW_HDR_CMD_LOGIN 
+					&& RAW_HDR_GET_CMD(in) == RAW_HDR_CMD_LOGIN
 					&& memcmp(&in[RAW_HDR_LEN], hash, sizeof(hash)) == 0) {
 
 					fprintf(stderr, "OK\n");
@@ -1556,7 +1556,7 @@ handshake_raw_udp(int dns_fd, int seed)
 		fprintf(stderr, ".");
 		fflush(stderr);
 	}
-	
+
 	fprintf(stderr, "failed\n");
 	return 0;
 }
@@ -2024,7 +2024,7 @@ handshake_switch_codec(int dns_fd, int bits)
 	for (i=0; running && i<5 ;i++) {
 
 		send_codec_switch(dns_fd, userid, bits);
-		
+
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 's', 'S', i+1);
 
 		if (read > 0) {
@@ -2051,7 +2051,7 @@ handshake_switch_codec(int dns_fd, int bits)
 
 	fprintf(stderr, "No reply from server on codec switch. ");
 
-codec_revert: 
+codec_revert:
 	fprintf(stderr, "Falling back to upstream codec %s\n", dataenc->name);
 }
 
@@ -2103,7 +2103,7 @@ handshake_switch_downenc(int dns_fd)
 
 	fprintf(stderr, "No reply from server on codec switch. ");
 
-codec_revert: 
+codec_revert:
 	fprintf(stderr, "Falling back to downstream codec Base32\n");
 }
 
@@ -2145,7 +2145,7 @@ handshake_try_lazy(int dns_fd)
 
 	fprintf(stderr, "No reply from server on lazy switch. ");
 
-codec_revert: 
+codec_revert:
 	fprintf(stderr, "Falling back to legacy mode\n");
 	lazymode = 0;
 	selecttimeout = 1;
@@ -2262,7 +2262,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 	int max_fragsize;
 
 	max_fragsize = 0;
-	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)\n"); 
+	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)\n");
 	while (running && range > 0 && (range >= 8 || max_fragsize < 300)) {
 		/* stop the slow probing early when we have enough bytes anyway */
 		for (i=0; running && i<3 ;i++) {
@@ -2270,7 +2270,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 			send_fragsize_probe(dns_fd, proposed_fragsize);
 
 			read = handshake_waitdns(dns_fd, in, sizeof(in), 'r', 'R', 1);
-				
+
 			if (read > 0) {
 				/* We got a reply */
 				if (fragsize_check(in, read, proposed_fragsize, &max_fragsize) == 1)

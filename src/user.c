@@ -59,7 +59,7 @@ init_users(in_addr_t my_ip, int netbits)
 
 	maxusers = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
 	usercount = MIN(maxusers, USERS);
-	
+
 	users = calloc(usercount, sizeof(struct tun_user));
 	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
@@ -98,13 +98,13 @@ users_waiting_on_reply()
 
 	ret = 0;
 	for (i = 0; i < usercount; i++) {
-		if (users[i].active && !users[i].disabled && 
+		if (users[i].active && !users[i].disabled &&
 			users[i].last_pkt + 60 > time(NULL) &&
 			users[i].q.id != 0 && users[i].conn == CONN_DNS_NULL) {
 			ret++;
 		}
 	}
-	
+
 	return ret;
 }
 
@@ -143,8 +143,8 @@ all_users_waiting_to_send()
 	for (i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled &&
 			users[i].last_pkt + 60 > now &&
-			((users[i].conn == CONN_RAW_UDP) || 
-			((users[i].conn == CONN_DNS_NULL) 
+			((users[i].conn == CONN_RAW_UDP) ||
+			((users[i].conn == CONN_DNS_NULL)
 #ifdef OUTPACKETQ_LEN
 				&& users[i].outpacketq_filled < 1
 #else
@@ -183,7 +183,7 @@ user_switch_codec(int userid, struct encoder *enc)
 {
 	if (userid < 0 || userid >= usercount)
 		return;
-	
+
 	users[userid].encoder = enc;
 }
 
@@ -195,7 +195,7 @@ user_set_conn_type(int userid, enum connection c)
 
 	if (c < 0 || c >= CONN_MAX)
 		return;
-	
+
 	users[userid].conn = c;
 }
-	
+

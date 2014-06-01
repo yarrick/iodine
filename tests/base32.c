@@ -63,7 +63,7 @@ START_TEST(test_base32_decode)
 	char buf[4096];
 	struct encoder *b32;
 	int val;
-	
+
 	b32 = get_base32_encoder();
 
 	len = sizeof(buf);
@@ -81,7 +81,7 @@ START_TEST(test_base32_5to8_8to5)
 	int c;
 
 	for (i = 0; i < 32; i++) {
-		c = b32_5to8(i);	
+		c = b32_5to8(i);
 		fail_unless(b32_8to5(c) == i);
 	}
 }

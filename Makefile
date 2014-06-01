@@ -16,7 +16,7 @@ RM_FLAGS=-f
 
 TARGETOS = `uname`
 
-all: 
+all:
 	@(cd src; $(MAKE) TARGETOS=$(TARGETOS) all)
 
 install: all

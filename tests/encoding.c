@@ -85,7 +85,7 @@ START_TEST(test_build_hostname)
 	}
 
 	buflen = sizeof(buf);
-	
+
 	for (i = 1; i < sizeof(data); i++) {
 		int len = build_hostname(buf, buflen, data, i, topdomain, get_base32_encoder(), sizeof(buf));
 

@@ -29,9 +29,9 @@ void fw_query_init()
 void fw_query_put(struct fw_query *fw_query)
 {
 	memcpy(&(fwq[fwq_ix]), fw_query, sizeof(struct fw_query));
-	
+
 	++fwq_ix;
-	if (fwq_ix >= FW_QUERY_CACHE_SIZE) 
+	if (fwq_ix >= FW_QUERY_CACHE_SIZE)
 		fwq_ix = 0;
 }
 

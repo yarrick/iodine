@@ -13,9 +13,9 @@ all: $(TEST)
 
 $(TEST): $(OBJS) $(SRCOBJS)
 	@echo LD $(TEST)
-	@$(CC) -o $@ $(SRCOBJS) $(OBJS) $(LDFLAGS) 
+	@$(CC) -o $@ $(SRCOBJS) $(OBJS) $(LDFLAGS)
 
-.c.o: 
+.c.o:
 	@echo CC $<
 	@$(CC) $(CFLAGS) -c $<
 

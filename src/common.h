@@ -53,12 +53,12 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 
 #define QUERY_NAME_SIZE 256
 
-#if defined IP_RECVDSTADDR 
-# define DSTADDR_SOCKOPT IP_RECVDSTADDR 
-# define dstaddr(x) ((struct in_addr *) CMSG_DATA(x)) 
-#elif defined IP_PKTINFO 
-# define DSTADDR_SOCKOPT IP_PKTINFO 
-# define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr)) 
+#if defined IP_RECVDSTADDR
+# define DSTADDR_SOCKOPT IP_RECVDSTADDR
+# define dstaddr(x) ((struct in_addr *) CMSG_DATA(x))
+#elif defined IP_PKTINFO
+# define DSTADDR_SOCKOPT IP_PKTINFO
+# define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr))
 #endif
 
 #if defined IP_MTU_DISCOVER
@@ -78,7 +78,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #define T_UNSET 65432
 /* Unused RR type; "private use" range, see http://www.bind9.net/dns-parameters */
 
-struct packet 
+struct packet
 {
 	int len;		/* Total packet length */
 	int sentlen;		/* Length of chunk currently transmitted */

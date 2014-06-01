@@ -29,11 +29,11 @@ TCase *test_user_create_tests();
 TCase *test_fw_query_create_tests();
 
 char *va_str(const char *, ...);
-	
+
 #if (CHECK_MAJOR_VERSION == 0 && \
 	((CHECK_MINOR_VERSION == 9 && CHECK_MICRO_VERSION < 2) || \
 	 (CHECK_MINOR_VERSION < 9)))
-#define tcase_set_timeout(...) 
+#define tcase_set_timeout(...)
 #endif
 
 #endif

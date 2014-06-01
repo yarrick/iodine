@@ -27,7 +27,7 @@ $(SERVER): $(COMMONOBJS) $(SERVEROBJS)
 	@mkdir -p ../bin
 	@$(CC) $(COMMONOBJS) $(SERVEROBJS) -o $(SERVER) $(LDFLAGS)
 
-.c.o: 
+.c.o:
 	@echo CC $<
 	@$(CC) $(CFLAGS) $< -o $@
 

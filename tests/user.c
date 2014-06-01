@@ -62,12 +62,12 @@ START_TEST(test_users_waiting)
 	fail_unless(users_waiting_on_reply() == 0);
 
 	users[3].last_pkt = time(NULL);
-	
+
 	fail_unless(users_waiting_on_reply() == 0);
-	
+
 	users[3].conn = CONN_DNS_NULL;
 	users[3].q.id = 1;
-	
+
 	fail_unless(users_waiting_on_reply() == 1);
 }
 END_TEST
@@ -83,17 +83,17 @@ START_TEST(test_find_user_by_ip)
 
 	testip = (unsigned int) inet_addr("10.0.0.1");
 	fail_unless(find_user_by_ip(testip) == -1);
-	
+
 	testip = (unsigned int) inet_addr("127.0.0.2");
 	fail_unless(find_user_by_ip(testip) == -1);
-	
+
 	users[0].active = 1;
-	
+
 	testip = (unsigned int) inet_addr("127.0.0.2");
 	fail_unless(find_user_by_ip(testip) == -1);
-	
+
 	users[0].last_pkt = time(NULL);
-	
+
 	testip = (unsigned int) inet_addr("127.0.0.2");
 	fail_unless(find_user_by_ip(testip) == 0);
 }
@@ -107,15 +107,15 @@ START_TEST(test_all_users_waiting_to_send)
 	init_users(ip, 27);
 
 	fail_unless(all_users_waiting_to_send() == 1);
-	
+
 	users[0].conn = CONN_DNS_NULL;
 	users[0].active = 1;
-	
+
 	fail_unless(all_users_waiting_to_send() == 1);
-	
+
 	users[0].last_pkt = time(NULL);
 	users[0].outpacket.len = 0;
-	
+
 	fail_unless(all_users_waiting_to_send() == 0);
 
 #ifdef OUTPACKETQ_LEN
@@ -123,7 +123,7 @@ START_TEST(test_all_users_waiting_to_send)
 #else
 	users[0].outpacket.len = 44;
 #endif
-	
+
 	fail_unless(all_users_waiting_to_send() == 1);
 }
 END_TEST
@@ -150,7 +150,7 @@ START_TEST(test_find_available_user)
 	fail_unless(find_available_user() == -1);
 
 	users[3].last_pkt = 55;
-	
+
 	fail_unless(find_available_user() == 3);
 	fail_unless(find_available_user() == -1);
 }
@@ -178,7 +178,7 @@ START_TEST(test_find_available_user_small_net)
 	fail_unless(find_available_user() == -1);
 
 	users[3].last_pkt = 55;
-	
+
 	fail_unless(find_available_user() == 3);
 	fail_unless(find_available_user() == -1);
 }

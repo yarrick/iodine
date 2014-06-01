@@ -36,12 +36,12 @@ get_resolvconf_addr()
 		rv = addr;
 	pclose(fp);
 #else
-	
+
 	rv = NULL;
 
-	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL) 
+	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
 		err(1, "/etc/resolv.conf");
-	
+
 	while (feof(fp) == 0) {
 		fgets(buf, sizeof(buf), fp);
 
@@ -50,7 +50,7 @@ get_resolvconf_addr()
 			break;
 		}
 	}
-	
+
 	fclose(fp);
 #endif
 #else /* !WINDOWS32 */

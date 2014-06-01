@@ -53,7 +53,7 @@ static char *__progname;
 #define PASSWORD_ENV_VAR "IODINE_PASS"
 
 static void
-sighandler(int sig) 
+sighandler(int sig)
 {
 	client_stop();
 }
@@ -179,7 +179,7 @@ main(int argc, char **argv)
 
 	srand((unsigned) time(NULL));
 	client_init();
-	
+
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
@@ -227,9 +227,9 @@ main(int argc, char **argv)
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
 			password[sizeof(password)-1] = 0;
-			
+
 			/* XXX: find better way of cleaning up ps(1) */
-			memset(optarg, 0, strlen(optarg)); 
+			memset(optarg, 0, strlen(optarg));
 			break;
 		case 'm':
 			autodetect_frag_size = 0;
@@ -247,7 +247,7 @@ main(int argc, char **argv)
 			break;
 		case 'F':
 			pidfile = optarg;
-			break;    
+			break;
 		case 'T':
 			set_qtype(optarg);
 			break;
@@ -273,7 +273,7 @@ main(int argc, char **argv)
 			/* NOTREACHED */
 		}
 	}
-	
+
 	check_superuser(usage);
 
 	argc -= optind;
@@ -310,7 +310,7 @@ main(int argc, char **argv)
 		warnx("No nameserver found - not connected to any network?\n");
 		usage();
 		/* NOTREACHED */
-	}	
+	}
 
 	if(check_topdomain(topdomain, &errormsg)) {
 		warnx("Invalid topdomain: %s", errormsg);
@@ -322,7 +322,7 @@ main(int argc, char **argv)
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
-	
+
 	if (username != NULL) {
 #ifndef WINDOWS32
 		if ((pw = getpwnam(username)) == NULL) {
@@ -332,14 +332,14 @@ main(int argc, char **argv)
 		}
 #endif
 	}
-	
+
 	if (strlen(password) == 0) {
 		if (NULL != getenv(PASSWORD_ENV_VAR))
 			snprintf(password, sizeof(password), "%s", getenv(PASSWORD_ENV_VAR));
 		else
 			read_password(password, sizeof(password));
 	}
-	
+
 	client_set_password(password);
 
 	if ((tun_fd = open_tun(device)) == -1) {
@@ -365,22 +365,22 @@ main(int argc, char **argv)
 		retval = 1;
 		goto cleanup2;
 	}
-	
+
 	if (client_get_conn() == CONN_RAW_UDP) {
 		fprintf(stderr, "Sending raw traffic directly to %s\n", client_get_raw_addr());
 	}
 
 	fprintf(stderr, "Connection setup complete, transmitting data.\n");
 
-	if (foreground == 0) 
+	if (foreground == 0)
 		do_detach();
-	
+
 	if (pidfile != NULL)
 		do_pidfile(pidfile);
 
 	if (newroot != NULL)
 		do_chroot(newroot);
-	
+
 	if (username != NULL) {
 #ifndef WINDOWS32
 		gid_t gids[1];
