@@ -23,6 +23,7 @@ master:
 	- A number of minor patches from Frank Denis, Gregor Herrmann and
 		Barak A. Pearlmutter.
 	- Testcase compilation fixes for OS X and FreeBSD
+	- Do not let sockets be inherited by sub-processes, fixes #99.
 
 2010-02-06: 0.6.0-rc1 "Hotspotify"
 	- Fixed tunnel not working on Windows.

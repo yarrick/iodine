@@ -189,6 +189,8 @@ open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
 #ifndef WINDOWS32
 	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
 	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+
+	fd_set_close_on_exec(fd);
 #endif
 
 #ifdef IP_OPT_DONT_FRAG
@@ -460,4 +462,20 @@ int recent_seqno(int ourseqno, int gotseqno)
 			return 1;
 	}
 	return 0;
+}
+
+/* Set FD_CLOEXEC flag on file descriptor.
+ * This stops it from being inherited by system() calls.
+ */
+void
+fd_set_close_on_exec(int fd)
+{
+	int flags;
+
+	flags = fcntl(fd, F_GETFD);
+	if (flags == -1)
+		err(4, "Failed to get fd flags");
+	flags |= FD_CLOEXEC;
+	if (fcntl(fd, F_SETFD, flags) == -1)
+		err(4, "Failed to set fd flags");
 }
