@@ -136,6 +136,8 @@ void warnx(const char *fmt, ...);
 
 int recent_seqno(int , int);
 
+#ifndef WINDOWS32
 void fd_set_close_on_exec(int fd);
+#endif
 
 #endif

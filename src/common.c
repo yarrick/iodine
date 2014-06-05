@@ -464,6 +464,7 @@ int recent_seqno(int ourseqno, int gotseqno)
 	return 0;
 }
 
+#ifndef WINDOWS32
 /* Set FD_CLOEXEC flag on file descriptor.
  * This stops it from being inherited by system() calls.
  */
@@ -479,3 +480,5 @@ fd_set_close_on_exec(int fd)
 	if (fcntl(fd, F_SETFD, flags) == -1)
 		err(4, "Failed to set fd flags");
 }
+#endif
+
