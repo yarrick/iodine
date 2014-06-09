@@ -83,7 +83,7 @@ help() {
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 	fprintf(stderr, "Options to try if connection doesn't work:\n");
-	fprintf(stderr, "  -T force dns type: NULL, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
+	fprintf(stderr, "  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
 	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
 	fprintf(stderr, "     Base128, or (only for TXT:) Raw  (default: autodetect)\n");
 	fprintf(stderr, "  -I max interval between requests (default 4 sec) to prevent DNS timeouts\n");

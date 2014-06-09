@@ -75,8 +75,10 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 # define DONT_FRAG_VALUE 1
 #endif
 
+#define T_PRIVATE 65399
+/* Undefined RR type; "private use" range, see http://www.bind9.net/dns-parameters */
 #define T_UNSET 65432
-/* Unused RR type; "private use" range, see http://www.bind9.net/dns-parameters */
+/* Unused RR type, never actually sent */
 
 struct packet
 {

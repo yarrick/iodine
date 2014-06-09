@@ -172,6 +172,8 @@ client_set_qtype(char *qtype)
 {
 	if (!strcasecmp(qtype, "NULL"))
       		do_qtype = T_NULL;
+	else if (!strcasecmp(qtype, "PRIVATE"))
+		do_qtype = T_PRIVATE;
 	else if (!strcasecmp(qtype, "CNAME"))
 		do_qtype = T_CNAME;
 	else if (!strcasecmp(qtype, "A"))
@@ -191,6 +193,7 @@ client_get_qtype()
 	char *c = "UNDEFINED";
 
 	if (do_qtype == T_NULL)		c = "NULL";
+	else if (do_qtype == T_PRIVATE)	c = "PRIVATE";
 	else if (do_qtype == T_CNAME)	c = "CNAME";
 	else if (do_qtype == T_A)	c = "A";
 	else if (do_qtype == T_MX)	c = "MX";
@@ -1786,7 +1789,7 @@ handshake_downenc_autodetect(int dns_fd)
 	int base64uok = 0;
 	int base128ok = 0;
 
-	if (do_qtype == T_NULL) {
+	if (do_qtype == T_NULL || do_qtype == T_PRIVATE) {
 		/* no other choice than raw */
 		fprintf(stderr, "No alternative downstream codec available, using default (Raw)\n");
 		return ' ';
@@ -1840,13 +1843,14 @@ handshake_qtypetest(int dns_fd, int timeout)
 	int trycodec;
 	int k;
 
-	if (do_qtype == T_NULL)
+	if (do_qtype == T_NULL || do_qtype == T_PRIVATE)
 		trycodec = 'R';
 	else
 		trycodec = 'T';
 
 	/* We could use 'Z' bouncing here, but 'Y' also tests that 0-255
-	   byte values can be returned, which is needed for NULL to work. */
+	   byte values can be returned, which is needed for NULL/PRIVATE
+	   to work. */
 
 	send_downenctest(dns_fd, trycodec, 1, NULL, 0);
 
@@ -1871,11 +1875,12 @@ handshake_qtype_numcvt(int num)
 {
 	switch (num) {
 	case 0:	return T_NULL;
-	case 1:	return T_TXT;
-	case 2:	return T_SRV;
-	case 3:	return T_MX;
-	case 4:	return T_CNAME;
-	case 5:	return T_A;
+	case 1:	return T_PRIVATE;
+	case 2:	return T_TXT;
+	case 3:	return T_SRV;
+	case 4:	return T_MX;
+	case 5:	return T_CNAME;
+	case 6:	return T_A;
 	}
 	return T_UNSET;
 }
@@ -2317,7 +2322,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 		fprintf(stderr, "Note: this probably won't work well.\n");
 		fprintf(stderr, "Try setting -M to 200 or lower, or try other DNS types (-T option).\n");
 	} else if (max_fragsize < 202 &&
-	    (do_qtype == T_NULL || do_qtype == T_TXT ||
+	    (do_qtype == T_NULL || do_qtype == T_PRIVATE || do_qtype == T_TXT ||
 	     do_qtype == T_SRV || do_qtype == T_MX)) {
 		fprintf(stderr, "Note: this isn't very much.\n");
 		fprintf(stderr, "Try setting -M to 200 or lower, or try other DNS types (-T option).\n");

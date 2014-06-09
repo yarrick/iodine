@@ -467,7 +467,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 		}
 
 		/* Here type is still the question type */
-		if (type == T_NULL) {
+		if (type == T_NULL || type == T_PRIVATE) {
 			/* Assume that first answer is what we wanted */
 			readname(packet, packetlen, &data, name, sizeof(name));
 			CHECKLEN(10);

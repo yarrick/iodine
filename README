@@ -177,12 +177,13 @@ packet, and one query can be max 256 chars. Each domain name part can be max
 63 chars. So your domain name and subdomain should be as short as possible to
 allow maximum upstream throughput.
 
-Several DNS request types are supported, with the NULL type expected to provide
-the largest downstream bandwidth. Other available types are TXT, SRV, MX,
-CNAME and A (returning CNAME), in decreasing bandwidth order. Normally the
+Several DNS request types are supported, with the NULL and PRIVATE types
+expected to provide the largest downstream bandwidth. The PRIVATE type uses
+value 65399 in the private-use range. Other available types are TXT, SRV, MX,
+CNAME and A (returning CNAME), in decreasing bandwidth order.  Normally the
 "best" request type is autodetected and used. However, DNS relays may impose
 limits on for example NULL and TXT, making SRV or MX actually the best choice.
-This is not autodetected, but can be forced using the -T option. It is
+This is not autodetected, but can be forced using the -T option.  It is
 advisable to try various alternatives especially when the autodetected request
 type provides a downstream fragment size of less than 200 bytes.
 
@@ -190,14 +191,14 @@ Note that SRV, MX and A (returning CNAME) queries may/will cause additional
 lookups by "smart" caching nameservers to get an actual IP address, which may
 either slow down or fail completely.
 
-DNS responses for non-NULL queries can be encoded with the same set of codecs
-as upstream data. This is normally also autodetected, but no fully exhaustive
-tests are done, so some problems may not be noticed when selecting more
-advanced codecs. In that case, you'll see failures/corruption in the fragment
-size autoprobe. In particular, several DNS relays have been found that change
-replies returning hostnames (SRV, MX, CNAME, A) to lowercase only when that
-hostname exceeds ca. 180 characters. In these and similar cases, use the -O
-option to try other downstream codecs; Base32 should always work.
+DNS responses for non-NULL/PRIVATE queries can be encoded with the same set of
+codecs as upstream data. This is normally also autodetected, but no fully
+exhaustive tests are done, so some problems may not be noticed when selecting
+more advanced codecs. In that case, you'll see failures/corruption in the
+fragment size autoprobe. In particular, several DNS relays have been found that
+change replies returning hostnames (SRV, MX, CNAME, A) to lowercase only when
+that hostname exceeds ca. 180 characters. In these and similar cases, use the
+-O option to try other downstream codecs; Base32 should always work.
 
 Normal operation now is for the server to _not_ answer a DNS request until
 the next DNS request has come in, a.k.a. being "lazy". This way, the server

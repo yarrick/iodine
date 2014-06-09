@@ -1662,6 +1662,7 @@ tunnel_dns(int tun_fd, int dns_fd, int bind_fd)
 
 		switch (q.type) {
 		case T_NULL:
+		case T_PRIVATE:
 		case T_CNAME:
 		case T_A:
 		case T_MX:

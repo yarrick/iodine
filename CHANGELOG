@@ -24,6 +24,8 @@ master:
 		Barak A. Pearlmutter.
 	- Testcase compilation fixes for OS X and FreeBSD
 	- Do not let sockets be inherited by sub-processes, fixes #99.
+	- Add unspecified RR type (called PRIVATE; id 65399, in private use
+		range). For servers with RFC3597 support. Fixes #97.
 
 2010-02-06: 0.6.0-rc1 "Hotspotify"
 	- Fixed tunnel not working on Windows.

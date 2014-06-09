@@ -169,6 +169,7 @@ more bandwidth.
 In that case, use this option to override the autodetection.
 In (expected) decreasing bandwidth order, the supported DNS request types are:
 .IR NULL ,
+.IR PRIVATE ,
 .IR TXT ,
 .IR SRV ,
 .IR MX ,
@@ -183,7 +184,10 @@ and
 .I A
 may/will cause additional lookups by "smart" caching
 nameservers to get an actual IP address, which may either slow down or fail
-completely.
+completely. The
+.IR PRIVATE
+type uses value 65399 (in the 'private use' range) and requires servers
+implementing RFC 3597.
 .TP
 .B -O downenc
 Force downstream encoding type for all query type responses except NULL.

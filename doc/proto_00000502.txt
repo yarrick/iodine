@@ -122,7 +122,8 @@ Server sends:
 	s or S: Downstream encoding Base64, for TXT/CNAME/A/MX
 	u or U: Downstream encoding Base64u, for TXT/CNAME/A/MX
 	v or V: Downstream encoding Base128, for TXT/CNAME/A/MX
-	r or R: Downstream encoding Raw, for TXT/NULL (default for NULL)
+	r or R: Downstream encoding Raw, for PRIVATE/TXT/NULL (default for
+		PRIVATE and NULL)
 	If codec unsupported for request type, server will use Base32; note
 	that server will answer any mix of request types that a client sends.
 	Server may disregard this option; client must always use the downstream
@@ -188,8 +189,8 @@ encoded with the chosen upstream codec.
 Downstream data starts with 2 byte header. Then payload data, which may be
 compressed.
 
-In NULL responses, downstream data is always raw. In all other response types,
-downstream data is encoded (see Options above).
+In NULL and PRIVATE responses, downstream data is always raw. In all other
+response types, downstream data is encoded (see Options above).
 Encoding type is indicated by 1 prefix char:
 TXT:
 	End result is always DNS-chopped (series of len-prefixed strings
