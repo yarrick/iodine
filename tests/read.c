@@ -51,7 +51,7 @@ START_TEST(test_read_putshort)
 					i, ntohs(k), i);
 
 		p = (char*)&k;
-		readshort(NULL, &p, (short *) &l);
+		readshort(NULL, &p, &l);
 		fail_unless(l == i,
 				"Bad value on readshort for %d: %d != %d",
 					i, l, i);

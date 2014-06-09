@@ -85,15 +85,15 @@ readname(char *packet, int packetlen, char **src, char *dst, size_t length)
 }
 
 int
-readshort(char *packet, char **src, short *dst)
+readshort(char *packet, char **src, unsigned short *dst)
 {
 	unsigned char *p;
 
 	p = (unsigned char *) *src;
 	*dst = (p[0] << 8) | p[1];
 
-	(*src) += sizeof(short);
-	return sizeof(short);
+	(*src) += sizeof(unsigned short);
+	return sizeof(unsigned short);
 }
 
 int

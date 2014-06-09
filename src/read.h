@@ -19,7 +19,7 @@
 #define _READ_H_
 
 int readname(char *, int, char **, char *, size_t);
-int readshort(char *, char **, short *);
+int readshort(char *, char **, unsigned short *);
 int readlong(char *, char **, uint32_t *);
 int readdata(char *, char **, char *, size_t);
 int readtxtbin(char *, char **, size_t, char *, size_t);

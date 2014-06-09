@@ -404,10 +404,10 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	short qdcount;
 	short ancount;
 	uint32_t ttl;
-	short class;
-	short type;
+	unsigned short class;
+	unsigned short type;
 	char *data;
-	short rlen;
+	unsigned short rlen;
 	int id;
 	int rv;
 
@@ -509,7 +509,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			 */
 			char names[250][QUERY_NAME_SIZE];
 			char *rdatastart;
-			short pref;
+			unsigned short pref;
 			int i;
 			int offset;
 
