@@ -167,7 +167,7 @@ client_set_password(const char *cp)
 	password = cp;
 }
 
-void
+int
 client_set_qtype(char *qtype)
 {
 	if (!strcasecmp(qtype, "NULL"))
@@ -182,6 +182,7 @@ client_set_qtype(char *qtype)
 		do_qtype = T_SRV;
 	else if (!strcasecmp(qtype, "TXT"))
 		do_qtype = T_TXT;
+	return (do_qtype == T_UNSET);
 }
 
 char *

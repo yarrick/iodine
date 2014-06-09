@@ -27,7 +27,7 @@ const char *client_get_raw_addr();
 void client_set_nameserver(struct sockaddr_storage *, int);
 void client_set_topdomain(const char *cp);
 void client_set_password(const char *cp);
-void client_set_qtype(char *qtype);
+int client_set_qtype(char *qtype);
 char *client_get_qtype();
 void client_set_downenc(char *encoding);
 void client_set_selecttimeout(int select_timeout);

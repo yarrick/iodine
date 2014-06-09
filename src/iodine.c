@@ -249,7 +249,8 @@ main(int argc, char **argv)
 			pidfile = optarg;
 			break;
 		case 'T':
-			client_set_qtype(optarg);
+			if (client_set_qtype(optarg))
+				errx(5, "Invalid query type '%s'", optarg);
 			break;
 		case 'O':       /* not -D, is Debug in server */
 			client_set_downenc(optarg);
