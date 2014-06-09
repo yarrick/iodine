@@ -249,10 +249,10 @@ main(int argc, char **argv)
 			pidfile = optarg;
 			break;
 		case 'T':
-			set_qtype(optarg);
+			client_set_qtype(optarg);
 			break;
 		case 'O':       /* not -D, is Debug in server */
-			set_downenc(optarg);
+			client_set_downenc(optarg);
 			break;
 		case 'L':
 			lazymode = atoi(optarg);

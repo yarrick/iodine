@@ -168,7 +168,7 @@ client_set_password(const char *cp)
 }
 
 void
-set_qtype(char *qtype)
+client_set_qtype(char *qtype)
 {
 	if (!strcasecmp(qtype, "NULL"))
       		do_qtype = T_NULL;
@@ -185,7 +185,7 @@ set_qtype(char *qtype)
 }
 
 char *
-get_qtype()
+client_get_qtype()
 {
 	char *c = "UNDEFINED";
 
@@ -200,7 +200,7 @@ get_qtype()
 }
 
 void
-set_downenc(char *encoding)
+client_set_downenc(char *encoding)
 {
 	if (!strcasecmp(encoding, "base32"))
 		downenc = 'T';
@@ -1917,7 +1917,7 @@ handshake_qtype_autodetect(int dns_fd)
 				highestworking = qtypenum;
 #if 0
 				fprintf(stderr, " Type %s timeout %d works\n",
-					get_qtype(), timeout);
+					client_get_qtype(), timeout);
 #endif
 				break;
 				/* try others with longer timeout */
@@ -2379,7 +2379,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		}
 	}
 
-	fprintf(stderr, "Using DNS type %s queries\n", get_qtype());
+	fprintf(stderr, "Using DNS type %s queries\n", client_get_qtype());
 
 	r = handshake_version(dns_fd, &seed);
 	if (r) {
