@@ -33,8 +33,8 @@
 #include "windows.h"
 #include <winioctl.h>
 
-HANDLE dev_handle;
-struct tun_data data;
+static HANDLE dev_handle;
+static struct tun_data data;
 
 static void get_name(char *ifname, int namelen, char *dev_name);
 
@@ -60,9 +60,8 @@ static void get_name(char *ifname, int namelen, char *dev_name);
 #include "tun.h"
 #include "common.h"
 
-char if_name[250];
+static char if_name[250];
 
-#ifndef WINDOWS32
 #ifdef LINUX
 
 #include <sys/ioctl.h>
@@ -129,51 +128,8 @@ open_tun(const char *tun_device)
 	return -1;
 }
 
-#else /* BSD */
+#elif WINDOWS32
 
-int
-open_tun(const char *tun_device)
-{
-	int i;
-	int tun_fd;
-	char tun_name[50];
-
-	if (tun_device != NULL) {
-		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
-		strncpy(if_name, tun_device, sizeof(if_name));
-		if_name[sizeof(if_name)-1] = '\0';
-
-		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
-			warn("open_tun: %s: %s", tun_name, strerror(errno));
-			return -1;
-		}
-
-		fprintf(stderr, "Opened %s\n", tun_name);
-		fd_set_close_on_exec(tun_fd);
-		return tun_fd;
-	} else {
-		for (i = 0; i < TUN_MAX_TRY; i++) {
-			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
-
-			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
-				fprintf(stderr, "Opened %s\n", tun_name);
-				snprintf(if_name, sizeof(if_name), "tun%d", i);
-				fd_set_close_on_exec(tun_fd);
-				return tun_fd;
-			}
-
-			if (errno == ENOENT)
-				break;
-		}
-
-		warn("open_tun: Failed to open tunneling device");
-	}
-
-	return -1;
-}
-
-#endif /* !LINUX */
-#else /* WINDOWS32 */
 static void
 get_device(char *device, int device_len, const char *wanted_dev)
 {
@@ -356,6 +312,50 @@ open_tun(const char *tun_device)
 
 	return tunfd;
 }
+
+#else /* BSD and friends */
+
+int
+open_tun(const char *tun_device)
+{
+	int i;
+	int tun_fd;
+	char tun_name[50];
+
+	if (tun_device != NULL) {
+		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
+		strncpy(if_name, tun_device, sizeof(if_name));
+		if_name[sizeof(if_name)-1] = '\0';
+
+		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
+			warn("open_tun: %s: %s", tun_name, strerror(errno));
+			return -1;
+		}
+
+		fprintf(stderr, "Opened %s\n", tun_name);
+		fd_set_close_on_exec(tun_fd);
+		return tun_fd;
+	} else {
+		for (i = 0; i < TUN_MAX_TRY; i++) {
+			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
+
+			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
+				fprintf(stderr, "Opened %s\n", tun_name);
+				snprintf(if_name, sizeof(if_name), "tun%d", i);
+				fd_set_close_on_exec(tun_fd);
+				return tun_fd;
+			}
+
+			if (errno == ENOENT)
+				break;
+		}
+
+		warn("open_tun: Failed to open tunneling device");
+	}
+
+	return -1;
+}
+
 #endif
 
 void
@@ -365,10 +365,49 @@ close_tun(int tun_fd)
 		close(tun_fd);
 }
 
+#ifdef WINDOWS32
 int
 write_tun(int tun_fd, char *data, size_t len)
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
+	DWORD written;
+	DWORD res;
+	OVERLAPPED olpd;
+
+	data += 4;
+	len -= 4;
+
+	olpd.Offset = 0;
+	olpd.OffsetHigh = 0;
+	olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	res = WriteFile(dev_handle, data, len, &written, &olpd);
+	if (!res && GetLastError() == ERROR_IO_PENDING) {
+		WaitForSingleObject(olpd.hEvent, INFINITE);
+		res = GetOverlappedResult(dev_handle, &olpd, &written, FALSE);
+		if (written != len) {
+			return -1;
+		}
+	}
+	return 0;
+}
+
+ssize_t
+read_tun(int tun_fd, char *buf, size_t len)
+{
+	int bytes;
+	memset(buf, 0, 4);
+
+	bytes = recv(tun_fd, buf + 4, len - 4, 0);
+	if (bytes < 0) {
+		return bytes;
+	} else {
+		return bytes + 4;
+	}
+}
+#else
+int
+write_tun(int tun_fd, char *data, size_t len)
+{
+#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
 	data += 4;
 	len -= 4;
 #else /* !FREEBSD/DARWIN */
@@ -385,47 +424,22 @@ write_tun(int tun_fd, char *data, size_t len)
 #endif /* !LINUX */
 #endif /* FREEBSD */
 
-#ifndef WINDOWS32
 	if (write(tun_fd, data, len) != len) {
 		warn("write_tun");
 		return 1;
 	}
-#else /* WINDOWS32 */
-	{
-		DWORD written;
-		DWORD res;
-		OVERLAPPED olpd;
-
-		olpd.Offset = 0;
-		olpd.OffsetHigh = 0;
-		olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-		res = WriteFile(dev_handle, data, len, &written, &olpd);
-		if (!res && GetLastError() == ERROR_IO_PENDING) {
-			WaitForSingleObject(olpd.hEvent, INFINITE);
-			res = GetOverlappedResult(dev_handle, &olpd, &written, FALSE);
-			if (written != len) {
-				return -1;
-			}
-		}
-	}
-#endif
 	return 0;
 }
 
 ssize_t
 read_tun(int tun_fd, char *buf, size_t len)
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
+#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
 	/* FreeBSD/Darwin/NetBSD has no header */
 	int bytes;
 	memset(buf, 0, 4);
-#ifdef WINDOWS32
-	/* Windows needs recv() since it is local UDP socket */
-	bytes = recv(tun_fd, buf + 4, len - 4, 0);
-#else
-	/* The other need read() because fd is not a socket */
+
 	bytes = read(tun_fd, buf + 4, len - 4);
-#endif /*WINDOWS32*/
 	if (bytes < 0) {
 		return bytes;
 	} else {
@@ -435,6 +449,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 	return read(tun_fd, buf, len);
 #endif /* !FREEBSD */
 }
+#endif
 
 int
 tun_setip(const char *ip, const char *other_ip, int netbits)
