@@ -5,7 +5,10 @@ iodine - http://code.kryo.se/iodine
 
 CHANGES:
 
-2010-02-13: 0.6.0-rc1 "Hotspotify"
+2014-06-17: 0.6.0
+	- Fix authentication bypass vulnerability; found by Oscar Reparaz.
+
+2010-02-06: 0.6.0-rc1 "Hotspotify"
 	- Fixed tunnel not working on Windows.
 	- Any device name is now supported on Windows, fixes #47.
 	- Multiple installed TAP32 interfaces are now supported, fixes #46.

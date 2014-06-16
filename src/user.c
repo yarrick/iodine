@@ -78,6 +78,8 @@ init_users(in_addr_t my_ip, int netbits)
 			users[i].disabled = 0;
 			created_users++;
 		}
+		users[i].authenticated = 0;
+		users[i].authenticated_raw = 0;
 		users[i].active = 0;
  		/* Rest is reset on login ('V' packet) */
 	}
@@ -119,7 +121,9 @@ find_user_by_ip(uint32_t ip)
 
 	ret = -1;
 	for (i = 0; i < USERS; i++) {
-		if (users[i].active && !users[i].disabled &&
+		if (users[i].active &&
+			users[i].authenticated &&
+			!users[i].disabled &&
 			users[i].last_pkt + 60 > time(NULL) &&
 			ip == users[i].tun_ip) {
 			ret = i;
@@ -171,6 +175,8 @@ find_available_user()
 		/* Not used at all or not used in one minute */
 		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
 			users[i].active = 1;
+			users[i].authenticated = 0;
+			users[i].authenticated_raw = 0;
 			users[i].last_pkt = time(NULL);
 			users[i].fragsize = 4096;
 			users[i].conn = CONN_DNS_NULL;

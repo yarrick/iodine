@@ -116,6 +116,7 @@ syslog(int a, const char *str, ...)
 }
 #endif
 
+/* This will not check that user has passed login challenge */
 static int
 check_user_and_ip(int userid, struct query *q)
 {
@@ -140,6 +141,20 @@ check_user_and_ip(int userid, struct query *q)
 
 	tempin = (struct sockaddr_in *) &(q->from);
 	return memcmp(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+}
+
+/* This checks that user has passed normal (non-raw) login challenge */
+static int
+check_authenticated_user_and_ip(int userid, struct query *q)
+{
+	int res = check_user_and_ip(userid, q);
+	if (res)
+		return res;
+
+	if (!users[userid].authenticated)
+		return 1;
+
+	return 0;
 }
 
 static void
@@ -780,8 +795,10 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			login_calculate(logindata, 16, password, users[userid].seed);
 
 			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
-				/* Login ok, send ip/mtu/netmask info */
+				/* Store login ok */
+				users[userid].authenticated = 1;
 
+				/* Send ip/mtu/netmask info */
 				tempip.s_addr = my_ip;
 				tmp[0] = strdup(inet_ntoa(tempip));
 				tempip.s_addr = users[userid].tun_ip;
@@ -810,7 +827,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		char reply[5];
 		
 		userid = b32_8to5(in[1]);
-		if (check_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -846,8 +863,8 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 		}
 
 		userid = b32_8to5(in[1]);
-		
-		if (check_user_and_ip(userid, q) != 0) {
+
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -888,7 +905,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		userid = b32_8to5(in[1]);
 
-		if (check_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1016,7 +1033,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		/* Downstream fragsize probe packet */
 		userid = (b32_8to5(in[1]) >> 1) & 15;
-		if (check_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1051,7 +1068,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		/* Downstream fragsize packet */
 		userid = unpacked[0];
-		if (check_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1084,7 +1101,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		/* Ping packet, store userid */
 		userid = unpacked[0];
-		if (check_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1214,7 +1231,7 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 
 		userid = code;
 		/* Check user and sending ip number */
-		if (check_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1785,10 +1802,11 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 	
 	if (len < 16) return;
 
-	/* can't use check_user_and_ip() since IP address will be different,
+	/* can't use check_authenticated_user_and_ip() since IP address will be different,
 	   so duplicate here except IP address */
 	if (userid < 0 || userid >= created_users) return;
 	if (!users[userid].active || users[userid].disabled) return;
+	if (!users[userid].authenticated) return;
 	if (users[userid].last_pkt + 60 < time(NULL)) return;
 
 	if (debug >= 1) {
@@ -1813,15 +1831,18 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 		user_set_conn_type(userid, CONN_RAW_UDP);
 		login_calculate(myhash, 16, password, users[userid].seed - 1);
 		send_raw(fd, myhash, 16, userid, RAW_HDR_CMD_LOGIN, q);
+
+		users[userid].authenticated_raw = 1;
 	}
 }
 
 static void
 handle_raw_data(char *packet, int len, struct query *q, int dns_fd, int tun_fd, int userid)
 {
-	if (check_user_and_ip(userid, q) != 0) {
+	if (check_authenticated_user_and_ip(userid, q) != 0) {
 		return;
 	}
+	if (!users[userid].authenticated_raw) return;
 
 	/* Update query and time info for user */
 	users[userid].last_pkt = time(NULL);
@@ -1843,9 +1864,10 @@ handle_raw_data(char *packet, int len, struct query *q, int dns_fd, int tun_fd, 
 static void
 handle_raw_ping(struct query *q, int dns_fd, int userid)
 {
-	if (check_user_and_ip(userid, q) != 0) {
+	if (check_authenticated_user_and_ip(userid, q) != 0) {
 		return;
 	}
+	if (!users[userid].authenticated_raw) return;
 
 	/* Update query and time info for user */
 	users[userid].last_pkt = time(NULL);

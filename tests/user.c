@@ -93,6 +93,11 @@ START_TEST(test_find_user_by_ip)
 	users[0].last_pkt = time(NULL);
 	
 	testip = (unsigned int) inet_addr("127.0.0.2");
+	fail_unless(find_user_by_ip(testip) == -1);
+
+	users[0].authenticated = 1;
+
+	testip = (unsigned int) inet_addr("127.0.0.2");
 	fail_unless(find_user_by_ip(testip) == 0);
 }
 END_TEST
@@ -135,7 +140,11 @@ START_TEST(test_find_available_user)
 	init_users(ip, 27);
 
 	for (i = 0; i < USERS; i++) {
+		users[i].authenticated = 1;
+		users[i].authenticated_raw = 1;
 		fail_unless(find_available_user() == i);
+		fail_if(users[i].authenticated);
+		fail_if(users[i].authenticated_raw);
 	}
 
 	for (i = 0; i < USERS; i++) {
