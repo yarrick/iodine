@@ -6,6 +6,9 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 master:
+	- Nothing yet
+
+2014-06-16: 0.7.0 "Kryoptonite"
 	- Partial IPv6 support (#107)
 	   Client can connect to iodined through an relaying IPv6
 	   nameserver. Server only supports IPv4 for now.
