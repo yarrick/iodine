@@ -63,6 +63,7 @@ static int running;
 static const char *password;
 
 static struct sockaddr_storage nameserv;
+static int nameserv_len;
 static struct sockaddr_in raw_serv;
 static const char *topdomain;
 
@@ -153,6 +154,7 @@ void
 client_set_nameserver(struct sockaddr_storage *addr, int addrlen)
 {
 	memcpy(&nameserv, addr, addrlen);
+	nameserv_len = addrlen;
 }
 
 void
@@ -270,7 +272,7 @@ send_query(int fd, char *hostname)
 	fprintf(stderr, "  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
 #endif
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, sizeof(nameserv));
+	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, nameserv_len);
 
 	/* There are DNS relays that time out quickly but don't send anything
 	   back on timeout.
