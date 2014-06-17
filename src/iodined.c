@@ -2187,7 +2187,7 @@ help() {
 static void
 version() {
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
-	fprintf(stderr, "version: 0.6.0-rc1 from 2010-02-13\n");
+	fprintf(stderr, "version: 0.6.0 from 2014-06-17\n");
 	exit(0);
 }
 
