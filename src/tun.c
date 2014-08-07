@@ -81,7 +81,7 @@ open_tun(const char *tun_device)
 #endif
 
 	if ((tun_fd = open(tunnel, O_RDWR)) < 0) {
-		warn("open_tun: %s: %s", tunnel, strerror(errno));
+		warn("open_tun: %s", tunnel);
 		return -1;
 	}
 
@@ -102,7 +102,7 @@ open_tun(const char *tun_device)
 		}
 
 		if (errno != EBUSY) {
-			warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+			warn("open_tun: ioctl[TUNSETIFF]");
 			return -1;
 		}
 	} else {
@@ -117,7 +117,7 @@ open_tun(const char *tun_device)
 			}
 
 			if (errno != EBUSY) {
-				warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+				warn("open_tun: ioctl[TUNSETIFF]");
 				return -1;
 			}
 		}
@@ -328,7 +328,7 @@ open_tun(const char *tun_device)
 		if_name[sizeof(if_name)-1] = '\0';
 
 		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
-			warn("open_tun: %s: %s", tun_name, strerror(errno));
+			warn("open_tun: %s", tun_name);
 			return -1;
 		}
 
