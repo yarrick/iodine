@@ -3,7 +3,7 @@
  * 2006-2009 Bjorn Andersson <flex@kryo.se>
  * Mostly rewritten 2009 J.A.Bezemer@opensourcepartners.nl
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *

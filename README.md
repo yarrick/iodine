@@ -385,7 +385,7 @@ AUTHORS & LICENSE
 Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>, 2006-2009 Bjorn
 Andersson <flex@kryo.se>. Also major contributions by Anne Bezemer.
 
-Permission to use, copy, modify, and distribute this software for any purpose
+Permission to use, copy, modify, and/or distribute this software for any purpose
 with or without fee is hereby granted, provided that the above copyright notice
 and this permission notice appear in all copies.
 
