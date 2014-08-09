@@ -20,7 +20,7 @@
 
 #define USERS 16
 
-#define OUTPACKETQ_LEN 4		/* Note: 16 users * 1 packet = 1MB */
+#define OUTPACKETQ_LEN 4                /* Note: 16 users * 1 packet = 1MB */
 /* Undefine to have no queue for packets coming in from tun device, which may
    lead to massive dropping in multi-user situations with high traffic. */
 
@@ -35,44 +35,44 @@
 /* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 6 bytes */
 
 struct tun_user {
-	char id;
-	int active;
-	int authenticated;
-	int authenticated_raw;
-	int disabled;
-	time_t last_pkt;
-	int seed;
-	in_addr_t tun_ip;
-	struct in_addr host;
-	struct query q;
-	struct query q_sendrealsoon;
-	int q_sendrealsoon_new;
-	struct packet inpacket;
-	struct packet outpacket;
-	int outfragresent;
-	struct encoder *encoder;
-	char downenc;
-	int out_acked_seqno;
-	int out_acked_fragment;
-	int fragsize;
-	enum connection conn;
-	int lazy;
-	unsigned char qmemping_cmc[QMEMPING_LEN * 4];
-	unsigned short qmemping_type[QMEMPING_LEN];
-	int qmemping_lastfilled;
-	unsigned char qmemdata_cmc[QMEMDATA_LEN * 4];
-	unsigned short qmemdata_type[QMEMDATA_LEN];
-	int qmemdata_lastfilled;
+        char id;
+        int active;
+        int authenticated;
+        int authenticated_raw;
+        int disabled;
+        time_t last_pkt;
+        int seed;
+        in_addr_t tun_ip;
+        struct in_addr host;
+        struct query q;
+        struct query q_sendrealsoon;
+        int q_sendrealsoon_new;
+        struct packet inpacket;
+        struct packet outpacket;
+        int outfragresent;
+        struct encoder *encoder;
+        char downenc;
+        int out_acked_seqno;
+        int out_acked_fragment;
+        int fragsize;
+        enum connection conn;
+        int lazy;
+        unsigned char qmemping_cmc[QMEMPING_LEN * 4];
+        unsigned short qmemping_type[QMEMPING_LEN];
+        int qmemping_lastfilled;
+        unsigned char qmemdata_cmc[QMEMDATA_LEN * 4];
+        unsigned short qmemdata_type[QMEMDATA_LEN];
+        int qmemdata_lastfilled;
 #ifdef OUTPACKETQ_LEN
-	struct packet outpacketq[OUTPACKETQ_LEN];
-	int outpacketq_nexttouse;
-	int outpacketq_filled;
+        struct packet outpacketq[OUTPACKETQ_LEN];
+        int outpacketq_nexttouse;
+        int outpacketq_filled;
 #endif
 #ifdef DNSCACHE_LEN
-	struct query dnscache_q[DNSCACHE_LEN];
-	char dnscache_answer[DNSCACHE_LEN][4096];
-	int dnscache_answerlen[DNSCACHE_LEN];
-	int dnscache_lastfilled;
+        struct query dnscache_q[DNSCACHE_LEN];
+        char dnscache_answer[DNSCACHE_LEN][4096];
+        int dnscache_answerlen[DNSCACHE_LEN];
+        int dnscache_lastfilled;
 #endif
 };
 

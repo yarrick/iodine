@@ -21,68 +21,68 @@
 
 START_TEST(test_fw_query_simple)
 {
-	struct fw_query q;
-	struct fw_query *qp;
+        struct fw_query q;
+        struct fw_query *qp;
 
-	q.addrlen = 33;
-	q.id = 0x848A;
+        q.addrlen = 33;
+        q.id = 0x848A;
 
-	fw_query_init();
+        fw_query_init();
 
-	/* Test empty cache */
-	fw_query_get(0x848A, &qp);
-	fail_unless(qp == NULL);
+        /* Test empty cache */
+        fw_query_get(0x848A, &qp);
+        fail_unless(qp == NULL);
 
-	fw_query_put(&q);
+        fw_query_put(&q);
 
-	/* Test cache with one entry */
-	fw_query_get(0x848A, &qp);
-	fail_unless(qp->addrlen == q.addrlen);
-	fail_unless(qp->id == q.id);
+        /* Test cache with one entry */
+        fw_query_get(0x848A, &qp);
+        fail_unless(qp->addrlen == q.addrlen);
+        fail_unless(qp->id == q.id);
 }
 END_TEST
 
 START_TEST(test_fw_query_edge)
 {
-	struct fw_query q;
-	struct fw_query *qp;
-	int i;
+        struct fw_query q;
+        struct fw_query *qp;
+        int i;
 
-	fw_query_init();
+        fw_query_init();
 
-	q.addrlen = 33;
-	q.id = 0x848A;
-	fw_query_put(&q);
+        q.addrlen = 33;
+        q.id = 0x848A;
+        fw_query_put(&q);
 
-	for (i = 1; i < FW_QUERY_CACHE_SIZE; i++) {
-		q.addrlen++;
-		q.id++;
-		fw_query_put(&q);
-	}
+        for (i = 1; i < FW_QUERY_CACHE_SIZE; i++) {
+                q.addrlen++;
+                q.id++;
+                fw_query_put(&q);
+        }
 
-	/* The query should still be cached */
-	fw_query_get(0x848A, &qp);
-	fail_unless(qp->addrlen == 33);
-	fail_unless(qp->id == 0x848A);
+        /* The query should still be cached */
+        fw_query_get(0x848A, &qp);
+        fail_unless(qp->addrlen == 33);
+        fail_unless(qp->id == 0x848A);
 
-	q.addrlen++;
-	q.id++;
-	fw_query_put(&q);
+        q.addrlen++;
+        q.id++;
+        fw_query_put(&q);
 
-	/* but now it is overwritten */
-	fw_query_get(0x848A, &qp);
-	fail_unless(qp == NULL);
+        /* but now it is overwritten */
+        fw_query_get(0x848A, &qp);
+        fail_unless(qp == NULL);
 }
 END_TEST
 
 TCase *
 test_fw_query_create_tests()
 {
-	TCase *tc;
+        TCase *tc;
 
-	tc = tcase_create("Forwarded query");
-	tcase_add_test(tc, test_fw_query_simple);
-	tcase_add_test(tc, test_fw_query_edge);
+        tc = tcase_create("Forwarded query");
+        tcase_add_test(tc, test_fw_query_simple);
+        tcase_add_test(tc, test_fw_query_edge);
 
-	return tc;
+        return tc;
 }

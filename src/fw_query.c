@@ -22,28 +22,28 @@ static int fwq_ix;
 
 void fw_query_init()
 {
-	memset(fwq, 0, sizeof(struct fw_query) * FW_QUERY_CACHE_SIZE);
-	fwq_ix = 0;
+        memset(fwq, 0, sizeof(struct fw_query) * FW_QUERY_CACHE_SIZE);
+        fwq_ix = 0;
 }
 
 void fw_query_put(struct fw_query *fw_query)
 {
-	memcpy(&(fwq[fwq_ix]), fw_query, sizeof(struct fw_query));
+        memcpy(&(fwq[fwq_ix]), fw_query, sizeof(struct fw_query));
 
-	++fwq_ix;
-	if (fwq_ix >= FW_QUERY_CACHE_SIZE)
-		fwq_ix = 0;
+        ++fwq_ix;
+        if (fwq_ix >= FW_QUERY_CACHE_SIZE)
+                fwq_ix = 0;
 }
 
 void fw_query_get(unsigned short query_id, struct fw_query **fw_query)
 {
-	int i;
+        int i;
 
-	*fw_query = NULL;
-	for (i = 0; i < FW_QUERY_CACHE_SIZE; i++) {
-		if (fwq[i].id == query_id) {
-			*fw_query = &(fwq[i]);
-			return;
-		}
-	}
+        *fw_query = NULL;
+        for (i = 0; i < FW_QUERY_CACHE_SIZE; i++) {
+                if (fwq[i].id == query_id) {
+                        *fw_query = &(fwq[i]);
+                        return;
+                }
+        }
 }
