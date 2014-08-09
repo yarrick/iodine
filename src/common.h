@@ -104,7 +104,7 @@ struct query {
 };
 
 enum connection {
-        CONN_RAW_UDP,
+        CONN_RAW_UDP = 0,
         CONN_DNS_NULL,
         CONN_MAX
 };

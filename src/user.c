@@ -199,7 +199,7 @@ user_set_conn_type(int userid, enum connection c)
         if (userid < 0 || userid >= usercount)
                 return;
 
-        if (c < 0 || c >= CONN_MAX)
+        if (c < CONN_RAW_UDP || c >= CONN_MAX)
                 return;
 
         users[userid].conn = c;
