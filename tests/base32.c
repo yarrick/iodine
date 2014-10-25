@@ -29,116 +29,116 @@
 
 static struct tuple
 {
-	char *a;
-	char *b;
+        char *a;
+        char *b;
 } testpairs[TUPLES] = {
-	{ "iodinetestingtesting", "nfxwi0lomv0gk21unfxgo3dfon0gs1th" },
-	{ "abc123", "mfrggmjsgm" },
-	{ "test", "orsxg3a" },
-	{ "tst", "orzxi" },
-	{ "", "" },
+        { "iodinetestingtesting", "nfxwi0lomv0gk21unfxgo3dfon0gs1th" },
+        { "abc123", "mfrggmjsgm" },
+        { "test", "orsxg3a" },
+        { "tst", "orzxi" },
+        { "", "" },
 };
 
 START_TEST(test_base32_encode)
 {
-	size_t len;
-	char buf[4096];
-	struct encoder *b32;
-	int val;
+        size_t len;
+        char buf[4096];
+        struct encoder *b32;
+        int val;
 
-	b32 = get_base32_encoder();
+        b32 = get_base32_encoder();
 
-	len = sizeof(buf);
-	val = b32->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
+        len = sizeof(buf);
+        val = b32->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
-	fail_unless(val == strlen(testpairs[_i].b));
-	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
-			"'%s' != '%s'", buf, testpairs[_i].b);
+        fail_unless(val == strlen(testpairs[_i].b));
+        fail_unless(strcmp(buf, testpairs[_i].b) == 0,
+                        "'%s' != '%s'", buf, testpairs[_i].b);
 }
 END_TEST
 
 START_TEST(test_base32_decode)
 {
-	size_t len;
-	char buf[4096];
-	struct encoder *b32;
-	int val;
+        size_t len;
+        char buf[4096];
+        struct encoder *b32;
+        int val;
 
-	b32 = get_base32_encoder();
+        b32 = get_base32_encoder();
 
-	len = sizeof(buf);
-	val = b32->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
+        len = sizeof(buf);
+        val = b32->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
-	fail_unless(val == strlen(testpairs[_i].a));
-	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
-			"'%s' != '%s'", buf, testpairs[_i].a);
+        fail_unless(val == strlen(testpairs[_i].a));
+        fail_unless(strcmp(buf, testpairs[_i].a) == 0,
+                        "'%s' != '%s'", buf, testpairs[_i].a);
 }
 END_TEST
 
 START_TEST(test_base32_5to8_8to5)
 {
-	int i;
-	int c;
+        int i;
+        int c;
 
-	for (i = 0; i < 32; i++) {
-		c = b32_5to8(i);
-		fail_unless(b32_8to5(c) == i);
-	}
+        for (i = 0; i < 32; i++) {
+                c = b32_5to8(i);
+                fail_unless(b32_8to5(c) == i);
+        }
 }
 END_TEST
 
 START_TEST(test_base32_blksize)
 {
-	size_t rawlen;
-	size_t enclen;
-	char *rawbuf;
-	char *encbuf;
-	struct encoder *b32;
-	int i;
-	int val;
+        size_t rawlen;
+        size_t enclen;
+        char *rawbuf;
+        char *encbuf;
+        struct encoder *b32;
+        int i;
+        int val;
 
-	b32 = get_base32_encoder();
+        b32 = get_base32_encoder();
 
-	rawlen = b32->blocksize_raw();
-	enclen = b32->blocksize_encoded();
+        rawlen = b32->blocksize_raw();
+        enclen = b32->blocksize_encoded();
 
-	rawbuf = malloc(rawlen + 16);
-	encbuf = malloc(enclen + 16);
+        rawbuf = malloc(rawlen + 16);
+        encbuf = malloc(enclen + 16);
 
-	for (i = 0; i < rawlen; i++) {
-		rawbuf[i] = 'A';
-	}
-	rawbuf[i] = 0;
+        for (i = 0; i < rawlen; i++) {
+                rawbuf[i] = 'A';
+        }
+        rawbuf[i] = 0;
 
-	val = b32->encode(encbuf, &enclen, rawbuf, rawlen);
+        val = b32->encode(encbuf, &enclen, rawbuf, rawlen);
 
-	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
-	fail_unless(enclen == 5, "encoded %d bytes, not 5", enclen);
-	fail_unless(val == 8, "encoded string %s was length %d", encbuf, val);
+        fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
+        fail_unless(enclen == 5, "encoded %d bytes, not 5", enclen);
+        fail_unless(val == 8, "encoded string %s was length %d", encbuf, val);
 
-	memset(rawbuf, 0, rawlen + 16);
+        memset(rawbuf, 0, rawlen + 16);
 
-	enclen = val;
-	val = b32->decode(rawbuf, &rawlen, encbuf, enclen);
+        enclen = val;
+        val = b32->decode(rawbuf, &rawlen, encbuf, enclen);
 
-	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
-	fail_unless(val == 5, "val was not 5 but %d", val);
-	for (i = 0; i < rawlen; i++) {
-		fail_unless(rawbuf[i] == 'A');
-	}
+        fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
+        fail_unless(val == 5, "val was not 5 but %d", val);
+        for (i = 0; i < rawlen; i++) {
+                fail_unless(rawbuf[i] == 'A');
+        }
 }
 END_TEST
 
 TCase *
 test_base32_create_tests()
 {
-	TCase *tc;
+        TCase *tc;
 
-	tc = tcase_create("Base32");
-	tcase_add_loop_test(tc, test_base32_encode, 0, TUPLES);
-	tcase_add_loop_test(tc, test_base32_decode, 0, TUPLES);
-	tcase_add_test(tc, test_base32_5to8_8to5);
-	tcase_add_test(tc, test_base32_blksize);
+        tc = tcase_create("Base32");
+        tcase_add_loop_test(tc, test_base32_encode, 0, TUPLES);
+        tcase_add_loop_test(tc, test_base32_decode, 0, TUPLES);
+        tcase_add_test(tc, test_base32_5to8_8to5);
+        tcase_add_test(tc, test_base32_blksize);
 
-	return tc;
+        return tc;
 }

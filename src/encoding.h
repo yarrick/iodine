@@ -26,13 +26,13 @@
 #define DOWNCODECCHECK1_LEN  48
 
 struct encoder {
-	char name[8];
-	int (*encode) (char *, size_t *, const void *, size_t);
-	int (*decode) (void *, size_t *, const char *, size_t);
-	int (*places_dots) (void);
-	int (*eats_dots) (void);
-	int (*blocksize_raw)(void);
-	int (*blocksize_encoded)(void);
+        char name[8];
+        int (*encode) (char *, size_t *, const void *, size_t);
+        int (*decode) (void *, size_t *, const char *, size_t);
+        int (*places_dots) (void);
+        int (*eats_dots) (void);
+        int (*blocksize_raw)(void);
+        int (*blocksize_encoded)(void);
 };
 
 int build_hostname(char *, size_t, const char *, const size_t, const char *, struct encoder *, int);

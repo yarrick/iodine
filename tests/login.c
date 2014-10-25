@@ -23,49 +23,49 @@
 
 START_TEST(test_login_hash)
 {
-	char ans[16];
-	char good[] = "\x2A\x8A\x12\xB4\xE0\x42\xEE\xAB\xD0\x19\x17\x1E\x44\xA0\x88\xCD";
-	char pass[32] = "iodine is the shit";
-	int len;
-	int seed;
+        char ans[16];
+        char good[] = "\x2A\x8A\x12\xB4\xE0\x42\xEE\xAB\xD0\x19\x17\x1E\x44\xA0\x88\xCD";
+        char pass[32] = "iodine is the shit";
+        int len;
+        int seed;
 
-	len = sizeof(ans);
-	seed = 15;
+        len = sizeof(ans);
+        seed = 15;
 
-	memset(ans, 0, sizeof(ans));
-	login_calculate(ans, len, pass, seed);
-	fail_unless(strncmp(ans, good, len) == 0, NULL);
+        memset(ans, 0, sizeof(ans));
+        login_calculate(ans, len, pass, seed);
+        fail_unless(strncmp(ans, good, len) == 0, NULL);
 }
 END_TEST
 
 START_TEST(test_login_hash_short)
 {
-	char ans[8];
-	char check[sizeof(ans)];
-	char pass[32] = "iodine is the shit";
-	int len;
-	int seed;
+        char ans[8];
+        char check[sizeof(ans)];
+        char pass[32] = "iodine is the shit";
+        int len;
+        int seed;
 
-	len = sizeof(ans);
-	seed = 15;
+        len = sizeof(ans);
+        seed = 15;
 
-	memset(ans, 0, sizeof(ans));
-	memset(check, 0, sizeof(check));
+        memset(ans, 0, sizeof(ans));
+        memset(check, 0, sizeof(check));
 
-	/* If len < 16, it should do nothing */
-	login_calculate(ans, len, pass, seed);
-	fail_if(memcmp(ans, check, sizeof(ans)));
+        /* If len < 16, it should do nothing */
+        login_calculate(ans, len, pass, seed);
+        fail_if(memcmp(ans, check, sizeof(ans)));
 }
 END_TEST
 
 TCase *
 test_login_create_tests()
 {
-	TCase *tc;
+        TCase *tc;
 
-	tc = tcase_create("Login");
-	tcase_add_test(tc, test_login_hash);
-	tcase_add_test(tc, test_login_hash_short);
+        tc = tcase_create("Login");
+        tcase_add_test(tc, test_login_hash);
+        tcase_add_test(tc, test_login_hash_short);
 
-	return tc;
+        return tc;
 }

@@ -21,62 +21,62 @@
 char *
 get_resolvconf_addr()
 {
-	static char addr[16];
-	char *rv;
+        static char addr[16];
+        char *rv;
 #ifndef WINDOWS32
-	char buf[80];
-	FILE *fp;
+        char buf[80];
+        FILE *fp;
 #ifdef ANDROID
-	fp = popen("getprop net.dns1", "r");
-	if (fp == NULL)
-		err(1, "getprop net.dns1 failed");
-	if (fgets(buf, sizeof(buf), fp) == NULL)
-		err(1, "read getprop net.dns1 failed");
-	if (sscanf(buf, "%15s", addr) == 1)
-		rv = addr;
-	pclose(fp);
+        fp = popen("getprop net.dns1", "r");
+        if (fp == NULL)
+                err(1, "getprop net.dns1 failed");
+        if (fgets(buf, sizeof(buf), fp) == NULL)
+                err(1, "read getprop net.dns1 failed");
+        if (sscanf(buf, "%15s", addr) == 1)
+                rv = addr;
+        pclose(fp);
 #else
 
-	rv = NULL;
+        rv = NULL;
 
-	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
-		err(1, "/etc/resolv.conf");
+        if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
+                err(1, "/etc/resolv.conf");
 
-	while (feof(fp) == 0) {
-		fgets(buf, sizeof(buf), fp);
+        while (feof(fp) == 0) {
+                fgets(buf, sizeof(buf), fp);
 
-		if (sscanf(buf, "nameserver %15s", addr) == 1) {
-			rv = addr;
-			break;
-		}
-	}
+                if (sscanf(buf, "nameserver %15s", addr) == 1) {
+                        rv = addr;
+                        break;
+                }
+        }
 
-	fclose(fp);
+        fclose(fp);
 #endif
 #else /* !WINDOWS32 */
-	FIXED_INFO  *fixed_info;
-	ULONG       buflen;
-	DWORD       ret;
+        FIXED_INFO  *fixed_info;
+        ULONG       buflen;
+        DWORD       ret;
 
-	rv = NULL;
-	fixed_info = malloc(sizeof(FIXED_INFO));
-	buflen = sizeof(FIXED_INFO);
+        rv = NULL;
+        fixed_info = malloc(sizeof(FIXED_INFO));
+        buflen = sizeof(FIXED_INFO);
 
-	if (GetNetworkParams(fixed_info, &buflen) == ERROR_BUFFER_OVERFLOW) {
-		/* official ugly api workaround */
-		free(fixed_info);
-		fixed_info = malloc(buflen);
-	}
+        if (GetNetworkParams(fixed_info, &buflen) == ERROR_BUFFER_OVERFLOW) {
+                /* official ugly api workaround */
+                free(fixed_info);
+                fixed_info = malloc(buflen);
+        }
 
-	ret = GetNetworkParams(fixed_info, &buflen);
-	if (ret == NO_ERROR) {
-		strncpy(addr, fixed_info->DnsServerList.IpAddress.String, sizeof(addr));
-		addr[15] = 0;
-		rv = addr;
-	}
-	free(fixed_info);
+        ret = GetNetworkParams(fixed_info, &buflen);
+        if (ret == NO_ERROR) {
+                strncpy(addr, fixed_info->DnsServerList.IpAddress.String, sizeof(addr));
+                addr[15] = 0;
+                rv = addr;
+        }
+        free(fixed_info);
 #endif
-	return rv;
+        return rv;
 }
 
 #ifdef OPENBSD
@@ -84,10 +84,10 @@ void
 socket_setrtable(int fd, int rtable)
 {
 #ifdef SO_RTABLE
-	if (setsockopt (fd, IPPROTO_IP, SO_RTABLE, &rtable, sizeof(rtable)) == -1)
-		err(1, "Failed to set routing table %d", rtable);
+        if (setsockopt (fd, IPPROTO_IP, SO_RTABLE, &rtable, sizeof(rtable)) == -1)
+                err(1, "Failed to set routing table %d", rtable);
 #else
-	fprintf(stderr, "Routing domain support was not available at compile time.\n");
+        fprintf(stderr, "Routing domain support was not available at compile time.\n");
 #endif
 }
 #endif

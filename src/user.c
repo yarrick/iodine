@@ -40,94 +40,94 @@ unsigned usercount;
 int
 init_users(in_addr_t my_ip, int netbits)
 {
-	int i;
-	int skip = 0;
-	char newip[16];
+        int i;
+        int skip = 0;
+        char newip[16];
 
-	int maxusers;
+        int maxusers;
 
-	in_addr_t netmask = 0;
-	struct in_addr net;
-	struct in_addr ipstart;
+        in_addr_t netmask = 0;
+        struct in_addr net;
+        struct in_addr ipstart;
 
-	for (i = 0; i < netbits; i++) {
-		netmask = (netmask << 1) | 1;
-	}
-	netmask <<= (32 - netbits);
-	net.s_addr = htonl(netmask);
-	ipstart.s_addr = my_ip & net.s_addr;
+        for (i = 0; i < netbits; i++) {
+                netmask = (netmask << 1) | 1;
+        }
+        netmask <<= (32 - netbits);
+        net.s_addr = htonl(netmask);
+        ipstart.s_addr = my_ip & net.s_addr;
 
-	maxusers = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
-	usercount = MIN(maxusers, USERS);
+        maxusers = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
+        usercount = MIN(maxusers, USERS);
 
-	users = calloc(usercount, sizeof(struct tun_user));
-	for (i = 0; i < usercount; i++) {
-		in_addr_t ip;
-		users[i].id = i;
-		snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
-		ip = ipstart.s_addr + inet_addr(newip);
-		if (ip == my_ip && skip == 0) {
-			/* This IP was taken by iodined */
-			skip++;
-			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
-			ip = ipstart.s_addr + inet_addr(newip);
-		}
-		users[i].tun_ip = ip;
-		net.s_addr = ip;
-		users[i].disabled = 0;
-		users[i].authenticated = 0;
-		users[i].authenticated_raw = 0;
-		users[i].active = 0;
- 		/* Rest is reset on login ('V' packet) */
-	}
+        users = calloc(usercount, sizeof(struct tun_user));
+        for (i = 0; i < usercount; i++) {
+                in_addr_t ip;
+                users[i].id = i;
+                snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
+                ip = ipstart.s_addr + inet_addr(newip);
+                if (ip == my_ip && skip == 0) {
+                        /* This IP was taken by iodined */
+                        skip++;
+                        snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
+                        ip = ipstart.s_addr + inet_addr(newip);
+                }
+                users[i].tun_ip = ip;
+                net.s_addr = ip;
+                users[i].disabled = 0;
+                users[i].authenticated = 0;
+                users[i].authenticated_raw = 0;
+                users[i].active = 0;
+                /* Rest is reset on login ('V' packet) */
+        }
 
-	return usercount;
+        return usercount;
 }
 
 const char*
 users_get_first_ip()
 {
-	struct in_addr ip;
-	ip.s_addr = users[0].tun_ip;
-	return strdup(inet_ntoa(ip));
+        struct in_addr ip;
+        ip.s_addr = users[0].tun_ip;
+        return strdup(inet_ntoa(ip));
 }
 
 int
 users_waiting_on_reply()
 {
-	int ret;
-	int i;
+        int ret;
+        int i;
 
-	ret = 0;
-	for (i = 0; i < usercount; i++) {
-		if (users[i].active && !users[i].disabled &&
-			users[i].last_pkt + 60 > time(NULL) &&
-			users[i].q.id != 0 && users[i].conn == CONN_DNS_NULL) {
-			ret++;
-		}
-	}
+        ret = 0;
+        for (i = 0; i < usercount; i++) {
+                if (users[i].active && !users[i].disabled &&
+                        users[i].last_pkt + 60 > time(NULL) &&
+                        users[i].q.id != 0 && users[i].conn == CONN_DNS_NULL) {
+                        ret++;
+                }
+        }
 
-	return ret;
+        return ret;
 }
 
 int
 find_user_by_ip(uint32_t ip)
 {
-	int ret;
-	int i;
+        int ret;
+        int i;
 
-	ret = -1;
-	for (i = 0; i < usercount; i++) {
-		if (users[i].active &&
-			users[i].authenticated &&
-			!users[i].disabled &&
-			users[i].last_pkt + 60 > time(NULL) &&
-			ip == users[i].tun_ip) {
-			ret = i;
-			break;
-		}
-	}
-	return ret;
+        ret = -1;
+        for (i = 0; i < usercount; i++) {
+                if (users[i].active &&
+                        users[i].authenticated &&
+                        !users[i].disabled &&
+                        users[i].last_pkt + 60 > time(NULL) &&
+                        ip == users[i].tun_ip) {
+                        ret = i;
+                        break;
+                }
+        }
+        return ret;
 }
 
 int
@@ -138,70 +138,70 @@ all_users_waiting_to_send()
    without going through another select loop.
 */
 {
-	time_t now;
-	int ret;
-	int i;
+        time_t now;
+        int ret;
+        int i;
 
-	ret = 1;
-	now = time(NULL);
-	for (i = 0; i < usercount; i++) {
-		if (users[i].active && !users[i].disabled &&
-			users[i].last_pkt + 60 > now &&
-			((users[i].conn == CONN_RAW_UDP) ||
-			((users[i].conn == CONN_DNS_NULL)
+        ret = 1;
+        now = time(NULL);
+        for (i = 0; i < usercount; i++) {
+                if (users[i].active && !users[i].disabled &&
+                        users[i].last_pkt + 60 > now &&
+                        ((users[i].conn == CONN_RAW_UDP) ||
+                        ((users[i].conn == CONN_DNS_NULL)
 #ifdef OUTPACKETQ_LEN
-				&& users[i].outpacketq_filled < 1
+                                && users[i].outpacketq_filled < 1
 #else
-				&& users[i].outpacket.len == 0
+                                && users[i].outpacket.len == 0
 #endif
-			))) {
+                        ))) {
 
-			ret = 0;
-			break;
-		}
-	}
-	return ret;
+                        ret = 0;
+                        break;
+                }
+        }
+        return ret;
 }
 
 int
 find_available_user()
 {
-	int ret = -1;
-	int i;
-	for (i = 0; i < usercount; i++) {
-		/* Not used at all or not used in one minute */
-		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
-			users[i].active = 1;
-			users[i].authenticated = 0;
-			users[i].authenticated_raw = 0;
-			users[i].last_pkt = time(NULL);
-			users[i].fragsize = 4096;
-			users[i].conn = CONN_DNS_NULL;
-			ret = i;
-			break;
-		}
-	}
-	return ret;
+        int ret = -1;
+        int i;
+        for (i = 0; i < usercount; i++) {
+                /* Not used at all or not used in one minute */
+                if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
+                        users[i].active = 1;
+                        users[i].authenticated = 0;
+                        users[i].authenticated_raw = 0;
+                        users[i].last_pkt = time(NULL);
+                        users[i].fragsize = 4096;
+                        users[i].conn = CONN_DNS_NULL;
+                        ret = i;
+                        break;
+                }
+        }
+        return ret;
 }
 
 void
 user_switch_codec(int userid, struct encoder *enc)
 {
-	if (userid < 0 || userid >= usercount)
-		return;
+        if (userid < 0 || userid >= usercount)
+                return;
 
-	users[userid].encoder = enc;
+        users[userid].encoder = enc;
 }
 
 void
 user_set_conn_type(int userid, enum connection c)
 {
-	if (userid < 0 || userid >= usercount)
-		return;
+        if (userid < 0 || userid >= usercount)
+                return;
 
-	if (c < 0 || c >= CONN_MAX)
-		return;
+        if (c < CONN_RAW_UDP || c >= CONN_MAX)
+                return;
 
-	users[userid].conn = c;
+        users[userid].conn = c;
 }
 

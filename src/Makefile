@@ -1,4 +1,4 @@
-COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o base64u.o base128.o md5.o common.o
+COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o base64u.o base128.o common.o
 CLIENTOBJS = iodine.o client.o util.o
 CLIENT = ../bin/iodine
 SERVEROBJS = iodined.o user.o fw_query.o
@@ -9,7 +9,7 @@ ARCH = `uname -m`
 HEAD_COMMIT = `git rev-parse --short HEAD`
 
 LIBPATH = -L.
-LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
+LDFLAGS += -lssl -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
 CFLAGS += -std=c99 -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
 
 all: stateos $(CLIENT) $(SERVER)

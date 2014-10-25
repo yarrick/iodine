@@ -26,45 +26,45 @@
 int
 main()
 {
-	SRunner *runner;
-	Suite *iodine;
-	TCase *test;
-	int failed;
+        SRunner *runner;
+        Suite *iodine;
+        TCase *test;
+        int failed;
 
-	iodine = suite_create("iodine");
+        iodine = suite_create("iodine");
 
-	test = test_base32_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_base32_create_tests();
+        suite_add_tcase(iodine, test);
 
-	test = test_base64_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_base64_create_tests();
+        suite_add_tcase(iodine, test);
 
-	test = test_common_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_common_create_tests();
+        suite_add_tcase(iodine, test);
 
-	test = test_dns_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_dns_create_tests();
+        suite_add_tcase(iodine, test);
 
-	test = test_encoding_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_encoding_create_tests();
+        suite_add_tcase(iodine, test);
 
- 	test = test_read_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_read_create_tests();
+        suite_add_tcase(iodine, test);
 
- 	test = test_login_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_login_create_tests();
+        suite_add_tcase(iodine, test);
 
- 	test = test_user_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_user_create_tests();
+        suite_add_tcase(iodine, test);
 
- 	test = test_fw_query_create_tests();
-	suite_add_tcase(iodine, test);
+        test = test_fw_query_create_tests();
+        suite_add_tcase(iodine, test);
 
-	runner = srunner_create(iodine);
-	srunner_run_all(runner, CK_NORMAL);
-	failed = srunner_ntests_failed(runner);
+        runner = srunner_create(iodine);
+        srunner_run_all(runner, CK_NORMAL);
+        failed = srunner_ntests_failed(runner);
 
-	srunner_free(runner);
+        srunner_free(runner);
 
-	return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+        return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

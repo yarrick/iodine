@@ -82,31 +82,31 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 
 struct packet
 {
-	int len;		/* Total packet length */
-	int sentlen;		/* Length of chunk currently transmitted */
-	int offset;		/* Current offset */
-	char data[64*1024];	/* The data */
-	char seqno;		/* The packet sequence number */
-	char fragment;		/* Fragment index */
+        int len;                /* Total packet length */
+        int sentlen;            /* Length of chunk currently transmitted */
+        int offset;             /* Current offset */
+        char data[64*1024];     /* The data */
+        char seqno;             /* The packet sequence number */
+        char fragment;          /* Fragment index */
 };
 
 struct query {
-	char name[QUERY_NAME_SIZE];
-	unsigned short type;
-	unsigned short rcode;
-	unsigned short id;
-	struct in_addr destination;
-	struct sockaddr_storage from;
-	int fromlen;
-	unsigned short id2;
-	struct sockaddr from2;
-	int fromlen2;
+        char name[QUERY_NAME_SIZE];
+        unsigned short type;
+        unsigned short rcode;
+        unsigned short id;
+        struct in_addr destination;
+        struct sockaddr_storage from;
+        int fromlen;
+        unsigned short id2;
+        struct sockaddr from2;
+        int fromlen2;
 };
 
 enum connection {
-	CONN_RAW_UDP,
-	CONN_DNS_NULL,
-	CONN_MAX
+        CONN_RAW_UDP = 0,
+        CONN_DNS_NULL,
+        CONN_MAX
 };
 
 void check_superuser(void (*usage_fn)(void));
