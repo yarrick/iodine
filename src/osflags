@@ -38,6 +38,9 @@ cflags)
 			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS -DHAVE_SYSTEMD";
 			echo $FLAGS;
 		;;
+		GNU/kFreeBSD|GNU)
+			echo '-D_GNU_SOURCE'
+		;;
 	esac
 ;;
 *)
