@@ -525,7 +525,7 @@ write_tun(int tun_fd, char *data, size_t len)
 		data[1] = 0x00;
 		data[2] = 0x08;
 		data[3] = 0x00;
-#else /* OPENBSD */
+#else /* OPENBSD and DARWIN(utun) */
 		data[0] = 0x00;
 		data[1] = 0x00;
 		data[2] = 0x00;
