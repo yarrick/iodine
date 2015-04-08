@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
  * 2006-2009 Bjorn Andersson <flex@kryo.se>
+ * 2013 Peter Sagerson <psagers.github@ignorare.net>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +25,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#ifdef DARWIN
+#include <ctype.h>
+#include <sys/kern_control.h>
+#include <sys/sys_domain.h>
+#include <sys/ioctl.h>
+#include <net/if_utun.h>
+#include <netinet/ip.h>
+#endif
 
 #ifndef IFCONFIGPATH
 #define IFCONFIGPATH "PATH=/sbin:/bin "
@@ -315,12 +325,101 @@ open_tun(const char *tun_device)
 
 #else /* BSD and friends */
 
+#ifdef DARWIN
+
+/* Extract the device number from the name, if given. The value returned will
+ * be suitable for sockaddr_ctl.sc_unit, which means 0 for auto-assign, or
+ * (n + 1) for manual.
+ */
+static int
+utun_unit(const char *dev)
+{
+	const char *unit_str = dev;
+	int unit = 0;
+
+	while (*unit_str != '\0' && !isdigit(*unit_str))
+		unit_str++;
+
+	if (isdigit(*unit_str))
+		unit = strtol(unit_str, NULL, 10) + 1;
+
+	return unit;
+}
+
+static int
+open_utun(const char *dev)
+{
+	struct sockaddr_ctl addr;
+	struct ctl_info info;
+	char ifname[10];
+	socklen_t ifname_len = sizeof(ifname);
+	int fd = -1;
+	int err = 0;
+
+	fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
+	if (fd < 0) {
+		warn("open_utun: socket(PF_SYSTEM)");
+		return -1;
+	}
+
+	/* Look up the kernel controller ID for utun devices. */
+	bzero(&info, sizeof(info));
+	strncpy(info.ctl_name, UTUN_CONTROL_NAME, MAX_KCTL_NAME);
+
+	err = ioctl(fd, CTLIOCGINFO, &info);
+	if (err != 0) {
+		warn("open_utun: ioctl(CTLIOCGINFO)");
+		close(fd);
+		return -1;
+	}
+
+	/* Connecting to the socket creates the utun device. */
+	addr.sc_len = sizeof(addr);
+	addr.sc_family = AF_SYSTEM;
+	addr.ss_sysaddr = AF_SYS_CONTROL;
+	addr.sc_id = info.ctl_id;
+	addr.sc_unit = utun_unit(dev);
+
+	err = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
+	if (err != 0) {
+		warn("open_utun: connect");
+		close(fd);
+		return -1;
+	}
+
+	/* Retrieve the assigned interface name. */
+	err = getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, ifname, &ifname_len);
+	if (err != 0) {
+		warn("open_utun: getsockopt(UTUN_OPT_IFNAME)");
+		close(fd);
+		return -1;
+	}
+
+	strncpy(if_name, ifname, sizeof(if_name));
+
+	fprintf(stderr, "Opened %s\n", ifname);
+	fd_set_close_on_exec(fd);
+
+	return fd;
+}
+
+#endif
+
 int
 open_tun(const char *tun_device)
 {
 	int i;
 	int tun_fd;
 	char tun_name[50];
+
+#ifdef DARWIN
+	if (!strncmp(tun_device, "utun", 4)) {
+		tun_fd = open_utun(tun_device);
+		if (tun_fd >= 0) {
+			return tun_fd;
+		}
+	}
+#endif
 
 	if (tun_device != NULL) {
 		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
@@ -407,22 +506,32 @@ read_tun(int tun_fd, char *buf, size_t len)
 int
 write_tun(int tun_fd, char *data, size_t len)
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
-	data += 4;
-	len -= 4;
-#else /* !FREEBSD/DARWIN */
+#if defined (FREEBSD) || defined (NETBSD)
+	/* FreeBSD/NetBSD has no header */
+	int header = 0;
+#elif defined (DARWIN)
+	/* Darwin tun has no header, Darwin utun does */
+	int header = !strncmp(if_name, "utun", 4);
+#else  /* LINUX/OPENBSD */
+	int header = 1;
+#endif
+
+	if (!header) {
+		data += 4;
+		len -= 4;
+	} else {
 #ifdef LINUX
-	data[0] = 0x00;
-	data[1] = 0x00;
-	data[2] = 0x08;
-	data[3] = 0x00;
-#else /* OPENBSD */
-	data[0] = 0x00;
-	data[1] = 0x00;
-	data[2] = 0x00;
-	data[3] = 0x02;
-#endif /* !LINUX */
-#endif /* FREEBSD */
+		data[0] = 0x00;
+		data[1] = 0x00;
+		data[2] = 0x08;
+		data[3] = 0x00;
+#else /* OPENBSD and DARWIN(utun) */
+		data[0] = 0x00;
+		data[1] = 0x00;
+		data[2] = 0x00;
+		data[3] = 0x02;
+#endif
+	}
 
 	if (write(tun_fd, data, len) != len) {
 		warn("write_tun");
@@ -434,20 +543,29 @@ write_tun(int tun_fd, char *data, size_t len)
 ssize_t
 read_tun(int tun_fd, char *buf, size_t len)
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD)
-	/* FreeBSD/Darwin/NetBSD has no header */
-	int bytes;
-	memset(buf, 0, 4);
+#if defined (FREEBSD) || defined (NETBSD)
+	/* FreeBSD/NetBSD has no header */
+	int header = 0;
+#elif defined (DARWIN)
+	/* Darwin tun has no header, Darwin utun does */
+	int header = !strncmp(if_name, "utun", 4);
+#else  /* LINUX/OPENBSD */
+	int header = 1;
+#endif
 
-	bytes = read(tun_fd, buf + 4, len - 4);
-	if (bytes < 0) {
-		return bytes;
+	if (!header) {
+		int bytes;
+		memset(buf, 0, 4);
+
+		bytes = read(tun_fd, buf + 4, len - 4);
+		if (bytes < 0) {
+			return bytes;
+		} else {
+			return bytes + 4;
+		}
 	} else {
-		return bytes + 4;
+		return read(tun_fd, buf, len);
 	}
-#else /* !FREEBSD */
-	return read(tun_fd, buf, len);
-#endif /* !FREEBSD */
 }
 #endif
 
