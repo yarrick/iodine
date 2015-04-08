@@ -6,7 +6,13 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 master:
-	- Nothing yet
+	- Mac OS X: Support native utun VPN devices. Patch by
+		Peter Sagerson, ported from OpenVPN by Catalin Patulea.
+	- Fix compilation failure on kFreeBSD and Hurd, by Gregor Herrmann
+	- Patch from Ryan Welton that fixes compilation warning.
+	- REAMDE converted to markdown by Nicolas Braud-Santoni.
+	- Linux: use pkg-config for systemd support flags.
+		Patch by Jason A. Donenfeld.
 
 2014-06-16: 0.7.0 "Kryoptonite"
 	- Partial IPv6 support (#107)
