@@ -162,6 +162,10 @@ supported request types, for example:
 
 The reply should look like garbled text in all these cases.
 
+#### Mac OS X
+On Mac OS X 10.6 and later, iodine supports the native utun devices built into
+the OS - use `-d utunX`.
+
 
 Operational info
 ----------------

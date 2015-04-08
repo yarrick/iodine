@@ -118,7 +118,8 @@ Chroot to 'chrootdir' after setting up tunnel.
 .TP
 .B -d device
 Use the TUN device 'device' instead of the normal one, which is dnsX on Linux
-and otherwise tunX.
+and otherwise tunX. On Mac OS X 10.6, this can also be utunX, which will attempt
+to use an utun device built into the OS.
 .TP
 .B -P password
 Use 'password' to authenticate. If not used, 
