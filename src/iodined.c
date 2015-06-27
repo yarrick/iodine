@@ -178,8 +178,6 @@ syslog(int a, const char *str, ...)
 static int
 check_user_and_ip(int userid, struct query *q)
 {
-	struct sockaddr_in *tempin;
-
 	/* Note: duplicate in handle_raw_login() except IP-address check */
 
 	if (userid < 0 || userid >= created_users ) {
@@ -197,8 +195,19 @@ check_user_and_ip(int userid, struct query *q)
 		return 0;
 	}
 
-	tempin = (struct sockaddr_in *) &(q->from);
-	return memcmp(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+	if (q->from.ss_family != users[userid].host.ss_family) {
+		return 1;
+	}
+	/* Check IPv4 */
+	if (q->from.ss_family == AF_INET) {
+		struct sockaddr_in *expected, *received;
+
+		expected = (struct sockaddr_in *) &(users[userid].host);
+		received = (struct sockaddr_in *) &(q->from);
+		return memcmp(&(expected->sin_addr), &(received->sin_addr), sizeof(struct in_addr));
+	}
+	/* Unknown address family */
+	return 1;
 }
 
 /* This checks that user has passed normal (non-raw) login challenge */
@@ -769,12 +778,11 @@ handle_null_request(int tun_fd, int dns_fd, struct query *q, int domain_len)
 			userid = find_available_user();
 			if (userid >= 0) {
 				int i;
-				struct sockaddr_in *tempin;
 
 				users[userid].seed = rand();
 				/* Store remote IP number */
-				tempin = (struct sockaddr_in *) &(q->from);
-				memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+				memcpy(&(users[userid].host), &(q->from), q->fromlen);
+				users[userid].hostlen = q->fromlen;
 
 				memcpy(&(users[userid].q), q, sizeof(struct query));
 				users[userid].encoder = get_base32_encoder();
@@ -1879,15 +1887,13 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, password, users[userid].seed + 1);
 	if (memcmp(packet, myhash, 16) == 0) {
-		struct sockaddr_in *tempin;
-
 		/* Update query and time info for user */
 		users[userid].last_pkt = time(NULL);
 		memcpy(&(users[userid].q), q, sizeof(struct query));
 
 		/* Store remote IP number */
-		tempin = (struct sockaddr_in *) &(q->from);
-		memcpy(&(users[userid].host), &(tempin->sin_addr), sizeof(struct in_addr));
+		memcpy(&(users[userid].host), &(q->from), q->fromlen);
+		users[userid].hostlen = q->fromlen;
 
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
