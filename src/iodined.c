@@ -99,20 +99,20 @@ static int read_dns(int, int, struct query *);
 static void write_dns(int, struct query *, char *, int, char);
 static void handle_full_packet(int, int, int);
 
-/* Ask externalip.net webservice to get external ip */
+/* Ask ipify.org webservice to get external ip */
 static int get_external_ip(struct in_addr *ip)
 {
 	int sock;
 	struct addrinfo *addr;
 	int res;
-	const char *getstr = "GET /ip/ HTTP/1.0\r\n"
+	const char *getstr = "GET / HTTP/1.0\r\n"
 		/* HTTP 1.0 to avoid chunked transfer coding */
-		"Host: api.externalip.net\r\n\r\n";
+		"Host: api.ipify.org\r\n\r\n";
 	char buf[512];
 	char *b;
 	int len;
 
-	res = getaddrinfo("api.externalip.net", "80", NULL, &addr);
+	res = getaddrinfo("api.ipify.org", "80", NULL, &addr);
 	if (res < 0) return 1;
 
 	sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
