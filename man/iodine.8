@@ -54,7 +54,9 @@ iodine, iodined \- tunnel IPv4 over DNS
 .B ] [-m
 .I mtu
 .B ] [-l
-.I listen_ip
+.I listen_ip4
+.B ] [-L
+.I listen_ip6
 .B ] [-p
 .I port
 .B ] [-n
@@ -81,9 +83,9 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I topdomain
 .SH DESCRIPTION
 .B iodine
-lets you tunnel IPv4 data through a DNS 
+lets you tunnel IPv4 data through a DNS
 server. This can be useful in situations where Internet access is firewalled,
-but DNS queries are allowed. It needs a TUN/TAP device to operate. The 
+but DNS queries are allowed. It needs a TUN/TAP device to operate. The
 bandwidth is asymmetrical,
 with a measured maximum of 680 kbit/s upstream and 2.3 Mbit/s
 downstream in a wired LAN test network.
@@ -122,7 +124,7 @@ and otherwise tunX. On Mac OS X 10.6, this can also be utunX, which will attempt
 to use an utun device built into the OS.
 .TP
 .B -P password
-Use 'password' to authenticate. If not used, 
+Use 'password' to authenticate. If not used,
 .B stdin
 will be used as input. Only the first 32 characters will be used.
 .TP
@@ -245,7 +247,7 @@ rejected, however this will cause problems when requests are routed
 via a cluster of DNS servers.
 .TP
 .B -s
-Don't try to configure IP address or MTU. 
+Don't try to configure IP address or MTU.
 This should only be used if you have already configured the device that will be
 used.
 .TP
@@ -261,18 +263,22 @@ This is easily done with : "LC_ALL=C luit iodined \-DD ..."
 (see luit(1)).
 .TP
 .B -m mtu
-Set 'mtu' as mtu size for the tun device. 
+Set 'mtu' as mtu size for the tun device.
 This will be sent to the client on login, and the client will use the same mtu
 for its tun device.  Default 1130.  Note that the DNS traffic will be
 automatically fragmented when needed.
 .TP
-.B -l listen_ip
-Make the server listen only on 'listen_ip' for incoming requests.
-By default, incoming requests are accepted from all interfaces.
+.B -l listen_ip4
+Make the server listen only on 'listen_ip4' for incoming IPv4 requests.
+By default, incoming requests are accepted from all interfaces (0.0.0.0).
+.TP
+.B -L listen_ip6
+Make the server listen only on 'listen_ip6' for incoming IPv6 requests.
+By default, incoming requests are accepted from all interfaces (::)
 .TP
 .B -p port
-Make the server listen on 'port' instead of 53 for traffic. 
-If 'listen_ip' does not include localhost, this 'port' can be the same
+Make the server listen on 'port' instead of 53 for traffic.
+If 'listen_ip4' does not include localhost, this 'port' can be the same
 as 'dnsport'.
 .B Note:
 You must make sure the dns requests are forwarded to this port yourself.
@@ -308,7 +314,7 @@ file.
 .B topdomain
 The dns traffic will be sent as queries for subdomains under
 \'topdomain'. This is normally a subdomain to a domain you own. Use a short
-domain name to get better throughput. If 
+domain name to get better throughput. If
 .B nameserver
 is the iodined server, then the topdomain can be chosen freely. This argument
 must be the same on both the client and the server.
@@ -316,15 +322,15 @@ must be the same on both the client and the server.
 .TP
 .B tunnel_ip[/netmask]
 This is the server's ip address on the tun interface. The client will be
-given the next ip number in the range. It is recommended to use the 
+given the next ip number in the range. It is recommended to use the
 10.0.0.0 or 172.16.0.0 ranges. The default netmask is /27, can be overridden
 by specifying it here. Using a smaller network will limit the number of
 concurrent users.
 .TP
 .B topdomain
 The dns traffic is expected to arrive as queries for
-subdomains under 'topdomain'. This is normally a subdomain to a domain you 
-own. Use a short domain name to get better throughput. This argument must be 
+subdomains under 'topdomain'. This is normally a subdomain to a domain you
+own. Use a short domain name to get better throughput. This argument must be
 the same on both the client and the server. Queries for domains other
 than 'topdomain' will be forwarded when the \-b option is given, otherwise
 they will be dropped.
@@ -349,7 +355,7 @@ except to the used ssh or vpn ports.
 If the environment variable
 .B IODINE_PASS
 is set, iodine will use the value it is set to as password instead of asking
-for one. The 
+for one. The
 .B -P
 option still has precedence.
 .SS IODINED_PASS

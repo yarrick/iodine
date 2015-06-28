@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * Copyright (c) 2006-2015 Erik Ekman <yarrick@kryo.se>,
  * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -97,7 +97,7 @@ struct query {
 	unsigned short id;
 	struct in_addr destination;
 	struct sockaddr_storage from;
-	int fromlen;
+	socklen_t fromlen;
 	unsigned short id2;
 	struct sockaddr from2;
 	int fromlen2;

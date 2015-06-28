@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * Copyright (c) 2006-2015 Erik Ekman <yarrick@kryo.se>,
  * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -224,6 +224,14 @@ check_user_and_ip(int userid, struct query *q)
 		expected = (struct sockaddr_in *) &(users[userid].host);
 		received = (struct sockaddr_in *) &(q->from);
 		return memcmp(&(expected->sin_addr), &(received->sin_addr), sizeof(struct in_addr));
+	}
+	/* Check IPv6 */
+	if (q->from.ss_family == AF_INET6) {
+		struct sockaddr_in6 *expected, *received;
+
+		expected = (struct sockaddr_in6 *) &(users[userid].host);
+		received = (struct sockaddr_in6 *) &(q->from);
+		return memcmp(&(expected->sin6_addr), &(received->sin6_addr), sizeof(struct in6_addr));
 	}
 	/* Unknown address family */
 	return 1;
@@ -1769,9 +1777,16 @@ tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 		}
 
 		FD_ZERO(&fds);
+		maxfd = 0;
 
-		FD_SET(dns_fds->v4fd, &fds);
-		maxfd = dns_fds->v4fd;
+		if (dns_fds->v4fd >= 0) {
+			FD_SET(dns_fds->v4fd, &fds);
+			maxfd = MAX(dns_fds->v4fd, maxfd);
+		}
+		if (dns_fds->v6fd >= 0) {
+			FD_SET(dns_fds->v6fd, &fds);
+			maxfd = MAX(dns_fds->v6fd, maxfd);
+		}
 
 		if (bind_fd) {
 			/* wait for replies from real DNS */
@@ -1814,6 +1829,9 @@ tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			}
 			if (FD_ISSET(dns_fds->v4fd, &fds)) {
 				tunnel_dns(tun_fd, dns_fds->v4fd, dns_fds, bind_fd);
+			}
+			if (FD_ISSET(dns_fds->v6fd, &fds)) {
+				tunnel_dns(tun_fd, dns_fds->v6fd, dns_fds, bind_fd);
 			}
 			if (FD_ISSET(bind_fd, &fds)) {
 				tunnel_bind(bind_fd, dns_fds);
@@ -2015,7 +2033,7 @@ static int
 read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 /* FIXME: dns_fds and tun_fd are because of raw_decode() below */
 {
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	socklen_t addrlen;
 	char packet[64*1024];
 	int r;
@@ -2025,7 +2043,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 	struct iovec iov;
 	struct cmsghdr *cmsg;
 
-	addrlen = sizeof(struct sockaddr);
+	addrlen = sizeof(struct sockaddr_storage);
 	iov.iov_base = packet;
 	iov.iov_len = sizeof(packet);
 
@@ -2039,7 +2057,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 
 	r = recvmsg(fd, &msg, 0);
 #else
-	addrlen = sizeof(struct sockaddr);
+	addrlen = sizeof(struct sockaddr_storage);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
 #endif /* !WINDOWS32 */
 
@@ -2236,26 +2254,27 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 }
 
 static void
-usage() {
+print_usage() {
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ip address to listen on] [-p port] [-n external ip] "
-		"[-b dnsport] [-P password] [-F pidfile] [-i max idle time] "
+		"[-l ipv4 listen address] [-L ipv6 listen address] "
+		"[-p port] [-n external ip] [-b dnsport] "
+		"[-P password] [-F pidfile] [-i max idle time] "
 		"tunnel_ip[/netmask] topdomain\n", __progname);
+}
+
+static void
+usage() {
+	print_usage();
 	exit(2);
 }
 
 static void
 help() {
-	extern char *__progname;
-
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
-	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
-		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ip address to listen on] [-p port] [-n external ip] [-b dnsport] [-P password] "
-		"[-F pidfile] tunnel_ip[/netmask] topdomain\n", __progname);
+	print_usage();
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
@@ -2269,8 +2288,10 @@ help() {
 	fprintf(stderr, "  -d device to set tunnel device name\n");
 	fprintf(stderr, "  -m mtu to set tunnel device mtu\n");
 	fprintf(stderr, "  -z context to apply SELinux context after initialization\n");
-	fprintf(stderr, "  -l ip address to listen on for incoming dns traffic "
+	fprintf(stderr, "  -l IPv4 address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n");
+	fprintf(stderr, "  -L IPv6 address to listen on for incoming dns traffic "
+		"(default ::)\n");
 	fprintf(stderr, "  -p port to listen on for incoming dns traffic (default 53)\n");
 	fprintf(stderr, "  -n ip to respond with to NS queries\n");
 	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
@@ -2295,6 +2316,7 @@ main(int argc, char **argv)
 {
 	extern char *__progname;
 	char *listen_ip4;
+	char *listen_ip6;
 	char *errormsg;
 #ifndef WINDOWS32
 	struct passwd *pw;
@@ -2322,7 +2344,9 @@ main(int argc, char **argv)
 	int retval;
 	int max_idle_time = 0;
 	struct sockaddr_storage dns4addr;
-	int dns4addr_len;
+	socklen_t dns4addr_len;
+	struct sockaddr_storage dns6addr;
+	socklen_t dns6addr_len;
 #ifdef HAVE_SYSTEMD
 	int nb_fds;
 #endif
@@ -2341,6 +2365,7 @@ main(int argc, char **argv)
 	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
 			   higher for NULL; tun/zlib adds ~17 bytes. */
 	listen_ip4 = NULL;
+	listen_ip6 = NULL;
 	port = 53;
 	ns_ip = INADDR_ANY;
 	ns_get_externalip = 0;
@@ -2373,7 +2398,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
-	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:p:n:b:P:z:F:i:")) != -1) {
+	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
 		switch(choice) {
 		case 'v':
 			version();
@@ -2407,6 +2432,9 @@ main(int argc, char **argv)
 			break;
 		case 'l':
 			listen_ip4 = optarg;
+			break;
+		case 'L':
+			listen_ip6 = optarg;
 			break;
 		case 'p':
 			port = atoi(optarg);
@@ -2505,7 +2533,12 @@ main(int argc, char **argv)
 
 	dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
 	if (dns4addr_len < 0) {
-		warnx("Bad IP address to listen on.");
+		warnx("Bad IPv4 address to listen on.");
+		usage();
+	}
+	dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
+	if (dns6addr_len < 0) {
+		warnx("Bad IPv6 address to listen on.");
 		usage();
 	}
 
@@ -2589,13 +2622,17 @@ main(int argc, char **argv)
 			retval = 1;
 			goto cleanup_tun;
 		}
+		if ((dns_fds.v6fd = open_dns(&dns6addr, dns6addr_len)) < 0) {
+			retval = 1;
+			goto cleanup_dns;
+		}
 #ifdef HAVE_SYSTEMD
 	}
 #endif
 	if (bind_enable) {
 		if ((bind_fd = open_dns_from_host(NULL, 0, AF_INET, 0)) < 0) {
 			retval = 1;
-			goto cleanup_dns4;
+			goto cleanup_dns;
 		}
 	}
 
@@ -2644,7 +2681,9 @@ main(int argc, char **argv)
 
 	syslog(LOG_INFO, "stopping");
 	close_dns(bind_fd);
-cleanup_dns4:
+cleanup_dns:
+	if (dns_fds.v6fd >= 0)
+		close_dns(dns_fds.v6fd);
 	if (dns_fds.v4fd >= 0)
 		close_dns(dns_fds.v4fd);
 cleanup_tun:

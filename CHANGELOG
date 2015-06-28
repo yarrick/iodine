@@ -14,6 +14,8 @@ master:
 	- Linux: use pkg-config for systemd support flags.
 		Patch by Jason A. Donenfeld.
 	- Change external IP webservice to ipify.org
+	- Add support for IPv6 in the server. (Raw mode missing)
+	   Traffic inside tunnel is still IPv4.
 
 2014-06-16: 0.7.0 "Kryoptonite"
 	- Partial IPv6 support (#107)
