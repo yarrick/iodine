@@ -2587,32 +2587,32 @@ main(int argc, char **argv)
 			read_password(password, sizeof(password));
 	}
 
+	/* Mark both file descriptors as unused */
+	dns_fds.v4fd = -1;
+	dns_fds.v6fd = -1;
+
 	created_users = init_users(my_ip, netmask);
 
 	if ((tun_fd = open_tun(device)) == -1) {
-		retval = 1;
-		goto cleanup_none;
+		/* nothing to clean up, just return */
+		return 1;
 	}
 	if (!skipipconfig) {
 		const char *other_ip = users_get_first_ip();
 		if (tun_setip(argv[0], other_ip, netmask) != 0 || tun_setmtu(mtu) != 0) {
 			retval = 1;
 			free((void*) other_ip);
-			goto cleanup_tun;
+			goto cleanup;
 		}
 		free((void*) other_ip);
 	}
-
-	/* Mark both file descriptors as unused */
-	dns_fds.v4fd = -1;
-	dns_fds.v6fd = -1;
 
 #ifdef HAVE_SYSTEMD
 	nb_fds = sd_listen_fds(0);
 	if (nb_fds > 1) {
 		retval = 1;
 		warnx("Too many file descriptors received!\n");
-		goto cleanup_tun;
+		goto cleanup;
 	} else if (nb_fds == 1) {
 		/* XXX: assume we get IPv4 socket */
 		dns_fds.v4fd = SD_LISTEN_FDS_START;
@@ -2620,11 +2620,11 @@ main(int argc, char **argv)
 #endif
 		if ((dns_fds.v4fd = open_dns(&dns4addr, dns4addr_len)) < 0) {
 			retval = 1;
-			goto cleanup_tun;
+			goto cleanup;
 		}
 		if ((dns_fds.v6fd = open_dns(&dns6addr, dns6addr_len)) < 0) {
 			retval = 1;
-			goto cleanup_dns;
+			goto cleanup;
 		}
 #ifdef HAVE_SYSTEMD
 	}
@@ -2632,7 +2632,7 @@ main(int argc, char **argv)
 	if (bind_enable) {
 		if ((bind_fd = open_dns_from_host(NULL, 0, AF_INET, 0)) < 0) {
 			retval = 1;
-			goto cleanup_dns;
+			goto cleanup;
 		}
 	}
 
@@ -2681,14 +2681,12 @@ main(int argc, char **argv)
 
 	syslog(LOG_INFO, "stopping");
 	close_dns(bind_fd);
-cleanup_dns:
+cleanup:
 	if (dns_fds.v6fd >= 0)
 		close_dns(dns_fds.v6fd);
 	if (dns_fds.v4fd >= 0)
 		close_dns(dns_fds.v4fd);
-cleanup_tun:
 	close_tun(tun_fd);
-cleanup_none:
 
 	return retval;
 }
