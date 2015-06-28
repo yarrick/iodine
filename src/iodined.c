@@ -2344,9 +2344,9 @@ main(int argc, char **argv)
 	int retval;
 	int max_idle_time = 0;
 	struct sockaddr_storage dns4addr;
-	socklen_t dns4addr_len;
+	int dns4addr_len;
 	struct sockaddr_storage dns6addr;
-	socklen_t dns6addr_len;
+	int dns6addr_len;
 #ifdef HAVE_SYSTEMD
 	int nb_fds;
 #endif
