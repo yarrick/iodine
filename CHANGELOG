@@ -10,7 +10,7 @@ master:
 		Peter Sagerson, ported from OpenVPN by Catalin Patulea.
 	- Fix compilation failure on kFreeBSD and Hurd, by Gregor Herrmann
 	- Patch from Ryan Welton that fixes compilation warning.
-	- REAMDE converted to markdown by Nicolas Braud-Santoni.
+	- README converted to markdown by Nicolas Braud-Santoni.
 	- Linux: use pkg-config for systemd support flags.
 		Patch by Jason A. Donenfeld.
 	- Change external IP webservice to ipify.org
