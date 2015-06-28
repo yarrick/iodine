@@ -173,7 +173,7 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 int
 open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
 {
-	int flag = 1;
+	int flag;
 	int fd;
 
 	if ((fd = socket(sockaddr->ss_family, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
@@ -187,9 +187,6 @@ open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
 
 #ifndef WINDOWS32
-	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
-	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
-
 	fd_set_close_on_exec(fd);
 #endif
 

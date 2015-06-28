@@ -38,7 +38,7 @@ Server replies:
 		VFUL (server has no free slots), followed by max users
 	4 byte value: means login challenge/server protocol version/max users
 	1 byte userid of the new user, or any byte if not VACK
-	
+
 Login:
 Client sends:
 	First byte l or L
@@ -50,17 +50,19 @@ Server replies:
 	LNAK means not accepted
 	x.x.x.x-y.y.y.y-mtu-netmask means accepted (server ip, client ip, mtu, netmask bits)
 
-IP Request:
+IP Request: (for where to try raw login)
 Client sends:
 	First byte i or I
 	5 bits coded as Base32 char, meaning userid
 	CMC as 3 Base32 chars
 Server replies
-	BADIP if bad userid, or
-	I and then 4 bytes network order external IP address of iodined server
+	BADIP if bad userid
+	First byte I
+	Then comes external IP address of iodined server
+	as 4 bytes (IPv4) or 16 bytes (IPv6)
 
 Upstream codec check / bounce:
-Client sends: 
+Client sends:
 	First byte z or Z
 	Lots of data that should not be decoded
 Server replies:
@@ -100,7 +102,7 @@ Client sends:
 		7: Base128  (a-zA-Z0-9\274-\375)
 	CMC as 3 Base32 chars
 Server sends:
-	Name of codec if accepted. After this all upstream data packets must 
+	Name of codec if accepted. After this all upstream data packets must
 	be encoded with the new codec.
 	BADCODEC if not accepted. Client must then revert to previous codec
 	BADLEN if length of query is too short
@@ -182,7 +184,7 @@ GGGG = Downstream fragment number
 C = Compression enabled for downstream packet
 UDCMC = Upstream Data CMC, 36 steps a-z0-9, case-insensitive
 
-Upstream data packet starts with 1 byte ASCII hex coded user byte; then 3 bytes 
+Upstream data packet starts with 1 byte ASCII hex coded user byte; then 3 bytes
 Base32 encoded header; then 1 char data-CMC; then comes the payload data,
 encoded with the chosen upstream codec.
 
@@ -225,8 +227,8 @@ always starting with the 2 bytes downstream data header as shown above.
 If server has nothing to send, no data is added after the header.
 If server has something to send, it will add the downstream data packet
 (or some fragment of it) after the header.
- 
- 
+
+
 "Lazy-mode" operation
 =====================
 
@@ -250,7 +252,7 @@ downstream data has to be sent.
 
 *: upstream data ack is usually done as reply on the previous ping packet,
 and the upstream-data packet itself is kept in queue.
- 
+
 Client:
 Downstream data is acked immediately, to keep it flowing fast (includes a
 ping after last downstream frag).

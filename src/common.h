@@ -53,14 +53,6 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 
 #define QUERY_NAME_SIZE 256
 
-#if defined IP_RECVDSTADDR
-# define DSTADDR_SOCKOPT IP_RECVDSTADDR
-# define dstaddr(x) ((struct in_addr *) CMSG_DATA(x))
-#elif defined IP_PKTINFO
-# define DSTADDR_SOCKOPT IP_PKTINFO
-# define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr))
-#endif
-
 #if defined IP_MTU_DISCOVER
   /* Linux */
 # define IP_OPT_DONT_FRAG IP_MTU_DISCOVER
@@ -95,12 +87,13 @@ struct query {
 	unsigned short type;
 	unsigned short rcode;
 	unsigned short id;
-	struct in_addr destination;
+	struct sockaddr_storage destination;
+	socklen_t dest_len;
 	struct sockaddr_storage from;
 	socklen_t fromlen;
 	unsigned short id2;
-	struct sockaddr from2;
-	int fromlen2;
+	struct sockaddr_storage from2;
+	socklen_t fromlen2;
 };
 
 enum connection {

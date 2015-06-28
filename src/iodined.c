@@ -72,6 +72,18 @@ WSADATA wsa_data;
 
 #define PASSWORD_ENV_VAR "IODINED_PASS"
 
+#if defined IP_RECVDSTADDR
+# define DSTADDR_SOCKOPT IP_RECVDSTADDR
+# define dstaddr(x) ((struct in_addr *) CMSG_DATA(x))
+#elif defined IP_PKTINFO
+# define DSTADDR_SOCKOPT IP_PKTINFO
+# define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr))
+#endif
+
+#ifndef IPV6_RECVPKTINFO
+#define IPV6_RECVPKTINFO IPV6_PKTINFO
+#endif
+
 static int running = 1;
 static char *topdomain;
 static char password[33];
@@ -917,9 +929,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		return;
 	} else if(in[0] == 'I' || in[0] == 'i') {
 		/* Request for IP number */
-		in_addr_t replyaddr;
-		unsigned addr;
-		char reply[5];
+		char reply[17];
+		int length;
 
 		userid = b32_8to5(in[1]);
 		if (check_authenticated_user_and_ip(userid, q) != 0) {
@@ -927,21 +938,24 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return; /* illegal id */
 		}
 
-		if (ns_ip != INADDR_ANY) {
-			/* If set, use assigned external ip (-n option) */
-			replyaddr = ns_ip;
+		reply[0] = 'I';
+		if (q->from.ss_family == AF_INET) {
+			if (ns_ip != INADDR_ANY) {
+				/* If set, use assigned external ip (-n option) */
+				memcpy(&reply[1], &ns_ip, sizeof(ns_ip));
+			} else {
+				/* otherwise return destination ip from packet */
+				struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+				memcpy(&reply[1], &addr->sin_addr, sizeof(struct in_addr));
+			}
+			length = 1 + sizeof(struct in_addr);
 		} else {
-			/* otherwise return destination ip from packet */
-			memcpy(&replyaddr, &q->destination.s_addr, sizeof(in_addr_t));
+			struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->destination;
+			memcpy(&reply[1], &addr->sin6_addr, sizeof(struct in6_addr));
+			length = 1 + sizeof(struct in6_addr);
 		}
 
-		addr = htonl(replyaddr);
-		reply[0] = 'I';
-		reply[1] = (addr >> 24) & 0xFF;
-		reply[2] = (addr >> 16) & 0xFF;
-		reply[3] = (addr >>  8) & 0xFF;
-		reply[4] = (addr >>  0) & 0xFF;
-		write_dns(dns_fd, q, reply, sizeof(reply), 'T');
+		write_dns(dns_fd, q, reply, length, 'T');
 	} else if(in[0] == 'Z' || in[0] == 'z') {
 		/* Check for case conservation and chars not allowed according to RFC */
 
@@ -1539,7 +1553,8 @@ handle_ns_request(int dns_fd, struct query *q)
 	if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
-		memcpy(&q->destination.s_addr, &ns_ip, sizeof(in_addr_t));
+		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
 	}
 
 	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
@@ -1566,12 +1581,14 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 
 	if (fakeip) {
 		in_addr_t ip = inet_addr("127.0.0.1");
-		memcpy(&q->destination.s_addr, &ip, sizeof(in_addr_t));
+		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+		memcpy(&addr->sin_addr, &ip, sizeof(ip));
 
 	} else if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
-		memcpy(&q->destination.s_addr, &ns_ip, sizeof(in_addr_t));
+		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
 	}
 
 	len = dns_encode_a_response(buf, sizeof(buf), q);
@@ -2038,7 +2055,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 	char packet[64*1024];
 	int r;
 #ifndef WINDOWS32
-	char address[96];
+	char control[CMSG_SPACE(sizeof (struct in6_pktinfo))];
 	struct msghdr msg;
 	struct iovec iov;
 	struct cmsghdr *cmsg;
@@ -2051,8 +2068,8 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 	msg.msg_namelen = (unsigned) addrlen;
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
-	msg.msg_control = address;
-	msg.msg_controllen = sizeof(address);
+	msg.msg_control = control;
+	msg.msg_controllen = sizeof(control);
 	msg.msg_flags = 0;
 
 	r = recvmsg(fd, &msg, 0);
@@ -2074,13 +2091,29 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 		}
 
 #ifndef WINDOWS32
+		memset(&q->destination, 0, sizeof(struct sockaddr_storage));
+		/* Read destination IP address */
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 
 			if (cmsg->cmsg_level == IPPROTO_IP &&
 				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
 
-				q->destination = *dstaddr(cmsg);
+				struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+				addr->sin_family = AF_INET;
+				addr->sin_addr = *dstaddr(cmsg);
+				q->dest_len = sizeof(*addr);
+				break;
+			}
+			if (cmsg->cmsg_level == IPPROTO_IPV6 &&
+				cmsg->cmsg_type == IPV6_PKTINFO) {
+
+				struct in6_pktinfo *pktinfo;
+				struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->destination;
+				pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
+				addr->sin6_family = AF_INET6;
+				memcpy(&addr->sin6_addr, &pktinfo->ipi6_addr, sizeof(struct in6_addr));
+				q->dest_len = sizeof(*addr);
 				break;
 			}
 		}
@@ -2309,6 +2342,24 @@ version() {
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
 	fprintf(stderr, "Git version: %s\n", GITREVISION);
 	exit(0);
+}
+
+static void
+prepare_dns_fd(int fd)
+{
+#ifndef WINDOWS32
+	int flag = 1;
+
+	/* To get destination address from each UDP datagram, see read_dns() */
+	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+#ifdef IPV6_RECVPKTINFO
+	setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const void*) &flag, sizeof(flag));
+#endif
+#ifdef IPV6_PKTINFO
+	setsockopt(fd, IPPROTO_IPV6, IPV6_PKTINFO, (const void*) &flag, sizeof(flag));
+#endif
+
+#endif
 }
 
 int
@@ -2629,6 +2680,13 @@ main(int argc, char **argv)
 #ifdef HAVE_SYSTEMD
 	}
 #endif
+
+	/* Setup dns file descriptors to get destination IP address */
+	if (dns_fds.v4fd >= 0)
+		prepare_dns_fd(dns_fds.v4fd);
+	if (dns_fds.v6fd >= 0)
+		prepare_dns_fd(dns_fds.v6fd);
+
 	if (bind_enable) {
 		if ((bind_fd = open_dns_from_host(NULL, 0, AF_INET, 0)) < 0) {
 			retval = 1;
