@@ -32,6 +32,9 @@ cflags)
 		BeOS)
 			echo '-Dsocklen_t=int';
 		;;
+		Darwin)
+			echo '-D__APPLE_USE_RFC_3542';
+		;;
 		Linux)
 			FLAGS="-D_GNU_SOURCE"
 			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -DHAVE_SETCON";
