@@ -53,7 +53,7 @@ iodine-latest:
 	@date >> iodine-latest/VERSION.txt
 	@echo "Git version: " >> iodine-latest/VERSION.txt
 	@git rev-parse HEAD >> iodine-latest/VERSION.txt
-	@for i in README CHANGELOG TODO; do cp $$i iodine-latest/$$i.txt; done
+	@for i in README.md CHANGELOG TODO; do cp $$i iodine-latest/$$i.txt; done
 	@unix2dos iodine-latest/*
 
 cross-android:
@@ -89,16 +89,4 @@ iodine-latest-windows.zip: iodine-latest
 	@cp /usr/x86_64-w64-mingw32/bin/zlib1.dll iodine-latest-windows/64bit
 	@cp README-win32.txt iodine-latest-windows
 	@zip -r iodine-latest-windows.zip iodine-latest-windows
-
-cross-mingw:
-	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-mingw32-gcc all)
-
-iodine-latest-win32.zip: cross-mingw iodine-latest
-	@mv iodine-latest iodine-latest-win32
-	@mkdir -p iodine-latest-win32/bin
-	@i686-mingw32-strip bin/iodine*
-	@for i in `ls bin`; do cp bin/$$i iodine-latest-win32/bin/$$i.exe; done
-	@cp /usr/i686-mingw32/usr/bin/zlib1.dll iodine-latest-win32/bin
-	@cp README-win32.txt iodine-latest-win32
-	@zip -r iodine-latest-win32.zip iodine-latest-win32
 
