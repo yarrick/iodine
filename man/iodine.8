@@ -45,7 +45,7 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodined [-h]
 
-.B iodined [-c] [-s] [-f] [-D] [-u
+.B iodined [-4] [-6] [-c] [-s] [-f] [-D] [-u
 .I user
 .B ] [-t
 .I chrootdir
@@ -112,6 +112,12 @@ Print usage info and exit.
 .B -f
 Keep running in foreground.
 .TP
+.B -4
+Force/allow only IPv4 DNS queries
+.TP
+.B -6
+Force/allow only IPv6 DNS queries
+.TP
 .B -u user
 Drop privileges and run as user 'user' after setting up tunnel.
 .TP
@@ -134,12 +140,6 @@ Apply SELinux 'context' after initialization.
 .B -F pidfile
 Create 'pidfile' and write process id in it.
 .SS Client Options:
-.TP
-.B -4
-Force IPv4 DNS queries
-.TP
-.B -6
-Force IPv6 DNS queries
 .TP
 .B -r
 Skip raw UDP mode. If not used, iodine will try getting the public IP address

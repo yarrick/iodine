@@ -123,8 +123,9 @@ end of the tunnel. In this case, `ping 192.168.99.1` from the iodine client, and
 #### IPv6
 The data inside the tunnel is IPv4 only.
 
-The server listens to both IPv4 and IPv6 for incoming requests. Raw mode
-will be attempted on the same protocol as used for the login.
+The server listens to both IPv4 and IPv6 for incoming requests by default.
+Use options `-4` or `-6` to only listen on one protocol. Raw mode will be
+attempted on the same protocol as used for the login.
 
 The client can use IPv4 or IPv6 nameservers to connect to iodined. The relay
 nameservers will translate between protocols automatically if needed. Use

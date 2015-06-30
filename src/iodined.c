@@ -2290,7 +2290,8 @@ static void
 print_usage() {
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] [-c] [-s] [-f] [-D] [-u user] "
+	fprintf(stderr, "Usage: %s [-v] [-h] "
+		"[-4] [-6] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
 		"[-l ipv4 listen address] [-L ipv6 listen address] "
 		"[-p port] [-n external ip] [-b dnsport] "
@@ -2310,6 +2311,8 @@ help() {
 	print_usage();
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
+	fprintf(stderr, "  -4 to listen only on IPv4\n");
+	fprintf(stderr, "  -6 to listen only on IPv6\n");
 	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
 	fprintf(stderr, "  -s to skip creating and configuring the tun device, "
 		"which then has to be created manually\n");
@@ -2378,6 +2381,7 @@ main(int argc, char **argv)
 	char *context;
 	char *device;
 	char *pidfile;
+	int addrfamily;
 	struct dnsfd dns_fds;
 	int tun_fd;
 
@@ -2420,6 +2424,7 @@ main(int argc, char **argv)
 	port = 53;
 	ns_ip = INADDR_ANY;
 	ns_get_externalip = 0;
+	addrfamily = AF_UNSPEC;
 	check_ip = 1;
 	skipipconfig = 0;
 	debug = 0;
@@ -2449,8 +2454,14 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
-	while ((choice = getopt(argc, argv, "vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
 		switch(choice) {
+		case '4':
+			addrfamily = AF_INET;
+			break;
+		case '6':
+			addrfamily = AF_INET6;
+			break;
 		case 'v':
 			version();
 			break;
@@ -2669,11 +2680,14 @@ main(int argc, char **argv)
 		dns_fds.v4fd = SD_LISTEN_FDS_START;
 	} else {
 #endif
-		if ((dns_fds.v4fd = open_dns(&dns4addr, dns4addr_len)) < 0) {
+		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET) &&
+			(dns_fds.v4fd = open_dns(&dns4addr, dns4addr_len)) < 0) {
+
 			retval = 1;
 			goto cleanup;
 		}
-		if ((dns_fds.v6fd = open_dns(&dns6addr, dns6addr_len)) < 0) {
+		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET6) &&
+			(dns_fds.v6fd = open_dns(&dns6addr, dns6addr_len)) < 0) {
 			retval = 1;
 			goto cleanup;
 		}
