@@ -173,6 +173,12 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 int
 open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
 {
+	return open_dns_opt(sockaddr, sockaddr_len, -1);
+}
+
+int
+open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only)
+{
 	int flag;
 	int fd;
 
@@ -189,6 +195,10 @@ open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
 #ifndef WINDOWS32
 	fd_set_close_on_exec(fd);
 #endif
+
+	if (sockaddr->ss_family == AF_INET6 && v6only >= 0) {
+		setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (const void*) &v6only, sizeof(v6only));
+	}
 
 #ifdef IP_OPT_DONT_FRAG
 	/* Set dont-fragment ip header flag */

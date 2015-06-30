@@ -2687,7 +2687,9 @@ main(int argc, char **argv)
 			goto cleanup;
 		}
 		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET6) &&
-			(dns_fds.v6fd = open_dns(&dns6addr, dns6addr_len)) < 0) {
+			/* Set IPv6 socket to V6ONLY */
+			(dns_fds.v6fd = open_dns_opt(&dns6addr, dns6addr_len, 1)) < 0) {
+
 			retval = 1;
 			goto cleanup;
 		}
