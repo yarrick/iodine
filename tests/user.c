@@ -176,7 +176,6 @@ test_user_create_tests()
 
 	tc = tcase_create("User");
 	tcase_add_test(tc, test_init_users);
-	tcase_add_test(tc, test_users_waiting);
 	tcase_add_test(tc, test_find_user_by_ip);
 	tcase_add_test(tc, test_all_users_waiting_to_send);
 	tcase_add_test(tc, test_find_available_user);
