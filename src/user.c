@@ -93,24 +93,6 @@ users_get_first_ip()
 }
 
 int
-users_waiting_on_reply()
-{
-	int ret;
-	int i;
-
-	ret = 0;
-	for (i = 0; i < usercount; i++) {
-		if (users[i].active && !users[i].disabled &&
-			users[i].last_pkt + 60 > time(NULL) &&
-			users[i].q.id != 0 && users[i].conn == CONN_DNS_NULL) {
-			ret++;
-		}
-	}
-
-	return ret;
-}
-
-int
 find_user_by_ip(uint32_t ip)
 {
 	int ret;
