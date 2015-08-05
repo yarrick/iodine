@@ -50,7 +50,7 @@ iodine-latest:
 	@rm -rf iodine-latest*
 	@mkdir -p iodine-latest
 	@echo "Create date: " > iodine-latest/VERSION.txt
-	@date >> iodine-latest/VERSION.txt
+	@LANG=en_US date >> iodine-latest/VERSION.txt
 	@echo "Git version: " >> iodine-latest/VERSION.txt
 	@git rev-parse HEAD >> iodine-latest/VERSION.txt
 	@for i in README.md CHANGELOG TODO; do cp $$i iodine-latest/$$i.txt; done
