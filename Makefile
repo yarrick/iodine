@@ -56,15 +56,32 @@ iodine-latest:
 	@for i in README.md CHANGELOG TODO; do cp $$i iodine-latest/$$i.txt; done
 	@unix2dos iodine-latest/*
 
+#non-PIE build for old android
+cross-android-old:
+	@(cd src; $(MAKE) base64u.c base64u.h)
+	@(cd src; ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk MY_PLATFORM=old)
+
+#Position-indepedent build for modern android
 cross-android:
 	@(cd src; $(MAKE) base64u.c base64u.h)
-	@(cd src; ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk)
+	@(cd src; ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk MY_PLATFORM=kitkat)
 
 iodine-latest-android.zip: iodine-latest
 	@mv iodine-latest iodine-latest-android
-	@mkdir -p iodine-latest-android/armeabi iodine-latest-android/x86
+	@mkdir -p iodine-latest-android/pre-kitkat/armeabi
+	@mkdir -p iodine-latest-android/pre-kitkat/x86
+	@$(MAKE) cross-android-old TARGET_ARCH_ABI=armeabi
+	@cp src/libs/armeabi/* iodine-latest-android/pre-kitkat/armeabi
+	@$(MAKE) cross-android-old TARGET_ARCH_ABI=x86
+	@cp src/libs/x86/* iodine-latest-android/pre-kitkat/x86
+	@rm -rf src/libs src/obj
+	@mkdir -p iodine-latest-android/armeabi
+	@mkdir -p iodine-latest-android/arm64-v8a
+	@mkdir -p iodine-latest-android/x86
 	@$(MAKE) cross-android TARGET_ARCH_ABI=armeabi
 	@cp src/libs/armeabi/* iodine-latest-android/armeabi
+	@$(MAKE) cross-android TARGET_ARCH_ABI=arm64-v8a
+	@cp src/libs/arm64-v8a/* iodine-latest-android/arm64-v8a
 	@$(MAKE) cross-android TARGET_ARCH_ABI=x86
 	@cp src/libs/x86/* iodine-latest-android/x86
 	@cp README-android.txt iodine-latest-android

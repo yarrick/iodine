@@ -20,5 +20,14 @@ LOCAL_SRC_FILES := tun.c dns.c read.c encoding.c login.c base32.c base64.c base6
 LOCAL_CFLAGS    := -c -DANDROID -DLINUX -DIFCONFIGPATH=\"/system/bin/\" -Wall -DGITREVISION=\"$(HEAD_COMMIT)\"
 LOCAL_LDLIBS    := -lz
 
+#Choose platform level (for PIE support)
+ifeq (kitkat, $(strip $(MY_PLATFORM)))
+APP_PLATFORM := android-16
+LOCAL_CFLAGS += -fPIE
+LOCAL_LDFLAGS += -fPIE -pie
+else
+APP_PLATFORM := android-3
+endif
+
 include $(BUILD_EXECUTABLE)
 

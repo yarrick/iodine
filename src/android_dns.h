@@ -17,6 +17,9 @@
 #ifndef __FIX_ANDROID_H__
 #define __FIX_ANDROID_H__
 
+/* Newer android platforms can have this data already */
+#ifndef C_IN
+
 typedef struct {
 	unsigned id :16;
 	unsigned rd :1;
@@ -50,5 +53,7 @@ typedef struct {
 #define T_MX		15
 #define T_TXT		16
 #define T_SRV		33
+
+#endif /* !C_IN */
 
 #endif
