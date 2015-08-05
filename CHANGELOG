@@ -17,6 +17,7 @@ master:
 	- Add support for IPv6 in the server.
 	   Raw mode will be with same protocol as used for login.
 	   Traffic inside tunnel is still IPv4.
+	- Update android build to support 5.0 (Lollipop) and newer.
 
 2014-06-16: 0.7.0 "Kryoptonite"
 	- Partial IPv6 support (#107)
