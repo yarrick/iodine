@@ -43,7 +43,7 @@ For more information: http://blog.bokhorst.biz/5123
    To build for other archs, specify TARGET_ARCH_ABI:
 		"make cross-android TARGET_ARCH_ABI=x86"
 
-   For older android versions (pre-kitkat), build with "make cross-android" in the
+   For older android versions (pre-kitkat), build with "make cross-android-old" in the
    root directory, or manually like above but with APP_PLATFORM=android-3
 
    The iodine binary ends up in src/libs/<arch>/iodine
