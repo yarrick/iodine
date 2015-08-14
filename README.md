@@ -24,11 +24,11 @@ QUICKSTART
 ----------
 
 Try it out within your own LAN! Follow these simple steps:
-- On your server, run: `./iodined -f 10.0.0.1 test.com`.  
+- On your server, run: `./iodined -f test.com 10.0.0.1`.  
   If you already use the `10.0.0.0` network, use another internal net like 
   `172.16.0.0`.
 - Enter a password.
-- On the client, run: `./iodine -f -r 192.168.0.1 test.com`.  
+- On the client, run: `./iodine -f -r test.com 192.168.0.1`.  
   Replace `192.168.0.1` with your server's ip address.
 - Enter the same password.
 - Now the client has the tunnel ip `10.0.0.2` and the server has `10.0.0.1`.
@@ -88,16 +88,16 @@ If there is a chance you'll be using an iodine tunnel from unexpected
 environments, start `iodined` with a `-c` option.
 Resulting commandline in this example situation:
 
-	./iodined -f -c -P secretpassword 192.168.99.1 t1.mydomain.com
+	./iodined -f -c -P secretpassword t1.mydomain.com 192.168.99.1
 
 ### Client side
-All the setup is done, just start `iodine`. It takes one or two arguments, the
-first is the local relaying DNS server (optional) and the second is the domain
-you used (`t1.mydomain.com`). If you don't specify the first argument, the
-system's current DNS setting will be consulted.
+All the setup is done, just start `iodine`. It takes one or more arguments, the
+first is the the domain you used (`t1.mydomain.com`) and the remaining options
+are a list of local relaying DNS server (optional). If you don't specify more
+than one argument, the system's current DNS setting will be consulted.
 
 If DNS queries are allowed to any computer, you can directly give the `iodined`
-server's address as first argument (in the example: `t1ns.mydomain.com` or
+server's address as second argument (in the example: `t1ns.mydomain.com` or
 `10.15.213.99`). In that case, it may also happen that _any_ traffic is allowed
 to the DNS port (53 UDP) of any computer. Iodine will detect this, and switch
 to raw UDP tunneling if possible. To force DNS tunneling in any case, use the
