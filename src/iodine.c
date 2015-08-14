@@ -70,7 +70,7 @@ usage() {
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
-			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+			"[-z context] [-F pidfile] topdomain [nameserver ...]\n", __progname);
 	exit(2);
 }
 
@@ -81,7 +81,7 @@ help() {
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
-			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [nameserverN ...]]] \n", __progname);
 	fprintf(stderr, "Options to try if connection doesn't work:\n");
 	fprintf(stderr, "  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
 	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
@@ -101,7 +101,8 @@ help() {
 	fprintf(stderr, "  -d device to set tunnel device name\n");
 	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
 	fprintf(stderr, "  -F pidfile to write pid to a file\n");
-	fprintf(stderr, "nameserver is the IP number/hostname of the relaying nameserver. if absent, /etc/resolv.conf is used\n");
+	fprintf(stderr, "nameserver is the IP/hostname of the relaying nameserver(s). if absent, /etc/resolv.conf is used\n");
+	fprintf(stderr, "   multiple nameservers can be specified (used in round-robin). \n");
 	fprintf(stderr, "topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
@@ -119,7 +120,6 @@ version() {
 int
 main(int argc, char **argv)
 {
-	char *nameserv_host;
 	char *topdomain;
 	char *errormsg;
 #ifndef WINDOWS32
@@ -145,10 +145,17 @@ main(int argc, char **argv)
 #ifdef OPENBSD
 	int rtable = 0;
 #endif
+
+	char *nameserv_host;
+	char **nameserv_hosts;
+	int nameserv_hosts_len;
 	struct sockaddr_storage nameservaddr;
+	struct sockaddr_storage *nameserv_addrs;
+	size_t nameserv_addrs_len;
 	int nameservaddr_len;
 	int nameserv_family;
 
+	nameserv_addrs_len = 0;
 	nameserv_host = NULL;
 	topdomain = NULL;
 	errormsg = NULL;
@@ -280,35 +287,48 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	switch (argc) {
-	case 1:
-		nameserv_host = get_resolvconf_addr();
-		topdomain = strdup(argv[0]);
-		break;
-	case 2:
-		nameserv_host = argv[0];
-		topdomain = strdup(argv[1]);
-		break;
-	default:
-		usage();
-		/* NOTREACHED */
-	}
+	nameserv_hosts_len = argc - 1;
+	if (nameserv_hosts_len <= 0)
+		nameserv_hosts_len = 1;
 
-	if (max_downstream_frag_size < 1 || max_downstream_frag_size > 0xffff) {
-		warnx("Use a max frag size between 1 and 65535 bytes.\n");
-		usage();
-		/* NOTREACHED */
-	}
+	// Preallocate memory with expected number of hosts
+	nameserv_hosts = malloc(sizeof(char *) * nameserv_hosts_len);
+	nameserv_addrs = malloc(sizeof(struct sockaddr_storage) * nameserv_hosts_len);
 
-	if (nameserv_host) {
+	if (argc == 0) {
+		usage();
+		/* NOT REACHED */
+	} else if (argc == 1) {
+		nameserv_hosts[0] = get_resolvconf_addr();
+	} else if (argc > 1)
+		for (int h = 0; h < nameserv_hosts_len; h++) nameserv_hosts[h] = strdup(argv[h + 1]);
+	topdomain = strdup(argv[0]);
+
+	for (int n = 0; n < nameserv_hosts_len; n++) {
+		nameserv_host = nameserv_hosts[n];
+		if (!nameserv_host) {
+			errx(1, "Error processing nameserver hostnames!\n");
+		}
 		nameservaddr_len = get_addr(nameserv_host, DNS_PORT, nameserv_family, 0, &nameservaddr);
 		if (nameservaddr_len < 0) {
 			errx(1, "Cannot lookup nameserver '%s': %s ",
-				nameserv_host, gai_strerror(nameservaddr_len));
+					nameserv_host, gai_strerror(nameservaddr_len));
 		}
-		client_set_nameserver(&nameservaddr, nameservaddr_len);
-	} else {
+		memcpy(&nameserv_addrs[n], &nameservaddr, sizeof(struct sockaddr_storage));
+		nameserv_addrs_len ++;
+		nameserv_host = NULL;
+	}
+
+
+	if (nameserv_addrs_len <= 0 || !nameserv_hosts[0]) {
 		warnx("No nameserver found - not connected to any network?\n");
+		usage();
+	}
+
+	client_set_nameservers(nameserv_addrs, nameserv_addrs_len);
+
+	if (max_downstream_frag_size < 1 || max_downstream_frag_size > 0xffff) {
+		warnx("Use a max frag size between 1 and 65535 bytes.\n");
 		usage();
 		/* NOTREACHED */
 	}
@@ -359,8 +379,10 @@ main(int argc, char **argv)
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
-	fprintf(stderr, "Sending DNS queries for %s to %s\n",
-		topdomain, format_addr(&nameservaddr, nameservaddr_len));
+	fprintf(stderr, "Sending DNS queries for %s to ", topdomain);
+	for (int a = 0; a < nameserv_addrs_len; a++)
+		fprintf(stderr, "%s%s", format_addr(&nameserv_addrs[a], nameservaddr_len), (a != nameserv_addrs_len-1) ?  ", " : "");
+	fprintf(stderr, "\n");
 
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
 		retval = 1;

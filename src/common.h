@@ -67,6 +67,10 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 # define DONT_FRAG_VALUE 1
 #endif
 
+#ifndef GITREVISION
+#define GITREVISION "GIT"
+#endif
+
 #define T_PRIVATE 65399
 /* Undefined RR type; "private use" range, see http://www.bind9.net/dns-parameters */
 #define T_UNSET 65432

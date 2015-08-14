@@ -24,7 +24,8 @@ void client_stop();
 enum connection client_get_conn();
 const char *client_get_raw_addr();
 
-void client_set_nameserver(struct sockaddr_storage *, int);
+void client_rotate_nameserver();
+void client_set_nameservers(struct sockaddr_storage *, int);
 void client_set_topdomain(const char *cp);
 void client_set_password(const char *cp);
 int client_set_qtype(char *qtype);

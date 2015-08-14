@@ -62,8 +62,10 @@ static void handshake_lazyoff(int dns_fd);
 static int running;
 static const char *password;
 
-static struct sockaddr_storage nameserv;
-static int nameserv_len;
+/* Nameserver/domain info */
+static struct sockaddr_storage *nameserv_addrs;
+static int nameserv_addrs_len;
+static int current_nameserver;
 static struct sockaddr_storage raw_serv;
 static int raw_serv_len;
 static const char *topdomain;
@@ -137,6 +139,8 @@ client_init()
 	inpkt.len = 0;
 	inpkt.seqno = 0;
 	inpkt.fragment = 0;
+
+	current_nameserver = 0;
 }
 
 void
@@ -152,10 +156,10 @@ client_get_conn()
 }
 
 void
-client_set_nameserver(struct sockaddr_storage *addr, int addrlen)
+client_set_nameservers(struct sockaddr_storage *addr, int addrslen)
 {
-	memcpy(&nameserv, addr, addrlen);
-	nameserv_len = addrlen;
+	nameserv_addrs = addr;
+	nameserv_addrs_len = addrslen;
 }
 
 void
@@ -246,6 +250,14 @@ client_get_raw_addr()
 	return format_addr(&raw_serv, raw_serv_len);
 }
 
+void
+client_rotate_nameserver()
+{
+	current_nameserver ++;
+	if (current_nameserver >= nameserv_addrs_len)
+		current_nameserver = 0;
+}
+
 static void
 send_query(int fd, char *hostname)
 {
@@ -273,7 +285,10 @@ send_query(int fd, char *hostname)
 	fprintf(stderr, "  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
 #endif
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&nameserv, nameserv_len);
+	sendto(fd, packet, len, 0, (struct sockaddr*) &nameserv_addrs[current_nameserver],
+			sizeof(struct sockaddr_storage));
+
+	client_rotate_nameserver();
 
 	/* There are DNS relays that time out quickly but don't send anything
 	   back on timeout.
@@ -798,13 +813,14 @@ tunnel_dns(int tun_fd, int dns_fd)
 	int up_ack_fragment;
 	int new_down_seqno;
 	int new_down_fragment;
-	struct query q;
+	static struct query q;
 	unsigned long datalen;
-	char buf[64*1024];
+	static char buf[64*1024];
 	int read;
 	int send_something_now = 0;
 
-	memset(q.name, 0, sizeof(q.name));
+	memset(q, 0, sizeof(q));
+	memset(buf, 0, sizeof(buf));
 	read = read_dns_withq(dns_fd, tun_fd, buf, sizeof(buf), &q);
 
 	if (conn != CONN_DNS_NULL)
