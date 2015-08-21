@@ -504,7 +504,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 }
 #else
 int
-write_tun(int tun_fd, char *data, size_t len)
+write_tun(int tun_fd, uint8_t *data, size_t len)
 {
 #if defined (FREEBSD) || defined (NETBSD)
 	/* FreeBSD/NetBSD has no header */
@@ -545,7 +545,7 @@ write_tun(int tun_fd, char *data, size_t len)
 }
 
 ssize_t
-read_tun(int tun_fd, char *buf, size_t len)
+read_tun(int tun_fd, uint8_t *buf, size_t len)
 {
 #if defined (FREEBSD) || defined (NETBSD)
 	/* FreeBSD/NetBSD has no header */

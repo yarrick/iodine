@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
- * 2006-2009 Bjorn Andersson <flex@kryo.se>
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>,
+ * 2015 Frekk van Blagh <frekk@frekkworks.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -132,7 +133,7 @@ client_init()
 	// TODO: user-set window size (command line option)
 	outbuf = window_buffer_init(100, 10, hostname_maxlen, WINDOW_SENDING);
 	/* Incoming buffer max fragsize doesn't matter */
-	inbuf = window_buffer_init(100, 10, 1200, WINDOW_RECVING);
+	inbuf = window_buffer_init(128, 10, MAX_FRAGSIZE, WINDOW_RECVING);
 
 	next_downstream_ack = -1;
 	current_nameserver = 0;
@@ -362,13 +363,33 @@ is_sending()
 	return (outbuf->numitems > 0);
 }
 
+static void
+send_ping(int fd, int ping_response) // TODO: setup window sync stuff in ping
+{
+	if (conn == CONN_DNS_NULL) {
+		char data[4];
+
+		data[0] = userid;
+		data[1] = inbuf->start_seq_id & 0xff;
+		data[2] = outbuf->start_seq_id & 0xff;
+		data[3] = outbuf->windowsize & 0xff;
+		data[4] = inbuf->windowsize & 0xff;
+		data[5] = ping_response & 1;
+		data[6] = (rand_seed >> 8) & 0xff;
+		data[7] = (rand_seed >> 0) & 0xff;
+		rand_seed++;
+
+		send_packet(fd, 'p', data, sizeof(data));
+	} else {
+		send_raw(fd, NULL, 0, userid, RAW_HDR_CMD_PING);
+	}
+}
 
 static void
 send_next_frag(int fd)
 /* Sends next available fragment of data from the outgoing window buffer */
 {
 	static uint8_t buf[MAX_FRAGSIZE];
-	size_t len;
 	int code;
 	static int datacmc = 0;
 	static char *datacmcchars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -381,13 +402,13 @@ send_next_frag(int fd)
 		if (is_sending()) {
 			/* There is stuff to send but we're out of sync, so send a ping
 			 * to get things back in order and keep the packets flowing */
-			send_ping(fd);
+			send_ping(fd, 1);
 		}
 		return; /* nothing to send - why was this called? */
 	}
 
 	/* Note: must be same, or smaller than send_fragsize_probe() */
-	len = build_hostname(buf, sizeof(buf), f->data, f->len, topdomain, dataenc, hostname_maxlen);
+	build_hostname((char *)buf, sizeof(buf), (char *)f->data, f->len, topdomain, dataenc, hostname_maxlen);
 
 	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
 
@@ -411,29 +432,7 @@ send_next_frag(int fd)
 	if (datacmc >= 36)
 		datacmc = 0;
 
-	send_query(fd, buf);
-}
-
-static void
-send_ping(int fd, int ping_response) // TODO: setup window sync stuff in ping
-{
-	if (conn == CONN_DNS_NULL) {
-		char data[4];
-
-		data[0] = userid;
-		data[1] = inbuf->start_seq_id & 0xff;
-		data[2] = outbuf->start_seq_id & 0xff;
-		data[3] = outbuf->windowsize & 0xff;
-		data[4] = inbuf->windowsize & 0xff;
-		data[5] = ping_response & 1;
-		data[6] = (rand_seed >> 8) & 0xff;
-		data[7] = (rand_seed >> 0) & 0xff;
-		rand_seed++;
-
-		send_packet(fd, 'p', data, sizeof(data));
-	} else {
-		send_raw(fd, NULL, 0, userid, RAW_HDR_CMD_PING);
-	}
+	send_query(fd, (char *)buf);
 }
 
 static void
@@ -574,7 +573,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 }
 
 static int
-read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, int buflen, struct query *q)
+read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 /* Returns -1 on receive error or decode error, including DNS error replies.
    Returns 0 on replies that could be correct but are useless, and are not
    DNS error replies.
@@ -671,7 +670,7 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, int buflen, struct query *q
 		r -= RAW_HDR_LEN;
 		datalen = sizeof(buf);
 		if (uncompress((uint8_t*)buf, &datalen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
-			write_tun(tun_fd, buf, datalen);
+			write_tun(tun_fd, (uint8_t*)buf, datalen);
 		}
 
 		/* don't process any further */
@@ -766,15 +765,27 @@ static int
 parse_data(uint8_t *data, size_t len, fragment *f)
 {
 	memset(f, 0, sizeof(fragment));
-	f->seqID = data[0];
-	f->start = data[3] & 1;
-	f->end = (data[3] >> 1) & 1;
-	f->is_nack = (data[3] >> 2) & 1;
-	f->ack_other = (data[3] >> 3) & 1 ? data[1] : -1;
-	f->compressed = (data[3] >> 4) & 1;
-	f->len = len - 3;
-	memcpy(f->data, data + 3, MIN(f->len, sizeof(f->data)));
-	return (data[3] >> 5) & 1; /* return ping flag (if corresponding query was a ping) */
+	int ping = (data[3] >> 5) & 1;
+	if (!ping) {
+		f->seqID = data[0];
+		f->start = data[3] & 1;
+		f->end = (data[3] >> 1) & 1;
+		f->is_nack = (data[3] >> 2) & 1;
+		f->ack_other = (data[3] >> 3) & 1 ? data[1] : -1;
+		f->compressed = (data[3] >> 4) & 1;
+		f->len = len - 3;
+		memcpy(f->data, data + 3, MIN(f->len, sizeof(f->data)));
+	} else { /* Handle ping stuff */
+		if (len != 5) return 1; /* invalid packet - continue */
+		static unsigned in_start_seq, out_start_seq, in_wsize, out_wsize;
+		out_start_seq = data[0];
+		in_start_seq = data[1];
+		in_wsize = data[3];
+		out_wsize = data[4];
+		warnx("Pingy thingy received.");
+		// TODO: handle pings
+	}
+	return ping; /* return ping flag (if corresponding query was a ping) */
 }
 
 static int
@@ -825,7 +836,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	memset(&q, 0, sizeof(q));
 	memset(buf, 0, sizeof(buf));
 	memset(cbuf, 0, sizeof(cbuf));
-	read = read_dns_withq(dns_fd, tun_fd, cbuf, sizeof(cbuf), &q);
+	read = read_dns_withq(dns_fd, tun_fd, (char *)cbuf, sizeof(cbuf), &q);
 
 	if (conn != CONN_DNS_NULL)
 		return 1;  /* everything already done */
@@ -895,9 +906,9 @@ tunnel_dns(int tun_fd, int dns_fd)
 	/* Decode the downstream data header and fragment-ify ready for processing */
 	res = parse_data(cbuf, read, &f);
 
-	/* if this response was a reverse ping/response to a ping: do something different? */
+	/* if this response was a reverse ping/response to a ping, we need to do something */
 	if (res) {
-		// TODO: handle pings to resync window
+		goto skip_recv;
 	}
 
 	window_ack(outbuf, f.ack_other);
@@ -954,6 +965,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		send_something_now = 1;
 	}
 
+	skip_recv:
 	/* Move window along after doing all data processing */
 	window_tick(inbuf);
 
@@ -968,7 +980,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 	/* Send ping if we didn't send anything yet */
 	if (send_something_now) {
-		send_ping(dns_fd);
+		send_ping(dns_fd, 0);
 		send_ping_soon = 0;
 	}
 
@@ -1031,10 +1043,10 @@ client_tunnel(int tun_fd, int dns_fd)
 					send_next_frag(dns_fd);
 				} else {
 					outbuf->resends = 0;
-					send_ping(dns_fd);
+					send_ping(dns_fd, 1);
 				}
 			} else {
-				send_ping(dns_fd);
+				send_ping(dns_fd, 0);
 			}
 			send_ping_soon = 0;
 
@@ -2324,7 +2336,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 			fragsize = handshake_autoprobe_fragsize(dns_fd);
 			if (fragsize > MAX_FRAGSIZE) {
 				/* This is very unlikely except perhaps over LAN */
-				fprintf(stderr, "Can transfer fragsize of %d, however iodine has been compiled with MAX_FRAGSIZE = %d. To fully utilize this connection, please recompile iodine/iodined.");
+				fprintf(stderr, "Can transfer fragsize of %d, however iodine has been compiled with MAX_FRAGSIZE = %d. To fully utilize this connection, please recompile iodine/iodined.", fragsize, MAX_FRAGSIZE);
 				fragsize = MAX_FRAGSIZE;
 			}
 			if (!fragsize) {

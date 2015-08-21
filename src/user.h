@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
- * 2006-2009 Bjorn Andersson <flex@kryo.se>
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>,
+ * 2015 Frekk van Blagh <frekk@frekkworks.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,21 +19,10 @@
 #ifndef __USER_H__
 #define __USER_H__
 
+#include "window.h"
+#include "server.h"
+
 #define USERS 16
-
-#define OUTPACKETQ_LEN 4		/* Note: 16 users * 1 packet = 1MB */
-/* Undefine to have no queue for packets coming in from tun device, which may
-   lead to massive dropping in multi-user situations with high traffic. */
-
-#define DNSCACHE_LEN 4
-/* Undefine to disable. Should be less than 18; also see comments in iodined.c */
-
-
-#define QMEMPING_LEN 30
-/* Max advisable: 64k/2 = 32000. Total mem usage: QMEMPING_LEN * USERS * 6 bytes */
-
-#define QMEMDATA_LEN 15
-/* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 6 bytes */
 
 struct tun_user {
 	char id;
@@ -48,13 +38,11 @@ struct tun_user {
 	struct query q;
 	struct query q_sendrealsoon;
 	int q_sendrealsoon_new;
-	struct packet inpacket;
-	struct packet outpacket;
-	int outfragresent;
+	struct frag_buffer *incoming;
+	struct frag_buffer *outgoing;
+	int next_upstream_ack;
 	struct encoder *encoder;
 	char downenc;
-	int out_acked_seqno;
-	int out_acked_fragment;
 	int fragsize;
 	enum connection conn;
 	int lazy;
@@ -64,11 +52,6 @@ struct tun_user {
 	unsigned char qmemdata_cmc[QMEMDATA_LEN * 4];
 	unsigned short qmemdata_type[QMEMDATA_LEN];
 	int qmemdata_lastfilled;
-#ifdef OUTPACKETQ_LEN
-	struct packet outpacketq[OUTPACKETQ_LEN];
-	int outpacketq_nexttouse;
-	int outpacketq_filled;
-#endif
 #ifdef DNSCACHE_LEN
 	struct query dnscache_q[DNSCACHE_LEN];
 	char dnscache_answer[DNSCACHE_LEN][4096];
@@ -78,11 +61,17 @@ struct tun_user {
 };
 
 extern struct tun_user *users;
+extern int created_users;
+
+int user_sending(int user);
+int all_users_waiting_to_send();
+int user_active(int i);
+int check_authenticated_user_and_ip(int userid, struct query *q);
+int check_user_and_ip(int userid, struct query *q);
 
 int init_users(in_addr_t, int);
 const char* users_get_first_ip();
 int find_user_by_ip(uint32_t);
-int all_users_waiting_to_send();
 int find_available_user();
 void user_switch_codec(int userid, struct encoder *enc);
 void user_set_conn_type(int userid, enum connection c);

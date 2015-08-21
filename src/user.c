@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
- * 2006-2009 Bjorn Andersson <flex@kryo.se>
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>,
+ * 2015 Frekk van Blagh <frekk@frekkworks.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,9 +34,12 @@
 #include "common.h"
 #include "encoding.h"
 #include "user.h"
+#include "window.h"
 
 struct tun_user *users;
 unsigned usercount;
+int created_users;
+
 
 int
 init_users(in_addr_t my_ip, int netbits)
@@ -60,6 +64,7 @@ init_users(in_addr_t my_ip, int netbits)
 	maxusers = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
 	usercount = MIN(maxusers, USERS);
 
+	if (users) free(users);
 	users = calloc(usercount, sizeof(struct tun_user));
 	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
@@ -74,11 +79,7 @@ init_users(in_addr_t my_ip, int netbits)
 		}
 		users[i].tun_ip = ip;
 		net.s_addr = ip;
-		users[i].disabled = 0;
-		users[i].authenticated = 0;
-		users[i].authenticated_raw = 0;
-		users[i].active = 0;
- 		/* Rest is reset on login ('V' packet) */
+ 		/* Rest is reset on login ('V' packet) or already 0 */
 	}
 
 	return usercount;
@@ -95,75 +96,55 @@ users_get_first_ip()
 int
 find_user_by_ip(uint32_t ip)
 {
-	int ret;
-	int i;
-
-	ret = -1;
-	for (i = 0; i < usercount; i++) {
-		if (users[i].active &&
-			users[i].authenticated &&
-			!users[i].disabled &&
-			users[i].last_pkt + 60 > time(NULL) &&
-			ip == users[i].tun_ip) {
-			ret = i;
-			break;
+	for (int i = 0; i < usercount; i++) {
+		if (user_active(i) && users[i].authenticated && ip == users[i].tun_ip) {
+			return i;
 		}
 	}
-	return ret;
+	return -1;
+}
+
+int
+user_sending(int user)
+{
+	return users[user].outgoing->numitems > 0;
+}
+
+int
+user_active(int i)
+{
+	return users[i].active && !users[i].disabled && users[i].last_pkt + 60 > time(NULL);
 }
 
 int
 all_users_waiting_to_send()
 /* If this returns true, then reading from tun device is blocked.
-   So only return true when all clients have at least one packet in
-   the outpacket-queue, so that sending back-to-back is possible
+   So only return true when all clients have at least one fragment in
+   the outgoing buffer, so that sending back-to-back is possible
    without going through another select loop.
 */
 {
-	time_t now;
-	int ret;
-	int i;
-
-	ret = 1;
-	now = time(NULL);
-	for (i = 0; i < usercount; i++) {
-		if (users[i].active && !users[i].disabled &&
-			users[i].last_pkt + 60 > now &&
-			((users[i].conn == CONN_RAW_UDP) ||
-			((users[i].conn == CONN_DNS_NULL)
-#ifdef OUTPACKETQ_LEN
-				&& users[i].outpacketq_filled < 1
-#else
-				&& users[i].outpacket.len == 0
-#endif
-			))) {
-
-			ret = 0;
-			break;
-		}
-	}
-	return ret;
+	for (int i = 0; i < usercount; i++)
+		if (!(user_active(i) && user_sending(i))) return 0;
+	return 1;
 }
 
 int
 find_available_user()
 {
-	int ret = -1;
-	int i;
-	for (i = 0; i < usercount; i++) {
+	for (int u = 0; u < usercount; u++) {
 		/* Not used at all or not used in one minute */
-		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
-			users[i].active = 1;
-			users[i].authenticated = 0;
-			users[i].authenticated_raw = 0;
-			users[i].last_pkt = time(NULL);
-			users[i].fragsize = 4096;
-			users[i].conn = CONN_DNS_NULL;
-			ret = i;
-			break;
+		if (!user_active(u)) {
+			/* reset all stats */
+			memset(&users[u], 0, sizeof(users[u]));
+			users[u].active = 1;
+			users[u].last_pkt = time(NULL);
+			users[u].fragsize = MAX_FRAGSIZE;
+			users[u].conn = CONN_DNS_NULL;
+			return u;
 		}
 	}
-	return ret;
+	return -1;
 }
 
 void
@@ -187,3 +168,60 @@ user_set_conn_type(int userid, enum connection c)
 	users[userid].conn = c;
 }
 
+/* This will not check that user has passed login challenge */
+int
+check_user_and_ip(int userid, struct query *q)
+{
+	/* Note: duplicate in handle_raw_login() except IP-address check */
+
+	if (userid < 0 || userid >= created_users ) {
+		return 1;
+	}
+	if (!users[userid].active || users[userid].disabled) {
+		return 1;
+	}
+	if (users[userid].last_pkt + 60 < time(NULL)) {
+		return 1;
+	}
+
+	/* return early if IP checking is disabled */
+	if (!check_ip) {
+		return 0;
+	}
+
+	if (q->from.ss_family != users[userid].host.ss_family) {
+		return 1;
+	}
+	/* Check IPv4 */
+	if (q->from.ss_family == AF_INET) {
+		struct sockaddr_in *expected, *received;
+
+		expected = (struct sockaddr_in *) &(users[userid].host);
+		received = (struct sockaddr_in *) &(q->from);
+		return memcmp(&(expected->sin_addr), &(received->sin_addr), sizeof(struct in_addr));
+	}
+	/* Check IPv6 */
+	if (q->from.ss_family == AF_INET6) {
+		struct sockaddr_in6 *expected, *received;
+
+		expected = (struct sockaddr_in6 *) &(users[userid].host);
+		received = (struct sockaddr_in6 *) &(q->from);
+		return memcmp(&(expected->sin6_addr), &(received->sin6_addr), sizeof(struct in6_addr));
+	}
+	/* Unknown address family */
+	return 1;
+}
+
+/* This checks that user has passed normal (non-raw) login challenge */
+int
+check_authenticated_user_and_ip(int userid, struct query *q)
+{
+	int res = check_user_and_ip(userid, q);
+	if (res)
+		return res;
+
+	if (!users[userid].authenticated)
+		return 1;
+
+	return 0;
+}

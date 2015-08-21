@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Frekk van Blagh
+ * Copyright (c) 2015 Frekk van Blagh <frekk@frekkworks.com>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,7 +18,7 @@
 #define __WINDOW_H__
 
 #define MAX_SEQ_ID 256
-#define MAX_FRAGSIZE 2048
+#define MAX_FRAGSIZE 4096
 #define ACK_TIMEOUT 5
 
 #define WINDOW_SENDING 1
@@ -95,7 +95,7 @@ fragment *window_get_next_sending_fragment(struct frag_buffer *w, int other_ack)
 int window_get_next_ack(struct frag_buffer *w);
 
 /* Sets the fragment with seqid to be ACK'd (SEND) */
-void window_ack(struct frag_buffer *w, unsigned seqid);
+void window_ack(struct frag_buffer *w, int seqid);
 
 /* To be called after all other processing has been done
  * when anything happens (moves window etc) (SEND/RECV) */
