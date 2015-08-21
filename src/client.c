@@ -55,6 +55,7 @@
 #include "login.h"
 #include "tun.h"
 #include "version.h"
+#include "window.h"
 #include "client.h"
 
 static void handshake_lazyoff(int dns_fd);
@@ -72,20 +73,18 @@ static const char *topdomain;
 
 static uint16_t rand_seed;
 
-/* Current up/downstream IP packet */
-static struct packet outpkt;
-static struct packet inpkt;
-int outchunkresent = 0;
+/* Current up/downstream window data */
+static struct frag_buffer *outbuf;
+static struct frag_buffer *inbuf;
+/* Next downstream seqID to be ACK'd (-1 if none pending) */
+static int next_downstream_ack;
 
 /* My userid at the server */
 static char userid;
 static char userid_char;		/* used when sending (lowercase) */
 static char userid_char2;		/* also accepted when receiving (uppercase) */
 
-/* DNS id for next packet */
 static uint16_t chunkid;
-static uint16_t chunkid_prev;
-static uint16_t chunkid_prev2;
 
 /* Base32 encoder used for non-data packets and replies */
 static struct encoder *b32;
@@ -129,17 +128,13 @@ client_init()
 	conn = CONN_DNS_NULL;
 
 	chunkid = ((unsigned int) rand()) & 0xFFFF;
-	chunkid_prev = 0;
-	chunkid_prev2 = 0;
 
-	outpkt.len = 0;
-	outpkt.seqno = 0;
-	outpkt.fragment = 0;
-	outchunkresent = 0;
-	inpkt.len = 0;
-	inpkt.seqno = 0;
-	inpkt.fragment = 0;
+	// TODO: user-set window size (command line option)
+	outbuf = window_buffer_init(100, 10, hostname_maxlen, WINDOW_SENDING);
+	/* Incoming buffer max fragsize doesn't matter */
+	inbuf = window_buffer_init(100, 10, 1200, WINDOW_RECVING);
 
+	next_downstream_ack = -1;
 	current_nameserver = 0;
 }
 
@@ -265,8 +260,6 @@ send_query(int fd, char *hostname)
 	struct query q;
 	size_t len;
 
-	chunkid_prev2 = chunkid_prev;
-	chunkid_prev = chunkid;
 	chunkid += 7727;
 	if (chunkid == 0)
 		/* 0 is used as "no-query" in iodined.c */
@@ -342,15 +335,17 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd)
 }
 
 static void
-send_raw_data(int dns_fd)
+send_raw_data(int dns_fd) // TODO: fix send_raw
 {
-	send_raw(dns_fd, outpkt.data, outpkt.len, userid, RAW_HDR_CMD_DATA);
-	outpkt.len = 0;
+	errx(1, "send_raw_data NEEDS FIXING!");
+	/*send_raw(dns_fd, outpkt.data, outpkt.len, userid, RAW_HDR_CMD_DATA);
+	outpkt.len = 0;*/
 }
 
 
 static void
 send_packet(int fd, char cmd, const char *data, const size_t datalen)
+/* Base32 encodes data and sends as single DNS query */
 {
 	char buf[4096];
 
@@ -364,71 +359,76 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 static inline int
 is_sending()
 {
-	return (outpkt.len != 0);
+	return (outbuf->numitems > 0);
 }
 
-static void
-send_chunk(int fd)
-{
-	char buf[4096];
-	int avail;
-	int code;
-	char *p;
-	static int datacmc = 0;
-	char *datacmcchars = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-	p = outpkt.data;
-	p += outpkt.offset;
-	avail = outpkt.len - outpkt.offset;
+static void
+send_next_frag(int fd)
+/* Sends next available fragment of data from the outgoing window buffer */
+{
+	static uint8_t buf[MAX_FRAGSIZE];
+	size_t len;
+	int code;
+	static int datacmc = 0;
+	static char *datacmcchars = "abcdefghijklmnopqrstuvwxyz0123456789";
+	fragment *f;
+
+	/* Get next fragment to send */
+	f = window_get_next_sending_fragment(outbuf, next_downstream_ack);
+	window_tick(outbuf);
+	if (f == NULL) {
+		if (is_sending()) {
+			/* There is stuff to send but we're out of sync, so send a ping
+			 * to get things back in order and keep the packets flowing */
+			send_ping(fd);
+		}
+		return; /* nothing to send - why was this called? */
+	}
 
 	/* Note: must be same, or smaller than send_fragsize_probe() */
-	outpkt.sentlen = build_hostname(buf + 5, sizeof(buf) - 5, p, avail,
-					topdomain, dataenc, hostname_maxlen);
+	len = build_hostname(buf, sizeof(buf), f->data, f->len, topdomain, dataenc, hostname_maxlen);
 
 	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
 
 	buf[0] = userid_char;		/* First byte is hex userid */
 
-	code = ((outpkt.seqno & 7) << 2) | ((outpkt.fragment & 15) >> 2);
-	buf[1] = b32_5to8(code); /* Second byte is 3 bits seqno, 2 upper bits fragment count */
+	buf[1] = datacmcchars[datacmc]; /* Second byte is data-CMC */
 
-	code = ((outpkt.fragment & 3) << 3) | (inpkt.seqno & 7);
-	buf[2] = b32_5to8(code); /* Third byte is 2 bits lower fragment count, 3 bits downstream packet seqno */
+	code = (f->seqID & 0xF8) >> 3;
+	buf[2] = b32_5to8(code); /* Second byte is 5 bits seqno */
 
-	code = ((inpkt.fragment & 15) << 1) | (outpkt.sentlen == avail);
-	buf[3] = b32_5to8(code); /* Fourth byte is 4 bits downstream fragment count, 1 bit last frag flag */
+	code = ((f->seqID & 7) << 2) |  ((f->ack_other & 0xC0) >> 6);
+	buf[3] = b32_5to8(code); /* Third byte is 3 bits seqno, 2 bits downstream ACK */
 
-	buf[4] = datacmcchars[datacmc];	/* Fifth byte is data-CMC */
+	code = ((f->ack_other & 0x3E) >> 1);
+	buf[4] = b32_5to8(code); /* Fourth byte is 5 bits downstream ACK */
+
+	code = (f->ack_other & 1) << 4 | ((f->ack_other < 0 ? 0 : 1) << 3) | (f->is_nack << 2) | (f->start << 1) | f->end;
+	buf[5] = b32_5to8(code); /* Fifth byte is 1 bit downstream ACK, bit flags isACK, isNACK, first, last */
+
 	datacmc++;
 	if (datacmc >= 36)
 		datacmc = 0;
-
-#if 0
-	fprintf(stderr, "  Send: down %d/%d up %d/%d, %d bytes\n",
-		inpkt.seqno, inpkt.fragment, outpkt.seqno, outpkt.fragment,
-		outpkt.sentlen);
-#endif
 
 	send_query(fd, buf);
 }
 
 static void
-send_ping(int fd)
+send_ping(int fd, int ping_response) // TODO: setup window sync stuff in ping
 {
 	if (conn == CONN_DNS_NULL) {
 		char data[4];
 
 		data[0] = userid;
-		data[1] = ((inpkt.seqno & 7) << 4) | (inpkt.fragment & 15);
-		data[2] = (rand_seed >> 8) & 0xff;
-		data[3] = (rand_seed >> 0) & 0xff;
-
+		data[1] = inbuf->start_seq_id & 0xff;
+		data[2] = outbuf->start_seq_id & 0xff;
+		data[3] = outbuf->windowsize & 0xff;
+		data[4] = inbuf->windowsize & 0xff;
+		data[5] = ping_response & 1;
+		data[6] = (rand_seed >> 8) & 0xff;
+		data[7] = (rand_seed >> 0) & 0xff;
 		rand_seed++;
-
-#if 0
-		fprintf(stderr, "  Send: down %d/%d         (ping)\n",
-			inpkt.seqno, inpkt.fragment);
-#endif
 
 		send_packet(fd, 'p', data, sizeof(data));
 	} else {
@@ -574,8 +574,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 }
 
 static int
-read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
-/* FIXME: tun_fd needed for raw handling */
+read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, int buflen, struct query *q)
 /* Returns -1 on receive error or decode error, including DNS error replies.
    Returns 0 on replies that could be correct but are useless, and are not
    DNS error replies.
@@ -764,36 +763,43 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char c1, char c2, int timeo
 }
 
 static int
+parse_data(uint8_t *data, size_t len, fragment *f)
+{
+	memset(f, 0, sizeof(fragment));
+	f->seqID = data[0];
+	f->start = data[3] & 1;
+	f->end = (data[3] >> 1) & 1;
+	f->is_nack = (data[3] >> 2) & 1;
+	f->ack_other = (data[3] >> 3) & 1 ? data[1] : -1;
+	f->compressed = (data[3] >> 4) & 1;
+	f->len = len - 3;
+	memcpy(f->data, data + 3, MIN(f->len, sizeof(f->data)));
+	return (data[3] >> 5) & 1; /* return ping flag (if corresponding query was a ping) */
+}
+
+static int
 tunnel_tun(int tun_fd, int dns_fd)
 {
-	unsigned long outlen;
-	unsigned long inlen;
-	char out[64*1024];
-	char in[64*1024];
+	size_t outlen, inlen;
+	uint8_t out[64*1024];
+	uint8_t in[64*1024];
 	ssize_t read;
 
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return -1;
 
-	/* We may be here only to empty the tun device; then return -1
-	   to force continue in select loop. */
-	if (is_sending())
+	/* Give outgoing buffer all new data if it can hold it */
+	if (window_buffer_available(outbuf) > read / MAX_FRAGSIZE)
 		return -1;
 
 	outlen = sizeof(out);
 	inlen = read;
-	compress2((uint8_t*)out, &outlen, (uint8_t*)in, inlen, 9);
+	compress2(out, &outlen, in, inlen, 9);
 
-	memcpy(outpkt.data, out, MIN(outlen, sizeof(outpkt.data)));
-	outpkt.sentlen = 0;
-	outpkt.offset = 0;
-	outpkt.seqno = (outpkt.seqno + 1) & 7;
-	outpkt.len = outlen;
-	outpkt.fragment = 0;
-	outchunkresent = 0;
+	window_add_outgoing_data(outbuf, out, outlen, 1);
 
 	if (conn == CONN_DNS_NULL) {
-		send_chunk(dns_fd);
+		send_next_frag(dns_fd);
 
 		send_ping_soon = 0;
 	} else {
@@ -809,19 +815,17 @@ tunnel_dns(int tun_fd, int dns_fd)
 	static long packrecv = 0;
 	static long packrecv_oos = 0;
 	static long packrecv_servfail = 0;
-	int up_ack_seqno;
-	int up_ack_fragment;
-	int new_down_seqno;
-	int new_down_fragment;
 	static struct query q;
-	unsigned long datalen;
-	static char buf[64*1024];
-	int read;
+	size_t datalen;
+	static uint8_t buf[64*1024], cbuf[64*1024];
+	static fragment f;
+	int read, compressed, res;
 	int send_something_now = 0;
 
-	memset(q, 0, sizeof(q));
+	memset(&q, 0, sizeof(q));
 	memset(buf, 0, sizeof(buf));
-	read = read_dns_withq(dns_fd, tun_fd, buf, sizeof(buf), &q);
+	memset(cbuf, 0, sizeof(cbuf));
+	read = read_dns_withq(dns_fd, tun_fd, cbuf, sizeof(cbuf), &q);
 
 	if (conn != CONN_DNS_NULL)
 		return 1;  /* everything already done */
@@ -842,7 +846,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return -1;	/* nothing done */
 	}
 
-	if (read < 2) {
+	if (read < 3) {
 		/* Maybe SERVFAIL etc. Send ping to get things back in order,
 		   but wait a bit to prevent fast ping-pong loops. */
 
@@ -874,12 +878,11 @@ tunnel_dns(int tun_fd, int dns_fd)
 		if (read == 1)
 			fprintf(stderr, "   q=%c id %5d 1-byte illegal \"QMEM\" reply\n", q.name[0], q.id);
 #endif
-
 		send_ping_soon = 900;
 		return -1;	/* nothing done */
 	}
 
-	if (read == 5 && !strncmp("BADIP", buf, 5)) {
+	if (read == 5 && !strncmp("BADIP", (char *)cbuf, 5)) {
 		warnx("BADIP: Server rejected sender IP address (maybe iodined -c will help), or server kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.");
 		return -1;	/* nothing done */
 	}
@@ -889,216 +892,79 @@ tunnel_dns(int tun_fd, int dns_fd)
 		send_ping_soon = 0;
 	}
 
-	/* Decode the data header, update seqno and frag;
-	   already checked read>=2
-	   Note that buf[] gets overwritten when down-pkt complete */
-	new_down_seqno = (buf[1] >> 5) & 7;
-	new_down_fragment = (buf[1] >> 1) & 15;
-	up_ack_seqno = (buf[0] >> 4) & 7;
-	up_ack_fragment = buf[0] & 15;
+	/* Decode the downstream data header and fragment-ify ready for processing */
+	res = parse_data(cbuf, read, &f);
 
-#if 0
-	fprintf(stderr, "				Recv: id %5d down %d/%d up %d/%d, %d bytes\n",
-		q.id, new_down_seqno, new_down_fragment, up_ack_seqno,
-		up_ack_fragment, read);
-#endif
-
-	/* Downstream data traffic */
-
-	if (read > 2 && new_down_seqno != inpkt.seqno &&
-	    recent_seqno(inpkt.seqno, new_down_seqno)) {
-		/* This is the previous seqno, or a bit earlier.
-		   Probably out-of-sequence dupe due to unreliable
-		   intermediary DNS. Don't get distracted, but send
-		   ping quickly to get things back in order.
-		   Ping will send our current seqno idea.
-		   If it's really a new packet that skipped multiple seqnos
-		   (why??), server will re-send and drop a few times and
-		   eventually everything will work again. */
-		read = 2;
-		send_ping_soon = 500;
-		/* Still process upstream ack, if any */
+	/* if this response was a reverse ping/response to a ping: do something different? */
+	if (res) {
+		// TODO: handle pings to resync window
 	}
 
+	window_ack(outbuf, f.ack_other);
+
+	/* In lazy mode, we shouldn't get immediate replies to our most-recent
+	 query, only during heavy data transfer. Since this means the server
+	 doesn't have any packets to send, send one relatively fast (but not
+	 too fast, to avoid runaway ping-pong loops..) */
+	if (f.len == 0) {
+		send_ping_soon = 700;
+		return -1;
+	}
+
+	/* Get next ACK if nothing already pending */
+	if (next_downstream_ack < 0) {
+		if ((next_downstream_ack = window_get_next_ack(inbuf)) < 0) {
+			next_downstream_ack = -1;
+		} else {
+			send_something_now = 1;
+		}
+	}
+
+	/* Downstream data traffic */
+	if (!window_process_incoming_fragment(inbuf, &f)) {
+		/* Packet outside window - old, duped and irrelevant */
+		packrecv_oos ++;
+		return -1;	/* nothing done */
+	}
+
+	// TODO: check OOS packet count and send ping to update params
+
+	/* Okay, we have a recent downstream packet */
+	lastdownstreamtime = time(NULL);
 	if (!(packrecv & 0x1000000))
 		packrecv++;
 	send_query_recvcnt++;  /* overflow doesn't matter */
 
-	/* Don't process any non-recent stuff any further.
-	   No need to remember more than 3 ids: in practice any older replies
-	   arrive after new/current replies, and whatever data the old replies
-	   have, it has become useless in the mean time.
-	   Actually, ever since iodined is replying to both the original query
-	   and the last dupe, this hardly triggers any more.
-	 */
-	if (q.id != chunkid && q.id != chunkid_prev && q.id != chunkid_prev2) {
-		packrecv_oos++;
-#if 0
-		fprintf(stderr, "   q=%c Packs received = %8ld  Out-of-sequence = %8ld\n", q.name[0], packrecv, packrecv_oos);
-#endif
-		if (lazymode && packrecv < 1000 && packrecv_oos == 5) {
-			if (selecttimeout > 1)
-				warnx("Hmm, getting some out-of-sequence DNS replies. Setting interval to 1 (use -I1 next time on this network). If data traffic still has large hiccups, try if -L0 works better.");
-			else
-				warnx("Hmm, getting some out-of-sequence DNS replies. If data traffic often has large hiccups, try running with -L0 .");
-			selecttimeout = 1;
-			send_query_sendcnt = 0;
-			send_query_recvcnt = 0;
-		}
-
-		if (send_something_now) {
-			send_ping(dns_fd);
-			send_ping_soon = 0;
-		}
-		return -1;	/* nothing done */
-	}
-#if 0
-	fprintf(stderr, "   q=%c Packs received = %8ld  Out-of-sequence = %8ld\n", q.name[0], packrecv, packrecv_oos);
-#endif
-
-	/* Okay, we have a recent downstream packet */
-	lastdownstreamtime = time(NULL);
-
-	/* In lazy mode, we shouldn't get much replies to our most-recent
-	   query, only during heavy data transfer. Since this means the server
-	   doesn't have any packets left, send one relatively fast (but not
-	   too fast, to avoid runaway ping-pong loops..) */
-	if (q.id == chunkid && lazymode) {
-		if (!send_ping_soon || send_ping_soon > 900)
-			send_ping_soon = 900;
-	}
-
-	if (read == 2 && new_down_seqno != inpkt.seqno &&
-	    !recent_seqno(inpkt.seqno, new_down_seqno)) {
-		/* This is a seqno that we didn't see yet, but it has
-		   no data any more. Possible since iodined will send
-		   fitting packs just once and not wait for ack.
-		   Real data got lost, or will arrive shortly.
-		   Update our idea of the seqno, and drop any waiting
-		   old pack. Send ping to get things back on track. */
-		inpkt.seqno = new_down_seqno;
-		inpkt.fragment = new_down_fragment;
-		inpkt.len = 0;
-		send_ping_soon = 500;
-	}
-
-	while (read > 2) {
-	/* "if" with easy exit */
-
-		if (new_down_seqno != inpkt.seqno) {
-			/* New packet (and not dupe of recent; checked above) */
-			/* Forget any old packet, even if incomplete */
-			inpkt.seqno = new_down_seqno;
-			inpkt.fragment = new_down_fragment;   /* hopefully 0 */
-			inpkt.len = 0;
-		} else if (inpkt.fragment == 0 && new_down_fragment == 0 &&
-			   inpkt.len == 0) {
-			/* Weird situation: we probably got a no-data reply
-			   for this seqno (see above), and the actual data
-			   is following now. */
-			/* okay, nothing to do here, just so that next else-if
-			   doesn't trigger */
-		} else if (new_down_fragment <= inpkt.fragment) {
-			/* Same packet but duplicate fragment, ignore.
-			   If the server didn't get our ack for it, the next
-			   ping or chunk will do that. */
-			send_ping_soon = 500;
-			break;
-		} else if (new_down_fragment > inpkt.fragment + 1) {
-			/* Quite impossible. We missed a fragment, but the
-			   server got our ack for it and is sending the next
-			   fragment already. Don't handle it but let server
-			   re-send and drop. */
-			send_ping_soon = 500;
-			break;
-		}
-		inpkt.fragment = new_down_fragment;
-
-		datalen = MIN(read - 2, sizeof(inpkt.data) - inpkt.len);
-
-		/* we are here only when read > 2, so datalen "always" >=1 */
-
-		/* Skip 2 byte data header and append to packet */
-		memcpy(&inpkt.data[inpkt.len], &buf[2], datalen);
-		inpkt.len += datalen;
-
-		if (buf[1] & 1) { /* If last fragment flag is set */
-			/* Uncompress packet and send to tun */
-			/* RE-USES buf[] */
-			datalen = sizeof(buf);
-			if (uncompress((uint8_t*)buf, &datalen, (uint8_t*) inpkt.data, inpkt.len) == Z_OK) {
+	datalen = window_reassemble_data(inbuf, cbuf, sizeof(cbuf), &compressed);
+	if (datalen != 0) {
+		if (compressed) {
+			if ((res = uncompress(buf, &datalen, cbuf, datalen)) == Z_OK) {
 				write_tun(tun_fd, buf, datalen);
+			} else {
+				warnx("Uncompress failed (%d): reassembled data corrupted or incomplete!", res);
 			}
-			inpkt.len = 0;
-			/* Keep .seqno and .fragment as is, so that we won't
-			   reassemble from duplicate fragments */
-		}
-
-		/* Send anything to ack the received seqno/frag, and get more */
-		if (inpkt.len == 0) {
-			/* was last frag; wait just a trifle because our
-			   tun will probably return TCP-ack immediately.
-			   5msec = 200 DNSreq/sec */
 			send_ping_soon = 5;
-		} else {
-			/* server certainly has more data */
-			send_something_now = 1;
 		}
-
-	        break;
+	} else {
+		/* Send anything to ack the received seqno/frag, and get more */
+		/* was last frag; wait just a trifle because our
+		 tun will probably return TCP-ack immediately.
+		 5msec = 200 DNSreq/sec */
+		/* server certainly has more data */
+		send_something_now = 1;
 	}
+
+	/* Move window along after doing all data processing */
+	window_tick(inbuf);
 
 	/* NOTE: buf[] was overwritten when down-packet complete */
-
-
 	/* Upstream data traffic */
-
 	if (is_sending()) {
-		/* already checked read>=2 */
-#if 0
-		fprintf(stderr, "Got ack for %d,%d - expecting %d,%d - id=%d cur=%d prev=%d prev2=%d\n",
-			up_ack_seqno, up_ack_fragment, outpkt.seqno, outpkt.fragment,
-			q.id, chunkid, chunkid_prev, chunkid_prev2);
-#endif
-
-		if (up_ack_seqno == outpkt.seqno &&
-		    up_ack_fragment == outpkt.fragment) {
-			/* Okay, previously sent fragment has arrived */
-
-			outpkt.offset += outpkt.sentlen;
-			if (outpkt.offset >= outpkt.len) {
-				/* Packet completed */
-				outpkt.offset = 0;
-				outpkt.len = 0;
-				outpkt.sentlen = 0;
-				outchunkresent = 0;
-
-				/* Normally, server still has a query in queue,
-				   but sometimes not. So send a ping.
-				   (Comment this out and you'll see occasional
-				   hiccups.)
-				   But since the server often still has a
-				   query and we can expect a TCP-ack returned
-				   from our tun device quickly in many cases,
-				   don't be too fast.
-				   20msec still is 50 DNSreq/second... */
-				if (!send_ping_soon || send_ping_soon > 20)
-					send_ping_soon = 20;
-			} else {
-				/* More to send */
-				outpkt.fragment++;
-				outchunkresent = 0;
-				send_chunk(dns_fd);
-				send_ping_soon = 0;
-				send_something_now = 0;
-			}
-		}
-		/* else: Some wrong fragment has arrived, or old fragment is
-		   acked again, mostly by ping responses.
-		   Don't resend chunk, usually not needed; select loop will
-		   re-send on timeout (1sec if is_sending()). */
+		/* More to send - next fragment*/
+		send_next_frag(dns_fd);
+		send_ping_soon = 2;
+		send_something_now = 0;
 	}
-
 
 	/* Send ping if we didn't send anything yet */
 	if (send_something_now) {
@@ -1137,20 +1003,17 @@ client_tunnel(int tun_fd, int dns_fd)
 		}
 
 		FD_ZERO(&fds);
-		if (!is_sending() || outchunkresent >= 2) {
-			/* If re-sending upstream data, chances are that
-			   we're several seconds behind already and TCP
-			   will start filling tun buffer with (useless)
-			   retransmits.
-			   Get up-to-date fast by simply dropping stuff,
-			   that's what TCP is designed to handle. */
+		if (window_buffer_available(outbuf) > 5 || 1) {
+			/* Fill up outgoing buffer with available data
+			 * The windowing protocol manages data retransmits, timeouts etc.
+			 * TODO: is this even necessary? tunnel_tun seems to be more useful */
 			FD_SET(tun_fd, &fds);
 		}
 		FD_SET(dns_fd, &fds);
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
 
- 		if (lastdownstreamtime + 60 < time(NULL)) {
+ 		if (difftime(lastdownstreamtime, time(NULL)) >= 60) {
  			warnx("No downstream data received in 60 seconds, shutting down.");
  			running = 0;
  		}
@@ -1159,28 +1022,15 @@ client_tunnel(int tun_fd, int dns_fd)
 			break;
 
 		if (i < 0)
-			err(1, "select");
+			err(1, "select < 0");
 
 		if (i == 0) {
 			/* timeout */
 			if (is_sending()) {
-				/* Re-send current fragment; either frag
-				   or ack probably dropped somewhere.
-				   But problem: no cache-miss-counter,
-				   so hostname will be identical.
-				   Just drop whole packet after 3 retries,
-				   and TCP retransmit will solve it.
-				   NOTE: tun dropping above should be
-				   >=(value_here - 1) */
-				if (outchunkresent < 3) {
-					outchunkresent++;
-					send_chunk(dns_fd);
+				if (outbuf->resends < 3) { // if too many retransmits/timeouts/waiting etc.
+					send_next_frag(dns_fd);
 				} else {
-					outpkt.offset = 0;
-					outpkt.len = 0;
-					outpkt.sentlen = 0;
-					outchunkresent = 0;
-
+					outbuf->resends = 0;
 					send_ping(dns_fd);
 				}
 			} else {
@@ -1199,8 +1049,7 @@ client_tunnel(int tun_fd, int dns_fd)
 				   If chunk sent, sets send_ping_soon=0. */
 			}
 			if (FD_ISSET(dns_fd, &fds)) {
-				if (tunnel_dns(tun_fd, dns_fd) <= 0)
-					continue;
+				tunnel_dns(tun_fd, dns_fd);
 			}
 		}
 	}
@@ -2329,7 +2178,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 		warnx("stopped while autodetecting fragment size (Try setting manually with -m)");
 		return 0;
 	}
-	if (max_fragsize <= 2) {
+	if (max_fragsize <= 6) {
 		/* Tried all the way down to 2 and found no good size.
 		   But we _did_ do all handshake before this, so there must
 		   be some workable connection. */
@@ -2338,8 +2187,8 @@ handshake_autoprobe_fragsize(int dns_fd)
 		warnx("try setting -M to 200 or lower, or try other -T or -O options.");
 		return 0;
 	}
-	/* data header adds 2 bytes */
-	fprintf(stderr, "will use %d-2=%d\n", max_fragsize, max_fragsize - 2);
+	/* data header adds 6 bytes */
+	fprintf(stderr, "will use %d-6=%d\n", max_fragsize, max_fragsize - 6);
 
 	/* need 1200 / 16frags = 75 bytes fragsize */
 	if (max_fragsize < 82) {
@@ -2473,6 +2322,11 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 
 		if (autodetect_frag_size) {
 			fragsize = handshake_autoprobe_fragsize(dns_fd);
+			if (fragsize > MAX_FRAGSIZE) {
+				/* This is very unlikely except perhaps over LAN */
+				fprintf(stderr, "Can transfer fragsize of %d, however iodine has been compiled with MAX_FRAGSIZE = %d. To fully utilize this connection, please recompile iodine/iodined.");
+				fragsize = MAX_FRAGSIZE;
+			}
 			if (!fragsize) {
 				return 1;
 			}

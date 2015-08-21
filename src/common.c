@@ -455,22 +455,6 @@ errx(int eval, const char *fmt, ...)
 }
 #endif
 
-
-int recent_seqno(int ourseqno, int gotseqno)
-/* Return 1 if we've seen gotseqno recently (current or up to 3 back).
-   Return 0 if gotseqno is new (or very old).
-*/
-{
-	int i;
-	for (i = 0; i < 4; i++, ourseqno--) {
-		if (ourseqno < 0)
-			ourseqno = 7;
-		if (gotseqno == ourseqno)
-			return 1;
-	}
-	return 0;
-}
-
 #ifndef WINDOWS32
 /* Set FD_CLOEXEC flag on file descriptor.
  * This stops it from being inherited by system() calls.

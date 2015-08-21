@@ -76,15 +76,8 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #define T_UNSET 65432
 /* Unused RR type, never actually sent */
 
-struct packet
-{
-	int len;		/* Total packet length */
-	int sentlen;		/* Length of chunk currently transmitted */
-	int offset;		/* Current offset */
-	char data[64*1024];	/* The data */
-	char seqno;		/* The packet sequence number */
-	char fragment;		/* Fragment index */
-};
+#define DOWNSTREAM_HDR 3
+#define UPSTREAM_HDR 6
 
 struct query {
 	char name[QUERY_NAME_SIZE];
@@ -133,8 +126,6 @@ void warn(const char *fmt, ...);
 void errx(int eval, const char *fmt, ...);
 void warnx(const char *fmt, ...);
 #endif
-
-int recent_seqno(int , int);
 
 #ifndef WINDOWS32
 void fd_set_close_on_exec(int fd);

@@ -37,6 +37,7 @@
 #endif
 
 #include "common.h"
+#include "version.h"
 #include "tun.h"
 #include "client.h"
 #include "util.h"
@@ -110,10 +111,8 @@ help() {
 
 static void
 version() {
-
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
-	fprintf(stderr, "Git version: %s\n", GITREVISION);
-
+	fprintf(stderr, "Git version: %s\n; protocol version %08X", GITREVISION, PROTOCOL_VERSION);
 	exit(0);
 }
 
