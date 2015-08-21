@@ -135,12 +135,16 @@ find_available_user()
 	for (int u = 0; u < usercount; u++) {
 		/* Not used at all or not used in one minute */
 		if (!user_active(u)) {
+			struct tun_user *user = &users[u];
+			if (user->incoming) window_buffer_destroy(user->incoming);
+			if (user->outgoing) window_buffer_destroy(user->outgoing);
 			/* reset all stats */
-			memset(&users[u], 0, sizeof(users[u]));
-			users[u].active = 1;
-			users[u].last_pkt = time(NULL);
-			users[u].fragsize = MAX_FRAGSIZE;
-			users[u].conn = CONN_DNS_NULL;
+			user->active = 1;
+			user->authenticated = 0;
+			user->authenticated_raw = 0;
+			user->last_pkt = time(NULL);
+			user->fragsize = MAX_FRAGSIZE;
+			user->conn = CONN_DNS_NULL;
 			return u;
 		}
 	}
@@ -177,12 +181,7 @@ check_user_and_ip(int userid, struct query *q)
 	if (userid < 0 || userid >= created_users ) {
 		return 1;
 	}
-	if (!users[userid].active || users[userid].disabled) {
-		return 1;
-	}
-	if (users[userid].last_pkt + 60 < time(NULL)) {
-		return 1;
-	}
+	if (!user_active(userid)) return 1;
 
 	/* return early if IP checking is disabled */
 	if (!check_ip) {

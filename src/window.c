@@ -56,7 +56,8 @@ window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int di
 void
 window_buffer_destroy(struct frag_buffer *w)
 {
-	free(w->frags);
+	if (!w) return;
+	if (w->frags) free(w->frags);
 	free(w);
 }
 
@@ -120,7 +121,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, unsigned maxlen, in
 //		warnx("chunk_start pointing to non-start fragment (%u)!", w->frags[w->chunk_start].seqID);
 		return 0;
 	}
-	*compression = 1;
+	if (compression) *compression = 1;
 
 	fragment *f;
 	size_t i, curseq;
@@ -139,7 +140,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, unsigned maxlen, in
 		memcpy(dest, f->data, MIN(fraglen, maxlen));
 		dest += fraglen;
 		datalen += fraglen;
-		*compression &= f->compressed & 1;
+		if (compression) *compression &= f->compressed & 1;
 		if (f->compressed != *compression) {
 			warnx("Inconsistent compression flags in chunk. Not reassembling!");
 			return 0;

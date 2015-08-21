@@ -397,7 +397,6 @@ send_next_frag(int fd)
 
 	/* Get next fragment to send */
 	f = window_get_next_sending_fragment(outbuf, next_downstream_ack);
-	window_tick(outbuf);
 	if (f == NULL) {
 		if (is_sending()) {
 			/* There is stuff to send but we're out of sync, so send a ping
@@ -433,6 +432,8 @@ send_next_frag(int fd)
 		datacmc = 0;
 
 	send_query(fd, (char *)buf);
+
+	window_tick(outbuf);
 }
 
 static void
