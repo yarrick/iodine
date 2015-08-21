@@ -294,6 +294,8 @@ main(int argc, char **argv)
 
 	retval = 0;
 
+	server_init();
+
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
 #endif
