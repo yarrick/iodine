@@ -113,7 +113,7 @@ static long send_ping_soon;
 static time_t lastdownstreamtime;
 static long send_query_sendcnt = -1;
 static long send_query_recvcnt = 0;
-static int hostname_maxlen = 0xFF;
+static size_t hostname_maxlen = 0xFF;
 
 void
 client_init()
@@ -234,10 +234,12 @@ client_set_lazymode(int lazy_mode)
 }
 
 void
-client_set_hostname_maxlen(int i)
+client_set_hostname_maxlen(size_t i)
 {
-	if (i <= 0xFF)
+	if (i <= 0xFF && i != hostname_maxlen) {
 		hostname_maxlen = i;
+		outbuf->maxfraglen = get_raw_length(hostname_maxlen, dataenc, topdomain);
+	}
 }
 
 const char *
@@ -352,8 +354,7 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 
 	buf[0] = cmd;
 
-	build_hostname(buf + 1, sizeof(buf) - 1, data, datalen, topdomain,
-		       b32, hostname_maxlen);
+	build_hostname(buf, sizeof(buf), data, datalen, topdomain, b32, hostname_maxlen, 1);
 	send_query(fd, buf);
 }
 
@@ -377,7 +378,7 @@ send_ping(int fd, int ping_response) // TODO: setup window sync stuff in ping
 		data[5] = ping_response & 1;
 		data[6] = (rand_seed >> 8) & 0xff;
 		data[7] = (rand_seed >> 0) & 0xff;
-		rand_seed++;
+		rand_seed += 7;
 
 		send_packet(fd, 'p', data, sizeof(data));
 	} else {
@@ -407,10 +408,10 @@ send_next_frag(int fd)
 	}
 
 	/* Note: must be same, or smaller than send_fragsize_probe() */
-	build_hostname((char *)buf, sizeof(buf), (char *)f->data, f->len, topdomain, dataenc, hostname_maxlen);
+	build_hostname((char *)buf, sizeof(buf), (char *)f->data, f->len, topdomain,
+				   dataenc, hostname_maxlen, 6);
 
 	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
-
 	buf[0] = userid_char;		/* First byte is hex userid */
 
 	buf[1] = datacmcchars[datacmc]; /* Second byte is data-CMC */
@@ -778,11 +779,11 @@ parse_data(uint8_t *data, size_t len, fragment *f)
 		memcpy(f->data, data + 3, MIN(f->len, sizeof(f->data)));
 	} else { /* Handle ping stuff */
 		if (len != 5) return 1; /* invalid packet - continue */
-		static unsigned in_start_seq, out_start_seq, in_wsize, out_wsize;
-		out_start_seq = data[0];
-		in_start_seq = data[1];
-		in_wsize = data[3];
-		out_wsize = data[4];
+//		static unsigned in_start_seq, out_start_seq, in_wsize, out_wsize;
+//		out_start_seq = data[0];
+//		in_start_seq = data[1];
+//		in_wsize = data[3];
+//		out_wsize = data[4];
 		warnx("Pingy thingy received.");
 		// TODO: handle pings
 	}
@@ -1102,10 +1103,10 @@ send_fragsize_probe(int fd, int fragsize)
 	rand_seed++;
 
 	/* Note: must either be same, or larger, than send_chunk() */
-	build_hostname(buf + 5, sizeof(buf) - 5, probedata, sizeof(probedata),
-		       topdomain, dataenc, hostname_maxlen);
+	build_hostname(buf, sizeof(buf), probedata, sizeof(probedata), topdomain,
+				   dataenc, hostname_maxlen, 5);
 
-	fragsize &= 2047;
+	fragsize &= 0x7FF;
 
 	buf[0] = 'r'; /* Probe downstream fragsize packet */
 	buf[1] = b32_5to8((userid << 1) | ((fragsize >> 10) & 1));
@@ -1933,6 +1934,9 @@ handshake_switch_codec(int dns_fd, int bits)
 			in[read] = 0; /* zero terminate */
 			fprintf(stderr, "Server switched upstream to codec %s\n", in);
 			dataenc = tempenc;
+
+			/* Update outgoing buffer max (decoded) fragsize */
+			outbuf->maxfraglen = get_raw_length(hostname_maxlen, dataenc, topdomain);
 			return;
 		}
 
@@ -2284,6 +2288,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 	}
 
 	if (raw_mode && handshake_raw_udp(dns_fd, seed)) {
+		/* TODO: fragsize based on max raw packet size */
 		conn = CONN_RAW_UDP;
 		selecttimeout = 20;
 	} else {
@@ -2305,11 +2310,11 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		if (!running)
 			return -1;
 
-		if (upcodec == 1) {
+		if (upcodec == 1) { /* Base64 */
 			handshake_switch_codec(dns_fd, 6);
-		} else if (upcodec == 2) {
+		} else if (upcodec == 2) { /* Base64u */
 			handshake_switch_codec(dns_fd, 26);
-		} else if (upcodec == 3) {
+		} else if (upcodec == 3) { /* Base128 */
 			handshake_switch_codec(dns_fd, 7);
 		}
 		if (!running)
