@@ -19,19 +19,43 @@
 #include "common.h"
 #include "encoding.h"
 
+size_t
+get_raw_length(size_t enc_bytes, struct encoder *enc, const char *topdomain)
+/* Returns the maximum length of raw data that can be encoded into max_enc_bytes */
+{
+	size_t enc_datalen = enc_bytes - strlen(topdomain);
+	/* Number of dots in length of encoded data */
+	size_t dots = enc_datalen / (DNS_MAXLABEL + 1);
+	if (!enc->eats_dots()) /* Dots are not included in encoded data length */
+		enc_datalen -= dots;
+	return enc->get_raw_length(enc_datalen);
+}
+
+size_t
+get_encoded_length(size_t raw_bytes, struct encoder *enc, const char *topdomain)
+/* Returns length of encoded data from original data length orig_len; */
+{
+	size_t dots = 1; /* dot before topdomain */
+	size_t len = enc->get_encoded_length(raw_bytes) + strlen(topdomain);
+	if (!enc->places_dots())
+		dots += len / 63; /* number of dots needed in data */
+	return len;
+}
+
 int
-build_hostname(char *buf, size_t buflen,
-		const char *data, const size_t datalen,
-		const char *topdomain, struct encoder *encoder, size_t maxlen)
+build_hostname(char *buf, size_t buflen, const char *data, const size_t datalen,
+		const char *topdomain, struct encoder *encoder, size_t maxlen, size_t header_len)
+/* Builds DNS-compatible hostname for data using specified encoder and topdomain
+ * NB: Does not account for header length. Data is encoded at start of buf to
+ * (buf + MIN(maxlen, buflen)). */
 {
 	size_t space;
 	char *b;
 
-	space = MIN(maxlen, buflen) - strlen(topdomain) - DOWNSTREAM_HDR + 3;
-	/* max header length + 1 dot before topdomain + 2 safety */
-
-	if (!encoder->places_dots())
-		space -= (space / 57); /* space for dots */
+	space = get_encoded_length(MIN(maxlen, buflen), encoder, topdomain);
+	buf += header_len;
+	buflen -= header_len;
+	maxlen -= header_len;
 
 	memset(buf, 0, buflen);
 
@@ -72,7 +96,7 @@ inline_dotify(char *buf, size_t buflen)
 	char *reader, *writer;
 
 	total = strlen(buf);
-	dots = total / 57;
+	dots = total / 63;
 
 	writer = buf;
 	writer += total;
@@ -91,7 +115,7 @@ inline_dotify(char *buf, size_t buflen)
 	while (dots) {
 		*writer-- = *reader--;
 		pos--;
-		if (pos % 57 == 0) {
+		if (pos % 63 == 0) {
 			*writer-- = '.';
 			dots--;
 		}

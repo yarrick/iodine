@@ -38,6 +38,7 @@ static int base64_decode(void *, size_t *, const char *, size_t);
 static int base64_handles_dots();
 static int base64_blksize_raw();
 static int base64_blksize_enc();
+static size_t base64_encoded_length(size_t inputlen);
 
 static struct encoder base64_encoder =
 {
@@ -47,7 +48,9 @@ static struct encoder base64_encoder =
 	base64_handles_dots,
 	base64_handles_dots,
 	base64_blksize_raw,
-	base64_blksize_enc
+	base64_blksize_enc,
+	base64_encoded_length,
+	base64_raw_length
 };
 
 struct encoder
@@ -72,6 +75,18 @@ static int
 base64_blksize_enc()
 {
 	return BLKSIZE_ENC;
+}
+
+static size_t
+base64_encoded_length(size_t inputlen)
+{
+	return (BLKSIZE_ENC * inputlen) / BLKSIZE_RAW + ((BLKSIZE_ENC * inputlen) % BLKSIZE_RAW) ? 1 : 0;
+}
+
+static size_t
+base64_raw_length(size_t inputlen)
+{
+	return (BLKSIZE_RAW * inputlen) / BLKSIZE_ENC + ((BLKSIZE_RAW * inputlen) % BLKSIZE_ENC) ? 1 : 0;
 }
 
 inline static void

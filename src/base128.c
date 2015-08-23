@@ -57,6 +57,7 @@ static int base128_decode(void *, size_t *, const char *, size_t);
 static int base128_handles_dots();
 static int base128_blksize_raw();
 static int base128_blksize_enc();
+static size_t base128_encoded_length(size_t inputlen);
 
 static struct encoder base128_encoder =
 {
@@ -66,7 +67,9 @@ static struct encoder base128_encoder =
 	base128_handles_dots,
 	base128_handles_dots,
 	base128_blksize_raw,
-	base128_blksize_enc
+	base128_blksize_enc,
+	base128_encoded_length,
+	base128_raw_length
 };
 
 struct encoder
@@ -91,6 +94,18 @@ static int
 base128_blksize_enc()
 {
 	return BLKSIZE_ENC;
+}
+
+static size_t
+base128_encoded_length(size_t inputlen)
+{
+	return (BLKSIZE_ENC * inputlen) / BLKSIZE_RAW + ((BLKSIZE_ENC * inputlen) % BLKSIZE_RAW) ? 1 : 0;
+}
+
+static size_t
+base128_raw_length(size_t inputlen)
+{
+	return (BLKSIZE_RAW * inputlen) / BLKSIZE_ENC + ((BLKSIZE_RAW * inputlen) % BLKSIZE_ENC) ? 1 : 0;
 }
 
 inline static void
