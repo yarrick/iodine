@@ -652,6 +652,9 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		}
 	} else {
 		/* Forward query to other port ? */
+		if (debug >= 3) {
+			fprintf(stderr, "Requested domain outside our topdomain.");
+		}
 		if (bind_fd) {
 			forward_query(bind_fd, &q);
 		}
@@ -1158,6 +1161,7 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 
 void
 handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
+/* Handles a NULL DNS request. See doc/proto_XXXXXXXX.txt for details on iodine protocol. */
 {
 	struct in_addr tempip;
 	char in[512];
@@ -1176,13 +1180,18 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 	memcpy(in, q->name, MIN(domain_len, sizeof(in)));
 
-	if(in[0] == 'V' || in[0] == 'v') {
+	if (debug >= 3) {
+		fprintf(stderr, "NULL request length %d/%lu, command '%c'\n", domain_len, sizeof(in), in[0]);
+	}
+
+	if(in[0] == 'V' || in[0] == 'v') { /* Version request */
 		int version = 0;
 
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		/* Version greeting, compare and send ack/nak */
 		if (read > 4) {
 			/* Received V + 32bits version */
+			// TODO htonl/ntohl for portability
 			version = (((unpacked[0] & 0xff) << 24) |
 					   ((unpacked[1] & 0xff) << 16) |
 					   ((unpacked[2] & 0xff) << 8) |
@@ -1244,7 +1253,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 				format_addr(&q->from, q->fromlen), version);
 		}
 		return;
-	} else if (in[0] == 'L' || in[0] == 'l') {
+	} else if (in[0] == 'L' || in[0] == 'l') { /* Login request */
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
 		if (read < 17) {
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
@@ -1289,8 +1298,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			}
 		}
 		return;
-	} else if(in[0] == 'I' || in[0] == 'i') {
-		/* Request for IP number */
+	} else if(in[0] == 'I' || in[0] == 'i') { /* IP address request */
 		char reply[17];
 		int length;
 
@@ -1325,7 +1333,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		/* No userid here, reply with lowest-grade downenc */
 		write_dns(dns_fd, q, in, domain_len, 'T');
 		return;
-	} else if(in[0] == 'S' || in[0] == 's') {
+	} else if(in[0] == 'S' || in[0] == 's') { /* Switch upstream codec */
 		int codec;
 		struct encoder *enc;
 		if (domain_len < 3) { /* len at least 3, example: "S15" */
@@ -1368,7 +1376,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			break;
 		}
 		return;
-	} else if(in[0] == 'O' || in[0] == 'o') {
+	} else if(in[0] == 'O' || in[0] == 'o') { /* Protocol options */
 		if (domain_len < 3) { /* len at least 3, example: "O1T" */
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
 			return;
@@ -1422,7 +1430,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			break;
 		}
 		return;
-	} else if(in[0] == 'Y' || in[0] == 'y') {
+	} else if(in[0] == 'Y' || in[0] == 'y') { /* Downstream codec check */
 		int i;
 		char *datap;
 		int datalen;
@@ -1494,7 +1502,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		write_dns(dns_fd, q, "BADCODEC", 8, 'T');
 		return;
 
-	} else if(in[0] == 'R' || in[0] == 'r') {
+	} else if(in[0] == 'R' || in[0] == 'r') { /* Downstream fragsize probe */
 		int req_frag_size;
 
 		if (domain_len < 16) {  /* we'd better have some chars for data... */
@@ -1510,12 +1518,16 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		req_frag_size = ((b32_8to5(in[1]) & 1) << 10) | ((b32_8to5(in[2]) & 31) << 5) | (b32_8to5(in[3]) & 31);
+		if (debug >= 3) {
+			fprintf(stderr, "Got downstream fragsize probe from user %d, required fragsize %d\n", userid, req_frag_size);
+		}
+
 		if (req_frag_size < 2 || req_frag_size > 2047) {
 			write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
 		} else {
 			char buf[2048];
 			int i;
-			unsigned int v = ((unsigned int) rand()) & 0xff ;
+			unsigned int v = ((unsigned int) rand()) & 0xff;
 
 			memset(buf, 0, sizeof(buf));
 			buf[0] = (req_frag_size >> 8) & 0xff;
@@ -1527,7 +1539,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			write_dns(dns_fd, q, buf, req_frag_size, users[userid].downenc);
 		}
 		return;
-	} else if(in[0] == 'N' || in[0] == 'n') {
+	} else if(in[0] == 'N' || in[0] == 'n') { /* Downstream fragsize (NS.topdomain A-type reply) */
 		int max_frag_size;
 
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
@@ -1552,7 +1564,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			write_dns(dns_fd, q, &unpacked[1], 2, users[userid].downenc);
 		}
 		return;
-	} else if(in[0] == 'P' || in[0] == 'p') {
+	} else if(in[0] == 'P' || in[0] == 'p') { /* Ping request */
 		int dn_seq, up_seq, dn_wins, up_wins;
 		int didsend = 0;
 		int respond;
@@ -1566,7 +1578,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if (q->id == 0)
 			return;
 
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
+		read = unpack_data(unpacked, sizeof(unpacked), in + 1, domain_len - 1, b32);
 		if (read < 7)
 			return;
 
@@ -1638,7 +1650,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		/* If there is a query that must be returned real soon, do it.
-		   May contain new downstream data if the ping had a new ack.
+		   May contain new downstream data if the ping had a new ack. TODO: ping with downstream data
 		   Otherwise, may also be re-sending old data. */
 		if (users[userid].q_sendrealsoon.id != 0) {
 			if (respond) send_ping_response(dns_fd, userid, &users[userid].q_sendrealsoon);
@@ -1670,7 +1682,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if ((!didsend) || !users[userid].lazy)
 			send_frag_or_dataless(dns_fd, userid, &users[userid].q);
 
-	} else if((in[0] >= '0' && in[0] <= '9') /* Data packet */
+	} else if((in[0] >= '0' && in[0] <= '9') /* Upstream data packet */
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {
 		int didsend = 0;
