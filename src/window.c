@@ -25,6 +25,12 @@
 #include "common.h"
 #include "window.h"
 
+void
+window_buffer_reset(struct frag_buffer *w)
+{
+
+}
+
 struct frag_buffer *
 window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int dir)
 {
@@ -51,6 +57,26 @@ window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int di
 	buf->direction = dir;
 
 	return buf;
+}
+
+void
+window_buffer_resize(struct frag_buffer *w, size_t length)
+{
+	if (w->length == length) return;
+	if (w->numitems > 0) {
+		warnx("Resizing window buffer with things still in it! This will cause problems!");
+	}
+	if (w->frags) free(w->frags);
+	w->frags = calloc(length, sizeof(fragment));
+	if (!w->frags) {
+		errx(1, "Failed to resize window buffer!");
+	}
+	w->length = length;
+	w->numitems = 0;
+	w->window_start = 0;
+	w->start_seq_id = 0;
+	w->cur_seq_id = 0;
+	w->window_end = AFTER(w, w->windowsize);
 }
 
 void

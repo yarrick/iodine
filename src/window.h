@@ -46,7 +46,6 @@ struct frag_buffer {
 	size_t numitems;	/* number of non-empty fragments stored in buffer */
 	size_t window_start;	/* Start of window */
 	size_t window_end;	/* End of window (index) */
-//	size_t last_sent;	/* Last fragment sent (index) */
 	size_t last_write;	/* Last fragment read/written */
 	size_t chunk_start;	/* Start of current chunk of fragments, ie where fragno = 0 */
 	unsigned cur_seq_id;	/* Most recent sequence ID */
@@ -73,6 +72,7 @@ struct frag_buffer {
 #define WRAP(x) ((x) % w->length)
 
 struct frag_buffer *window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int dir);
+void window_buffer_resize(struct frag_buffer *w, size_t length);
 void window_buffer_destroy(struct frag_buffer *w);
 
 /* Returns number of available fragment slots (NOT BYTES) */
