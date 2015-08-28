@@ -168,11 +168,11 @@ Upstream data header:
 	|0UUUU|UDCMC|SSSSSSSS|DDDDDDDD|ANFL|
 	+-----+-----+--------+--------+----+
 
-Downstream data header:        |=> only if P(ing) bit set
-	 76543210 76543210 76543210 76543210 76543210
-	+--------+--------+--------+--------+--------+
-	|DDDDDDDD|SSSSSSSS|00PCANFL|ZZZZZZZZ|WWWWWWWW|
-	+--------+--------+--------+--------+--------+
+Downstream data header:     |=> only if P(ing) bit set
+	 76543210 76543210 76543210 76543210 76543210 76543210 76543210
+	+--------+--------+--------+--------+--------+--------+--------+
+	|DDDDDDDD|SSSSSSSS|00PCANFL|ZZZZZZZZ|WWWWWWWW|XXXXXXXX|YYYYYYYY|
+	+--------+--------+--------+--------+--------+--------+--------+
 
 UUUU = Userid
 L = Last fragment flag
@@ -185,6 +185,8 @@ SSSSSSSS = Upstream packet sequence number/ACK
 DDDDDDDD = Downstream packet sequence number/ACK
 ZZZZZZZZ = Downstream window size
 WWWWWWWW = Upstream window size
+XXXXXXXX = Downstream window start seqID
+YYYYYYYY = Upstream window start seqID
 UDCMC = Upstream Data CMC char (actually base36 [a-z0-9]), case-insensitive
 
 Upstream data packet starts with 1 byte ASCII hex coded user byte; then
@@ -192,11 +194,9 @@ Upstream data packet starts with 1 byte ASCII hex coded user byte; then
 data, encoded with the chosen upstream codec.
 
 Downstream data starts with 3 byte header. Then payload data, which may be
-compressed. If Ping flag is set, another 8 bits of downstream window size and
-8 bits of upstream window size are appended to the header and the downstream or
-upstream sequence IDs are the start of the remote windows. This occurs either
-when the server wants to re-sync its window parameters or when the client has
-requested a ping response.
+compressed. If Ping flag is set, another 4 bytes are appended to the header. 
+This occurs either when the server wants to re-sync its window parameters or
+when the client has requested a ping response.
 
 In NULL and PRIVATE responses, downstream data is always raw. In all other
 response types, downstream data is encoded (see Options above).
@@ -224,16 +224,20 @@ Client sends:
 	First byte p or P
 	Second byte CMC
 	Rest encoded with Base32:
-	 76543 21076543 21076543 21076543 21076543 210
-	+!----+!----!--+--!----!+----!---+-!----!-+--------+
-	|0UUUU|DDDDDDDD|SSSSSSSS|WWWWWWWW|ZZZZZZZZ|0000000R|
-	+-----+--------+--------+--------+--------+--------+
+	 76543 21076543 21076543 21076543 21076543 21076543 21076543
+	+!----+!----!--+--!----!+----!---+-!----!-+--------+--------+
+	|0UUUU|DDDDDDDD|WWWWWWWW|ZZZZZZZZ|XXXXXXXX|YYYYYYYY|00000ANR|
+	+-----+--------+--------+--------+--------+--------+--------+
 	4 bits Userid
-	1 byte Downstream seq ID of window start
-	1 byte upStream seq ID of window start
+	1 byte Downstream seq ID ACK
 	1 byte Window size (upstream)
 	1 byte window siZe (downstream)
-	1 byte "Respond with ping" flag
+	1 byte window start (downstream)
+	1 bYte window start (upstream)
+	1 byte:
+		A = is ACKing downstream frag
+		N = is NACKing downstream frag (unused)
+		R = respond with a data/ping packet
 	2 bytes CMC
 
 The server response to Ping and Data packets is a DNS NULL/TXT/.. type response,
