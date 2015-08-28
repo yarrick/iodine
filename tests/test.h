@@ -27,6 +27,7 @@ TCase *test_read_create_tests();
 TCase *test_login_create_tests();
 TCase *test_user_create_tests();
 TCase *test_fw_query_create_tests();
+TCase *test_window_create_tests();
 
 char *va_str(const char *, ...);
 
