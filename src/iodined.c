@@ -283,6 +283,8 @@ main(int argc, char **argv)
 	bind_fd = 0;
 	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
 			   higher for NULL; tun/zlib adds ~17 bytes. */
+	dns4addr_len = 0;
+	dns6addr_len = 0;
 	listen_ip4 = NULL;
 	listen_ip6 = NULL;
 	port = 53;
@@ -447,17 +449,20 @@ main(int argc, char **argv)
 		foreground = 1;
 	}
 
-	dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
-	if (dns4addr_len < 0) {
-		warnx("Bad IPv4 address to listen on.");
-		usage();
+	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET) {
+		dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
+		if (dns4addr_len < 0) {
+			warnx("Bad IPv4 address to listen on.");
+			usage();
+		}
 	}
-	dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
-	if (dns6addr_len < 0) {
-		warnx("Bad IPv6 address to listen on.");
-		usage();
+	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
+		dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
+		if (dns6addr_len < 0) {
+			warnx("Bad IPv6 address to listen on.");
+			usage();
+		}
 	}
-
 	if(bind_enable) {
 		in_addr_t dns_ip = ((struct sockaddr_in *) &dns4addr)->sin_addr.s_addr;
 		if (bind_port < 1 || bind_port > 65535) {
