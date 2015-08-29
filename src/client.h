@@ -18,6 +18,8 @@
 #ifndef __CLIENT_H__
 #define __CLIENT_H__
 
+extern int debug;
+
 void client_init();
 void client_stop();
 
@@ -33,7 +35,7 @@ char *client_get_qtype();
 void client_set_downenc(char *encoding);
 void client_set_selecttimeout(int select_timeout);
 void client_set_lazymode(int lazy_mode);
-void client_set_hostname_maxlen(int i);
+void client_set_hostname_maxlen(size_t i);
 
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize);
 int client_tunnel(int tun_fd, int dns_fd);

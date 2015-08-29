@@ -69,7 +69,7 @@ static void
 usage() {
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-D] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] topdomain [nameserver ...]\n", __progname);
 	exit(2);
@@ -97,6 +97,7 @@ help() {
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
 	fprintf(stderr, "  -f to keep running in foreground\n");
+	fprintf(stderr, "  -D enable debug mode (add more D's to increase debug level)\n");
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
@@ -169,6 +170,7 @@ main(int argc, char **argv)
 	context = NULL;
 	device = NULL;
 	pidfile = NULL;
+	debug = 0;
 
 	autodetect_frag_size = 1;
 	max_downstream_frag_size = 3072;
@@ -194,7 +196,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfDhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -208,6 +210,9 @@ main(int argc, char **argv)
 			break;
 		case 'f':
 			foreground = 1;
+			break;
+		case 'D':
+			debug++;
 			break;
 		case 'h':
 			help();
@@ -285,6 +290,12 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
+
+	if (debug) {
+		fprintf(stderr, "Debug level %d enabled, will stay in foreground.\n", debug);
+		fprintf(stderr, "Add more -D switches to set higher debug level.\n");
+		foreground = 1;
+	}
 
 	nameserv_hosts_len = argc - 1;
 	if (nameserv_hosts_len <= 0)
