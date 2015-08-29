@@ -47,6 +47,15 @@
 #define QMEMDATA_LEN 15
 /* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 6 bytes */
 
+/* Number of fragments in outgoing buffer.
+ * Mem usage: USERS * (MAX_FRAGLEN * OUTFRAGBUF_LEN + sizeof(struct window_buffer) */
+#define OUTFRAGBUF_LEN 64
+
+/* Number of fragments in incoming buffer
+ * Minimum recommended = ((max packet size or MTU) / (max up fragsize)) * 2
+ * ie. (1200 / 100) * 2 = 24 */
+#define INFRAGBUF_LEN 32
+
 #define PASSWORD_ENV_VAR "IODINED_PASS"
 
 #if defined IP_RECVDSTADDR
@@ -102,7 +111,7 @@ void server_stop();
 int server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time);
 
 int read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q);
-void write_dns(int fd, struct query *q, char *data, int datalen, char downenc);
+void write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc);
 void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data, size_t len);
 void handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len);
 void handle_ns_request(int dns_fd, struct query *q);
