@@ -61,6 +61,8 @@
 
 static void handshake_lazyoff(int dns_fd);
 
+int debug;
+
 static int running;
 static const char *password;
 
@@ -238,7 +240,7 @@ client_set_hostname_maxlen(size_t i)
 {
 	if (i <= 0xFF && i != hostname_maxlen) {
 		hostname_maxlen = i;
-		outbuf->maxfraglen = get_raw_length(hostname_maxlen, dataenc, topdomain);
+		outbuf->maxfraglen = get_raw_length_from_dns(hostname_maxlen - UPSTREAM_HDR, dataenc, topdomain);
 	}
 }
 
@@ -257,11 +259,14 @@ client_rotate_nameserver()
 }
 
 static void
-send_query(int fd, char *hostname)
+send_query(int fd, uint8_t *hostname)
 {
-	char packet[4096];
+	uint8_t packet[4096];
 	struct query q;
 	size_t len;
+
+	if (debug >= 2)
+		fprintf(stderr, "TX: pkt len %lu: hostname '%s'\n", strlen((char *)hostname), hostname);
 
 	chunkid += 7727;
 	if (chunkid == 0)
@@ -271,15 +276,14 @@ send_query(int fd, char *hostname)
 	q.id = chunkid;
 	q.type = do_qtype;
 
-	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
+	len = dns_encode((char *)packet, sizeof(packet), &q, QR_QUERY, (char *)hostname, strlen((char *)hostname));
 	if (len < 1) {
 		warnx("dns_encode doesn't fit");
 		return;
 	}
 
-#if 0
-	fprintf(stderr, "  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
-#endif
+	if (debug >= 3)
+		fprintf(stderr, "  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
 
 	sendto(fd, packet, len, 0, (struct sockaddr*) &nameserv_addrs[current_nameserver],
 			sizeof(struct sockaddr_storage));
@@ -347,14 +351,15 @@ send_raw_data(int dns_fd) // TODO: fix send_raw
 
 
 static void
-send_packet(int fd, char cmd, const char *data, const size_t datalen)
+send_packet(int fd, char cmd, const uint8_t *data, const size_t datalen)
 /* Base32 encodes data and sends as single DNS query */
 {
-	char buf[4096];
+	uint8_t buf[4096];
 
 	buf[0] = cmd;
 
 	build_hostname(buf, sizeof(buf), data, datalen, topdomain, b32, hostname_maxlen, 1);
+
 	send_query(fd, buf);
 }
 
@@ -364,21 +369,28 @@ is_sending()
 	return (outbuf->numitems > 0);
 }
 
+static inline int
+is_recving()
+{
+	return inbuf->numitems > 0;
+}
+
 static void
-send_ping(int fd, int ping_response) // TODO: setup window sync stuff in ping
+send_ping(int fd, int ping_response, int ack) // TODO: setup window sync stuff in ping
 {
 	if (conn == CONN_DNS_NULL) {
-		char data[4];
+		uint8_t data[9];
 
 		data[0] = userid;
-		data[1] = inbuf->start_seq_id & 0xff;
-		data[2] = outbuf->start_seq_id & 0xff;
-		data[3] = outbuf->windowsize & 0xff;
-		data[4] = inbuf->windowsize & 0xff;
-		data[5] = ping_response & 1;
-		data[6] = (rand_seed >> 8) & 0xff;
-		data[7] = (rand_seed >> 0) & 0xff;
-		rand_seed += 7;
+		data[1] = ack & 0xFF;
+		data[2] = outbuf->windowsize & 0xff;
+		data[3] = inbuf->windowsize & 0xff;
+		data[4] = inbuf->start_seq_id & 0xff;  /* Downstream window start */
+		data[5] = outbuf->start_seq_id & 0xff; /* Upstream window start */
+		data[6] = ((ack < 0 ? 0 : 1) << 2) | (ping_response & 1);
+		data[7] = (rand_seed >> 8) & 0xff;
+		data[8] = (rand_seed >> 0) & 0xff;
+		rand_seed += 263;
 
 		send_packet(fd, 'p', data, sizeof(data));
 	} else {
@@ -390,49 +402,54 @@ static void
 send_next_frag(int fd)
 /* Sends next available fragment of data from the outgoing window buffer */
 {
-	static uint8_t buf[MAX_FRAGSIZE];
+	static uint8_t buf[MAX_FRAGSIZE], hdr[5];
 	int code;
 	static int datacmc = 0;
 	static char *datacmcchars = "abcdefghijklmnopqrstuvwxyz0123456789";
 	fragment *f;
+	size_t buflen, len;
 
 	/* Get next fragment to send */
-	f = window_get_next_sending_fragment(outbuf, next_downstream_ack);
-	if (f == NULL) {
+	f = window_get_next_sending_fragment(outbuf, &next_downstream_ack);
+	if (!f) {
 		if (is_sending()) {
 			/* There is stuff to send but we're out of sync, so send a ping
 			 * to get things back in order and keep the packets flowing */
-			send_ping(fd, 1);
+			send_ping(fd, 1, next_downstream_ack);
+			next_downstream_ack = -1;
+			window_tick(outbuf);
 		}
 		return; /* nothing to send - why was this called? */
 	}
-
-	/* Note: must be same, or smaller than send_fragsize_probe() */
-	build_hostname((char *)buf, sizeof(buf), (char *)f->data, f->len, topdomain,
-				   dataenc, hostname_maxlen, 6);
 
 	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
 	buf[0] = userid_char;		/* First byte is hex userid */
 
 	buf[1] = datacmcchars[datacmc]; /* Second byte is data-CMC */
 
-	code = (f->seqID & 0xF8) >> 3;
-	buf[2] = b32_5to8(code); /* Second byte is 5 bits seqno */
+	/* Next 3 bytes is seq ID, downstream ACK and flags */
+	code = ((f->ack_other < 0 ? 0 : 1) << 3) | (f->is_nack << 2)
+			| (f->start << 1) | f->end;
 
-	code = ((f->seqID & 7) << 2) |  ((f->ack_other & 0xC0) >> 6);
-	buf[3] = b32_5to8(code); /* Third byte is 3 bits seqno, 2 bits downstream ACK */
+	hdr[0] = f->seqID & 0xFF;
+	hdr[1] = f->ack_other & 0xFF;
+	hdr[2] = code << 4; /* Flags are in upper 4 bits - lower 4 unused */
 
-	code = ((f->ack_other & 0x3E) >> 1);
-	buf[4] = b32_5to8(code); /* Fourth byte is 5 bits downstream ACK */
+	buflen = sizeof(buf) - 1;
+	/* Encode 3 bytes data into 2 bytes after buf */
+	len = b32->encode(buf + 2, &buflen, hdr, 3);
+	if (len != 5)
+		warnx("mismatch in encoded upstream header length! expected 5, got %lu", len);
 
-	code = (f->ack_other & 1) << 4 | ((f->ack_other < 0 ? 0 : 1) << 3) | (f->is_nack << 2) | (f->start << 1) | f->end;
-	buf[5] = b32_5to8(code); /* Fifth byte is 1 bit downstream ACK, bit flags isACK, isNACK, first, last */
+	/* Encode data into buf after header (6 = user + CMC + 4 bytes header) */
+	build_hostname(buf, sizeof(buf), f->data, f->len, topdomain,
+				   dataenc, hostname_maxlen, 6);
 
 	datacmc++;
 	if (datacmc >= 36)
 		datacmc = 0;
 
-	send_query(fd, (char *)buf);
+	send_query(fd, buf);
 
 	window_tick(outbuf);
 }
@@ -477,8 +494,8 @@ write_dns_error(struct query *q, int ignore_some_errors)
 	}
 }
 
-static int
-dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
+static size_t
+dns_namedec(uint8_t *outdata, size_t outdatalen, uint8_t *buf, size_t buflen)
 /* Decodes *buf to *outdata.
  * *buf WILL be changed by undotify.
  * Note: buflen must be _exactly_ strlen(buf) before undotifying.
@@ -496,8 +513,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 			return 0;
 
 		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4,
-				   b32);
+		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4, b32);
 
 	case 'i': /* Hostname++ with base64 */
 	case 'I':
@@ -506,8 +522,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 			return 0;
 
 		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4,
-				   b64);
+		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4, b64);
 
 	case 'j': /* Hostname++ with base64u */
 	case 'J':
@@ -516,8 +531,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 			return 0;
 
 		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4,
-				   b64u);
+		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4, b64u);
 
 	case 'k': /* Hostname++ with base128 */
 	case 'K':
@@ -526,8 +540,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 			return 0;
 
 		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4,
-				   b128);
+		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4, b128);
 
 	case 't': /* plain base32(Thirty-two) from TXT */
 	case 'T':
@@ -575,7 +588,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 }
 
 static int
-read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
+read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query *q)
 /* Returns -1 on receive error or decode error, including DNS error replies.
    Returns 0 on replies that could be correct but are useless, and are not
    DNS error replies.
@@ -583,7 +596,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 */
 {
 	struct sockaddr_storage from;
-	char data[64*1024];
+	uint8_t data[64*1024];
 	socklen_t addrlen;
 	int r;
 
@@ -600,7 +613,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 			/* useless packet */
 			return 0;
 
-		rv = dns_decode(buf, buflen, q, QR_ANSWER, data, r);
+		rv = dns_decode((char *)buf, buflen, q, QR_ANSWER, (char *)data, r);
 		if (rv <= 0)
 			return rv;
 
@@ -630,7 +643,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 			int thispartlen, dataspace, datanew;
 
 			while (1) {
-				thispartlen = strlen(buf);
+				thispartlen = strlen((char *)buf);
 				thispartlen = MIN(thispartlen, buftotal-bufoffset);
 				dataspace = sizeof(data) - dataoffset;
 				if (thispartlen <= 0 || dataspace <= 0)
@@ -681,7 +694,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 }
 
 static int
-handshake_waitdns(int dns_fd, char *buf, int buflen, char c1, char c2, int timeout)
+handshake_waitdns(int dns_fd, char *buf, size_t buflen, char c1, char c2, int timeout)
 /* Wait for DNS reply fitting to our latest query and returns it.
    Returns length of reply = #bytes used in buf.
    Returns 0 if fitting reply happens to be useless.
@@ -713,12 +726,11 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char c1, char c2, int timeo
 
 		q.id = 0;
 		q.name[0] = '\0';
-		rv = read_dns_withq(dns_fd, 0, buf, buflen, &q);
+		rv = read_dns_withq(dns_fd, 0, (uint8_t *)buf, buflen, &q);
 
 		if (q.id != chunkid || (q.name[0] != c1 && q.name[0] != c2)) {
-#if 0
-			fprintf(stderr, "Ignoring unfitting reply id %d starting with '%c'\n", q.id, q.name[0]);
-#endif
+			if (debug >= 1)
+				fprintf(stderr, "Ignoring unfitting reply id %d starting with '%c'\n", q.id, q.name[0]);
 			continue;
 		}
 
@@ -766,34 +778,37 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char c1, char c2, int timeo
 static int
 parse_data(uint8_t *data, size_t len, fragment *f)
 {
+	size_t headerlen = DOWNSTREAM_HDR;
 	memset(f, 0, sizeof(fragment));
-	int ping = (data[3] >> 5) & 1;
-	if (!ping) {
-		f->seqID = data[0];
-		f->start = data[3] & 1;
-		f->end = (data[3] >> 1) & 1;
-		f->is_nack = (data[3] >> 2) & 1;
-		f->ack_other = (data[3] >> 3) & 1 ? data[1] : -1;
-		f->compressed = (data[3] >> 4) & 1;
-		f->len = len - 3;
-		memcpy(f->data, data + 3, MIN(f->len, sizeof(f->data)));
-	} else { /* Handle ping stuff */
-		if (len != 5) return 1; /* invalid packet - continue */
-//		static unsigned in_start_seq, out_start_seq, in_wsize, out_wsize;
-//		out_start_seq = data[0];
-//		in_start_seq = data[1];
-//		in_wsize = data[3];
-//		out_wsize = data[4];
-		warnx("Pingy thingy received.");
-		// TODO: handle pings
+	int ping = (data[2] >> 5) & 1;
+	f->compressed = (data[2] >> 4) & 1;
+	f->ack_other = (data[2] >> 3) & 1 ? data[1] : -1;
+	f->is_nack = (data[2] >> 2) & 1;
+	f->start = (data[2] >> 1) & 1;
+	f->end = data[2] & 1;
+	f->seqID = data[0];
+	if (ping) { /* Handle ping stuff */
+		headerlen = DOWNSTREAM_PING_HDR;
+		if (len < headerlen) return -1; /* invalid packet - continue */
+		/* Parse data/ping header */
+		static unsigned dn_start_seq, up_start_seq, dn_wsize, up_wsize;
+		dn_wsize = data[3]; /* TODO: do something with wsize/start params in ping */
+		up_wsize = data[4];
+		dn_start_seq = data[5];
+		up_start_seq = data[6];
+		if (debug >= 3)
+			fprintf(stderr, "PING pkt data=%lu WS: up=%u, dn=%u; Start: up=%u, dn=%u\n",
+					len - headerlen, up_wsize, dn_wsize, up_start_seq, dn_start_seq);
 	}
+	f->len = len - headerlen;
+	if (f->len > 0) memcpy(f->data, data + headerlen, MIN(f->len, sizeof(f->data)));
 	return ping; /* return ping flag (if corresponding query was a ping) */
 }
 
 static int
 tunnel_tun(int tun_fd, int dns_fd)
 {
-	size_t outlen, inlen;
+	size_t outlen;
 	uint8_t out[64*1024];
 	uint8_t in[64*1024];
 	ssize_t read;
@@ -801,20 +816,26 @@ tunnel_tun(int tun_fd, int dns_fd)
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return -1;
 
-	/* Give outgoing buffer all new data if it can hold it */
-	if (window_buffer_available(outbuf) > read / MAX_FRAGSIZE)
+	/* Check if outgoing buffer can hold data */
+	if (window_buffer_available(outbuf) < (read / MAX_FRAGSIZE) + 1) {
+		if (debug >= 3)
+			fprintf(stderr, "  Outgoing buffer full (%lu/%lu), not adding data!\n", outbuf->numitems, outbuf->length);
 		return -1;
+	}
+
+	if (debug >= 2)
+		fprintf(stderr, " IN: %lu bytes on tunnel\n", read);
 
 	outlen = sizeof(out);
-	inlen = read;
-	compress2(out, &outlen, in, inlen, 9);
+	compress2(out, &outlen, in, read, 9);
 
 	window_add_outgoing_data(outbuf, out, outlen, 1);
 
 	if (conn == CONN_DNS_NULL) {
 		send_next_frag(dns_fd);
 
-		send_ping_soon = 0;
+		// TODO: adjust min send interval based on DNS server droppiness
+		send_ping_soon = is_sending() ? 2 : 0;
 	} else {
 		send_raw_data(dns_fd);
 	}
@@ -829,7 +850,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	static long packrecv_oos = 0;
 	static long packrecv_servfail = 0;
 	static struct query q;
-	size_t datalen;
+	size_t datalen, buflen;
 	static uint8_t buf[64*1024], cbuf[64*1024];
 	static fragment f;
 	int read, compressed, res;
@@ -838,15 +859,13 @@ tunnel_dns(int tun_fd, int dns_fd)
 	memset(&q, 0, sizeof(q));
 	memset(buf, 0, sizeof(buf));
 	memset(cbuf, 0, sizeof(cbuf));
-	read = read_dns_withq(dns_fd, tun_fd, (char *)cbuf, sizeof(cbuf), &q);
+	read = read_dns_withq(dns_fd, tun_fd, cbuf, sizeof(cbuf), &q);
 
 	if (conn != CONN_DNS_NULL)
 		return 1;  /* everything already done */
 
-#if 0
-	fprintf(stderr, "				Recv: id %5d name[0]='%c'\n",
-		q.id, q.name[0]);
-#endif
+	if (debug >= 2)
+		fprintf(stderr, "RX: id %5d name[0]='%c'\n", q.id, q.name[0]);
 
 	/* Don't process anything that isn't data for us; usually error
 	   replies from fragsize probes etc. However a sequence of those,
@@ -859,7 +878,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return -1;	/* nothing done */
 	}
 
-	if (read < 3) {
+	if (read < DOWNSTREAM_HDR) {
 		/* Maybe SERVFAIL etc. Send ping to get things back in order,
 		   but wait a bit to prevent fast ping-pong loops. */
 
@@ -883,14 +902,6 @@ tunnel_dns(int tun_fd, int dns_fd)
 			}
 		}
 
-		/* read==1 happens with "QMEM" illegal replies, caused by
-		   heavy reordering, or after short disconnections when
-		   data-CMC has looped around into the "duplicate" values.
-		   All these cases are helped by faster pinging. */
-#if 0
-		if (read == 1)
-			fprintf(stderr, "   q=%c id %5d 1-byte illegal \"QMEM\" reply\n", q.name[0], q.id);
-#endif
 		send_ping_soon = 900;
 		return -1;	/* nothing done */
 	}
@@ -905,13 +916,17 @@ tunnel_dns(int tun_fd, int dns_fd)
 		send_ping_soon = 0;
 	}
 
+	/* Okay, we have a recent downstream packet */
+	lastdownstreamtime = time(NULL);
+	if (!(packrecv & 0x1000000))
+		packrecv++;
+	send_query_recvcnt++;  /* overflow doesn't matter */
+
 	/* Decode the downstream data header and fragment-ify ready for processing */
 	res = parse_data(cbuf, read, &f);
-
-	/* if this response was a reverse ping/response to a ping, we need to do something */
-	if (res) {
-		goto skip_recv;
-	}
+	if ((debug >= 3 && res) || (debug >= 2 && !res))
+		fprintf(stderr, " RX %s frag id %u, ACK %d, nack %d, datalen %lu, s%d e%d\n",
+				res ? "PING" : "DATA", f.seqID, f.ack_other, f.is_nack, f.len, f.start, f.end);
 
 	window_ack(outbuf, f.ack_other);
 
@@ -919,19 +934,16 @@ tunnel_dns(int tun_fd, int dns_fd)
 	 query, only during heavy data transfer. Since this means the server
 	 doesn't have any packets to send, send one relatively fast (but not
 	 too fast, to avoid runaway ping-pong loops..) */
+	/* Don't send anything too soon; no data waiting from server */
 	if (f.len == 0) {
+		if (!res && debug >= 1)
+			fprintf(stderr, "Received downstream data with 0 length and NOT a ping!");
 		send_ping_soon = 700;
 		return -1;
 	}
 
-	/* Get next ACK if nothing already pending */
-	if (next_downstream_ack < 0) {
-		if ((next_downstream_ack = window_get_next_ack(inbuf)) < 0) {
-			next_downstream_ack = -1;
-		} else {
-			send_something_now = 1;
-		}
-	}
+	/* Send something quickly to see if any more data needs to come through */
+	send_ping_soon = 5;
 
 	/* Downstream data traffic */
 	if (!window_process_incoming_fragment(inbuf, &f)) {
@@ -940,40 +952,38 @@ tunnel_dns(int tun_fd, int dns_fd)
 		return -1;	/* nothing done */
 	}
 
-	// TODO: check OOS packet count and send ping to update params
+	/* Get next ACK if nothing already pending: only do this if we are sending */
+	if (next_downstream_ack < 0) {
+		if ((next_downstream_ack = window_get_next_ack(inbuf)) >= 0) {
+			send_something_now = 1;
+		}
+	}
 
-	/* Okay, we have a recent downstream packet */
-	lastdownstreamtime = time(NULL);
-	if (!(packrecv & 0x1000000))
-		packrecv++;
-	send_query_recvcnt++;  /* overflow doesn't matter */
+	// TODO: check OOS packet count and send ping to update params
 
 	datalen = window_reassemble_data(inbuf, cbuf, sizeof(cbuf), &compressed);
 	if (datalen != 0) {
 		if (compressed) {
-			if ((res = uncompress(buf, &datalen, cbuf, datalen)) == Z_OK) {
-				write_tun(tun_fd, buf, datalen);
-			} else {
-				warnx("Uncompress failed (%d): reassembled data corrupted or incomplete!", res);
+			buflen = sizeof(buf);
+			if ((res = uncompress(buf, &buflen, cbuf, datalen)) != Z_OK) {
+				if (debug >= 1)
+					warnx("Uncompress failed (%d): reassembled data corrupted or incomplete!", res);
 			}
-			send_ping_soon = 5;
+			datalen = buflen;
 		}
+		write_tun(tun_fd, buf, datalen);
+		/* ACK frag quickly */
+		send_ping_soon = 2;
 	} else {
-		/* Send anything to ack the received seqno/frag, and get more */
-		/* was last frag; wait just a trifle because our
-		 tun will probably return TCP-ack immediately.
-		 5msec = 200 DNSreq/sec */
-		/* server certainly has more data */
+		/* ACK received frag and let server send any more data */
 		send_something_now = 1;
 	}
 
-	skip_recv:
 	/* Move window along after doing all data processing */
 	window_tick(inbuf);
 
-	/* NOTE: buf[] was overwritten when down-packet complete */
 	/* Upstream data traffic */
-	if (is_sending()) {
+	if (is_sending() || is_recving()) {
 		/* More to send - next fragment*/
 		send_next_frag(dns_fd);
 		send_ping_soon = 2;
@@ -982,7 +992,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 
 	/* Send ping if we didn't send anything yet */
 	if (send_something_now) {
-		send_ping(dns_fd, 0);
+		send_ping(dns_fd, 0, next_downstream_ack);
+		next_downstream_ack = -1;
 		send_ping_soon = 0;
 	}
 
@@ -1006,9 +1017,15 @@ client_tunnel(int tun_fd, int dns_fd)
 		tv.tv_usec = 0;
 
 		if (is_sending()) {
-			/* fast timeout for retransmits */
-			tv.tv_sec = 1;
-			tv.tv_usec = 0;
+			tv.tv_sec = 0;
+			tv.tv_usec = 2000;
+			send_ping_soon = 0;
+		}
+
+		if (is_recving()) {
+			/* get next thingy soon ish */
+			tv.tv_sec = 0;
+			tv.tv_usec = 5000;
 		}
 
 		if (send_ping_soon) {
@@ -1017,10 +1034,9 @@ client_tunnel(int tun_fd, int dns_fd)
 		}
 
 		FD_ZERO(&fds);
-		if (window_buffer_available(outbuf) > 5 || 1) {
+		if (window_buffer_available(outbuf) > 16) {
 			/* Fill up outgoing buffer with available data
-			 * The windowing protocol manages data retransmits, timeouts etc.
-			 * TODO: is this even necessary? tunnel_tun seems to be more useful */
+			 * The windowing protocol manages data retransmits, timeouts etc. */
 			FD_SET(tun_fd, &fds);
 		}
 		FD_SET(dns_fd, &fds);
@@ -1045,10 +1061,10 @@ client_tunnel(int tun_fd, int dns_fd)
 					send_next_frag(dns_fd);
 				} else {
 					outbuf->resends = 0;
-					send_ping(dns_fd, 1);
+					send_ping(dns_fd, 1, -1);
 				}
 			} else {
-				send_ping(dns_fd, 0);
+				send_ping(dns_fd, 0, -1);
 			}
 			send_ping_soon = 0;
 
@@ -1074,7 +1090,7 @@ client_tunnel(int tun_fd, int dns_fd)
 static void
 send_login(int fd, char *login, int len)
 {
-	char data[19];
+	uint8_t data[19];
 
 	memset(data, 0, sizeof(data));
 	data[0] = userid;
@@ -1091,8 +1107,8 @@ send_login(int fd, char *login, int len)
 static void
 send_fragsize_probe(int fd, int fragsize)
 {
-	char probedata[256];
-	char buf[4096];
+	uint8_t probedata[256];
+	uint8_t buf[MAX_FRAGSIZE];
 
 	/*
 	 * build a large query domain which is random and maximum size,
@@ -1120,7 +1136,7 @@ send_fragsize_probe(int fd, int fragsize)
 static void
 send_set_downstream_fragsize(int fd, int fragsize)
 {
-	char data[5];
+	uint8_t data[5];
 
 	data[0] = userid;
 	data[1] = (fragsize & 0xff00) >> 8;
@@ -1136,7 +1152,7 @@ send_set_downstream_fragsize(int fd, int fragsize)
 static void
 send_version(int fd, uint32_t version)
 {
-	char data[6];
+	uint8_t data[6];
 
 	data[0] = (version >> 24) & 0xff;
 	data[1] = (version >> 16) & 0xff;
@@ -1154,7 +1170,7 @@ send_version(int fd, uint32_t version)
 static void
 send_ip_request(int fd, int userid)
 {
-	char buf[512] = "i____.";
+	uint8_t buf[512] = "i____.";
 	buf[1] = b32_5to8(userid);
 
 	buf[2] = b32_5to8((rand_seed >> 10) & 0x1f);
@@ -1162,7 +1178,7 @@ send_ip_request(int fd, int userid)
 	buf[4] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat((char *)buf, topdomain, 512 - strlen((char *)buf));
 	send_query(fd, buf);
 }
 
@@ -1189,7 +1205,7 @@ send_upenctest(int fd, char *s)
 	strncat(buf, s, 512);
 	strncat(buf, ".", 512);
 	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
+	send_query(fd, (uint8_t *)buf);
 }
 
 static void
@@ -1207,7 +1223,7 @@ send_downenctest(int fd, char downenc, int variant, char *s, int slen)
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
+	send_query(fd, (uint8_t *)buf);
 }
 
 static void
@@ -1223,7 +1239,7 @@ send_codec_switch(int fd, int userid, int bits)
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
+	send_query(fd, (uint8_t *)buf);
 }
 
 
@@ -1240,7 +1256,7 @@ send_downenc_switch(int fd, int userid)
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
+	send_query(fd, (uint8_t *)buf);
 }
 
 static void
@@ -1260,7 +1276,7 @@ send_lazy_switch(int fd, int userid)
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
+	send_query(fd, (uint8_t *)buf);
 }
 
 static int
@@ -1285,7 +1301,7 @@ handshake_version(int dns_fd, int *seed)
 					((in[6] & 0xff) << 8) |
 					((in[7] & 0xff)));
 
-			if (strncmp("VACK", in, 4) == 0) {
+			if (strncmp("VACK", (char *)in, 4) == 0) {
 				*seed = payload;
 				userid = in[8];
 				userid_char = hex[userid & 15];
@@ -1294,11 +1310,11 @@ handshake_version(int dns_fd, int *seed)
 				fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n",
 					PROTOCOL_VERSION, userid);
 				return 0;
-			} else if (strncmp("VNAK", in, 4) == 0) {
+			} else if (strncmp("VNAK", (char *)in, 4) == 0) {
 				warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up",
 						PROTOCOL_VERSION, payload);
 				return 1;
-			} else if (strncmp("VFUL", in, 4) == 0) {
+			} else if (strncmp("VFUL", (char *)in, 4) == 0) {
 				warnx("Server full, all %d slots are taken. Try again later", payload);
 				return 1;
 			}
@@ -1483,13 +1499,6 @@ handshake_upenctest(int dns_fd, char *s)
 
 		if (read > 0) {
 			int k;
-#if 0
-			/* in[56] = '@'; */
-			/* in[56] = '_'; */
-			/* if (in[29] == '\344') in[29] = 'a'; */
-			in[read] = '\0';
-			fprintf(stderr, "BounceReply: >%s<\n", in);
-#endif
 			/* quick check if case swapped, to give informative error msg */
 			if (in[4] == 'A') {
 				fprintf(stderr, "DNS queries get changed to uppercase, keeping upstream codec Base32\n");
@@ -1808,10 +1817,8 @@ handshake_qtype_autodetect(int dns_fd)
 			if (handshake_qtypetest(dns_fd, timeout)) {
 				/* okay */
 				highestworking = qtypenum;
-#if 0
-				fprintf(stderr, " Type %s timeout %d works\n",
-					client_get_qtype(), timeout);
-#endif
+				if (debug >= 1)
+					fprintf(stderr, " Type %s timeout %d works\n", client_get_qtype(), timeout);
 				break;
 				/* try others with longer timeout */
 			}
@@ -1922,13 +1929,13 @@ handshake_switch_codec(int dns_fd, int bits)
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
-				fprintf(stderr, "Server got bad message length. ");
+				fprintf(stderr, "Server got bad message length.\n");
 				goto codec_revert;
 			} else if (strncmp("BADIP", in, 5) == 0) {
-				fprintf(stderr, "Server rejected sender IP address. ");
+				fprintf(stderr, "Server rejected sender IP address.\n");
 				goto codec_revert;
 			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				fprintf(stderr, "Server rejected the selected codec. ");
+				fprintf(stderr, "Server rejected the selected codec.\n");
 				goto codec_revert;
 			}
 			in[read] = 0; /* zero terminate */
@@ -1936,7 +1943,7 @@ handshake_switch_codec(int dns_fd, int bits)
 			dataenc = tempenc;
 
 			/* Update outgoing buffer max (decoded) fragsize */
-			outbuf->maxfraglen = get_raw_length(hostname_maxlen, dataenc, topdomain);
+			outbuf->maxfraglen = get_raw_length_from_dns(hostname_maxlen - UPSTREAM_HDR, dataenc, topdomain);
 			return;
 		}
 
@@ -1945,7 +1952,7 @@ handshake_switch_codec(int dns_fd, int bits)
 	if (!running)
 		return;
 
-	fprintf(stderr, "No reply from server on codec switch. ");
+	fprintf(stderr, "No reply from server on codec switch.\n");
 
 codec_revert:
 	fprintf(stderr, "Falling back to upstream codec %s\n", dataenc->name);
@@ -1978,13 +1985,13 @@ handshake_switch_downenc(int dns_fd)
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
-				fprintf(stderr, "Server got bad message length. ");
+				fprintf(stderr, "Server got bad message length.\n");
 				goto codec_revert;
 			} else if (strncmp("BADIP", in, 5) == 0) {
-				fprintf(stderr, "Server rejected sender IP address. ");
+				fprintf(stderr, "Server rejected sender IP address.\n");
 				goto codec_revert;
 			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				fprintf(stderr, "Server rejected the selected codec. ");
+				fprintf(stderr, "Server rejected the selected codec.\n");
 				goto codec_revert;
 			}
 			in[read] = 0; /* zero terminate */
@@ -1997,7 +2004,7 @@ handshake_switch_downenc(int dns_fd)
 	if (!running)
 		return;
 
-	fprintf(stderr, "No reply from server on codec switch. ");
+	fprintf(stderr, "No reply from server on codec switch.\n");
 
 codec_revert:
 	fprintf(stderr, "Falling back to downstream codec Base32\n");
@@ -2019,13 +2026,13 @@ handshake_try_lazy(int dns_fd)
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
-				fprintf(stderr, "Server got bad message length. ");
+				fprintf(stderr, "Server got bad message length.\n");
 				goto codec_revert;
 			} else if (strncmp("BADIP", in, 5) == 0) {
-				fprintf(stderr, "Server rejected sender IP address. ");
+				fprintf(stderr, "Server rejected sender IP address.\n");
 				goto codec_revert;
 			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				fprintf(stderr, "Server rejected lazy mode. ");
+				fprintf(stderr, "Server rejected lazy mode.\n");
 				goto codec_revert;
 			} else if (strncmp("Lazy", in, 4) == 0) {
 				fprintf(stderr, "Server switched to lazy mode\n");
@@ -2039,7 +2046,7 @@ handshake_try_lazy(int dns_fd)
 	if (!running)
 		return;
 
-	fprintf(stderr, "No reply from server on lazy switch. ");
+	fprintf(stderr, "No reply from server on lazy switch.\n");
 
 codec_revert:
 	fprintf(stderr, "Falling back to legacy mode\n");
@@ -2062,7 +2069,7 @@ handshake_lazyoff(int dns_fd)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', 1);
 
 		if (read == 9 && strncmp("Immediate", in, 9) == 0) {
-			warnx("Server switched back to legacy mode.\n");
+			warnx("Server switched back to legacy mode.");
 			lazymode = 0;
 			selecttimeout = 1;
 			return;
@@ -2071,7 +2078,7 @@ handshake_lazyoff(int dns_fd)
 	if (!running)
 		return;
 
-	warnx("No reply from server on legacy mode switch.\n");
+	warnx("No reply from server on legacy mode switch.");
 }
 
 static int
@@ -2111,8 +2118,7 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 	/* in[123] = 123; */
 
 	if ((in[2] & 0xff) != 107) {
-		fprintf(stderr, "\n");
-		warnx("corruption at byte 2, this won't work. Try -O Base32, or other -T options.");
+		warnx("\ncorruption at byte 2, this won't work. Try -O Base32, or other -T options.");
 		*max_fragsize = -1;
 		return 1;
 	}
@@ -2150,7 +2156,7 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 static int
 handshake_autoprobe_fragsize(int dns_fd)
 {
-	char in[4096];
+	char in[MAX_FRAGSIZE];
 	int i;
 	int read;
 	int proposed_fragsize = 768;
@@ -2158,7 +2164,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 	int max_fragsize;
 
 	max_fragsize = 0;
-	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)\n");
+	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)");
 	while (running && range > 0 && (range >= 8 || max_fragsize < 300)) {
 		/* stop the slow probing early when we have enough bytes anyway */
 		for (i=0; running && i<3 ;i++) {
@@ -2191,16 +2197,14 @@ handshake_autoprobe_fragsize(int dns_fd)
 		}
 	}
 	if (!running) {
-		fprintf(stderr, "\n");
-		warnx("stopped while autodetecting fragment size (Try setting manually with -m)");
+		warnx("\nstopped while autodetecting fragment size (Try setting manually with -m)");
 		return 0;
 	}
 	if (max_fragsize <= 6) {
 		/* Tried all the way down to 2 and found no good size.
 		   But we _did_ do all handshake before this, so there must
 		   be some workable connection. */
-		fprintf(stderr, "\n");
-		warnx("found no accepted fragment size.");
+		warnx("\nfound no accepted fragment size.");
 		warnx("try setting -M to 200 or lower, or try other -T or -O options.");
 		return 0;
 	}
@@ -2238,7 +2242,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 		if (read > 0) {
 
 			if (strncmp("BADFRAG", in, 7) == 0) {
-				fprintf(stderr, "Server rejected fragsize. Keeping default.");
+				fprintf(stderr, "Server rejected fragsize. Keeping default.\n");
 				return;
 			} else if (strncmp("BADIP", in, 5) == 0) {
 				fprintf(stderr, "Server rejected sender IP address.\n");

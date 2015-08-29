@@ -77,7 +77,9 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 /* Unused RR type, never actually sent */
 
 #define DOWNSTREAM_HDR 3
+#define DOWNSTREAM_PING_HDR 7
 #define UPSTREAM_HDR 6
+#define UPSTREAM_PING 6
 
 struct query {
 	char name[QUERY_NAME_SIZE];
