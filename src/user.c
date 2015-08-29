@@ -35,6 +35,7 @@
 #include "encoding.h"
 #include "user.h"
 #include "window.h"
+#include "server.h"
 
 struct tun_user *users;
 unsigned usercount;
@@ -76,6 +77,11 @@ init_users(in_addr_t my_ip, int netbits)
 			skip++;
 			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 			ip = ipstart.s_addr + inet_addr(newip);
+		}
+		if (debug >= 2) {
+			struct in_addr IP;
+			IP.s_addr = ip;
+			fprintf(stderr, "User %d: IP %s\n", i, inet_ntoa(IP));
 		}
 		users[i].tun_ip = ip;
 		net.s_addr = ip;
