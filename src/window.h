@@ -24,8 +24,12 @@
 #define WINDOW_SENDING 1
 #define WINDOW_RECVING 0
 
+
+/* Enables LOTS of annoying debug output */
+//#define WINDOW_DEBUG
+
 typedef struct fragment {
-	size_t len;		/* Length of fragment data */
+	size_t len;		/* Length of fragment data (0 if fragment unused) */
 	unsigned seqID;	/* fragment sequence ID */
 	int ack_other;	/* other way ACK seqID (>=0) or unset (<0) */
 	int is_nack;	/* 1 if other way ACK is a NACK */
@@ -54,6 +58,12 @@ struct frag_buffer {
 	int direction;		/* Sending or recving */
 };
 
+#ifdef WINDOW_DEBUG
+#define DEBUG(msg, ...) fprintf(stderr, "[WINDOW-DEBUG] (%s:%d) " msg "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#else
+#define DEBUG(msg, ...)
+#endif
+
 #define AFTER(w, o) ((w->window_start + o) % w->length)
 
 // Distance (going forwards) between a and b in window of length l
@@ -71,6 +81,15 @@ struct frag_buffer {
 #define SEQ_OFFSET(start, a) ((a >= start) ? a - start : MAX_SEQ_ID + start - a - 1)
 #define WRAP(x) ((x) % w->length)
 
+#define ITER_FORWARD(begin, end, max, pos, f) { \
+		if (end >= begin) \
+			for (pos = begin; pos < end && pos < max; pos++) {f}\
+		else {\
+			for (pos = begin; pos < max; pos++) {f}\
+			for (pos = 0; pos < end && pos < max; pos++) {f}\
+		}\
+	}
+
 struct frag_buffer *window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int dir);
 void window_buffer_resize(struct frag_buffer *w, size_t length);
 void window_buffer_destroy(struct frag_buffer *w);
@@ -86,10 +105,10 @@ int window_process_incoming_fragment(struct frag_buffer *w, fragment *f);
 
 /* Reassembles first complete sequence of fragments into data. (RECV)
  * Returns length of data reassembled, or 0 if no data reassembled */
-size_t window_reassemble_data(struct frag_buffer *w, uint8_t *data, unsigned maxlen, int *compression);
+size_t window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int *compression);
 
 /* Returns next fragment to be sent or NULL if nothing (SEND) */
-fragment *window_get_next_sending_fragment(struct frag_buffer *w, int other_ack);
+fragment *window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack);
 
 /* Gets the seqid of next fragment to be ACK'd (RECV) */
 int window_get_next_ack(struct frag_buffer *w);
