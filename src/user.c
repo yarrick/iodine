@@ -85,6 +85,9 @@ init_users(in_addr_t my_ip, int netbits)
 		}
 		users[i].tun_ip = ip;
 		net.s_addr = ip;
+
+		users[i].incoming = window_buffer_init(INFRAGBUF_LEN, 10, MAX_FRAGSIZE, WINDOW_RECVING);
+		users[i].outgoing = window_buffer_init(OUTFRAGBUF_LEN, 10, 100, WINDOW_SENDING);
  		/* Rest is reset on login ('V' packet) or already 0 */
 	}
 
@@ -119,7 +122,7 @@ user_sending(int user)
 int
 user_active(int i)
 {
-	return users[i].active && !users[i].disabled && users[i].last_pkt + 60 > time(NULL);
+	return users[i].active && !users[i].disabled && difftime(time(NULL), users[i].last_pkt) < 60;
 }
 
 int
@@ -131,7 +134,8 @@ all_users_waiting_to_send()
 */
 {
 	for (int i = 0; i < usercount; i++)
-		if (!(user_active(i) && user_sending(i))) return 0;
+		if (user_active(i))
+			if (!user_sending(i)) return 0;
 	return 1;
 }
 
@@ -142,8 +146,6 @@ find_available_user()
 		/* Not used at all or not used in one minute */
 		if (!user_active(u)) {
 			struct tun_user *user = &users[u];
-			if (user->incoming) window_buffer_destroy(user->incoming);
-			if (user->outgoing) window_buffer_destroy(user->outgoing);
 			/* reset all stats */
 			user->active = 1;
 			user->authenticated = 0;

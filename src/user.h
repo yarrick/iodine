@@ -31,11 +31,11 @@ struct tun_user {
 	int authenticated_raw;
 	int disabled;
 	time_t last_pkt;
+	struct timeval dns_timeout;
 	int seed;
 	in_addr_t tun_ip;
 	struct sockaddr_storage host;
 	socklen_t hostlen;
-	struct query q;
 	/* TODO: multiple incoming query storage + handling */
 	struct frag_buffer *incoming;
 	struct frag_buffer *outgoing;
@@ -43,15 +43,13 @@ struct tun_user {
 	struct encoder *encoder;
 	char downenc;
 	int downenc_bits;
+	int down_compression;
 	int fragsize;
 	enum connection conn;
 	int lazy;
-	/*unsigned char qmemping_cmc[QMEMPING_LEN * 4];
-	unsigned short qmemping_type[QMEMPING_LEN];
-	int qmemping_lastfilled;
-	unsigned char qmemdata_cmc[QMEMDATA_LEN * 4];
-	unsigned short qmemdata_type[QMEMDATA_LEN];
-	int qmemdata_lastfilled;*/
+#ifdef QMEM_LEN
+	struct query_buffer qmem;
+#endif
 #ifdef DNSCACHE_LEN
 	struct query dnscache_q[DNSCACHE_LEN];
 	char dnscache_answer[DNSCACHE_LEN][4096];
