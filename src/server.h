@@ -41,20 +41,18 @@
 #define DNSCACHE_LEN 10
 /* Undefine to disable. Should be less than 18; also see comments in iodined.c */
 
-#define QMEMPING_LEN 30
-/* Max advisable: 64k/2 = 32000. Total mem usage: QMEMPING_LEN * USERS * 6 bytes */
-
-#define QMEMDATA_LEN 15
-/* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 6 bytes */
+/* Max number of incoming queries to hold at one time (recommended to be same as windowsize)
+ * Memory = USERS * (sizeof(struct query_buffer) + sizeof(query) * QMEM_LEN) */
+#define QMEM_LEN 24
 
 /* Number of fragments in outgoing buffer.
- * Mem usage: USERS * (MAX_FRAGLEN * OUTFRAGBUF_LEN + sizeof(struct window_buffer) */
+ * Mem usage: USERS * (MAX_FRAGLEN * OUTFRAGBUF_LEN + sizeof(struct window_buffer)) */
 #define OUTFRAGBUF_LEN 64
 
-/* Number of fragments in incoming buffer
+/* Number of fragments in incoming buffer; must be at least windowsize * 2
  * Minimum recommended = ((max packet size or MTU) / (max up fragsize)) * 2
  * ie. (1200 / 100) * 2 = 24 */
-#define INFRAGBUF_LEN 32
+#define INFRAGBUF_LEN 64
 
 #define PASSWORD_ENV_VAR "IODINED_PASS"
 
@@ -89,6 +87,15 @@ typedef enum {
 	VERSION_FULL
 } version_ack_t;
 
+struct query_buffer {
+	struct query queries[QMEM_LEN];
+	size_t start_pending;	/* index of first "pending" query (ie. no response yet) */
+	size_t start;		/* index of first stored/pending query */
+	size_t end;			/* index of space after last stored/pending query */
+	size_t length;		/* number of stored queries */
+	size_t num_pending;	/* number of pending queries */
+};
+
 extern char *topdomain;
 extern char password[33];
 extern struct encoder *b32;
@@ -112,7 +119,7 @@ int server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_t
 
 int read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q);
 void write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc);
-void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data, size_t len);
+void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data, size_t len, int);
 void handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len);
 void handle_ns_request(int dns_fd, struct query *q);
 void handle_a_request(int dns_fd, struct query *q, int fakeip);

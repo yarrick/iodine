@@ -29,6 +29,7 @@
 #include <time.h>
 #include <zlib.h>
 #include <err.h>
+#include <ctype.h>
 
 #include "common.h"
 #include "version.h"
@@ -97,12 +98,10 @@ server_stop()
 }
 
 static void
-send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct query *q)
+send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct sockaddr_storage *from, socklen_t fromlen)
 {
-	char packet[4096];
-	int len;
-
-	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
+	char packet[buflen + RAW_HDR_LEN];
+	int len = buflen;
 
 	memcpy(packet, raw_header, RAW_HDR_LEN);
 	if (len) {
@@ -113,141 +112,191 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct query *q
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
 	if (debug >= 2) {
-		fprintf(stderr, "TX-raw: client %s, cmd %d, %d bytes\n",
-			format_addr(&q->from, q->fromlen), cmd, len);
+		fprintf(stderr, "TX-raw: client %s (user %d), cmd %d, %d bytes\n",
+			format_addr(from, fromlen), user, cmd, len);
 	}
 
-	sendto(fd, packet, len, 0, (struct sockaddr *) &q->from, q->fromlen);
+	sendto(fd, packet, len, 0, (struct sockaddr *) from, fromlen);
 }
 
-int
-answer_from_qmem(int dns_fd, struct query *q, unsigned char *qmem_cmc,
-		 unsigned short *qmem_type, int qmem_len,
-		 unsigned char *cmc_to_check)
-/* Checks query memory and sends an (illegal) answer if this is a duplicate.
-   Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
-   not a duplicate. */
+/* Ringbuffer Query Handling (qmem):
+   This is used to make the handling duplicates and query timeouts simpler
+   and all in one place.
+   Using this, lazy mode should be possible with n queries (n <= windowsize)
+
+   New queries are placed consecutively in the buffer, replacing any old
+   queries (already responded to) if length == QMEM_LEN. Old queries are kept
+   to check for dupes etc.
+
+   TODO: modify a bit to replace dnscache entirely?
+    it seems the only difference is qmem doesn't store answers. */
+#ifdef QMEM_LEN
+
+#define QMEM_DEBUG(l, u, ...) \
+	if (debug >= l) {\
+		fprintf(stderr, "[QMEM u%d (%lu/%u)] ", u, users[u].qmem.num_pending, users[u].outgoing->windowsize); \
+		fprintf(stderr, __VA_ARGS__);\
+		fprintf(stderr, "\n");\
+	}
+
+static void
+qmem_init(int userid)
 {
-	int i;
+	memset(&users[userid].qmem, 0, sizeof(struct query_buffer));
+//	users[userid].qmem.end = 1;
+	for (size_t i = 0; i < QMEM_LEN; i++) {
+		users[userid].qmem.queries[i].id = -1;
+	}
+}
 
-	for (i = 0; i < qmem_len ; i++) {
+static int
+qmem_append(int dns_fd, int userid, struct query *q)
+/* Appends incoming query to the buffer. If the query is already in the buffer,
+ * ie a duplicate, an illegal answer is sent.
+ * Return: 0 = answer sent, don't process; 1 = not a duplicate (all OK) */
+{
+	struct query_buffer *buf;
+	struct query *pq;
+	buf = &users[userid].qmem;
 
-		if (qmem_type[i] == T_UNSET)
+	/* Check if this is a duplicate query */
+	for (size_t p = buf->start; p != buf->end; p = (p + 1) % QMEM_LEN) {
+		pq = &buf->queries[p];
+		if (pq->id != q->id)
 			continue;
-		if (qmem_type[i] != q->type)
-			continue;
-		if (memcmp(qmem_cmc + i * 4, cmc_to_check, 4))
+		if (pq->type != q->type)
 			continue;
 
-		/* okay, match */
-		if (debug >= 1)
-			fprintf(stderr, "OUT  from qmem for %s == duplicate, sending illegal reply\n", q->name);
+		// FIXME: check for case changes?
+		if (memcmp(pq->name, q->name, sizeof(q->name)))
+			continue;
 
+		QMEM_DEBUG(1, userid, "OUT for '%s' == duplicate, sending illegal reply\n", q->name);
+
+		// TODO cache answers/respond using cache? (merge with dnscache)
 		write_dns(dns_fd, q, "x", 1, 'T');
+		return 0;
+	}
 
-		q->id = 0;	/* this query was used */
+	if (buf->num_pending >= QMEM_LEN) {
+		/* this means we have QMEM_LEN *pending* queries; don't overwrite */
+		QMEM_DEBUG(2, userid, "full of pending queries. Not appending query with id %d.", q->id);
 		return 1;
 	}
 
-	/* here only when no match found */
-	return 0;
-}
-
-/* INLINE FUNCTION DEFINITIONS */
-static inline void
-save_to_qmem(unsigned char *qmem_cmc, unsigned short *qmem_type, int qmem_len,
-	     int *qmem_lastfilled, unsigned char *cmc_to_add,
-	     unsigned short type_to_add)
-/* Remember query to check for duplicates */
-{
-	int fill;
-
-	fill = *qmem_lastfilled + 1;
-	if (fill >= qmem_len)
-		fill = 0;
-
-	memcpy(qmem_cmc + fill * 4, cmc_to_add, 4);
-	qmem_type[fill] = type_to_add;
-	*qmem_lastfilled = fill;
-}
-
-static inline void
-save_to_qmem_pingordata(int userid, struct query *q)
-{
-	/* Our CMC is a bit more than the "official" CMC; we store 4 bytes
-	   just because we can, and because it may prevent some false matches.
-	   For ping, we save the 4 decoded bytes: userid + seq/frag + CMC.
-	   For data, we save the 4 _un_decoded chars in lowercase: seq/frag's
-	   + 1 char CMC; that last char is non-Base32.
-	 */
-
-	warnx("save_to_qmem_pingordata deprecated! use something else instead!");
-	uint8_t cmc[8];
-	int i;
-
-	if (q->name[0] == 'P' || q->name[0] == 'p') {
-		/* Ping packet */
-
-		size_t cmcsize = sizeof(cmc);
-		char *cp = strchr(q->name, '.');
-
-		if (cp == NULL)
-			return;  /* illegal hostname; shouldn't happen */
-
-		/* We already unpacked in handle_null_request(), but that's
-		   lost now... Note: b32 directly, we want no undotify here! */
-		i = b32->decode(cmc, &cmcsize, (uint8_t *)q->name + 1, (cp - q->name) - 1);
-
-		if (i < 4)
-			return;	 /* illegal ping; shouldn't happen */
-
-		/*save_to_qmem(users[userid].qmemping_cmc,
-			     users[userid].qmemping_type, QMEMPING_LEN,
-			     &users[userid].qmemping_lastfilled,
-			     (void *) cmc, q->type);*/
+	if (buf->length < QMEM_LEN) {
+		buf->length++;
 	} else {
-		/* Data packet, hopefully not illegal */
-		if (strlen(q->name) < 5)
-			return;
-
-		/* We store CMC in lowercase; if routing via multiple parallel
-		   DNS servers, one may do case-switch and another may not,
-		   and we still want to detect duplicates.
-		   Data-header is always base32, so case-swap won't hurt.
-		 */
-		for (i = 0; i < 4; i++)
-			if (q->name[i+1] >= 'A' && q->name[i+1] <= 'Z')
-				cmc[i] = q->name[i+1] + ('a' - 'A');
-			else
-				cmc[i] = q->name[i+1];
-
-		/*save_to_qmem(users[userid].qmemdata_cmc,
-			     users[userid].qmemdata_type, QMEMDATA_LEN,
-			     &users[userid].qmemdata_lastfilled,
-			     (void *) cmc, q->type);*/
+		/* will replace already answered query in this spot */
+		buf->start = (buf->start + 1) % QMEM_LEN;
 	}
+
+	if (debug >= 5) {
+		time_t dnstimeout_ms;
+		dnstimeout_ms = users[userid].dns_timeout.tv_sec * 1000;
+		dnstimeout_ms += users[userid].dns_timeout.tv_usec / 1000;
+		QMEM_DEBUG(5, userid, "add query ID %d, timeout %lu ms", q->id, dnstimeout_ms);
+	}
+
+	/* Copy query into buffer */
+	memcpy(&buf->queries[buf->end], q, sizeof(struct query));
+	buf->end = (buf->end + 1) % QMEM_LEN;
+	buf->num_pending += 1;
+	return 1;
 }
 
-static inline int
-answer_from_qmem_data(int dns_fd, int userid, struct query *q)
-/* Quick helper function to keep handle_null_request() clean */
+static void
+qmem_answered(int userid)
+/* Last query added has been answered */
 {
-	warnx("answer_from_qmem_data deprecated! use something else");
-	/*char cmc[4];
-	int i;
+	struct query_buffer *buf;
+	buf = &users[userid].qmem;
+	buf->start_pending = (buf->start_pending + 1) % QMEM_LEN;
+	if (buf->num_pending > 0)
+		buf->num_pending -= 1;
 
-	for (i = 0; i < 4; i++)
-		if (q->name[i+1] >= 'A' && q->name[i+1] <= 'Z')
-			cmc[i] = q->name[i+1] + ('a' - 'A');
-		else
-			cmc[i] = q->name[i+1];
-
-	return answer_from_qmem(dns_fd, q, users[userid].qmemdata_cmc,
-				users[userid].qmemdata_type, QMEMDATA_LEN,
-				(void *) cmc);*/
-	return 0;
+	QMEM_DEBUG(3, userid, "query ID %d answered", buf->queries[buf->start_pending].id);
 }
-/* END INLINE FUNCTION DEFINITIONS */
+
+static struct query *
+qmem_get_next_response(int userid)
+/* Gets oldest query to be responded to (for lazy mode) or NULL if none available */
+{
+	struct query_buffer *buf;
+	struct query *q;
+	buf = &users[userid].qmem;
+	if (buf->length == 0)
+		return NULL;
+	q = &buf->queries[buf->start_pending];
+	buf->start_pending = (buf->start_pending + 1) % QMEM_LEN;
+	if (buf->num_pending > 0)
+		buf->num_pending -= 1;
+	QMEM_DEBUG(3, userid, "responding lazily to query ID %d", q->id);
+	return q;
+}
+
+static struct timeval
+qmem_max_wait(int *touser, struct query **sendq)
+/* Gets max interval before anything has to be sent to any user */
+{
+	struct timeval now, timeout, soonest, tmp;
+	soonest.tv_sec = 10;
+	soonest.tv_usec = 0;
+	int userid, qnum, nextuser = -1;
+	struct query *q = NULL, *nextq = NULL;
+
+	gettimeofday(&now, NULL);
+	for (userid = 0; userid < created_users; userid++) {
+		if (!user_active(userid))
+			continue;
+		qnum = users[userid].qmem.start_pending;
+		if (users[userid].qmem.num_pending == 0 || !users[userid].lazy)
+			continue;
+		for (; qnum != users[userid].qmem.end; qnum = (qnum + 1) % QMEM_LEN) {
+			// TODO are queries always going to be in time order already?
+			q = &users[userid].qmem.queries[qnum];
+			timeradd(&q->time_recv, &users[userid].dns_timeout, &timeout);
+			if (!timercmp(&now, &timeout, <)) {
+				/* if timeout has been reached, must send ASAP */
+				soonest.tv_sec = 0;
+				soonest.tv_usec = 0;
+				nextuser = userid;
+				nextq = q;
+
+				/* no need to check other users */
+				userid = created_users;
+				break;
+			}
+			timersub(&timeout, &now, &tmp);
+			if (timercmp(&tmp, &soonest, <)) {
+				/* time until timeout is smaller */
+				soonest = tmp;
+				nextuser = userid;
+				nextq = q;
+			}
+		}
+	}
+
+	if (debug >= 5) {
+		time_t soonest_ms = soonest.tv_sec * 1000;
+		soonest_ms += soonest.tv_usec / 1000;
+		if (nextq && nextuser > 0) {
+			QMEM_DEBUG(5, nextuser, "can wait for %lu ms, will send id %d", soonest_ms, nextq->id);
+		} else {
+			if (nextuser < 0)
+				nextuser = 0;
+			QMEM_DEBUG(5, nextuser, "Don't need to send anything to any users, waiting %lu ms", soonest_ms);
+		}
+	}
+
+	if (sendq)
+		*sendq = nextq;
+	if (touser)
+		*touser = nextuser;
+
+	return soonest;
+}
+#endif /* QMEM_LEN */
 
 #ifdef DNSCACHE_LEN
 
@@ -373,75 +422,6 @@ forward_query(int bind_fd, struct query *q)
 	}
 }
 
-static int
-send_frag_or_dataless(int dns_fd, int userid, struct query *q, int ping)
-/* Sends current fragment to user, or a ping if no data available.
-   Does not update anything, except:
-   - discards q always (query is used)
-   - forgets entire users[userid].outpacket if it was sent in one go,
-     and then tries to get new packet from outpacket-queue
-   Returns: 1 = can call us again immediately, new packet from queue;
-   0 = don't call us again for now.
-*/
-{
-	static uint8_t pkt[MAX_FRAGSIZE + DOWNSTREAM_PING_HDR];
-	size_t datalen, headerlen;
-	fragment *f;
-	struct frag_buffer *out, *in;
-
-	in = users[userid].incoming;
-	out = users[userid].outgoing;
-
-	f = window_get_next_sending_fragment(out, &users[userid].next_upstream_ack);
-	if (!f) {
-		/* No data, may as well send data/ping header (with extra info) */
-		ping = 1;
-		datalen = 0;
-		pkt[0] = 0; /* Pings don't need seq IDs unless they have data */
-		pkt[1] = users[userid].next_upstream_ack & 0xFF;
-		pkt[2] = (1 << 5) | ((users[userid].next_upstream_ack < 0 ? 0 : 1) << 3);
-		/* TODO: resend ACKs in pings? */
-		users[userid].next_upstream_ack = -1;
-	} else {
-		datalen = f->len;
-		pkt[0] = f->seqID & 0xFF;
-		pkt[1] = f->ack_other & 0xFF;
-		pkt[2] = ((f->compressed & 1) << 4) | ((f->ack_other < 0 ? 0 : 1) << 3) |
-			(f->is_nack << 2) | (f->start << 1) | f->end;
-		headerlen = DOWNSTREAM_HDR;
-	}
-
-	/* Build downstream data/ping header (see doc/proto_xxxxxxxx.txt) for details */
-
-	if (ping) { /* TODO: pings with downstream data */
-		pkt[3] = out->windowsize & 0xFF;
-		pkt[4] = in->windowsize & 0xFF;
-		pkt[5] = out->start_seq_id & 0xFF;
-		pkt[6] = in->start_seq_id & 0xFF;
-		headerlen = DOWNSTREAM_PING_HDR;
-	}
-	if (datalen + headerlen > sizeof(pkt)) {
-		warnx("send_frag_or_dataless: fragment too large to send! (%lu)", datalen);
-		return 0;
-	}
-	if (f) memcpy(pkt + headerlen, f->data, datalen);
-	write_dns(dns_fd, q, (char *)pkt, datalen + headerlen, users[userid].downenc);
-
-	/* TODO: reply to any duplicates (q.id2 etc) */
-
-//	save_to_qmem_pingordata(userid, q);
-
-#ifdef DNSCACHE_LEN
-	save_to_dnscache(userid, q, (char *)pkt, datalen + 2);
-#endif
-	/* this query has been used */
-	q->id = 0;
-	window_tick(out);
-
-	/* call again if we have more things to send */
-	return users[userid].outgoing->numitems > 0;
-}
-
 static void
 send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, struct query *q)
 {
@@ -459,7 +439,6 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 		break;
 	}
 
-	// TODO: use htonl for compatibility with big-endian systems
 	out[4] = ((payload >> 24) & 0xff);
 	out[5] = ((payload >> 16) & 0xff);
 	out[6] = ((payload >> 8) & 0xff);
@@ -467,6 +446,123 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 	out[8] = userid & 0xff;
 
 	write_dns(fd, q, out, sizeof(out), users[userid].downenc);
+}
+
+void
+send_data_or_ping(int tun_fd, struct dnsfd *dns_fds, int userid, struct query *q,
+				  int ping, int respond_now, int immediate)
+/* Sends current fragment to user, or a ping if no data available.
+   ping: 1=force send ping (even if data available), 0=only send if no data.
+   respond_now: 1=must answer query now, 0=leave in qmem if no data available
+   immediate: 1=not from qmem (ie. fresh query), 0=query is from qmem
+   Updates next_upstream_ack if new ACK needed. */
+{
+	uint8_t pkt[MAX_FRAGSIZE + DOWNSTREAM_PING_HDR];
+	size_t datalen, headerlen;
+	fragment *f;
+	int compressed = 0;
+	struct frag_buffer *out, *in;
+
+	in = users[userid].incoming;
+	out = users[userid].outgoing;
+
+	datalen = window_reassemble_data(in, pkt, sizeof(pkt), &compressed);
+	window_tick(in);
+	window_tick(out);
+
+	/* Update time info */
+	users[userid].last_pkt = time(NULL);
+
+	if (datalen > 0) {
+		/* Data reassembled successfully + cleared out of buffer */
+		handle_full_packet(tun_fd, dns_fds, userid, pkt, datalen, compressed);
+	}
+
+	f = window_get_next_sending_fragment(out, &users[userid].next_upstream_ack);
+
+	/* Build downstream data/ping header (see doc/proto_xxxxxxxx.txt) for details */
+	if (!f) {
+		if (users[userid].lazy && !respond_now) {
+			/* No data and lazy mode: leave this query to wait in qmem */
+			return;
+		}
+		/* No data, may as well send data/ping header (with extra info) */
+		ping = 1;
+		datalen = 0;
+		pkt[0] = 0; /* Pings don't need seq IDs unless they have data */
+		pkt[1] = users[userid].next_upstream_ack & 0xFF;
+		pkt[2] = (users[userid].next_upstream_ack < 0 ? 0 : 1) << 3;
+		users[userid].next_upstream_ack = -1;
+	} else {
+		datalen = f->len;
+		pkt[0] = f->seqID & 0xFF;
+		pkt[1] = f->ack_other & 0xFF;
+		pkt[2] = ((f->ack_other < 0 ? 0 : 1) << 3) | ((f->compressed & 1) << 2) | (f->start << 1) | f->end;
+		headerlen = DOWNSTREAM_HDR;
+	}
+
+	/* If this is being responded to immediately (ie. not from qmem) */
+	pkt[2] |= (immediate & 1) << 5;
+
+	if (ping) {
+		/* set ping flag and build extra header */
+		pkt[2] |= 1 << 4;
+		pkt[3] = out->windowsize & 0xFF;
+		pkt[4] = in->windowsize & 0xFF;
+		pkt[5] = out->start_seq_id & 0xFF;
+		pkt[6] = in->start_seq_id & 0xFF;
+		headerlen = DOWNSTREAM_PING_HDR;
+	}
+	if (datalen + headerlen > sizeof(pkt)) {
+		/* Should never happen, or at least user should be warned about
+		 * fragsize > MAX_FRAGLEN earlier on */
+		warnx("send_frag_or_dataless: fragment too large to send! (%lu)", datalen);
+		return;
+	}
+	if (f)
+		memcpy(pkt + headerlen, f->data, datalen);
+
+	write_dns(get_dns_fd(dns_fds, &q->from), q, (char *)pkt,
+			  datalen + headerlen, users[userid].downenc);
+
+#ifdef DNSCACHE_LEN
+	save_to_dnscache(userid, q, (char *)pkt, datalen + headerlen);
+#endif
+#ifdef QMEM_LEN
+	qmem_answered(userid);
+#endif
+	/* this query has been used */
+	q->id = 0;
+	window_tick(out);
+}
+
+static int
+user_send_data(int userid, int tun_fd, struct dnsfd *dns_fds, uint8_t *data, size_t datalen, int compressed)
+/* Appends data to a user's outgoing queue and sends it if queries are waiting */
+{
+	struct query *q;
+	if (users[userid].conn == CONN_DNS_NULL) {
+
+		window_add_outgoing_data(users[userid].outgoing, data, datalen, compressed);
+
+		/* Start sending immediately if queries are waiting */
+#ifdef QMEM_LEN
+		while (users[userid].qmem.num_pending > 0 &&
+			window_sending(users[userid].outgoing)) {
+			q = qmem_get_next_response(userid);
+			if (q == NULL)
+				break;
+			send_data_or_ping(tun_fd, dns_fds, userid, q, 0, 1, 0);
+		}
+#endif
+
+		return datalen;
+	} else { /* CONN_RAW_UDP */
+		int dns_fd = get_dns_fd(dns_fds, &users[userid].host);
+		send_raw(dns_fd, data, datalen, userid, RAW_HDR_CMD_DATA,
+					&users[userid].host, users[userid].hostlen);
+		return datalen;
+	}
 }
 
 static int
@@ -535,21 +631,17 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 	if (userid < 0)
 		return 0;
 
-	outlen = sizeof(out);
-	compress2(out, &outlen, in, read, 9);
+	if (debug >= 2)
+		fprintf(stderr, "IN: %d byte pkt from tun to user %d; compression %d\n",
+				read, userid, users[userid].down_compression);
 
-	if (users[userid].conn == CONN_DNS_NULL) {
+	if (users[userid].down_compression) {
+		outlen = sizeof(out);
+		compress2(out, &outlen, in, read, 9);
 
-		window_add_outgoing_data(users[userid].outgoing, out, outlen, 1);
-
-		/* TODO: Start sending immediately if query is waiting
-		 * Need to get incoming query handling done first. */
-
-		return outlen;
-	} else { /* CONN_RAW_UDP */
-		int dns_fd = get_dns_fd(dns_fds, &users[userid].q.from);
-		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].q);
-		return outlen;
+		return user_send_data(userid, tun_fd, dns_fds, out, outlen, 1);
+	} else {
+		return user_send_data(userid, tun_fd, dns_fds, in, read, 0);
 	}
 }
 
@@ -636,12 +728,21 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 	fd_set fds;
 	int i;
 	int userid;
+	struct query *answer_now = NULL;
 	time_t last_action = time(NULL);
+
+	if (debug >= 4)
+		window_debug = debug - 3;
 
 	while (running) {
 		int maxfd;
-		tv.tv_sec = 5; /* TODO: adjust time based on query timeouts (lazy mode) */
-		tv.tv_usec = 0;
+		/* TODO: adjust time based on query timeouts (lazy mode) */
+		tv = qmem_max_wait(&userid, &answer_now);
+
+		if (tv.tv_sec == 0 && tv.tv_usec == 0) {
+			/* We need to respond to an old query immediately; do so now. */
+			send_data_or_ping(tun_fd, dns_fds, userid, answer_now, 0, 1, 0);
+		}
 
 		FD_ZERO(&fds);
 		maxfd = 0;
@@ -662,7 +763,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 		}
 
 		/* Don't read from tun if no users can accept data anyway;
-		   tun queue/TCP buffers are larger than our outpacket-queues */
+		   tun queue/TCP buffers are larger than our outgoing queues */
 		if(!all_users_waiting_to_send()) {
 			FD_SET(tun_fd, &fds);
 			maxfd = MAX(tun_fd, maxfd);
@@ -680,12 +781,12 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			if (max_idle_time) {
 				/* only trigger the check if that's worth ( ie, no need to loop over if there
 				is something to send */
-				if (last_action + max_idle_time < time(NULL)) {
+				if (difftime(time(NULL), last_action) > max_idle_time) {
 					for (userid = 0; userid < created_users; userid++) {
-						last_action = ( users[userid].last_pkt > last_action ) ? users[userid].last_pkt : last_action;
+						last_action = (users[userid].last_pkt > last_action) ? users[userid].last_pkt : last_action;
 					}
-					if (last_action + max_idle_time < time(NULL)) {
-						fprintf(stderr, "Idling since too long, shutting down...\n");
+					if (difftime(time(NULL), last_action) > max_idle_time) {
+						fprintf(stderr, "Server idle for too long, shutting down...\n");
 						running = 0;
 					}
 				}
@@ -710,35 +811,49 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 }
 
 void
-handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data, size_t len)
+handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data, size_t len, int compressed)
 {
-	size_t outlen;
-	uint8_t out[64*1024];
+	size_t rawlen;
+	uint8_t out[64*1024], *rawdata;
 	struct ip *hdr;
 	int touser;
-	int ret; // TODO: optional upstream compression flag
-	outlen = sizeof(out);
-	if ((ret = uncompress(out, &outlen, data, len)) == Z_OK) {
+	int ret;
+
+	/* Check if data needs to be uncompressed */
+	if (compressed) {
+		rawlen = sizeof(out);
+		ret = uncompress(out, &rawlen, data, len);
+		rawdata = out;
+	} else {
+		rawlen = len;
+		rawdata = data;
+		ret = Z_OK;
+	}
+
+	if (ret == Z_OK) {
 		hdr = (struct ip*) (out + 4);
 		touser = find_user_by_ip(hdr->ip_dst.s_addr);
 		if (debug >= 3)
 			fprintf(stderr, "FULL PKT: %lu bytes from user %d (touser %d)\n", len, userid, touser);
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
-			write_tun(tun_fd, out, outlen);
+			write_tun(tun_fd, rawdata, rawlen);
 		} else {
-			/* send the compressed (!) packet to other client */
-			if (users[touser].conn == CONN_DNS_NULL) {
-				window_add_outgoing_data(users[touser].outgoing, data, len, 1);
-				/* TODO: send immediately if query waiting */
-			} else{ /* CONN_RAW_UDP */
-				int dns_fd = get_dns_fd(dns_fds, &users[touser].q.from);
-				send_raw(dns_fd, data, len, touser, RAW_HDR_CMD_DATA, &users[touser].q);
+			/* use compressed or uncompressed packet to match user settings */
+			if (users[touser].down_compression) {
+				if (!compressed) {
+					len = sizeof(out);
+					compress2(out, &len, rawdata, rawlen, 9);
+					data = out;
+				}
+				user_send_data(touser, tun_fd, dns_fds, data, len, 1);
+			} else {
+				user_send_data(touser, tun_fd, dns_fds, rawdata, rawlen, 0);
 			}
 		}
 	} else {
-		if (debug >= 1)
-			fprintf(stderr, "Discarded data, uncompress() result: %d\n", ret);
+		if (debug >= 2)
+			fprintf(stderr, "Discarded upstream data from user %d, uncompress() result: %d\n", userid, ret);
 	}
 }
 
@@ -761,9 +876,8 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, password, users[userid].seed + 1);
 	if (memcmp(packet, myhash, 16) == 0) {
-		/* Update query and time info for user */
+		/* Update time info for user */
 		users[userid].last_pkt = time(NULL);
-		memcpy(&(users[userid].q), q, sizeof(struct query));
 
 		/* Store remote IP number */
 		memcpy(&(users[userid].host), &(q->from), q->fromlen);
@@ -772,7 +886,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
 		login_calculate(myhash, 16, password, users[userid].seed - 1);
-		send_raw(fd, (uint8_t *)myhash, 16, userid, RAW_HDR_CMD_LOGIN, q);
+		send_raw(fd, (uint8_t *)myhash, 16, userid, RAW_HDR_CMD_LOGIN, &q->from, q->fromlen);
 
 		users[userid].authenticated_raw = 1;
 	}
@@ -786,9 +900,8 @@ handle_raw_data(uint8_t *packet, size_t len, struct query *q, struct dnsfd *dns_
 	}
 	if (!users[userid].authenticated_raw) return;
 
-	/* Update query and time info for user */
+	/* Update time info for user */
 	users[userid].last_pkt = time(NULL);
-	memcpy(&(users[userid].q), q, sizeof(struct query));
 
 	/* copy to packet buffer, update length TODO fix the raw UDP protocol */
 
@@ -796,7 +909,7 @@ handle_raw_data(uint8_t *packet, size_t len, struct query *q, struct dnsfd *dns_
 		fprintf(stderr, "IN   pkt raw, total %lu, from user %d\n", len, userid);
 	}
 
-	handle_full_packet(tun_fd, dns_fds, userid, packet, len);
+	handle_full_packet(tun_fd, dns_fds, userid, packet, len, 1);
 }
 
 static void
@@ -807,16 +920,15 @@ handle_raw_ping(struct query *q, int dns_fd, int userid)
 	}
 	if (!users[userid].authenticated_raw) return;
 
-	/* Update query and time info for user */
+	/* Update time info for user */
 	users[userid].last_pkt = time(NULL);
-	memcpy(&(users[userid].q), q, sizeof(struct query));
 
 	if (debug >= 1) {
 		fprintf(stderr, "IN   ping raw, from user %d\n", userid);
 	}
 
 	/* Send ping reply */
-	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, q);
+	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, &q->from, q->fromlen);
 }
 
 static int
@@ -824,12 +936,16 @@ raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd, struct dnsf
 {
 	int raw_user;
 
+	warnx("raw_decode len %lu", len);
 	/* minimum length */
 	if (len < RAW_HDR_LEN) return 0;
 	/* should start with header */
 	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
 
 	raw_user = RAW_HDR_GET_USR(packet);
+	if (debug >= 3)
+		warnx("TX-raw: client %s, user %d, raw command '%c' length %lu",
+			  format_addr(&q->from, q->fromlen), raw_user, RAW_HDR_GET_CMD(packet), len);
 	switch (RAW_HDR_GET_CMD(packet)) {
 	case RAW_HDR_CMD_LOGIN:
 		/* Login challenge */
@@ -883,8 +999,9 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 #endif /* !WINDOWS32 */
 
 	if (r > 0) {
-		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
+		memcpy(&q->from, &from, addrlen);
 		q->fromlen = addrlen;
+		gettimeofday(&q->time_recv, NULL);
 
 		/* TODO do not handle raw packets here! */
 		if (raw_decode(packet, r, q, fd, dns_fds, tun_fd)) {
@@ -936,70 +1053,34 @@ static size_t
 write_dns_nameenc(uint8_t *buf, size_t buflen, uint8_t *data, size_t datalen, char downenc)
 /* Returns #bytes of data that were encoded */
 {
-	static int td1 = 0;
-	static int td2 = 0;
-	size_t space;
-	uint8_t *b;
+	static int td_cmc;
+	char td[3];
+	struct encoder *enc;
 
-	/* Make a rotating topdomain to prevent filtering */
-	td1+=3;
-	td2+=7;
-	if (td1>=26) td1-=26;
-	if (td2>=25) td2-=25;
+	/* Make a rotating topdomain to prevent filtering, ie 10-bit CMC */
+	td_cmc ++;
+	td_cmc &= 0x3FF;
 
-	/* encode data,datalen to CNAME/MX answer
-	   (adapted from build_hostname() in encoding.c)
-	 */
+	td[0] = b32_5to8(td_cmc & 0x1F);
+	td[1] = b32_5to8((td_cmc >> 5) & 0x1F);
+	td[2] = 0;
 
-	space = MIN(0xFF, buflen) - 4 - 2;
-	/* -1 encoding type, -3 ".xy", -2 for safety */
-
-	memset(buf, 0, buflen);
-
+	/* encode data,datalen to CNAME/MX answer */
 	if (downenc == 'S') {
 		buf[0] = 'i';
-		if (!b64->places_dots())
-			space -= (space / 57);	/* space for dots */
-		b64->encode(buf+1, &space, data, datalen);
-		if (!b64->places_dots())
-			inline_dotify(buf, buflen);
+		enc = b64;
 	} else if (downenc == 'U') {
 		buf[0] = 'j';
-		if (!b64u->places_dots())
-			space -= (space / 57);	/* space for dots */
-		b64u->encode(buf+1, &space, data, datalen);
-		if (!b64u->places_dots())
-			inline_dotify(buf, buflen);
+		enc = b64u;
 	} else if (downenc == 'V') {
 		buf[0] = 'k';
-		if (!b128->places_dots())
-			space -= (space / 57);	/* space for dots */
-		b128->encode(buf+1, &space, data, datalen);
-		if (!b128->places_dots())
-			inline_dotify(buf, buflen);
+		enc = b128;
 	} else {
 		buf[0] = 'h';
-		if (!b32->places_dots())
-			space -= (space / 57);	/* space for dots */
-		b32->encode(buf+1, &space, data, datalen);
-		if (!b32->places_dots())
-			inline_dotify(buf, buflen);
+		enc = b32;
 	}
 
-	/* Add dot (if it wasn't there already) and topdomain */
-	b = buf;
-	b += strlen((char *)buf) - 1;
-	if (*b != '.')
-		*++b = '.';
-        b++;
-
-	*b = 'a' + td1;
-	b++;
-	*b = 'a' + td2;
-	b++;
-	*b = '\0';
-
-	return space;
+	return build_hostname(buf, buflen, data, datalen, td, enc, 0xFF, 1);
 }
 
 void
@@ -1007,6 +1088,8 @@ write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc)
 {
 	char buf[64*1024];
 	int len = 0;
+
+	// TODO: respond to duplicate queries here + handling qmem stuff
 
 	if (q->type == T_CNAME || q->type == T_A) {
 		char cnamebuf[1024];		/* max 255 */
@@ -1088,31 +1171,6 @@ write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc)
 }
 
 void
-send_data_or_ping_response(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int userid, struct query *q, int ping) {
-	uint8_t unpacked[64*1024];
-	size_t read;
-
-	/* if waiting for an ACK to be sent back upstream (on incoming buffer) */
-	if (users[userid].next_upstream_ack < 0) {
-		users[userid].next_upstream_ack = window_get_next_ack(users[userid].incoming);
-	}
-	window_tick(users[userid].outgoing);
-
-	read = window_reassemble_data(users[userid].incoming, unpacked, sizeof(unpacked), NULL);
-	window_tick(users[userid].incoming);
-
-	if (read > 0) { /* Data reassembled successfully + cleared out of buffer */
-		handle_full_packet(tun_fd, dns_fds, userid, unpacked, read);
-	}
-
-	send_frag_or_dataless(dns_fd, userid, q, ping);
-
-	/* Save new query and time info */
-	memcpy(&(users[userid].q), q, sizeof(struct query));
-	users[userid].last_pkt = time(NULL);
-}
-
-void
 handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
 /* Handles a NULL DNS request. See doc/proto_XXXXXXXX.txt for details on iodine protocol. */
 {
@@ -1138,17 +1196,13 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	}
 
 	if(in[0] == 'V' || in[0] == 'v') { /* Version request */
-		int version = 0;
+		uint32_t version;
 
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
+		read = unpack_data(unpacked, sizeof(unpacked), in + 1, domain_len - 1, b32);
 		/* Version greeting, compare and send ack/nak */
 		if (read > 4) {
-			/* Received V + 32bits version */
-			// TODO htonl/ntohl for portability
-			version = (((unpacked[0] & 0xff) << 24) |
-					   ((unpacked[1] & 0xff) << 16) |
-					   ((unpacked[2] & 0xff) << 8) |
-					   ((unpacked[3] & 0xff)));
+			/* Received V + 32bits version (network byte order) */
+			version = ntohl(*(uint32_t *) unpacked);
 		}
 
 		if (version == PROTOCOL_VERSION) {
@@ -1161,38 +1215,38 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 				memcpy(&(u->host), &(q->from), q->fromlen);
 				u->hostlen = q->fromlen;
 
-				memcpy(&(u->q), q, sizeof(struct query));
 				u->encoder = get_base32_encoder();
-				u->downenc = 'T';
-				u->downenc_bits = 5;
+
+				if (q->type == T_NULL || q->type == T_PRIVATE) {
+					u->downenc = 'R';
+					u->downenc_bits = 8;
+				} else {
+					u->downenc = 'T';
+					u->downenc_bits = 5;
+				}
+				u->down_compression = 1;
 				send_version_response(dns_fd, VERSION_ACK, u->seed, userid, q);
-				syslog(LOG_INFO, "accepted version for user #%d from %s",
+				syslog(LOG_INFO, "Accepted version for user #%d from %s",
 					userid, format_addr(&q->from, q->fromlen));
-				u->q.id = 0;
-				u->q.id2 = 0;
 				u->fragsize = 100; /* very safe */
 				u->conn = CONN_DNS_NULL;
 				u->lazy = 0;
 				// TODO: client specified window size
-				u->incoming = window_buffer_init(INFRAGBUF_LEN, 10, MAX_FRAGSIZE, WINDOW_RECVING);
-				u->outgoing = window_buffer_init(OUTFRAGBUF_LEN, 10,
-							u->encoder->get_raw_length(u->fragsize) - DOWNSTREAM_PING_HDR, WINDOW_SENDING);
+				u->outgoing->maxfraglen = u->encoder->get_raw_length(u->fragsize) - DOWNSTREAM_PING_HDR;
+				window_buffer_clear(u->outgoing);
+				window_buffer_clear(u->incoming);
 				u->next_upstream_ack = -1;
+#ifdef QMEM_LEN
+				qmem_init(userid);
+#endif
 #ifdef DNSCACHE_LEN
-				{
-					for (i = 0; i < DNSCACHE_LEN; i++) {
-						u->dnscache_q[i].id = 0;
-						u->dnscache_answerlen[i] = 0;
-					}
+				for (i = 0; i < DNSCACHE_LEN; i++) {
+					u->dnscache_q[i].id = 0;
+					u->dnscache_answerlen[i] = 0;
 				}
 				u->dnscache_lastfilled = 0;
 #endif
-				/*for (i = 0; i < QMEMPING_LEN; i++)
-				        u->qmemping_type[i] = T_UNSET;
-				u->qmemping_lastfilled = 0;
-				for (i = 0; i < QMEMDATA_LEN; i++)
-				        u->qmemdata_type[i] = T_UNSET;
-				u->qmemdata_lastfilled = 0;*/
+
 				if (debug >= 1)
 					fprintf(stderr, "User %d connected with correct version from %s.\n",
 							userid, format_addr(&q->from, q->fromlen));
@@ -1209,7 +1263,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 		return;
 	} else if (in[0] == 'L' || in[0] == 'l') { /* Login request */
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
+		read = unpack_data(unpacked, sizeof(unpacked), in + 1, domain_len - 1, b32);
 		if (read < 17) {
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
 			return;
@@ -1309,22 +1363,22 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 		switch (codec) {
 		case 5: /* 5 bits per byte = base32 */
-			enc = get_base32_encoder();
+			enc = b32;
 			user_switch_codec(userid, enc);
 			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
 			break;
 		case 6: /* 6 bits per byte = base64 */
-			enc = get_base64_encoder();
+			enc = b64;
 			user_switch_codec(userid, enc);
 			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
 			break;
 		case 26: /* "2nd" 6 bits per byte = base64u, with underscore */
-			enc = get_base64u_encoder();
+			enc = b64u;
 			user_switch_codec(userid, enc);
 			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
 			break;
 		case 7: /* 7 bits per byte = base128 */
-			enc = get_base128_encoder();
+			enc = b128;
 			user_switch_codec(userid, enc);
 			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
 			break;
@@ -1347,50 +1401,58 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		int bits = 0;
-		switch (in[2]) {
+		switch (toupper(in[2])) {
 		case 'T':
-		case 't':
 			users[userid].downenc = 'T';
 			write_dns(dns_fd, q, "Base32", 6, users[userid].downenc);
 			bits = 5;
 			break;
 		case 'S':
-		case 's':
 			users[userid].downenc = 'S';
 			write_dns(dns_fd, q, "Base64", 6, users[userid].downenc);
 			bits = 6;
 			break;
 		case 'U':
-		case 'u':
 			users[userid].downenc = 'U';
 			write_dns(dns_fd, q, "Base64u", 7, users[userid].downenc);
 			bits = 6;
 			break;
 		case 'V':
-		case 'v':
 			users[userid].downenc = 'V';
 			write_dns(dns_fd, q, "Base128", 7, users[userid].downenc);
 			bits = 7;
 			break;
 		case 'R':
-		case 'r':
 			users[userid].downenc = 'R';
 			write_dns(dns_fd, q, "Raw", 3, users[userid].downenc);
 			bits = 8;
 			break;
 		case 'L':
-		case 'l':
 			users[userid].lazy = 1;
 			write_dns(dns_fd, q, "Lazy", 4, users[userid].downenc);
 			break;
 		case 'I':
-		case 'i':
 			users[userid].lazy = 0;
 			write_dns(dns_fd, q, "Immediate", 9, users[userid].downenc);
+			break;
+		case 'C':
+			users[userid].down_compression = 1;
+			write_dns(dns_fd, q, "Enabled", 7, users[userid].downenc);
+			break;
+		case 'D':
+			users[userid].down_compression = 0;
+			write_dns(dns_fd, q, "Disabled", 8, users[userid].downenc);
 			break;
 		default:
 			write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
 			break;
+		}
+		/* Automatically switch to raw encoding if PRIVATE or NULL request */
+		if (q->type == T_NULL || q->type == T_PRIVATE) {
+			users[userid].downenc = 'R';
+			bits = 8;
+			if (debug >= 3)
+				warnx("Assuming raw data encoding due to NULL/PRIVATE requests for user %d.", userid);
 		}
 		if (bits) {
 			int f = users[userid].fragsize;
@@ -1423,45 +1485,19 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return;
 		}
 
-		switch (in[1]) {
+		switch (toupper(in[1])) {
 		case 'T':
-		case 't':
-			if (q->type == T_TXT ||
-			    q->type == T_SRV || q->type == T_MX ||
-			    q->type == T_CNAME || q->type == T_A) {
-				write_dns(dns_fd, q, datap, datalen, 'T');
-				return;
-			}
-			break;
 		case 'S':
-		case 's':
-			if (q->type == T_TXT ||
-			    q->type == T_SRV || q->type == T_MX ||
-			    q->type == T_CNAME || q->type == T_A) {
-				write_dns(dns_fd, q, datap, datalen, 'S');
-				return;
-			}
-			break;
 		case 'U':
-		case 'u':
-			if (q->type == T_TXT ||
-			    q->type == T_SRV || q->type == T_MX ||
-			    q->type == T_CNAME || q->type == T_A) {
-				write_dns(dns_fd, q, datap, datalen, 'U');
-				return;
-			}
-			break;
 		case 'V':
-		case 'v':
 			if (q->type == T_TXT ||
 			    q->type == T_SRV || q->type == T_MX ||
 			    q->type == T_CNAME || q->type == T_A) {
-				write_dns(dns_fd, q, datap, datalen, 'V');
+				write_dns(dns_fd, q, datap, datalen, toupper(in[1]));
 				return;
 			}
 			break;
 		case 'R':
-		case 'r':
 			if (q->type == T_NULL || q->type == T_TXT) {
 				write_dns(dns_fd, q, datap, datalen, 'R');
 				return;
@@ -1482,13 +1518,15 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		/* Downstream fragsize probe packet */
-		userid = (b32_8to5(in[1]) >> 1) & 15;
+		read = unpack_data(unpacked, sizeof(unpacked), in + 1, 5, b32);
+
+		userid = unpacked[0];
 		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
 
-		req_frag_size = ((b32_8to5(in[1]) & 1) << 10) | ((b32_8to5(in[2]) & 31) << 5) | (b32_8to5(in[3]) & 31);
+		req_frag_size = ntohs(*(uint16_t *) (unpacked + 1));
 		if (debug >= 3) {
 			fprintf(stderr, "Got downstream fragsize probe from user %d, required fragsize %d\n", userid, req_frag_size);
 		}
@@ -1510,10 +1548,10 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			write_dns(dns_fd, q, buf, req_frag_size, users[userid].downenc);
 		}
 		return;
-	} else if(in[0] == 'N' || in[0] == 'n') { /* Downstream fragsize (NS.topdomain A-type reply) */
+	} else if(in[0] == 'N' || in[0] == 'n') { /* Downstream fragsize */
 		int max_frag_size;
 
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, b32);
+		read = unpack_data(unpacked, sizeof(unpacked), in + 1, domain_len - 1, b32);
 
 		if (read < 3) {
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
@@ -1527,7 +1565,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return; /* illegal id */
 		}
 
-		max_frag_size = ((unpacked[1] & 0xff) << 8) | (unpacked[2] & 0xff);
+		max_frag_size = ntohs(*(uint16_t *)(unpacked + 1));
 		if (max_frag_size < 2) {
 			write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
 		} else {
@@ -1537,20 +1575,23 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			write_dns(dns_fd, q, (char *) unpacked + 1, 2, users[userid].downenc);
 
 			if (debug >= 1)
-				warnx("Setting max downstream data length to %u bytes for user %d; bits %d (%c)",
+				warnx("Setting max downstream data length to %u bytes for user %d; %d bits (%c)",
 					  users[userid].outgoing->maxfraglen, userid, users[userid].downenc_bits, users[userid].downenc);
 		}
 		return;
 	} else if(in[0] == 'P' || in[0] == 'p') { /* Ping request */
-		int dn_seq, up_seq, dn_wins, up_wins, dn_ack;
+		int dn_seq, up_seq, dn_winsize, up_winsize, dn_ack;
 		int respond;
+		unsigned timeout_ms;
+		struct timeval timeout;
 
 		/* We can't handle id=0, that's "no packet" to us. So drop
 		   request completely. Note that DNS servers rewrite the id.
 		   We'll drop 1 in 64k times. If DNS server retransmits with
 		   different id, then all okay.
 		   Else client won't retransmit, and we'll just keep the
-		   previous ping in cache, no problem either. */
+		   previous ping in cache, no problem either.
+		   TODO don't use ID=0 to check if query */
 		if (q->id == 0)
 			return;
 
@@ -1571,47 +1612,54 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		/* Check if cached */
 		if (answer_from_dnscache(dns_fd, userid, q))
 			return;
+#endif // XXX hmm these look very similar...
+#ifdef QMEM_LEN
+		/* Check if cached */
+		if (!qmem_append(dns_fd, userid, q))
+			return;
 #endif
-		/* TODO: incoming query handling for lazy mode */
-		/* Check if duplicate (and not in full dnscache any more) * /
-		if (answer_from_qmem(dns_fd, q, users[userid].qmemping_cmc,
-				     users[userid].qmemping_type, QMEMPING_LEN,
-				     (void *) unpacked))
-			return; */
 
-		dn_ack = ((unpacked[6] >> 2) & 1) ? unpacked[1] : -1;
-		up_wins = unpacked[2];
-		dn_wins = unpacked[3];
-		dn_seq = unpacked[4];
-		up_seq = unpacked[5];
-		respond = unpacked[6] & 1;
+		dn_ack = ((unpacked[8] >> 2) & 1) ? unpacked[1] : -1;
+		up_winsize = unpacked[2];
+		dn_winsize = unpacked[3];
+		up_seq = unpacked[4];
+		dn_seq = unpacked[5];
 
-		/* TODO: Use ping to re-sync window buffer */
+		timeout_ms = ntohs(*(uint16_t *) (unpacked + 6));
+		timeout.tv_sec = timeout_ms / 1000;
+		timeout.tv_usec = (timeout_ms - timeout.tv_sec * 1000) * 1000;
+
+		respond = unpacked[8] & 1;
+
+		if ((unpacked[8] >> 3) & 1) {
+			/* update user's query timeout */
+			users[userid].dns_timeout = timeout;
+		}
+
 		if (debug >= 2) {
-			fprintf(stderr, "PING pkt from user %d, down %d/%d, up %d/%d, ACK %d\n", userid, dn_seq, dn_wins, up_seq, up_wins, dn_ack);
+			fprintf(stderr, "PING pkt from user %d, down %d/%d, up %d/%d, ACK %d, set timeout %u ms (flags %02X)\n",
+					userid, dn_seq, dn_winsize, up_seq, up_winsize, dn_ack, timeout_ms, unpacked[8]);
 		}
 
 		window_ack(users[userid].outgoing, dn_ack);
 
-		send_data_or_ping_response(tun_fd, dns_fd, dns_fds, userid, q, respond);
+		/* Send resonse; q can be left in qmem if no data (q is still fresh) */
+		send_data_or_ping(tun_fd, dns_fds, userid, q, respond, 0, 1);
 
-	} else if((in[0] >= '0' && in[0] <= '9') /* Upstream data packet */
-			|| (in[0] >= 'a' && in[0] <= 'f')
-			|| (in[0] >= 'A' && in[0] <= 'F')) {
-		int code = -1;
+	} else if (isxdigit(in[0])) { /* Upstream data packet */
+		int code = 0;
 		static fragment f;
 		size_t len;
 
 		/* Need 6 char header + >=1 char data */
-		if (domain_len < 7)
+		if (domain_len < UPSTREAM_HDR + 1)
 			return;
 
 		/* We can't handle id=0, that's "no packet" to us. So drop
 		   request completely. Note that DNS servers rewrite the id.
 		   We'll drop 1 in 64k times. If DNS server retransmits with
 		   different id, then all okay.
-		   Else client doesn't get our ack, and will retransmit in
-		   1 second. */
+		   Else client doesn't get our ack, and will retransmit in 1 second. */
 		if (q->id == 0) {
 			warnx("Query with ID 0!");
 			return;
@@ -1625,10 +1673,10 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			code = in[0] - 'A' + 10;
 
 		userid = code;
-		/* Check user and sending ip number */
+		/* Check user and sending IP address */
 		if (check_authenticated_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
+			return; /* illegal IP */
 		}
 
 #ifdef DNSCACHE_LEN
@@ -1636,41 +1684,42 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if (answer_from_dnscache(dns_fd, userid, q))
 			return;
 #endif
-		/* TODO: incoming query buffer/handling for lazy mode */
-
-		/* TODO: Check if duplicate of waiting queries (ping and data) */
-
+#ifdef QMEM_LEN
+		/* Check if cached */
+		if (!qmem_append(dns_fd, userid, q))
+			return;
+#endif
 		/* Decode upstream data header - see docs/proto_XXXXXXXX.txt */
-		/* First byte (after userid) = CMC (ignored) */
-//		f.seqID = (b32_8to5(in[2]) << 2) | (b32_8to5(in[3]) >> 2);
-//		f.ack_other = (b32_8to5(in[5]) & 8) ? ((b32_8to5(in[3]) & 3) << 6)
-//			| (b32_8to5(in[4]) << 1) | ((b32_8to5(in[5]) >> 4) & 1) : -1;
-//		f.is_nack = (b32_8to5(in[5]) >> 2) & 1;
-//		f.start = (b32_8to5(in[5]) >> 1) & 1;
-//		f.end = b32_8to5(in[5]) & 1;
+		/* First byte (after userid) = CMC (ignored); skip 2 bytes */
 		len = sizeof(unpacked);
 		read = b32->decode(unpacked, &len, in + 2, 5);
+
 		f.seqID = unpacked[0];
 		unpacked[2] >>= 4; /* Lower 4 bits are unused */
 		f.ack_other = ((unpacked[2] >> 3) & 1) ? unpacked[1] : -1;
-		f.is_nack = (unpacked[2] >> 2) & 1;
+		f.compressed = (unpacked[2] >> 2) & 1;
 		f.start = (unpacked[2] >> 1) & 1;
 		f.end = unpacked[2] & 1;
 
-		/* Decode remainder of data with user encoding */
-		read = unpack_data(unpacked, sizeof(unpacked), in + UPSTREAM_HDR,
-							domain_len - UPSTREAM_HDR, users[userid].encoder);
-		if (debug >= 4) warnx("++++ UNPACKED %d bytes into %lu using %s with header len %d",
-							  domain_len, read, users[userid].encoder->name, UPSTREAM_HDR);
+		/* Decode remainder of data with user encoding into fragment */
+		f.len = unpack_data(f.data, MAX_FRAGSIZE, in + UPSTREAM_HDR,
+						   domain_len - UPSTREAM_HDR, users[userid].encoder);
 
-		f.len = MIN(read, MAX_FRAGSIZE);
-		memcpy(f.data, unpacked, f.len);
+		if (debug >= 3)
+			warnx("frag seq %3u, datalen %5lu, ACK %3d, compression %1d, s%1d e%1d",
+					f.seqID, f.len, f.ack_other, f.compressed, f.start, f.end);
 
-		window_process_incoming_fragment(users[userid].incoming, &f);
+		/* if waiting for an ACK to be sent back upstream (on incoming buffer) */
+		if (users[userid].next_upstream_ack >= 0) {
+			/* Shouldn't normally happen; will always be reset after sending a packet. */
+			warnx("[WARNING] next_upstream_ack == %d for user %d.", users[userid].next_upstream_ack, userid);
+		}
+		users[userid].next_upstream_ack = window_process_incoming_fragment(users[userid].incoming, &f);
 
 		window_ack(users[userid].outgoing, f.ack_other);
 
-		send_data_or_ping_response(tun_fd, dns_fd, dns_fds, userid, q, 0);
+		/* Respond/ACK data packet immediately; query is fresh */
+		send_data_or_ping(tun_fd, dns_fds, userid, q, 0, 1, 1);
 	}
 }
 
