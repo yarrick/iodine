@@ -124,25 +124,28 @@ Server sends:
 	s or S: Downstream encoding Base64, for TXT/CNAME/A/MX
 	u or U: Downstream encoding Base64u, for TXT/CNAME/A/MX
 	v or V: Downstream encoding Base128, for TXT/CNAME/A/MX
-	r or R: Downstream encoding Raw, for PRIVATE/TXT/NULL (default for
+	r or R: Downstream encoding Raw, for PRIVATE/TXT/NULL (assumed for
 		PRIVATE and NULL)
 	If codec unsupported for request type, server will use Base32; note
 	that server will answer any mix of request types that a client sends.
 	Server may disregard this option; client must always use the downstream
 	encoding type indicated in every downstream DNS packet.
 
-	l or L: Lazy mode, server will keep one request unanswered until the
-	next one comes in. Applies only to data transfer; handshake is always
-	answered immediately.
+	c or C: Downstream compression enabled (compressed before encoding)
+	d or D: Downstream compression disabled
+	l or L: Lazy mode, server will keep a number of requests waiting until data
+		becomes available to send downstream or the requests time out. The
+		timeout value for requests is controlled by the client.
+		Applies only to data transfer; handshake is always answered immediately.
 	i or I: Immediate (non-lazy) mode, server will answer all requests
-	(nearly) immediately.
+		(nearly) immediately.
 
 Probe downstream fragment size:
 Client sends:
 	First byte r or R
-	15 bits coded as 3 Base32 chars: UUUUF FFFFF FFFFF
-		meaning 4 bits userid, 11 bits fragment size
-	Then follows a long random query which contents does not matter
+	Second byte userid char
+	2 bytes big-endian fragsize encoded as 4 bytes base32
+	Then follows a long random query which contents does not matter.
 Server sends:
 	Requested number of bytes as a response. The first two bytes contain
 	the requested length. The third byte is 107 (0x6B). The fourth byte
@@ -155,32 +158,33 @@ Client sends:
 	First byte n or N
 	Rest encoded with base32:
 	1 byte userid
-	2 bytes new downstream fragment size
+	2 bytes new downstream fragment size (big-endian)
 	CMC
 Server sends:
 	2 bytes new downstream fragment size. After this all downstream
 	payloads will be max (fragsize + 2) bytes long.
 	BADFRAG if not accepted.
 
-Upstream data header:
-	 76543 21076 54321076 54321076 5432
-	+!----+!----+!----!--+--!----!+----+
-	|0UUUU|UDCMC|SSSSSSSS|DDDDDDDD|ANFL|
-	+-----+-----+--------+--------+----+
 
-Downstream data header:     |=> only if P(ing) bit set
-	 76543210 76543210 76543210 76543210 76543210 76543210 76543210
-	+--------+--------+--------+--------+--------+--------+--------+
-	|DDDDDDDD|SSSSSSSS|00PCANFL|ZZZZZZZZ|WWWWWWWW|XXXXXXXX|YYYYYYYY|
-	+--------+--------+--------+--------+--------+--------+--------+
+Upstream data header:
+     76543 21076 54321076 54321076 5432
+    +!----+!----+!----!--+--!----!+----+
+    |0UUUU|UDCMC|SSSSSSSS|DDDDDDDD|ACFL|
+    +-----+-----+--------+--------+----+
+
+Downstream data header:        |=> only if P(ing) bit set          |
+     76543210 76543210 76543210 76543210 76543210 76543210 76543210
+    +--------+--------+--------+--------+--------+--------+--------+
+    |DDDDDDDD|SSSSSSSS|00IPACFL|ZZZZZZZZ|WWWWWWWW|XXXXXXXX|YYYYYYYY|
+    +--------+--------+--------+--------+--------+--------+--------+
 
 UUUU = Userid
 L = Last fragment flag
 A = ACK flag
-N = NACK flag (unused)
 F = First fragment flag
 C = Compression enabled for downstream packet
-P = is ping response
+P = ping flag: extra header present
+I = responded to immediately (for RTT calculation)
 SSSSSSSS = Upstream packet sequence number/ACK
 DDDDDDDD = Downstream packet sequence number/ACK
 ZZZZZZZZ = Downstream window size
@@ -193,14 +197,12 @@ Upstream data packet starts with 1 byte ASCII hex coded user byte; then
 1 char data-CMC; then 4 bytes Base32 encoded header; then comes the payload
 data, encoded with the chosen upstream codec.
 
-Downstream data starts with 3 byte header. Then payload data, which may be
-compressed. If Ping flag is set, another 4 bytes are appended to the header. 
-This occurs either when the server wants to re-sync its window parameters or
-when the client has requested a ping response.
+Downstream data starts with 3 byte headerm, followed by data, which may be
+compressed. If Ping flag is set, another 4 bytes are appended to the header.
 
 In NULL and PRIVATE responses, downstream data is always raw. In all other
 response types, downstream data is encoded (see Options above).
-Encoding type is indicated by 1 prefix char:
+Encoding type is indicated by 1 prefix char (before the data header):
 TXT:
 	End result is always DNS-chopped (series of len-prefixed strings
 	<=255 bytes)
@@ -219,22 +221,26 @@ has a 10-multiple priority, and encoding/decoding is done in strictly
 increasing priority sequence 10, 20, 30, etc. without gaps. Note that some DNS
 relays will shuffle the answer records in the response.
 
+
 Ping:
 Client sends:
 	First byte p or P
 	Second byte CMC
 	Rest encoded with Base32:
-	 76543 21076543 21076543 21076543 21076543 21076543 21076543
-	+!----+!----!--+--!----!+----!---+-!----!-+--------+--------+
-	|0UUUU|DDDDDDDD|WWWWWWWW|ZZZZZZZZ|XXXXXXXX|YYYYYYYY|00000ANR|
-	+-----+--------+--------+--------+--------+--------+--------+
+     76543210 76543210     76543210
+    +--------+--------+---+--------+
+    |0000UUUU|DownSQID|...|0000TANR|
+    +--------+--------+---+--------+
 	4 bits Userid
 	1 byte Downstream seq ID ACK
-	1 byte Window size (upstream)
-	1 byte window siZe (downstream)
+	1 byte window size (upstream)
+	1 byte window size (downstream)
+	1 byte window start (upstream)
 	1 byte window start (downstream)
-	1 bYte window start (upstream)
-	1 byte:
+	2 bytes big-endian server timeout in ms
+	
+	1 byte flags:
+		T = update server timeout
 		A = is ACKing downstream frag
 		N = is NACKing downstream frag (unused)
 		R = respond with a data/ping packet
