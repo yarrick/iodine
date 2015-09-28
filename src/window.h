@@ -32,7 +32,6 @@ typedef struct fragment {
 	size_t len;		/* Length of fragment data (0 if fragment unused) */
 	unsigned seqID;	/* fragment sequence ID */
 	int ack_other;	/* other way ACK seqID (>=0) or unset (<0) */
-	int is_nack;	/* 1 if other way ACK is a NACK */
 	int compressed;	/* compression flag */
 	uint8_t start;	/* start of chunk flag */
 	uint8_t end;	/* end of chunk flag */
@@ -55,11 +54,14 @@ struct frag_buffer {
 	unsigned cur_seq_id;	/* Most recent sequence ID */
 	unsigned start_seq_id;	/* Start of window sequence ID */
 	unsigned resends;	/* number of fragments resent */
+	unsigned oos;		/* Number of out-of-sequence fragments received */
 	int direction;		/* Sending or recving */
 };
 
-#ifdef WINDOW_DEBUG
-#define DEBUG(msg, ...) fprintf(stderr, "[WINDOW-DEBUG] (%s:%d) " msg "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+extern int window_debug;
+
+#ifdef DEBUG_BUILD
+#define DEBUG(msg, ...) if (window_debug) fprintf(stderr, "[WINDOW-DEBUG] (%s:%d) " msg "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 #else
 #define DEBUG(msg, ...)
 #endif
@@ -94,6 +96,12 @@ struct frag_buffer *window_buffer_init(size_t length, unsigned windowsize, unsig
 void window_buffer_resize(struct frag_buffer *w, size_t length);
 void window_buffer_destroy(struct frag_buffer *w);
 
+/* Clears fragments and resets window stats */
+void window_buffer_clear(struct frag_buffer *w);
+
+/* Resets window stats without clearing fragments */
+void window_buffer_reset(struct frag_buffer *w);
+
 /* Returns number of available fragment slots (NOT BYTES) */
 size_t window_buffer_available(struct frag_buffer *w);
 
@@ -106,6 +114,9 @@ int window_process_incoming_fragment(struct frag_buffer *w, fragment *f);
 /* Reassembles first complete sequence of fragments into data. (RECV)
  * Returns length of data reassembled, or 0 if no data reassembled */
 size_t window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int *compression);
+
+/* Returns number of fragments to be sent */
+int window_sending(struct frag_buffer *w);
 
 /* Returns next fragment to be sent or NULL if nothing (SEND) */
 fragment *window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack);
