@@ -20,6 +20,13 @@
 
 extern int debug;
 
+#define PENDING_QUERIES_LENGTH (MAX(windowsize_up, windowsize_down) * 2)
+
+struct query_tuple {
+	int id; /* DNS query / response ID */
+	struct timeval time; /* time sent or 0 if cleared */
+};
+
 void client_init();
 void client_stop();
 
@@ -33,11 +40,16 @@ void client_set_password(const char *cp);
 int client_set_qtype(char *qtype);
 char *client_get_qtype();
 void client_set_downenc(char *encoding);
-void client_set_selecttimeout(int select_timeout);
+void client_set_compression(int up, int down);
+void client_set_dnstimeout(double, double, int);
 void client_set_lazymode(int lazy_mode);
+void client_set_windowsize(size_t, size_t);
 void client_set_hostname_maxlen(size_t i);
 
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize);
 int client_tunnel(int tun_fd, int dns_fd);
+
+void handshake_lazyoff(int dns_fd);
+void send_ping(int fd, int ping_response, int ack);
 
 #endif
