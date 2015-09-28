@@ -10,9 +10,18 @@ HEAD_COMMIT = `git rev-parse --short HEAD`
 
 LIBPATH = -L.
 LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
-CFLAGS += -std=c99 -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
+CFLAGS += -std=c99 -c -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
 
-all: stateos $(CLIENT) $(SERVER)
+CFLAGS_RELEASE = -O3 -fno-strict-aliasing
+CFLAGS_DEBUG = -g -Og -DDEBUG_BUILD
+
+all: CFLAGS += $(CFLAGS_RELEASE)
+all: executables
+
+debug: CFLAGS += $(CFLAGS_DEBUG)
+debug: executables
+
+executables: stateos $(CLIENT) $(SERVER)
 
 stateos:
 	@echo OS is $(OS), arch is $(ARCH)

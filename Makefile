@@ -18,6 +18,9 @@ TARGETOS = `uname`
 
 all:
 	@(cd src; $(MAKE) TARGETOS=$(TARGETOS) all)
+	
+debug:
+	@(cd src; $(MAKE) TARGETOS=$(TARGETOS) debug)
 
 install: all
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(sbindir)
