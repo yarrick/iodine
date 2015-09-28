@@ -23,7 +23,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/time.h>
 #include <fcntl.h>
 #include <time.h>
 
@@ -66,33 +65,48 @@ static void usage() __attribute__((noreturn));
 #endif
 
 static void
-usage() {
+print_usage()
+{
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-D] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
-			"[-z context] [-F pidfile] topdomain [nameserver ...]\n", __progname);
+	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
+			"[-w downfrags] [-W upfrags] [-i sec] [-I sec] [-C 0|1] [-c 0|1]"
+			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] "
+			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [nameserverN ...]]]\n", __progname);
+}
+
+static void
+usage()
+{
+	print_usage();
 	exit(2);
 }
 
 static void
-help() {
-	extern char *__progname;
-
+help()
+{
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
-	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
-			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [nameserverN ...]]] \n", __progname);
-	fprintf(stderr, "Options to try if connection doesn't work:\n");
+	print_usage();
+	fprintf(stderr, "\nOptions to try if connection doesn't work:\n");
 	fprintf(stderr, "  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
 	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
 	fprintf(stderr, "     Base128, or (only for TXT:) Raw  (default: autodetect)\n");
-	fprintf(stderr, "  -I max interval between requests (default 4 sec) to prevent DNS timeouts\n");
+	fprintf(stderr, "  -I target interval between sending and receiving requests (default: 4 secs)\n");
+	fprintf(stderr, "     should be greater than the round-trip for the connection\n");
 	fprintf(stderr, "  -L 1: use lazy mode for low-latency (default). 0: don't (implies -I1)\n");
 	fprintf(stderr, "  -m max size of downstream fragments (default: autodetect)\n");
 	fprintf(stderr, "  -M max size of upstream hostnames (~100-255, default: 255)\n");
 	fprintf(stderr, "  -r to skip raw UDP mode attempt\n");
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+
+	fprintf(stderr, "Fine-tuning options:\n");
+	fprintf(stderr, "  -w downstream fragment window size (default: 8)\n");
+	fprintf(stderr, "  -W upstream fragment window size (default: 8)\n");
+	fprintf(stderr, "  -i server-side request timeout in lazy mode \n");
+	fprintf(stderr, "     (default: automatically adjust from max timeout and round-trip time)\n");
+	fprintf(stderr, "  -C 1: use downstream compression (default), 0: disable\n");
+	fprintf(stderr, "  -c 1: use upstream compression, 0: disable (default)\n\n");
+
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
@@ -102,16 +116,19 @@ help() {
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
 	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
-	fprintf(stderr, "  -F pidfile to write pid to a file\n");
-	fprintf(stderr, "nameserver is the IP/hostname of the relaying nameserver(s). if absent, /etc/resolv.conf is used\n");
+	fprintf(stderr, "  -F pidfile to write pid to a file\n\n");
+
+	fprintf(stderr, "nameserver is the IP/hostname of the relaying nameserver(s).\n");
 	fprintf(stderr, "   multiple nameservers can be specified (used in round-robin). \n");
+	fprintf(stderr, "   if absent, system default is used\n");
 	fprintf(stderr, "topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
 }
 
 static void
-version() {
+version()
+{
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Git version: %s\n; protocol version %08X", GITREVISION, PROTOCOL_VERSION);
 	exit(0);
@@ -137,11 +154,20 @@ main(int argc, char **argv)
 	int dns_fd;
 	int max_downstream_frag_size;
 	int autodetect_frag_size;
+	int hostname_maxlen;
+
 	int retval;
 	int raw_mode;
 	int lazymode;
-	int selecttimeout;
-	int hostname_maxlen;
+	double max_interval_sec;
+	double server_timeout_sec ;
+	int autodetect_server_timeout;
+	int up_compression;
+	int down_compression;
+
+	int up_windowsize;
+	int down_windowsize;
+
 #ifdef OPENBSD
 	int rtable = 0;
 #endif
@@ -156,6 +182,7 @@ main(int argc, char **argv)
 	int nameserv_family;
 
 	nameserv_addrs_len = 0;
+	nameservaddr_len = 0;
 	nameserv_host = NULL;
 	topdomain = NULL;
 	errormsg = NULL;
@@ -177,9 +204,16 @@ main(int argc, char **argv)
 	retval = 0;
 	raw_mode = 1;
 	lazymode = 1;
-	selecttimeout = 4;
+	max_interval_sec = 5;	/* DNS RFC says 5 seconds minimum */
+	server_timeout_sec = 4;	/* Safe value for RTT <1s */
+	autodetect_server_timeout = 1;
 	hostname_maxlen = 0xFF;
 	nameserv_family = AF_UNSPEC;
+	up_compression = 0;
+	down_compression = 1;
+
+	up_windowsize = 8;
+	down_windowsize = 8;
 
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
@@ -196,7 +230,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfDhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfDhrCcu:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -263,7 +297,7 @@ main(int argc, char **argv)
 			if (client_set_qtype(optarg))
 				errx(5, "Invalid query type '%s'", optarg);
 			break;
-		case 'O':       /* not -D, is Debug in server */
+		case 'O':
 			client_set_downenc(optarg);
 			break;
 		case 'L':
@@ -272,13 +306,31 @@ main(int argc, char **argv)
 				lazymode = 1;
 			if (lazymode < 0)
 				lazymode = 0;
-			if (!lazymode)
-				selecttimeout = 1;
+			if (!lazymode && max_interval_sec > 1)
+				max_interval_sec = 1;
 			break;
 		case 'I':
-			selecttimeout = atoi(optarg);
-			if (selecttimeout < 1)
-				selecttimeout = 1;
+			max_interval_sec = strtod(optarg, NULL);
+			if (max_interval_sec < 1)
+				max_interval_sec = 1;
+			break;
+		case 'i':
+			server_timeout_sec = strtod(optarg, NULL);
+			if (server_timeout_sec < 0.4)
+				server_timeout_sec = 0.4;
+			autodetect_server_timeout = 0;
+			break;
+		case 'w':
+			down_windowsize = atoi(optarg);
+			break;
+		case 'W':
+			up_windowsize = atoi(optarg);
+			break;
+		case 'c':
+			up_compression = atoi(optarg) & 1;
+			break;
+		case 'C':
+			down_compression = atoi(optarg) & 1;
 			break;
 		default:
 			usage();
@@ -349,10 +401,17 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
-	client_set_selecttimeout(selecttimeout);
+	if (up_windowsize < 1 || down_windowsize < 1) {
+		warnx("Windowsize (-w or -W) must be greater than 0!");
+		usage();
+	}
+
+	client_set_compression(up_compression, down_compression);
+	client_set_dnstimeout(max_interval_sec, server_timeout_sec, autodetect_server_timeout);
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
+	client_set_windowsize(up_windowsize, down_windowsize);
 
 	if (username != NULL) {
 #ifndef WINDOWS32
@@ -391,7 +450,8 @@ main(int argc, char **argv)
 
 	fprintf(stderr, "Sending DNS queries for %s to ", topdomain);
 	for (int a = 0; a < nameserv_addrs_len; a++)
-		fprintf(stderr, "%s%s", format_addr(&nameserv_addrs[a], nameservaddr_len), (a != nameserv_addrs_len-1) ?  ", " : "");
+		fprintf(stderr, "%s%s", format_addr(&nameserv_addrs[a], nameservaddr_len),
+				(a != nameserv_addrs_len-1) ?  ", " : "");
 	fprintf(stderr, "\n");
 
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
