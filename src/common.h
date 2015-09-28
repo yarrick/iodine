@@ -85,14 +85,12 @@ struct query {
 	char name[QUERY_NAME_SIZE];
 	unsigned short type;
 	unsigned short rcode;
-	unsigned short id;
+	int id;	/* id < 0: unusued */
 	struct sockaddr_storage destination;
 	socklen_t dest_len;
 	struct sockaddr_storage from;
 	socklen_t fromlen;
-	unsigned short id2;
-	struct sockaddr_storage from2;
-	socklen_t fromlen2;
+	struct timeval time_recv;
 };
 
 enum connection {
@@ -117,6 +115,8 @@ void do_pidfile(char *);
 void read_password(char*, size_t);
 
 int check_topdomain(char *, char **);
+
+extern double difftime(time_t, time_t);
 
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID

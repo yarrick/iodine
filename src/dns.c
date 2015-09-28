@@ -411,7 +411,6 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	int id;
 	int rv;
 
-	q->id2 = 0;
 	rv = 0;
 	header = (HEADER*)packet;
 
