@@ -111,12 +111,14 @@ Options:
 Client sends:
 	First byte o or O
 	5 bits coded as Base32 char, meaning userid
-	1 char, meaning option
+	number of options (n) as decimal digit
+	n chars, each a valid option (to be processed in order)
 	CMC as 3 Base32 chars
 Server sends:
-	Full name of option if accepted. After this, option immediately takes
-	effect in server.
+	Option chars in the same order as request, indicating that options were
+	accepted by the server.
 	BADCODEC if not accepted. Previous situation remains.
+	BADLEN if number of options doesn't match length of query.
 	All options affect only the requesting client.
 
 	Option chars:

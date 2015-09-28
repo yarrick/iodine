@@ -474,7 +474,7 @@ send_query(int fd, uint8_t *hostname)
 					" always work any more. Start with -L0 next time on this network.");
 				lazymode = 0;
 				server_timeout_ms = 0;
-				handshake_lazyoff(fd);
+				handshake_switch_options(fd, 0, compression_down, downenc);
 			}
 		}
 	}
@@ -1455,51 +1455,21 @@ send_codec_switch(int fd, int userid, int bits)
 }
 
 static void
-send_compression_switch(int fd, int userid)
+send_server_options(int fd, int userid, int lazy, int compression, char denc, char *options)
+/* Options must be length >=4 */
 {
-	char buf[512] = "o_____.";
-	buf[1] = b32_5to8(userid);
-	buf[2] = compression_down ? 'c' : 'd';
-
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed) & 0x1f);
-	rand_seed++;
-
-	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, (uint8_t *)buf);
-}
-
-static void
-send_downenc_switch(int fd, int userid)
-{
-	char buf[512] = "o_____.";
-	buf[1] = b32_5to8(userid);
-	buf[2] = tolower(downenc);
-
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed) & 0x1f);
-	rand_seed++;
-
-	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, (uint8_t *)buf);
-}
-
-static void
-send_lazy_switch(int fd, int userid)
-{
-	char buf[512] = "o_____.";
+	char buf[512] = "oU3___CMC.";
 	buf[1] = b32_5to8(userid);
 
-	if (lazymode)
-		buf[2] = 'l';
-	else
-		buf[2] = 'i';
+	options[0] = tolower(denc);
+	options[1] = lazy ? 'l' : 'i';
+	options[2] = compression ? 'c' : 'd';
+	options[3] = 0;
+	strncpy(buf + 3, options, 3);
 
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed ) & 0x1f);
+	buf[6] = b32_5to8((rand_seed >> 10) & 0x1f);
+	buf[7] = b32_5to8((rand_seed >> 5) & 0x1f);
+	buf[8] = b32_5to8((rand_seed) & 0x1f);
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
@@ -2185,87 +2155,54 @@ codec_revert:
 	fprintf(stderr, "Falling back to upstream codec %s\n", dataenc->name);
 }
 
-static void
-handshake_switch_downcompression(int dns_fd)
+void
+handshake_switch_options(int dns_fd, int lazy, int compression, char denc)
 {
 	char in[4096];
-	int i;
 	int read;
-	char *status;
+	char *dname, *comp_status, *lazy_status;
+	char opts[4];
 
-	status = compression_down ? "on" : "off";
-	fprintf(stderr, "Switching %s downstream data compression\n", status);
-	for (i = 0; running && i < 5; i++) {
-
-		send_compression_switch(dns_fd, userid);
-
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'O', i+1);
-
-		if (read > 0) {
-			if (strncmp("BADLEN", in, 6) == 0) {
-				fprintf(stderr, "Server got bad message length.\n");
-				goto fail;
-			} else if (strncmp("BADIP", in, 5) == 0) {
-				fprintf(stderr, "Server rejected sender IP address.\n");
-				goto fail;
-			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				fprintf(stderr, "Server rejected the compression option.\n");
-				goto fail;
-			}
-			in[read] = 0; /* zero terminate */
-			fprintf(stderr, "Server %s downstream compression\n", in);
-			return;
-		}
-
-		fprintf(stderr, "Retrying downstream compression switch...\n");
-	}
-	if (!running)
-		return;
-
-	fprintf(stderr, "No reply from server on downstream compression switch.\n");
-
-fail:
-	fprintf(stderr, "Failed to switch %s downstream data compression\n", status);
-}
-
-static void
-handshake_switch_downenc(int dns_fd)
-{
-	char in[4096];
-	int i;
-	int read;
-	char *dname;
+	comp_status = compression ? "enabled" : "disabled";
 
 	dname = "Base32";
-	if (downenc == 'S')
+	if (denc == 'S')
 		dname = "Base64";
-	else if (downenc == 'U')
+	else if (denc == 'U')
 		dname = "Base64u";
-	else if (downenc == 'V')
+	else if (denc == 'V')
 		dname = "Base128";
-	else if (downenc == 'R')
+	else if (denc == 'R')
 		dname = "Raw";
 
-	fprintf(stderr, "Switching downstream to codec %s\n", dname);
-	for (i=0; running && i<5 ;i++) {
+	lazy_status = lazy ? "lazy" : "immediate";
 
-		send_downenc_switch(dns_fd, userid);
+	fprintf(stderr, "Switching server options: %s mode, downstream codec %s, compression %s...\n",
+			lazy_status, dname, comp_status);
+	for (int i = 0; running && i < 5; i++) {
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'O', i+1);
+		send_server_options(dns_fd, userid, lazy, compression, denc, opts);
+
+		read = handshake_waitdns(dns_fd, in, sizeof(in) - 1, 'O', i + 1);
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
 				fprintf(stderr, "Server got bad message length.\n");
-				goto codec_revert;
+				goto opt_revert;
 			} else if (strncmp("BADIP", in, 5) == 0) {
 				fprintf(stderr, "Server rejected sender IP address.\n");
-				goto codec_revert;
+				goto opt_revert;
 			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				fprintf(stderr, "Server rejected the selected codec.\n");
-				goto codec_revert;
+				fprintf(stderr, "Server rejected the selected options.\n");
+				goto opt_revert;
+			} else if (strncasecmp(opts, in + 3, 3) != 0) {
+				fprintf(stderr, "Server failed to change options.\n");
+				goto opt_revert;
 			}
-			in[read] = 0; /* zero terminate */
-			fprintf(stderr, "Server switched downstream to codec %s\n", in);
+			fprintf(stderr, "Switched server options successfully. (%s)\n", opts);
+			lazymode = lazy;
+			compression_down = compression;
+			downenc = denc;
 			return;
 		}
 
@@ -2276,79 +2213,9 @@ handshake_switch_downenc(int dns_fd)
 
 	fprintf(stderr, "No reply from server on codec switch.\n");
 
-codec_revert:
-	fprintf(stderr, "Falling back to downstream codec Base32\n");
-}
-
-static void
-handshake_try_lazy(int dns_fd)
-{
-	char in[4096];
-	int i;
-	int read;
-
-	fprintf(stderr, "Switching to lazy mode for low-latency\n");
-	for (i=0; running && i<5; i++) {
-
-		send_lazy_switch(dns_fd, userid);
-
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'O', i+1);
-
-		if (read > 0) {
-			if (strncmp("BADLEN", in, 6) == 0) {
-				fprintf(stderr, "Server got bad message length.\n");
-				goto codec_revert;
-			} else if (strncmp("BADIP", in, 5) == 0) {
-				fprintf(stderr, "Server rejected sender IP address.\n");
-				goto codec_revert;
-			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				fprintf(stderr, "Server rejected lazy mode.\n");
-				goto codec_revert;
-			} else if (strncmp("Lazy", in, 4) == 0) {
-				fprintf(stderr, "Server switched to lazy mode\n");
-				lazymode = 1;
-				return;
-			}
-		}
-
-		fprintf(stderr, "Retrying lazy mode switch...\n");
-	}
-	if (!running)
-		return;
-
-	fprintf(stderr, "No reply from server on lazy switch.\n");
-
-codec_revert:
-	fprintf(stderr, "Falling back to legacy mode\n");
-	lazymode = 0;
-	max_timeout_ms = 1000;
-}
-
-void
-handshake_lazyoff(int dns_fd)
-/* Used in the middle of data transfer, timing is different and no error msgs */
-{
-	char in[4096];
-	int i;
-	int read;
-
-	for (i=0; running && i<5; i++) {
-
-		send_lazy_switch(dns_fd, userid);
-
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'O', 1);
-
-		if (read == 9 && strncmp("Immediate", in, 9) == 0) {
-			warnx("Server switched back to legacy mode.");
-			lazymode = 0;
-			max_timeout_ms = 1000;
-			return;
-		}
-	}
-	if (!running)
-		return;
-
-	warnx("No reply from server on legacy mode switch.");
+opt_revert:
+	fprintf(stderr, "Falling back to previous configuration, downstream codec %s.\n",
+			dataenc->name);
 }
 
 static int
@@ -2600,16 +2467,8 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		if (!running)
 			return -1;
 
-		handshake_switch_downenc(dns_fd);
-		if (!running)
-			return -1;
-
-		if (!compression_down)
-			handshake_switch_downcompression(dns_fd);
-
-		if (lazymode) {
-			handshake_try_lazy(dns_fd);
-		}
+		/* Set options for compression, lazymode and downstream codec */
+		handshake_switch_options(dns_fd, lazymode, compression_down, downenc);
 		if (!running)
 			return -1;
 

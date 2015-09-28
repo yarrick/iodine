@@ -49,7 +49,7 @@ void client_set_hostname_maxlen(size_t i);
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize);
 int client_tunnel(int tun_fd, int dns_fd);
 
-void handshake_lazyoff(int dns_fd);
+void handshake_switch_options(int dns_fd, int lazy, int compression, char denc);
 void send_ping(int fd, int ping_response, int ack);
 
 #endif

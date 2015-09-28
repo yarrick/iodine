@@ -1388,7 +1388,12 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 		return;
 	} else if(in[0] == 'O' || in[0] == 'o') { /* Protocol options */
-		if (domain_len < 3) { /* len at least 3, example: "O1T" */
+		int bits = 0;
+		int numopts;
+		char num[2], *opts;
+
+		int tmp_lazy, tmp_downenc, tmp_comp;
+		if (domain_len < 7) { /* len at least 7, example: "oa1tcmc" */
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
 			return;
 		}
@@ -1400,59 +1405,67 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return; /* illegal id */
 		}
 
-		int bits = 0;
-		switch (toupper(in[2])) {
-		case 'T':
-			users[userid].downenc = 'T';
-			write_dns(dns_fd, q, "Base32", 6, users[userid].downenc);
-			bits = 5;
-			break;
-		case 'S':
-			users[userid].downenc = 'S';
-			write_dns(dns_fd, q, "Base64", 6, users[userid].downenc);
-			bits = 6;
-			break;
-		case 'U':
-			users[userid].downenc = 'U';
-			write_dns(dns_fd, q, "Base64u", 7, users[userid].downenc);
-			bits = 6;
-			break;
-		case 'V':
-			users[userid].downenc = 'V';
-			write_dns(dns_fd, q, "Base128", 7, users[userid].downenc);
-			bits = 7;
-			break;
-		case 'R':
-			users[userid].downenc = 'R';
-			write_dns(dns_fd, q, "Raw", 3, users[userid].downenc);
-			bits = 8;
-			break;
-		case 'L':
-			users[userid].lazy = 1;
-			write_dns(dns_fd, q, "Lazy", 4, users[userid].downenc);
-			break;
-		case 'I':
-			users[userid].lazy = 0;
-			write_dns(dns_fd, q, "Immediate", 9, users[userid].downenc);
-			break;
-		case 'C':
-			users[userid].down_compression = 1;
-			write_dns(dns_fd, q, "Enabled", 7, users[userid].downenc);
-			break;
-		case 'D':
-			users[userid].down_compression = 0;
-			write_dns(dns_fd, q, "Disabled", 8, users[userid].downenc);
-			break;
-		default:
-			write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
-			break;
+		num[0] = in[2];
+		num[1] = 0;
+		numopts = atoi(num);
+
+		if (domain_len != numopts + 6 || numopts == 0) {
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
 		}
+
+		/* Temporary variables: don't change anything until all options parsed */
+		tmp_lazy = users[userid].lazy;
+		tmp_comp = users[userid].down_compression;
+		tmp_downenc = users[userid].downenc;
+
+		opts = (char *) in + 3;
+
+		for (int i = 0; i < numopts; i++) {
+			switch (toupper(opts[i])) {
+			case 'T':
+				tmp_downenc = 'T';
+				bits = 5;
+				break;
+			case 'S':
+				tmp_downenc = 'S';
+				bits = 6;
+				break;
+			case 'U':
+				tmp_downenc = 'U';
+				bits = 6;
+				break;
+			case 'V':
+				tmp_downenc = 'V';
+				bits = 7;
+				break;
+			case 'R':
+				tmp_downenc = 'R';
+				bits = 8;
+				break;
+			case 'L':
+				tmp_lazy = 1;
+				break;
+			case 'I':
+				tmp_lazy = 0;
+				break;
+			case 'C':
+				tmp_comp = 1;
+				break;
+			case 'D':
+				tmp_comp = 0;
+				break;
+			default:
+				write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
+				return;
+			}
+		}
+
 		/* Automatically switch to raw encoding if PRIVATE or NULL request */
-		if (q->type == T_NULL || q->type == T_PRIVATE) {
+		if ((q->type == T_NULL || q->type == T_PRIVATE) && !bits) {
 			users[userid].downenc = 'R';
 			bits = 8;
 			if (debug >= 3)
-				warnx("Assuming raw data encoding due to NULL/PRIVATE requests for user %d.", userid);
+				warnx("Assuming raw data encoding with NULL/PRIVATE requests for user %d.", userid);
 		}
 		if (bits) {
 			int f = users[userid].fragsize;
@@ -1462,6 +1475,13 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 					  users[userid].outgoing->maxfraglen, userid, bits, users[userid].downenc);
 			users[userid].downenc_bits = bits;
 		}
+
+		/* Store any changes */
+		users[userid].down_compression = tmp_comp;
+		users[userid].downenc = tmp_downenc;
+		users[userid].lazy = tmp_lazy;
+
+		write_dns(dns_fd, q, opts, numopts, users[userid].downenc);
 		return;
 	} else if(in[0] == 'Y' || in[0] == 'y') { /* Downstream codec check */
 		int i;
