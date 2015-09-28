@@ -25,6 +25,7 @@ typedef unsigned int in_addr_t;
 #include <windns.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
+#include <time.h>
 
 /* Missing from the mingw headers */
 #ifndef DNS_TYPE_SRV
@@ -74,7 +75,7 @@ typedef struct {
 } HEADER;
 
 struct ip
-  {
+{
     unsigned int ip_hl:4;               /* header length */
     unsigned int ip_v:4;                /* version */
     u_char ip_tos;                      /* type of service */
@@ -89,7 +90,85 @@ struct ip
     u_char ip_p;                        /* protocol */
     u_short ip_sum;                     /* checksum */
     struct in_addr ip_src, ip_dst;      /* source and dest address */
-  };
+};
+
+/* windows gettimeofday from https://gist.github.com/ugovaretto/5875385 */
+#if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
+  #define DELTA_EPOCH_IN_MICROSECS 116444736000000000Ui64
+#else
+  #define DELTA_EPOCH_IN_MICROSECS 116444736000000000ULL
+#endif
+
+/* Convenience macros for operations on timevals.
+   NOTE: `timercmp' does not work for >= or <=.  */
+#define timerisset(tvp)	((tvp)->tv_sec || (tvp)->tv_usec)
+#define timerclear(tvp)	((tvp)->tv_sec = (tvp)->tv_usec = 0)
+#define timercmp(a, b, CMP) 						      \
+	(((a)->tv_sec == (b)->tv_sec) ? 					      \
+	 ((a)->tv_usec CMP (b)->tv_usec) : 					      \
+	 ((a)->tv_sec CMP (b)->tv_sec))
+#define timeradd(a, b, result)						      \
+	do {									      \
+		(result)->tv_sec = (a)->tv_sec + (b)->tv_sec;			      \
+		(result)->tv_usec = (a)->tv_usec + (b)->tv_usec;			      \
+		if ((result)->tv_usec >= 1000000)					      \
+		{									      \
+			++(result)->tv_sec;						      \
+			(result)->tv_usec -= 1000000;					      \
+		}									      \
+	} while (0)
+#define timersub(a, b, result)						      \
+	do {									      \
+		(result)->tv_sec = (a)->tv_sec - (b)->tv_sec;			      \
+		(result)->tv_usec = (a)->tv_usec - (b)->tv_usec;			      \
+		if ((result)->tv_usec < 0) {					      \
+			--(result)->tv_sec;						      \
+			(result)->tv_usec += 1000000;					      \
+		}									      \
+	} while (0)
+
+struct timezone
+{
+  int  tz_minuteswest; /* minutes W of Greenwich */
+  int  tz_dsttime;     /* type of dst correction */
+};
+
+inline int
+gettimeofday(struct timeval *tv, struct timezone *tz)
+{
+	FILETIME ft;
+	unsigned __int64 tmpres = 0;
+	static int tzflag = 0;
+
+	if (NULL != tv)
+		{
+		GetSystemTimeAsFileTime(&ft);
+
+		tmpres |= ft.dwHighDateTime;
+		tmpres <<= 32;
+		tmpres |= ft.dwLowDateTime;
+
+		/* convert into microseconds */
+		tmpres /= 10;
+		/* converting file time to unix epoch */
+		tmpres -= DELTA_EPOCH_IN_MICROSECS;
+		tv->tv_sec = (long) (tmpres / 1000000UL);
+		tv->tv_usec = (long) (tmpres % 1000000UL);
+	}
+
+	if (NULL != tz)
+		{
+		if (!tzflag)
+		{
+			_tzset();
+			tzflag++;
+		}
+		tz->tz_minuteswest = _timezone / 60;
+		tz->tz_dsttime = _daylight;
+	}
+
+	return 0;
+}
 
 DWORD WINAPI tun_reader(LPVOID arg);
 struct tun_data {
