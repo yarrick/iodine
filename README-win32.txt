@@ -11,10 +11,11 @@ Extra README file for Win32 related stuff
 
 0. After iodine 0.6, you need Windows XP or newer to run.
 
-1. Install the TAP32 driver 
+1. Install the TAP driver 
    http://openvpn.net/index.php/open-source/downloads.html
-   Choose OpenVPN 2.0.9 Windows Installer, when installing you can
-   select to install only the TAP driver.
+   Download the OpenVPN TAP driver (under section Tap-windows)
+   Problems has been reported with the NDIS6 version (9.2x.y), use the
+   NDIS5 version for now if possible.
 
 2. Have at least one TAP32 interface installed. There are scripts for adding
    and removing in the OpenVPN bin directory. If you have more than one
