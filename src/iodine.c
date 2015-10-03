@@ -70,7 +70,7 @@ print_usage()
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-w downfrags] [-W upfrags] [-i sec] [-I sec] [-C 0|1] [-c 0|1]"
+			"[-w downfrags] [-W upfrags] [-i sec] [-I sec] [-c 0|1] [-C 0|1] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] "
 			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [nameserverN ...]]]\n", __progname);
 }
@@ -97,15 +97,15 @@ help()
 	fprintf(stderr, "  -m max size of downstream fragments (default: autodetect)\n");
 	fprintf(stderr, "  -M max size of upstream hostnames (~100-255, default: 255)\n");
 	fprintf(stderr, "  -r to skip raw UDP mode attempt\n");
-	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n\n");
 
 	fprintf(stderr, "Fine-tuning options:\n");
 	fprintf(stderr, "  -w downstream fragment window size (default: 8)\n");
 	fprintf(stderr, "  -W upstream fragment window size (default: 8)\n");
 	fprintf(stderr, "  -i server-side request timeout in lazy mode \n");
 	fprintf(stderr, "     (default: automatically adjust from max timeout and round-trip time)\n");
-	fprintf(stderr, "  -C 1: use downstream compression (default), 0: disable\n");
-	fprintf(stderr, "  -c 1: use upstream compression, 0: disable (default)\n\n");
+	fprintf(stderr, "  -c 1: use downstream compression (default), 0: disable\n");
+	fprintf(stderr, "  -C 1: use upstream compression, 0: disable (default)\n\n");
 
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");
@@ -230,7 +230,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfDhrCcu:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfDhrcCu:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -326,10 +326,10 @@ main(int argc, char **argv)
 		case 'W':
 			up_windowsize = atoi(optarg);
 			break;
-		case 'c':
+		case 'C':
 			up_compression = atoi(optarg) & 1;
 			break;
-		case 'C':
+		case 'c':
 			down_compression = atoi(optarg) & 1;
 			break;
 		default:
