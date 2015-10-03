@@ -20,7 +20,7 @@
 
 extern int debug;
 
-#define PENDING_QUERIES_LENGTH (MAX(windowsize_up, windowsize_down) * 2)
+#define PENDING_QUERIES_LENGTH (MAX(windowsize_up, windowsize_down) * 3)
 
 struct query_tuple {
 	int id; /* DNS query / response ID */
