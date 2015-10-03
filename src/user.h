@@ -40,6 +40,7 @@ struct tun_user {
 	struct frag_buffer *incoming;
 	struct frag_buffer *outgoing;
 	int next_upstream_ack;
+	int send_ping_next;
 	struct encoder *encoder;
 	char downenc;
 	int downenc_bits;

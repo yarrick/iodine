@@ -128,14 +128,14 @@ user_active(int i)
 int
 all_users_waiting_to_send()
 /* If this returns true, then reading from tun device is blocked.
-   So only return true when all clients have at least one fragment in
-   the outgoing buffer, so that sending back-to-back is possible
-   without going through another select loop.
-*/
+   So only return true when all clients have insufficient space in
+   outgoing buffer, so that sending back-to-back is possible
+   without going through another select loop. */
 {
 	for (int i = 0; i < usercount; i++)
 		if (user_active(i))
-			if (!user_sending(i)) return 0;
+			if (users[i].outgoing->length - users[i].outgoing->numitems > 8)
+				return 0;
 	return 1;
 }
 
