@@ -62,7 +62,7 @@ extern int window_debug;
 
 #ifdef DEBUG_BUILD
 #define DEBUG(...) if (window_debug) {\
-		fprintf(stderr, "[WINDOW-DEBUG] (%s:%d)", __FILE__, __LINE__);\
+		fprintf(stderr, "[WINDOW-DEBUG] (%s:%d) ", __FILE__, __LINE__);\
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
 	}
@@ -120,7 +120,7 @@ int window_process_incoming_fragment(struct frag_buffer *w, fragment *f);
 size_t window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int *compression);
 
 /* Returns number of fragments to be sent */
-int window_sending(struct frag_buffer *w);
+size_t window_sending(struct frag_buffer *w);
 
 /* Returns next fragment to be sent or NULL if nothing (SEND) */
 fragment *window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack);

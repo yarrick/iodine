@@ -232,18 +232,18 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 
 /* Returns number of fragments that can be sent immediately; effectively
  * the same as window_get_next_sending_fragment but without changing anything. */
-int
+size_t
 window_sending(struct frag_buffer *w)
 {
 	fragment *f;
-	int tosend = 0;
+	size_t tosend = 0;
 	if (w->numitems == 0)
 		return 0;
 	for (size_t i = 0; i < w->windowsize; i++) {
 		f = &w->frags[WRAP(w->window_start + i)];
 		if (f->len == 0 || f->acks >= 1) continue;
-		if ((f->retries == 0) != (difftime(time(NULL), f->lastsent) > ACK_TIMEOUT)) {
-			/* Fragment not sent xor timed out (to be re-sent) */
+		if (f->retries < 1 || difftime(time(NULL), f->lastsent) >= ACK_TIMEOUT) {
+			/* Fragment not sent or timed out (to be re-sent) */
 			tosend++;
 		}
 	}
@@ -262,7 +262,7 @@ window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack)
 		f = &w->frags[WRAP(w->window_start + i)];
 		if (f->acks >= 1) continue;
 		/* TODO: use timeval for more precise timeouts */
-		if (f->retries >= 1 && difftime(time(NULL), f->lastsent) > ACK_TIMEOUT) {
+		if (f->retries >= 1 && difftime(time(NULL), f->lastsent) >= ACK_TIMEOUT) {
 			/* Fragment sent before, not ACK'd */
 			DEBUG("Sending fragment %u again, %u retries so far, %u resent overall\n", f->seqID, f->retries, w->resends);
 			w->resends ++;
@@ -328,17 +328,20 @@ window_ack(struct frag_buffer *w, int seqid)
 void
 window_tick(struct frag_buffer *w)
 {
+	unsigned old_start_id;
 	for (size_t i = 0; i < w->windowsize; i++) {
 		if (w->frags[w->window_start].acks >= 1) {
-			DEBUG("moving window forwards 1; start = %lu-%lu, end = %lu-%lu, len = %lu",
-					w->window_start, AFTER(w, 1), w->window_end, AFTER(w, w->windowsize + 1), w->length);
+			old_start_id = w->start_seq_id;
+			w->start_seq_id = (w->start_seq_id + 1) % MAX_SEQ_ID;
+			DEBUG("moving window forwards; %lu-%lu (%u) to %lu-%lu (%u) len=%lu",
+					w->window_start, w->window_end, old_start_id, AFTER(w, 1),
+					AFTER(w, w->windowsize + 1), w->start_seq_id, w->length);
 			if (w->direction == WINDOW_SENDING) {
 				DEBUG("Clearing old fragments in SENDING window.");
 				w->numitems --; /* Clear old fragments */
 				memset(&w->frags[w->window_start], 0, sizeof(fragment));
 			}
 			w->window_start = AFTER(w, 1);
-			w->start_seq_id = (w->start_seq_id + 1) % MAX_SEQ_ID;
 
 			w->window_end = AFTER(w, w->windowsize);
 		} else break;
