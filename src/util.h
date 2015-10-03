@@ -18,7 +18,27 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
+#include <time.h>
+#include <sys/time.h>
+
 char *get_resolvconf_addr();
 void socket_setrtable(int fd, int rtable);
+
+inline time_t
+timeval_to_ms(struct timeval *tv)
+{
+	time_t ms = tv->tv_sec * 1000;
+	ms += (tv->tv_usec + 500) / 1000;
+	return ms;
+}
+
+inline struct timeval
+ms_to_timeval(time_t ms)
+{
+	struct timeval tv;
+	tv.tv_sec = ms / 1000;
+	tv.tv_usec = (ms - tv.tv_sec * 1000) * 1000;
+	return tv;
+}
 
 #endif
