@@ -19,6 +19,7 @@
 #define __CLIENT_H__
 
 extern int debug;
+extern int stats;
 
 #define PENDING_QUERIES_LENGTH (MAX(windowsize_up, windowsize_down) * 3)
 
@@ -49,6 +50,8 @@ void client_set_hostname_maxlen(size_t i);
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize);
 int client_tunnel(int tun_fd, int dns_fd);
 
+int parse_data(uint8_t *data, size_t len, fragment *f, int *immediate);
+int handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout);
 void handshake_switch_options(int dns_fd, int lazy, int compression, char denc);
 void send_ping(int fd, int ping_response, int ack);
 

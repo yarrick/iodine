@@ -60,7 +60,9 @@
 #include "util.h"
 #include "client.h"
 
+/* Output flags for debug and time between stats update */
 int debug;
+int stats;
 
 static int running;
 static const char *password;
@@ -98,11 +100,20 @@ static int autodetect_server_timeout;
 static time_t rtt_total_ms;
 static size_t num_immediate;
 
-/* Query statistics */
+/* Connection statistics */
 static size_t num_timeouts;
 static size_t num_untracked;
-static size_t send_query_sendcnt = -1;
-static size_t send_query_recvcnt = -1;
+static size_t num_servfail;
+static size_t num_badip;
+static size_t num_init_queries;
+static size_t num_sent;
+static size_t num_recv;
+static size_t send_query_sendcnt = 0;
+static size_t send_query_recvcnt = 0;
+
+static size_t num_frags_sent;
+static size_t num_frags_recv;
+static size_t num_pings;
 
 /* My userid at the server */
 static char userid;
@@ -168,6 +179,9 @@ client_init()
 	current_nameserver = 0;
 
 	maxfragsize_up = 100;
+
+	num_immediate = 1;
+	rtt_total_ms = 1000;
 
 	outbuf = NULL;
 	inbuf = NULL;
@@ -323,6 +337,48 @@ client_rotate_nameserver()
 	}
 
 static void
+update_server_timeout(int dns_fd, int handshake)
+/* Calculate server timeout based on average RTT, send ping "handshake" to set */
+{
+	time_t rtt_ms;
+	static size_t num_rtt_timeouts = 0;
+
+	/* Get average RTT in ms */
+	rtt_ms = rtt_total_ms / num_immediate;
+	if (rtt_ms >= max_timeout_ms) {
+		num_rtt_timeouts++;
+		if (num_rtt_timeouts < 3) {
+			fprintf(stderr, "Target interval of %ld ms less than average round-trip of "
+					"%ld ms! Try increasing interval with -I.\n", max_timeout_ms, rtt_ms);
+		} else {
+			max_timeout_ms = server_timeout_ms;
+			if (server_timeout_ms > rtt_ms) {
+				server_timeout_ms -= rtt_ms;
+				if (lazymode)
+					fprintf(stderr, "Adjusting server timeout to %ld ms, target interval %ld ms.\n",
+							server_timeout_ms, max_timeout_ms);
+			} else {
+				server_timeout_ms = 0;
+				fprintf(stderr, "Switching off lazy mode to keep timeouts below target interval (%ld ms).",
+						max_timeout_ms);
+				handshake_switch_options(dns_fd, 0, compression_down, downenc);
+			}
+
+			num_rtt_timeouts = 0;
+		}
+	} else {
+		/* Set server timeout based on target interval and RTT */
+		server_timeout_ms = max_timeout_ms - rtt_ms;
+	}
+
+	if (!handshake)
+		return;
+
+	/* Send ping handshake to set server timeout/lazymode */
+	send_ping(dns_fd, 1, -1);
+}
+
+static void
 check_pending_queries()
 /* Updates pending queries list */
 {
@@ -330,7 +386,7 @@ check_pending_queries()
 	struct timeval now, qtimeout, max_timeout;
 	gettimeofday(&now, NULL);
 	/* Max timeout for queries is max interval + 1 second extra */
-	max_timeout = ms_to_timeval(max_timeout_ms);
+	max_timeout = ms_to_timeval(max_timeout_ms + 1000);
 	for (int i = 0; i < PENDING_QUERIES_LENGTH; i++) {
 		if (pending_queries[i].time.tv_sec > 0 && pending_queries[i].id >= 0) {
 			timeradd(&pending_queries[i].time, &max_timeout, &qtimeout);
@@ -383,11 +439,9 @@ query_sent_now(int id)
 }
 
 static void
-got_response(int id, int immediate)
+got_response(int id, int immediate, int dns_fd)
 {
 	struct timeval now, rtt;
-	time_t rtt_ms;
-	static size_t num_rtt_timeouts;
 	gettimeofday(&now, NULL);
 
 	QTRACK_DEBUG(4, "Got answer id %d (%s)", id, immediate ? "immediate" : "lazy");
@@ -412,25 +466,8 @@ got_response(int id, int immediate)
 				rtt_total_ms += timeval_to_ms(&rtt);
 				num_immediate++;
 
-				if (autodetect_server_timeout) {
-					/* Get average RTT in ms */
-					rtt_ms = rtt_total_ms / num_immediate;
-					if (rtt_ms >= max_timeout_ms) {
-						num_rtt_timeouts++;
-						if (num_rtt_timeouts < 3) {
-							fprintf(stderr, "Preferred interval of %lu ms less than average round-trip of "
-									"%lu ms! Try increasing interval with -I.\n", max_timeout_ms, rtt_ms);
-						} else {
-							server_timeout_ms = max_timeout_ms;
-							max_timeout_ms += rtt_ms;
-							if (lazymode)
-								fprintf(stderr, "Adjusting server timeout to %lu ms.\n", server_timeout_ms);
-							num_rtt_timeouts = 0;
-						}
-					} else {
-						server_timeout_ms = max_timeout_ms - rtt_ms;
-					}
-				}
+				if (autodetect_server_timeout)
+					update_server_timeout(dns_fd, 0);
 			}
 
 			/* Remove query info from buffer to mark it as answered */
@@ -487,29 +524,32 @@ send_query(int fd, uint8_t *hostname)
 	   (Can't very well do this anywhere else; this is the only place
 	   we'll reliably get to in such situations.) */
 
+	num_sent++;
 	if (send_query_sendcnt >= 0 && send_query_sendcnt < 100 && lazymode) {
 		send_query_sendcnt++;
 
-		if ((send_query_sendcnt > 6 && send_query_recvcnt <= 0) ||
-		    (send_query_sendcnt > 10 && 4 * send_query_recvcnt < send_query_sendcnt)) {
-			if (server_timeout_ms > 500 && autodetect_server_timeout) {
-				server_timeout_ms -= 200;
-				double secs = (double) server_timeout_ms / 1000.0;
-				fprintf(stderr, "Receiving too few answers. Setting server timeout to %fs (-I%f)\n", secs, secs);
+		if ((send_query_sendcnt > windowsize_down && send_query_recvcnt <= 0) ||
+		    (send_query_sendcnt > 2 * windowsize_down && 4 * send_query_recvcnt < send_query_sendcnt)) {
+			if (max_timeout_ms > 500 && autodetect_server_timeout) {
+				max_timeout_ms -= 500;
+				double secs = (double) max_timeout_ms / 1000.0;
+				fprintf(stderr, "Receiving too few answers. Setting target timeout to %.1fs (-I%.1f)\n", secs, secs);
+
 				/* restart counting */
 				send_query_sendcnt = 0;
 				send_query_recvcnt = 0;
-				rtt_total_ms = 1000;
-				num_immediate = 1;
-				/* TODO: reduce windowsize due to DNS server dropping queries */
-				send_ping(fd, 1, -1);
+				if (rtt_total_ms / num_immediate < 1000) {
+					rtt_total_ms = 1000;
+					num_immediate = 1;
+				}
+
 			} else if (lazymode && autodetect_server_timeout) {
 				fprintf(stderr, "Receiving too few answers. Will try to switch lazy mode off, but that may not"
 					" always work any more. Start with -L0 next time on this network.");
 				lazymode = 0;
 				server_timeout_ms = 0;
-				handshake_switch_options(fd, 0, compression_down, downenc);
 			}
+			update_server_timeout(fd, 1);
 		}
 	}
 	return q.id;
@@ -558,6 +598,7 @@ send_packet(int fd, char cmd, const uint8_t *data, const size_t datalen)
 void
 send_ping(int fd, int ping_response, int ack)
 {
+	num_pings++;
 	if (conn == CONN_DNS_NULL) {
 		uint8_t data[11];
 		int id;
@@ -651,6 +692,7 @@ send_next_frag(int fd)
 	query_sent_now(id);
 
 	window_tick(outbuf);
+	num_frags_sent++;
 }
 
 static void
@@ -899,7 +941,7 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query
 	}
 }
 
-static int
+int
 handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 /* Wait for DNS reply fitting to our latest query and returns it.
    Returns length of reply = #bytes used in buf.
@@ -985,7 +1027,7 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 	return -1;
 }
 
-static int
+int
 parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
 {
 	size_t headerlen = DOWNSTREAM_HDR;
@@ -1011,7 +1053,6 @@ parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
 		if (len < headerlen) return -1; /* invalid packet - continue */
 
 		/* Parse data/ping header */
-		/* TODO: do something with wsize/start params in ping */
 		dn_wsize = data[3];
 		up_wsize = data[4];
 		dn_start_seq = data[5];
@@ -1072,11 +1113,9 @@ tunnel_tun(int tun_fd, int dns_fd)
 static int
 tunnel_dns(int tun_fd, int dns_fd)
 {
-	static long packrecv = 0;
-	static long packrecv_servfail = 0;
 	static struct query q;
 	size_t datalen, buflen;
-	static uint8_t buf[64*1024], cbuf[64*1024];
+	static uint8_t buf[64*1024], cbuf[64*1024], *data;
 	static fragment f;
 	int read, compressed, res, immediate;
 
@@ -1106,25 +1145,28 @@ tunnel_dns(int tun_fd, int dns_fd)
 		if (read < 0)
 			write_dns_error(&q, 0);
 
-		if (read < 0 && q.rcode == SERVFAIL && lazymode && server_timeout_ms > 500) {
-			if (packrecv < 500 && packrecv_servfail < 4) {
-				packrecv_servfail++;
-				fprintf(stderr, "Hmm, that's %ld SERVFAILs. Your data should still go through...", packrecv_servfail);
-			} else if (packrecv < 500 && packrecv_servfail >= 4 && autodetect_server_timeout) {
-				packrecv_servfail++;
+		if (read < 0 && q.rcode == SERVFAIL && lazymode && max_timeout_ms > 500) {
+			num_servfail++;
+
+			if (send_query_recvcnt < 500 && num_servfail < 4) {
+				fprintf(stderr, "Hmm, that's %ld SERVFAILs. Your data should still go through...", num_servfail);
+			} else if (send_query_recvcnt < 500 && num_servfail >= 4 && autodetect_server_timeout) {
 				server_timeout_ms -= 500;
 				double server_timeout = (float) server_timeout_ms / 1000.0;
-				fprintf(stderr, "%ld SERVFAILs is too many. Setting server timeout to %f to hopefully reduce SERVFAILs."
-						" But just ignore them if data still comes through. (Use -I%f next time on this network.)",
-						packrecv_servfail, server_timeout, server_timeout);
+				fprintf(stderr, "Exceeded acceptable limit for SERVFAILs (%ld), setting "
+					"timeout to %.1f secs. (use -I%.1f next time on this network)\n",
+						num_servfail, server_timeout, server_timeout);
+
+				/* Reset query counts stats */
 				send_query_sendcnt = 0;
 				send_query_recvcnt = 0;
-				rtt_total_ms = 1000;
-				num_immediate = 1;
-				send_ping(dns_fd, 0, -1);
-			} else if (packrecv >= 500 && packrecv_servfail > 0) {
-				fprintf(stderr, "(Sorry, stopped counting; try -I1 if you experience hiccups.)");
-				packrecv_servfail = 0;
+				if (rtt_total_ms / num_immediate < 1000) {
+					/* only reset avg RTT if it might be too small (TODO trust the statistics) */
+					rtt_total_ms = 1000;
+					num_immediate = 1;
+				}
+
+				update_server_timeout(dns_fd, 1);
 			}
 		}
 
@@ -1133,18 +1175,19 @@ tunnel_dns(int tun_fd, int dns_fd)
 	}
 
 	if (read == 5 && !strncmp("BADIP", (char *)cbuf, 5)) {
-		fprintf(stderr, "BADIP: Server rejected sender IP address (maybe iodined -c will help), or server "
-				"kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.");
+		num_badip++;
+		if (num_badip % 5 == 1) {
+			fprintf(stderr, "BADIP (%ld): Server rejected sender IP address (maybe iodined -c will help), or server "
+					"kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.", num_badip);
+		}
 		return -1;	/* nothing done */
 	}
 
 	/* Okay, we have a recent downstream packet */
 	lastdownstreamtime = time(NULL);
 
-	if (!(packrecv & 0x10000000))
-		packrecv++;
-
-	send_query_recvcnt++;  /* overflow doesn't matter */
+	send_query_recvcnt++;  /* unlikely we will ever overflow (2^64 queries is a LOT) */
+	num_recv++;
 
 	/* Decode the downstream data header and fragment-ify ready for processing */
 	res = parse_data(cbuf, read, &f, &immediate);
@@ -1153,7 +1196,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 				res ? "PING" : "DATA", f.seqID, f.ack_other, f.compressed, f.len, f.start, f.end);
 
 	/* Mark query as received */
-	got_response(q.id, immediate);
+	got_response(q.id, immediate, dns_fd);
 
 	window_ack(outbuf, f.ack_other);
 	window_tick(outbuf);
@@ -1185,6 +1228,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 	/* Downstream data traffic + get ack for that data */
 	next_downstream_ack = window_process_incoming_fragment(inbuf, &f);
 
+	num_frags_recv++;
+
 	datalen = window_reassemble_data(inbuf, cbuf, sizeof(cbuf), &compressed);
 	if (datalen > 0) {
 		if (compressed) {
@@ -1196,10 +1241,13 @@ tunnel_dns(int tun_fd, int dns_fd)
 			} else {
 				datalen = buflen;
 			}
+			data = buf;
+		} else {
+			data = cbuf;
 		}
 
 		if (datalen)
-			write_tun(tun_fd, buf, datalen);
+			write_tun(tun_fd, data, datalen);
 	}
 
 	/* Move window along after doing all data processing */
@@ -1216,6 +1264,7 @@ client_tunnel(int tun_fd, int dns_fd)
 	int rv;
 	int i;
 	int sending;
+	time_t last_stats;
 
 	if (conn != CONN_DNS_NULL) {
 		compression_up = 1;
@@ -1225,6 +1274,9 @@ client_tunnel(int tun_fd, int dns_fd)
 	/* Incoming buffer max fragsize doesn't matter */
 	inbuf = window_buffer_init(64, windowsize_down, MAX_FRAGSIZE, WINDOW_RECVING);
 
+	/* init query tracking */
+	num_untracked = 0;
+	num_pending = 0;
 	pending_queries = calloc(PENDING_QUERIES_LENGTH, sizeof(struct query_tuple));
 	for (int i = 0; i < PENDING_QUERIES_LENGTH; i++)
 		pending_queries[i].id = -1;
@@ -1232,13 +1284,22 @@ client_tunnel(int tun_fd, int dns_fd)
 	/* start counting now */
 	rv = 0;
 	lastdownstreamtime = time(NULL);
+	last_stats = time(NULL);
 	rtt_total_ms = 1000;
 	num_immediate = 1;
+
+	/* reset connection statistics */
+	num_init_queries = MAX(send_query_recvcnt, send_query_sendcnt);
+	num_badip = 0;
+	num_servfail = 0;
 	num_timeouts = 0;
-	num_untracked = 0;
-	num_pending = 0;
 	send_query_recvcnt = 0;
 	send_query_sendcnt = 0;
+	num_sent = 0;
+	num_recv = 0;
+	num_frags_sent = 0;
+	num_frags_recv = 0;
+	num_pings = 0;
 
 	if (debug >= 5)
 		window_debug = debug - 3;
@@ -1246,8 +1307,7 @@ client_tunnel(int tun_fd, int dns_fd)
 	while (running) {
 		tv = ms_to_timeval(max_timeout_ms);
 
-		/* TODO: adjust min send interval based on DNS server droppiness
-		 *  (eg. from sending lots of requests simultaneously)
+		/* TODO: detect DNS servers which drop frequent requests
 		 * TODO: adjust number of pending queries based on current data rate */
 		sending = window_sending(outbuf);
 		check_pending_queries();
@@ -1268,6 +1328,26 @@ client_tunnel(int tun_fd, int dns_fd)
 			send_ping_soon = 0;
 		}
 
+		if (stats) {
+			if (difftime(time(NULL), last_stats) >= stats) {
+				/* print useful statistics report */
+				fprintf(stderr, "\n========== iodine connection statistics (user %1d) ==========\n", userid);
+				fprintf(stderr, " Queries sent: %8lu"  "  answered: %8lu"  "  SERVFAILs: %4lu\n",
+						num_sent, num_recv, num_servfail);
+				fprintf(stderr, "  during init: %4lu   IP rejected: %4lu      untracked: %4lu\n",
+						num_init_queries, num_badip, num_untracked);
+				fprintf(stderr, " Average round-trip time: %4ld ms   immediate answers: %5lu\n",
+						rtt_total_ms / num_immediate, num_immediate);
+				fprintf(stderr, " query timeouts: %4lu     target: %4ld ms    server: %4ld ms\n",
+						num_timeouts, max_timeout_ms, server_timeout_ms);
+				fprintf(stderr, " Resent fragments up: %4u    downstream out of window: %4u\n",
+						outbuf->resends, inbuf->oos);
+				fprintf(stderr, " TX fragments: %8lu"  "     RX: %8lu"  "     pings: %8lu"  "\n\n",
+						num_frags_sent, num_frags_recv, num_pings);
+				last_stats = time(NULL);
+			}
+		}
+
 		if (send_ping_soon) {
 			tv.tv_sec = 0;
 			tv.tv_usec = send_ping_soon * 1000;
@@ -1284,7 +1364,7 @@ client_tunnel(int tun_fd, int dns_fd)
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
 
 		if (difftime(time(NULL), lastdownstreamtime) > 60) {
- 			warnx("No downstream data received in 60 seconds, shutting down.");
+ 			fprintf(stderr, "No downstream data received in 60 seconds, shutting down.\n");
  			running = 0;
  		}
 

@@ -69,7 +69,7 @@ print_usage()
 {
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-V sec] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-w downfrags] [-W upfrags] [-i sec] [-I sec] [-c 0|1] [-C 0|1] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] "
 			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [nameserverN ...]]]\n", __progname);
@@ -110,6 +110,7 @@ help()
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");
 	fprintf(stderr, "  -h to print this help and exit\n");
+	fprintf(stderr, "  -V sec to print connection statistics at specified intervals\n");
 	fprintf(stderr, "  -f to keep running in foreground\n");
 	fprintf(stderr, "  -D enable debug mode (add more D's to increase debug level)\n");
 	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
@@ -198,6 +199,7 @@ main(int argc, char **argv)
 	device = NULL;
 	pidfile = NULL;
 	debug = 0;
+	stats = 0;
 
 	autodetect_frag_size = 1;
 	max_downstream_frag_size = 3072;
@@ -230,7 +232,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfDhrcCu:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfDhrV:c:C:i:u:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -241,6 +243,11 @@ main(int argc, char **argv)
 		case 'v':
 			version();
 			/* NOTREACHED */
+			break;
+		case 'V':
+			stats = atoi(optarg);
+			if (stats < 0)
+				stats = 0;
 			break;
 		case 'f':
 			foreground = 1;
