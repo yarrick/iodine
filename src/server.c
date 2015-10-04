@@ -112,10 +112,8 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct sockaddr
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX-raw: client %s (user %d), cmd %d, %d bytes\n",
+	DEBUG(3, "TX-raw: client %s (user %d), cmd %d, %d bytes\n",
 			format_addr(from, fromlen), user, cmd, len);
-	}
 
 	sendto(fd, packet, len, 0, (struct sockaddr *) from, fromlen);
 }
@@ -172,7 +170,7 @@ qmem_append(int dns_fd, int userid, struct query *q)
 		if (memcmp(pq->name, q->name, sizeof(q->name)))
 			continue;
 
-		QMEM_DEBUG(1, userid, "OUT for '%s' == duplicate, sending illegal reply\n", q->name);
+		QMEM_DEBUG(1, userid, "OUT for '%s' == duplicate, sending illegal reply", q->name);
 
 		// TODO cache answers/respond using cache? (merge with dnscache)
 		write_dns(dns_fd, q, "x", 1, 'T');
@@ -211,7 +209,7 @@ qmem_answered(int userid)
 
 	if (buf->num_pending == 0) {
 		/* Most likely caused by bugs somewhere else. */
-		QMEM_DEBUG(3, userid, "can't answer query that has already been answered! Fix bugs.");
+		QMEM_DEBUG(1, userid, "can't answer query that has already been answered! Fix bugs.");
 		return;
 	}
 	answered = buf->start_pending;
@@ -409,8 +407,7 @@ answer_from_dnscache(int dns_fd, int userid, struct query *q)
 			continue;
 
 		/* okay, match */
-		if (debug >= 1)
-			fprintf(stderr, "OUT  user %d %s from dnscache\n", userid, q->name);
+		DEBUG(1, "OUT  user %d %s from dnscache", userid, q->name);
 
 		write_dns(dns_fd, q, users[userid].dnscache_answer[use],
 			  users[userid].dnscache_answerlen[use],
@@ -462,9 +459,7 @@ forward_query(int bind_fd, struct query *q)
 	memcpy(&(myaddr->sin_addr), &newaddr, sizeof(in_addr_t));
 	myaddr->sin_port = htons(bind_port);
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: NS reply\n");
-	}
+	DEBUG(2, "TX: NS reply");
 
 	if (sendto(bind_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("forward query error");
@@ -615,9 +610,7 @@ user_send_data(int userid, struct dnsfd *dns_fds, uint8_t *indata,
 		datalen = sizeof(out);
 		ret = uncompress(out, &datalen, indata, len);
 		if (ret != Z_OK) {
-			if (debug >= 1) {
-				warnx("Uncompress == %d: %lu bytes to user %d!", ret, len, userid);
-			}
+			DEBUG(1, "FAIL: Uncompress == %d: %lu bytes to user %d!", ret, len, userid);
 			return 0;
 		}
 	}
@@ -629,9 +622,8 @@ user_send_data(int userid, struct dnsfd *dns_fds, uint8_t *indata,
 		ret = window_add_outgoing_data(users[userid].outgoing, data, datalen, compressed);
 
 	} else if (data && datalen) { /* CONN_RAW_UDP */
-		if (!compressed && debug >= 1) {
-			warnx("Sending in RAW mode uncompressed to user %d!", userid);
-		}
+		if (!compressed)
+			DEBUG(1, "Sending in RAW mode uncompressed to user %d!", userid);
 		int dns_fd = get_dns_fd(dns_fds, &users[userid].host);
 		send_raw(dns_fd, data, datalen, userid, RAW_HDR_CMD_DATA,
 					&users[userid].host, users[userid].hostlen);
@@ -661,23 +653,17 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 
 	id = dns_get_id(packet, r);
 
-	if (debug >= 2) {
-		fprintf(stderr, "RX: Got response on query %u from DNS\n", (id & 0xFFFF));
-	}
+	DEBUG(3, "RX: Got response on query %u from DNS", (id & 0xFFFF));
 
 	/* Get sockaddr from id */
 	fw_query_get(id, &query);
 	if (!query) {
-		if (debug >= 2) {
-			fprintf(stderr, "Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
-		}
+		DEBUG(2, "Lost sender of id %u, dropping reply", (id & 0xFFFF));
 		return 0;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: client %s id %u, %d bytes\n",
+	DEBUG(3, "TX: client %s id %u, %d bytes",
 			format_addr(&query->addr, query->addrlen), (id & 0xffff), r);
-	}
 
 	dns_fd = get_dns_fd(dns_fds, &query->addr);
 	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr),
@@ -705,8 +691,7 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 	if (userid < 0)
 		return 0;
 
-	if (debug >= 2)
-		fprintf(stderr, "IN: %d byte pkt from tun to user %d; compression %d\n",
+	DEBUG(3, "IN: %d byte pkt from tun to user %d; compression %d",
 				read, userid, users[userid].down_compression);
 
 	return user_send_data(userid, dns_fds, in, read, 0);
@@ -723,10 +708,8 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	if ((read = read_dns(dns_fd, dns_fds, tun_fd, &q)) <= 0)
 		return 0;
 
-	if (debug >= 2) {
-		fprintf(stderr, "RX: client %s ID %5d, type %d, name %s\n",
+	DEBUG(3, "RX: client %s ID %5d, type %d, name %s\n",
 			format_addr(&q.from, q.fromlen), q.id, q.type, q.name);
-	}
 
 	domain_len = strlen(q.name) - strlen(topdomain);
 	if (domain_len >= 0 && !strcasecmp(q.name + domain_len, topdomain))
@@ -778,9 +761,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		}
 	} else {
 		/* Forward query to other port ? */
-		if (debug >= 3) {
-			fprintf(stderr, "Requested domain outside our topdomain.\n");
-		}
+		DEBUG(2, "Requested domain outside our topdomain.");
 		if (bind_fd) {
 			forward_query(bind_fd, &q);
 		}
@@ -798,7 +779,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 	struct query *answer_now = NULL;
 	time_t last_action = time(NULL);
 
-	if (debug >= 4)
+	if (debug >= 5)
 		window_debug = debug - 3;
 
 	while (running) {
@@ -894,8 +875,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data,
 	if (ret == Z_OK) {
 		hdr = (struct ip*) (out + 4);
 		touser = find_user_by_ip(hdr->ip_dst.s_addr);
-		if (debug >= 3)
-			fprintf(stderr, "FULL PKT: %lu bytes from user %d (touser %d)\n", len, userid, touser);
+		DEBUG(2, "FULL PKT: %lu bytes from user %d (touser %d)", len, userid, touser);
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
 			write_tun(tun_fd, rawdata, rawlen);
@@ -908,8 +888,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data,
 			}
 		}
 	} else {
-		if (debug >= 2)
-			fprintf(stderr, "Discarded upstream data from user %d, uncompress() result: %d\n", userid, ret);
+		DEBUG(2, "Discarded upstream data from user %d, uncompress() result: %d", userid, ret);
 	}
 }
 
@@ -925,9 +904,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 	if (userid < 0 || userid >= created_users) return;
 	if (!check_authenticated_user_and_ip(userid, q)) return;
 
-	if (debug >= 1) {
-		fprintf(stderr, "IN   login raw, len %lu, from user %d\n", len, userid);
-	}
+	DEBUG(1, "IN   login raw, len %lu, from user %d", len, userid);
 
 	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, password, users[userid].seed + 1);
@@ -961,9 +938,7 @@ handle_raw_data(uint8_t *packet, size_t len, struct query *q, struct dnsfd *dns_
 
 	/* copy to packet buffer, update length TODO fix the raw UDP protocol */
 
-	if (debug >= 1) {
-		fprintf(stderr, "IN   pkt raw, total %lu, from user %d\n", len, userid);
-	}
+	DEBUG(3, "IN   pkt raw, total %lu, from user %d", len, userid);
 
 	handle_full_packet(tun_fd, dns_fds, userid, packet, len, 1);
 }
@@ -979,9 +954,7 @@ handle_raw_ping(struct query *q, int dns_fd, int userid)
 	/* Update time info for user */
 	users[userid].last_pkt = time(NULL);
 
-	if (debug >= 1) {
-		fprintf(stderr, "IN   ping raw, from user %d\n", userid);
-	}
+	DEBUG(3, "IN   ping raw, from user %d", userid);
 
 	/* Send ping reply */
 	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, &q->from, q->fromlen);
@@ -998,8 +971,7 @@ raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd, struct dnsf
 	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
 
 	raw_user = RAW_HDR_GET_USR(packet);
-	if (debug >= 3)
-		warnx("TX-raw: client %s, user %d, raw command '%c' length %lu",
+	DEBUG(3, "TX-raw: client %s, user %d, raw command '%c' length %lu",
 			  format_addr(&q->from, q->fromlen), raw_user, RAW_HDR_GET_CMD(packet), len);
 	switch (RAW_HDR_GET_CMD(packet)) {
 	case RAW_HDR_CMD_LOGIN:
@@ -1015,7 +987,7 @@ raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd, struct dnsf
 		handle_raw_ping(q, dns_fd, raw_user);
 		break;
 	default:
-		warnx("Unhandled raw command %02X from user %d", RAW_HDR_GET_CMD(packet), raw_user);
+		DEBUG(1, "Unhandled raw command %02X from user %d", RAW_HDR_GET_CMD(packet), raw_user);
 		break;
 	}
 	return 1;
@@ -1217,10 +1189,8 @@ write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc)
 		return;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: client %s ID %5d, %lu bytes data, type %d, name '%10s'\n",
+	DEBUG(3, "TX: client %s ID %5d, %lu bytes data, type %d, name '%10s'\n",
 			format_addr(&q->from, q->fromlen), q->id, datalen, q->type, q->name);
-	}
 
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
@@ -1246,9 +1216,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 	memcpy(in, q->name, MIN(domain_len, sizeof(in)));
 
-	if (debug >= 3) {
-		fprintf(stderr, "NULL request length %d/%lu, command '%c'\n", domain_len, sizeof(in), in[0]);
-	}
+	DEBUG(3, "NULL request length %d/%lu, command '%c'\n", domain_len, sizeof(in), in[0]);
 
 	if(in[0] == 'V' || in[0] == 'v') { /* Version request */
 		uint32_t version = !PROTOCOL_VERSION;
@@ -1303,8 +1271,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 				u->dnscache_lastfilled = 0;
 #endif
 
-				if (debug >= 1)
-					fprintf(stderr, "User %d connected with correct version from %s.\n",
+				DEBUG(1, "User %d connected with correct version from %s.",
 							userid, format_addr(&q->from, q->fromlen));
 			} else {
 				/* No space for another user */
@@ -1327,8 +1294,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 		/* Login phase, handle auth */
 		userid = unpacked[0];
-		if (debug >= 3)
-			fprintf(stderr, "Received login request for user %d from %s.\n",
+		DEBUG(2, "Received login request for user %d from %s.",
 					userid, format_addr(&q->from, q->fromlen));
 		if (check_user_and_ip(userid, q) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
@@ -1519,14 +1485,12 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if ((q->type == T_NULL || q->type == T_PRIVATE) && !bits) {
 			users[userid].downenc = 'R';
 			bits = 8;
-			if (debug >= 3)
-				warnx("Assuming raw data encoding with NULL/PRIVATE requests for user %d.", userid);
+			DEBUG(2, "Assuming raw data encoding with NULL/PRIVATE requests for user %d.", userid);
 		}
 		if (bits) {
 			int f = users[userid].fragsize;
 			users[userid].outgoing->maxfraglen = (bits * f) / 8 - DOWNSTREAM_PING_HDR;
-			if (debug >= 1)
-				warnx("Setting max downstream data length to %u bytes for user %d; bits %d (%c)",
+			DEBUG(1, "Setting max downstream data length to %u bytes for user %d; bits %d (%c)",
 					  users[userid].outgoing->maxfraglen, userid, bits, users[userid].downenc);
 			users[userid].downenc_bits = bits;
 		}
@@ -1602,9 +1566,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		req_frag_size = ntohs(*(uint16_t *) (unpacked + 1));
-		if (debug >= 3) {
-			fprintf(stderr, "Got downstream fragsize probe from user %d, required fragsize %d\n", userid, req_frag_size);
-		}
+		DEBUG(3, "Got downstream fragsize probe from user %d, required fragsize %d", userid, req_frag_size);
 
 		if (req_frag_size < 2 || req_frag_size > 2047) {
 			write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
@@ -1649,9 +1611,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 				8 - DOWNSTREAM_PING_HDR;
 			write_dns(dns_fd, q, (char *) unpacked + 1, 2, users[userid].downenc);
 
-			if (debug >= 1)
-				warnx("Setting max downstream data length to %u bytes for user %d; %d bits (%c)",
-					  users[userid].outgoing->maxfraglen, userid, users[userid].downenc_bits, users[userid].downenc);
+			DEBUG(1, "Setting max downstream data length to %u bytes for user %d; %d bits (%c)",
+				  users[userid].outgoing->maxfraglen, userid, users[userid].downenc_bits, users[userid].downenc);
 		}
 		return;
 	} else if(in[0] == 'P' || in[0] == 'p') { /* Ping request */
@@ -1670,7 +1631,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 		read = unpack_data(unpacked, sizeof(unpacked), in + 1, domain_len - 1, b32);
 		if (read < UPSTREAM_PING) {
-			if (debug >= 1) warnx("Invalid ping! Length %lu", read);
+			DEBUG(1, "Invalid ping! Length %lu", read);
 			return;
 		}
 
@@ -1712,10 +1673,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			}
 		}
 
-		if (debug >= 2) {
-			fprintf(stderr, "PING pkt from user %d, down %d/%d, up %d/%d, ACK %d, set timeout %u ms (flags %02X)\n",
+		DEBUG(3, "PING pkt from user %d, down %d/%d, up %d/%d, ACK %d, set timeout %u ms (flags %02X)",
 					userid, dn_seq, dn_winsize, up_seq, up_winsize, dn_ack, timeout_ms, unpacked[8]);
-		}
 
 		user_process_incoming_data(tun_fd, dns_fds, userid, dn_ack);
 
@@ -1738,7 +1697,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		   different id, then all okay.
 		   Else client doesn't get our ack, and will retransmit in 1 second. */
 		if (q->id == 0) {
-			warnx("Query with ID 0!");
+			DEBUG(1, "Query with ID 0!");
 			return;
 		}
 
@@ -1782,14 +1741,13 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		f.len = unpack_data(f.data, MAX_FRAGSIZE, in + UPSTREAM_HDR,
 						   domain_len - UPSTREAM_HDR, users[userid].encoder);
 
-		if (debug >= 3)
-			warnx("frag seq %3u, datalen %5lu, ACK %3d, compression %1d, s%1d e%1d",
+		DEBUG(3, "frag seq %3u, datalen %5lu, ACK %3d, compression %1d, s%1d e%1d",
 					f.seqID, f.len, f.ack_other, f.compressed, f.start, f.end);
 
 		/* if already waiting for an ACK to be sent back upstream (on incoming buffer) */
 		if (users[userid].next_upstream_ack >= 0) {
 			/* Shouldn't normally happen; will always be reset after sending a packet. */
-			warnx("[WARNING] next_upstream_ack == %d for user %d.", users[userid].next_upstream_ack, userid);
+			DEBUG(1, "[WARNING] next_upstream_ack == %d for user %d.", users[userid].next_upstream_ack, userid);
 		}
 		users[userid].next_upstream_ack = window_process_incoming_fragment(users[userid].incoming, &f);
 
@@ -1821,10 +1779,8 @@ handle_ns_request(int dns_fd, struct query *q)
 		return;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: NS reply client %s ID %5d, type %d, name %s, %d bytes\n",
+	DEBUG(2, "TX: NS reply client %s ID %5d, type %d, name %s, %d bytes",
 			format_addr(&q->from, q->fromlen), q->id, q->type, q->name, len);
-	}
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("ns reply send error");
 	}
@@ -1855,10 +1811,8 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 		return;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: A reply client %s ID %5d, type %d, name %s, %d bytes\n",
+	DEBUG(2, "TX: A reply client %s ID %5d, type %d, name %s, %d bytes",
 			format_addr(&q->from, q->fromlen), q->id, q->type, q->name, len);
-	}
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("a reply send error");
 	}

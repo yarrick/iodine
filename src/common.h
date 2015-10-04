@@ -87,7 +87,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 			if (level >= 3) {\
 				fprintf(stderr, "[D%d %s:%d] ", level, __FILE__, __LINE__); \
 			} else { \
-				fprintf(stderr, "[D%d] ", level)\
+				fprintf(stderr, "[D%d] ", level);\
 			}\
 			fprintf(stderr, __VA_ARGS__);\
 			fprintf(stderr, "\n");\

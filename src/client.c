@@ -490,8 +490,7 @@ send_query(int fd, uint8_t *hostname)
 	struct query q;
 	size_t len;
 
-	if (debug >= 2)
-		fprintf(stderr, "TX: pkt len %lu: hostname '%s'\n", strlen((char *)hostname), hostname);
+	DEBUG(3, "TX: pkt len %lu: hostname '%s'", strlen((char *)hostname), hostname);
 
 	chunkid += 7727;
 	if (chunkid == 0)
@@ -507,8 +506,7 @@ send_query(int fd, uint8_t *hostname)
 		return -1;
 	}
 
-	if (debug >= 3)
-		fprintf(stderr, "  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
+	DEBUG(4, "  Sendquery: id %5d name[0] '%c'", q.id, hostname[0]);
 
 	sendto(fd, packet, len, 0, (struct sockaddr*) &nameserv_addrs[current_nameserver],
 			sizeof(struct sockaddr_storage));
@@ -545,7 +543,7 @@ send_query(int fd, uint8_t *hostname)
 
 			} else if (lazymode && autodetect_server_timeout) {
 				fprintf(stderr, "Receiving too few answers. Will try to switch lazy mode off, but that may not"
-					" always work any more. Start with -L0 next time on this network.");
+					" always work any more. Start with -L0 next time on this network.\n");
 				lazymode = 0;
 				server_timeout_ms = 0;
 			}
@@ -622,10 +620,8 @@ send_ping(int fd, int ping_response, int ack)
 		data[10] = (rand_seed >> 0) & 0xff;
 		rand_seed += 263;
 
-		if (debug >= 3) {
-			fprintf(stderr, " SEND PING: respond %d, ack %d, servertimeout %ld, flags %02X\n",
+		DEBUG(3, " SEND PING: respond %d, ack %d, servertimeout %ld, flags %02X",
 					ping_response, ack, server_timeout_ms, data[8]);
-		}
 
 		id = send_packet(fd, 'p', data, sizeof(data));
 
@@ -904,8 +900,7 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query
 				memcpy(buf, data, rv);
 		}
 
-		if (debug >= 2)
-			fprintf(stderr, "RX: id %5d name[0]='%c'\n", q->id, q->name[0]);
+		DEBUG(2, "RX: id %5d name[0]='%c'", q->id, q->name[0]);
 
 		return rv;
 	} else { /* CONN_RAW_UDP */
@@ -981,8 +976,7 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 
 		qcmd = toupper(q.name[0]);
 		if (q.id != chunkid || qcmd != cmd) {
-			if (debug >= 1)
-				fprintf(stderr, "Ignoring unfitting reply id %d starting with '%c'\n", q.id, q.name[0]);
+			DEBUG(1, "Ignoring unfitting reply id %d starting with '%c'", q.id, q.name[0]);
 			continue;
 		}
 
@@ -1057,10 +1051,8 @@ parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
 		up_wsize = data[4];
 		dn_start_seq = data[5];
 		up_start_seq = data[6];
-		if (debug >= 3) {
-			fprintf(stderr, "PING pkt data=%lu WS: up=%u, dn=%u; Start: up=%u, dn=%u\n",
+		DEBUG(3, "PING pkt data=%lu WS: up=%u, dn=%u; Start: up=%u, dn=%u",
 					len - headerlen, up_wsize, dn_wsize, up_start_seq, dn_start_seq);
-		}
 	}
 	f->len = len - headerlen;
 	if (f->len > 0)
@@ -1082,14 +1074,12 @@ tunnel_tun(int tun_fd, int dns_fd)
 
 	/* Check if outgoing buffer can hold data */
 	if (window_buffer_available(outbuf) < (read / MAX_FRAGSIZE) + 1) {
-		if (debug >= 2)
-			fprintf(stderr, "  Outgoing buffer full (%lu/%lu), not adding data!\n",
+		DEBUG(1, "  Outgoing buffer full (%lu/%lu), not adding data!",
 					outbuf->numitems, outbuf->length);
 		return -1;
 	}
 
-	if (debug >= 2)
-		fprintf(stderr, " IN: %lu bytes on tunnel, compression %d\n", read, compression_up);
+	DEBUG(2, " IN: %lu bytes on tunnel, compression %d", read, compression_up);
 
 	if (conn != CONN_DNS_NULL || compression_up) {
 		datalen = sizeof(out);
@@ -1207,8 +1197,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 	 too fast, to avoid runaway ping-pong loops..) */
 	/* Don't send anything too soon; no data waiting from server */
 	if (f.len == 0) {
-		if (!res && debug >= 1)
-			fprintf(stderr, "[WARNING] Received downstream data fragment with 0 length and NOT a ping!");
+		if (!res)
+			DEBUG(1, "[WARNING] Received downstream data fragment with 0 length and NOT a ping!");
 		if (!lazymode)
 			send_ping_soon = 100;
 		else
@@ -1221,8 +1211,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	if (next_downstream_ack >= 0) {
 		/* If this happens something is wrong (or last frag was a re-send)
 		 * May result in ACKs being delayed. */
-		if (debug >= 1)
-			warnx("next_downstream_ack NOT -1! (%d), %u resends, %u oos", next_downstream_ack, outbuf->resends, outbuf->oos);
+		DEBUG(1, "next_downstream_ack NOT -1! (%d), %u resends, %u oos", next_downstream_ack, outbuf->resends, outbuf->oos);
 	}
 
 	/* Downstream data traffic + get ack for that data */
@@ -1235,8 +1224,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		if (compressed) {
 			buflen = sizeof(buf);
 			if ((res = uncompress(buf, &buflen, cbuf, datalen)) != Z_OK) {
-				if (debug >= 1)
-					warnx("Uncompress failed (%d) for data len %lu: reassembled data corrupted or incomplete!", res, datalen);
+				DEBUG(1, "Uncompress failed (%d) for data len %lu: reassembled data corrupted or incomplete!", res, datalen);
 				datalen = 0;
 			} else {
 				datalen = buflen;
@@ -2105,8 +2093,7 @@ handshake_qtype_autodetect(int dns_fd)
 			if (handshake_qtypetest(dns_fd, timeout)) {
 				/* okay */
 				highestworking = qtypenum;
-				if (debug >= 1)
-					fprintf(stderr, " Type %s timeout %d works\n", client_get_qtype(), timeout);
+				DEBUG(1, " Type %s timeout %d works", client_get_qtype(), timeout);
 				break;
 				/* try others with longer timeout */
 			}
