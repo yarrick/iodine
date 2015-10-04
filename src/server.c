@@ -262,8 +262,10 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 		u = &users[userid];
 		qnum = u->qmem.start_pending;
 
-		if (u->qmem.num_pending == 0 || !u->lazy)
+		if (u->qmem.num_pending == 0)
 			continue;
+
+
 		/* Keep track of how many fragments we can send */
 		total = window_sending(u->outgoing);
 		if (u->qmem.num_pending > u->outgoing->windowsize) {
@@ -272,6 +274,11 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 		}
 		sending = total;
 		sent = 0;
+
+		if (!u->lazy && u->qmem.num_pending > 0) {
+			QMEM_DEBUG(2, userid, "User switched to immediate mode, answering all pending queries...");
+			sending = u->qmem.num_pending;
+		}
 
 		for (; qnum != u->qmem.end; qnum = (qnum + 1) % QMEM_LEN) {
 			q = &u->qmem.queries[qnum];
@@ -1697,8 +1704,12 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		respond = unpacked[8] & 1;
 
 		if ((unpacked[8] >> 3) & 1) {
-			/* update user's query timeout */
+			/* update user's query timeout if timeout flag set */
 			users[userid].dns_timeout = timeout;
+			if (timeout_ms == 0) {
+				/* immediate mode is implied by server timeout of 0 */
+				users[userid].lazy = 0;
+			}
 		}
 
 		if (debug >= 2) {

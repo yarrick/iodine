@@ -250,7 +250,10 @@ Client sends:
 
 The server response to Ping and Data packets is a DNS NULL/TXT/.. type response,
 always starting with the 3 bytes downstream data header as shown above. If R bit
-set, server must respond with a ping downstream header.
+set, server must respond with a ping downstream header. This also requires the
+server to set its windowsizes to the ones provided. 
+If the T but is set, the server sets the user's DNS timeout to the value spec-
+ified by the packet. A timeout value of 0 implies disabling lazy mode.
 If server has nothing to send, no data is added after the header. 
 If server has something to send, it will add the downstream data packet
 (or some fragment of it) after the header.
