@@ -81,6 +81,19 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #define UPSTREAM_HDR 6
 #define UPSTREAM_PING 6
 
+/* handy debug printing macro */
+#define DEBUG(level, ...) \
+		if (debug >= level) {\
+			if (level >= 3) {\
+				fprintf(stderr, "[D%d %s:%d] ", level, __FILE__, __LINE__); \
+			} else { \
+				fprintf(stderr, "[D%d] ", level)\
+			}\
+			fprintf(stderr, __VA_ARGS__);\
+			fprintf(stderr, "\n");\
+		}\
+
+
 struct query {
 	char name[QUERY_NAME_SIZE];
 	unsigned short type;

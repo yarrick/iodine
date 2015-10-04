@@ -61,13 +61,13 @@ struct frag_buffer {
 extern int window_debug;
 
 #ifdef DEBUG_BUILD
-#define DEBUG(...) if (window_debug) {\
+#define WDEBUG(...) if (window_debug) {\
 		fprintf(stderr, "[WINDOW-DEBUG] (%s:%d) ", __FILE__, __LINE__);\
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
 	}
 #else
-#define DEBUG(...)
+#define WDEBUG(...)
 #endif
 
 #define AFTER(w, o) ((w->window_start + o) % w->length)
