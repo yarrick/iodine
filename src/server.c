@@ -1637,6 +1637,13 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return;
 		}
 
+		/* Check userid */
+		userid = unpacked[0];
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
+			return; /* illegal id */
+		}
+
 #ifdef DNSCACHE_LEN
 		/* Check if cached */
 		if (answer_from_dnscache(dns_fd, userid, q))
@@ -1647,13 +1654,6 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if (!qmem_is_cached(dns_fd, userid, q))
 			return;
 #endif
-
-		/* Ping packet, store userid */
-		userid = unpacked[0];
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
-		}
 
 		dn_ack = ((unpacked[8] >> 2) & 1) ? unpacked[1] : -1;
 		up_winsize = unpacked[2];
@@ -1732,7 +1732,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 #ifdef QMEM_LEN
 		/* Check if cached */
 		if (!qmem_is_cached(dns_fd, userid, q))
-			return;
+			qmem_append(userid, q);
 #endif
 		/* Decode upstream data header - see docs/proto_XXXXXXXX.txt */
 		/* First byte (after userid) = CMC (ignored); skip 2 bytes */
