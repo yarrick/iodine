@@ -112,7 +112,7 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct sockaddr
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
-	DEBUG(3, "TX-raw: client %s (user %d), cmd %d, %d bytes\n",
+	DEBUG(3, "TX-raw: client %s (user %d), cmd %d, %d bytes",
 			format_addr(from, fromlen), user, cmd, len);
 
 	sendto(fd, packet, len, 0, (struct sockaddr *) from, fromlen);
@@ -149,10 +149,10 @@ qmem_init(int userid)
 }
 
 static int
-qmem_append(int dns_fd, int userid, struct query *q)
-/* Appends incoming query to the buffer. If the query is already in the buffer,
- * ie a duplicate, an illegal answer is sent.
- * Return: 0 = answer sent, don't process; 1 = not a duplicate (all OK) */
+qmem_is_cached(int dns_fd, int userid, struct query *q)
+/* Check if an answer for a particular query is cached in qmem
+ * If so, sends an "invalid" answer
+ * Returns 1 if new query, 0 if cached (and then answered) */
 {
 	struct query_buffer *buf;
 	struct query *pq;
@@ -166,21 +166,29 @@ qmem_append(int dns_fd, int userid, struct query *q)
 		if (pq->type != q->type)
 			continue;
 
-		// FIXME: check for case changes?
-		if (memcmp(pq->name, q->name, sizeof(q->name)))
+		if (strcasecmp(pq->name, q->name))
 			continue;
 
-		QMEM_DEBUG(1, userid, "OUT for '%s' == duplicate, sending illegal reply", q->name);
+		QMEM_DEBUG(2, userid, "OUT for '%s' == duplicate, sending illegal reply", q->name);
 
 		// TODO cache answers/respond using cache? (merge with dnscache)
 		write_dns(dns_fd, q, "x", 1, 'T');
 		return 0;
 	}
+	return 1;
+}
+
+static int
+qmem_append(int userid, struct query *q)
+/* Appends incoming query to the buffer. */
+{
+	struct query_buffer *buf;
+	buf = &users[userid].qmem;
 
 	if (buf->num_pending >= QMEM_LEN) {
 		/* this means we have QMEM_LEN *pending* queries; don't overwrite */
 		QMEM_DEBUG(2, userid, "full of pending queries. Not appending query with id %d.", q->id);
-		return 1;
+		return 0;
 	}
 
 	if (buf->length < QMEM_LEN) {
@@ -241,15 +249,15 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
  *  - the query has timed out
  *  - the user has data to send, pending ACKs or ping and spare pending queries
  *  - the user has excess pending queries (>downstream window size)
- * Returns largest safe time to wait before next timeout
- * TODO respond to excess pending queries */
+ * Returns largest safe time to wait before next timeout */
 {
-	struct timeval now, timeout, soonest, tmp;
+	struct timeval now, timeout, soonest, tmp, age;
 	soonest.tv_sec = 10;
 	soonest.tv_usec = 0;
-	int userid, qnum, nextuser = -1;
+	int userid, qnum, nextuser = -1, immediate;
 	struct query *q = NULL, *nextq = NULL;
 	size_t sending, total, sent;
+	time_t age_ms;
 	struct tun_user *u;
 
 	gettimeofday(&now, NULL);
@@ -273,7 +281,7 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 		sending = total;
 		sent = 0;
 
-		if (!u->lazy && u->qmem.num_pending > 0) {
+		if ((!u->lazy) && u->qmem.num_pending > 0) {
 			QMEM_DEBUG(2, userid, "User switched to immediate mode, answering all pending queries...");
 			sending = u->qmem.num_pending;
 		}
@@ -283,29 +291,28 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 
 			/* queries will always be in time order */
 			timeradd(&q->time_recv, &u->dns_timeout, &timeout);
-			if (sending > 0 || !timercmp(&now, &timeout, <) ||
-					u->next_upstream_ack >= 0 || u->send_ping_next) {
+			if (sending > 0 || !timercmp(&now, &timeout, <) || u->next_upstream_ack >= 0) {
 				/* respond to a query with ping/data if:
 				 *  - query has timed out (ping, or data if available)
 				 *  - user has pending data (always data)
 				 *  - user has pending ACK (either)
 				 *  - user has pending ping (always ping, with data if available) */
+				timersub(&q->time_recv, &now, &age);
+				age_ms = timeval_to_ms(&age);
+
+				/* only consider "immediate" when age is negligible */
+				immediate = age_ms <= 10;
 
 				if (debug >= 3) {
-					struct timeval age;
-					timersub(&q->time_recv, &now, &age);
-					QMEM_DEBUG(3, userid, "Auto response to cached query: ID %d, %ld ms old, timeout %ld ms",
-							q->id, timeval_to_ms(&age), timeval_to_ms(&u->dns_timeout));
+					QMEM_DEBUG(3, userid, "Auto response to cached query: ID %d, %ld ms old (%s), timeout %ld ms",
+							q->id, age_ms, immediate ? "immediate" : "lazy", timeval_to_ms(&u->dns_timeout));
 				}
 
 				sent++;
-				QMEM_DEBUG(4, userid, "ANSWER q id %d, ping %d, ACK %d; sent %lu of %lu + sending another %lu",
-										q->id, u->send_ping_next, u->next_upstream_ack, sent, total, sending);
+				QMEM_DEBUG(4, userid, "ANSWER q id %d, ACK %d; sent %lu of %lu + sending another %lu",
+										q->id, u->next_upstream_ack, sent, total, sending);
 
-				send_data_or_ping(dns_fds, userid, q, u->send_ping_next, 1, 0);
-
-				if (u->send_ping_next)
-					u->send_ping_next = 0;
+				send_data_or_ping(dns_fds, userid, q, 0, immediate);
 
 				if (sending > 0)
 					sending--;
@@ -332,7 +339,8 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 			if (nextuser < 0)
 				nextuser = 0;
 			/* sanity check: soonest_ms should always be default value here (ie. 10000) */
-			QMEM_DEBUG(5, nextuser, "Don't need to send anything to any users, waiting %lu ms", soonest_ms);
+			if (soonest_ms != 10000)
+				QMEM_DEBUG(1, nextuser, "Don't need to send anything to any users, waiting %lu ms", soonest_ms);
 		}
 	}
 
@@ -494,10 +502,9 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 
 void
 send_data_or_ping(struct dnsfd *dns_fds, int userid, struct query *q,
-				  int ping, int respond_now, int immediate)
+				  int ping, int immediate)
 /* Sends current fragment to user, or a ping if no data available.
    ping: 1=force send ping (even if data available), 0=only send if no data.
-   respond_now: 1=must answer query now, 0=leave in qmem if no data available
    immediate: 1=not from qmem (ie. fresh query), 0=query is from qmem */
 {
 	uint8_t pkt[MAX_FRAGSIZE + DOWNSTREAM_PING_HDR];
@@ -514,10 +521,6 @@ send_data_or_ping(struct dnsfd *dns_fds, int userid, struct query *q,
 
 	/* Build downstream data/ping header (see doc/proto_xxxxxxxx.txt) for details */
 	if (!f) {
-		if (users[userid].lazy && !respond_now) {
-			/* No data and lazy mode: leave this query to wait in qmem */
-			return;
-		}
 		/* No data, may as well send data/ping header (with extra info) */
 		ping = 1;
 		datalen = 0;
@@ -708,7 +711,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	if ((read = read_dns(dns_fd, dns_fds, tun_fd, &q)) <= 0)
 		return 0;
 
-	DEBUG(3, "RX: client %s ID %5d, type %d, name %s\n",
+	DEBUG(3, "RX: client %s ID %5d, type %d, name %s",
 			format_addr(&q.from, q.fromlen), q.id, q.type, q.name);
 
 	domain_len = strlen(q.name) - strlen(topdomain);
@@ -1189,7 +1192,7 @@ write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc)
 		return;
 	}
 
-	DEBUG(3, "TX: client %s ID %5d, %lu bytes data, type %d, name '%10s'\n",
+	DEBUG(3, "TX: client %s ID %5d, %lu bytes data, type %d, name '%10s'",
 			format_addr(&q->from, q->fromlen), q->id, datalen, q->type, q->name);
 
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
@@ -1216,7 +1219,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 	memcpy(in, q->name, MIN(domain_len, sizeof(in)));
 
-	DEBUG(3, "NULL request length %d/%lu, command '%c'\n", domain_len, sizeof(in), in[0]);
+	DEBUG(3, "NULL request length %d/%lu, command '%c'", domain_len, sizeof(in), in[0]);
 
 	if(in[0] == 'V' || in[0] == 'v') { /* Version request */
 		uint32_t version = !PROTOCOL_VERSION;
@@ -1259,7 +1262,6 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 				window_buffer_clear(u->outgoing);
 				window_buffer_clear(u->incoming);
 				u->next_upstream_ack = -1;
-				u->send_ping_next = 0;
 #ifdef QMEM_LEN
 				qmem_init(userid);
 #endif
@@ -1635,13 +1637,6 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return;
 		}
 
-		/* Ping packet, store userid */
-		userid = unpacked[0];
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
-		}
-
 #ifdef DNSCACHE_LEN
 		/* Check if cached */
 		if (answer_from_dnscache(dns_fd, userid, q))
@@ -1649,9 +1644,16 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 #endif // XXX hmm these look very similar...
 #ifdef QMEM_LEN
 		/* Check if cached */
-		if (!qmem_append(dns_fd, userid, q))
+		if (!qmem_is_cached(dns_fd, userid, q))
 			return;
 #endif
+
+		/* Ping packet, store userid */
+		userid = unpacked[0];
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
+			return; /* illegal id */
+		}
 
 		dn_ack = ((unpacked[8] >> 2) & 1) ? unpacked[1] : -1;
 		up_winsize = unpacked[2];
@@ -1663,6 +1665,16 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		timeout = ms_to_timeval(timeout_ms);
 
 		respond = unpacked[8] & 1;
+
+		if (respond) {
+			/* ping handshake - set windowsizes etc, respond NOW using this query
+			 * NOTE: not added to qmem */
+			users[userid].outgoing->windowsize = dn_winsize;
+			users[userid].incoming->windowsize = up_winsize;
+			send_data_or_ping(dns_fds, userid, q, 1, 1);
+		} else {
+			qmem_append(userid, q);
+		}
 
 		if ((unpacked[8] >> 3) & 1) {
 			/* update user's query timeout if timeout flag set */
@@ -1678,10 +1690,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 		user_process_incoming_data(tun_fd, dns_fds, userid, dn_ack);
 
-		/* Leave query in qmem, response is done in qmem_max_wait.
-		 * Set the ping flag if it needs to respond */
-		users[userid].send_ping_next = respond;
-
+		/* if respond flag not set, query waits in qmem and is used later */
 	} else if (isxdigit(in[0])) { /* Upstream data packet */
 		int code = 0;
 		static fragment f;
@@ -1722,7 +1731,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 #endif
 #ifdef QMEM_LEN
 		/* Check if cached */
-		if (!qmem_append(dns_fd, userid, q))
+		if (!qmem_is_cached(dns_fd, userid, q))
 			return;
 #endif
 		/* Decode upstream data header - see docs/proto_XXXXXXXX.txt */
@@ -1753,8 +1762,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 		user_process_incoming_data(tun_fd, dns_fds, userid, f.ack_other);
 
-		/* Nothing to do. ACK (and response to this query) is sent
-		 * later in qmem_max_wait. */
+		/* Nothing to do. ACK for this fragment is sent later in qmem_max_wait,
+		 * using an old query. This is left in qmem until needed/times out */
 	}
 }
 

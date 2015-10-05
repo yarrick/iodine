@@ -124,6 +124,6 @@ void handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct q
 void handle_ns_request(int dns_fd, struct query *q);
 void handle_a_request(int dns_fd, struct query *q, int fakeip);
 
-void send_data_or_ping(struct dnsfd *, int, struct query *, int, int, int);
+void send_data_or_ping(struct dnsfd *, int, struct query *, int, int);
 
 #endif /* __SERVER_H__ */
