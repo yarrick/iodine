@@ -50,12 +50,12 @@ START_TEST(test_window_everything)
 //			warnx("Nothing to send.");
 			continue;
 		}
-		fail_if(!window_process_incoming_fragment(in, f), "Incoming fragment failed!");
+		fail_if((a = window_process_incoming_fragment(in, f)) != f->seqID, "Did not ACK last seqId!");
 //		warnx("Received fragment with seqid %u, remaining space %lu.", f->seqID, window_buffer_available(in));
-		int a = window_get_next_ack(in);
 		window_tick(in);
 		window_ack(out, a);
 		window_tick(out);
+		fail_if(out->start_seq_id != in->start_seq_id, "in/out windows have different start IDs!");
 	}
 //	warnx("Added %lu fragments, reassembling into data.", in->numitems);
 	uint8_t data[100];
@@ -72,7 +72,7 @@ START_TEST(test_window_everything)
 //			printf("%c", data[i]);
 //		}
 //		printf("'\n");
-		strncat((char *)newdata, data, len);
+		strncat((char *)newdata, (char *)data, len);
 		if (in->numitems <= 0) break;
 	}
 //	printf("New data: '%s' (%lu)\n", newdata, strlen((char *)newdata));

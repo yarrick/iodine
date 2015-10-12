@@ -28,6 +28,8 @@
 #include "user.h"
 #include "test.h"
 
+int debug = 0;
+
 START_TEST(test_init_users)
 {
 	in_addr_t ip;
@@ -39,9 +41,9 @@ START_TEST(test_init_users)
 	count = init_users(ip, 27);
 	for (i = 0; i < count; i++) {
 		fail_unless(users[i].id == i);
-		fail_unless(users[i].q.id == 0);
 		snprintf(givenip, sizeof(givenip), "127.0.0.%d", i + 2);
 		fail_unless(users[i].tun_ip == inet_addr(givenip));
+		fail_if(user_active(i), "user_active true for new users");
 	}
 }
 END_TEST
@@ -78,28 +80,24 @@ START_TEST(test_find_user_by_ip)
 }
 END_TEST
 
-extern unsigned usercount;
 START_TEST(test_all_users_waiting_to_send)
 {
 	in_addr_t ip;
 
 	ip = inet_addr("127.0.0.1");
 	init_users(ip, 27);
-	for (int i = 0; i < usercount; i++) users[i].outgoing = window_buffer_init(10, 1, 10, WINDOW_SENDING);
 
-	fail_if(all_users_waiting_to_send() == 1);
+	fail_unless(all_users_waiting_to_send() == 0, "empty user list all waiting to send");
 
 	users[0].conn = CONN_DNS_NULL;
 	users[0].active = 1;
 
-	fail_if(all_users_waiting_to_send() == 1);
+	fail_unless(all_users_waiting_to_send() == 0, "single user with empty buffer waiting to send");
 
 	users[0].last_pkt = time(NULL);
 
-	fail_unless(all_users_waiting_to_send() == 0);
+	fail_unless(all_users_waiting_to_send() == 0, "single active user with empty buffer waiting to send");
 
-
-	fail_unless(all_users_waiting_to_send() == 1);
 }
 END_TEST
 
@@ -171,7 +169,7 @@ test_user_create_tests()
 	tc = tcase_create("User");
 	tcase_add_test(tc, test_init_users);
 	tcase_add_test(tc, test_find_user_by_ip);
-//	tcase_add_test(tc, test_all_users_waiting_to_send);
+	tcase_add_test(tc, test_all_users_waiting_to_send);
 	tcase_add_test(tc, test_find_available_user);
 	tcase_add_test(tc, test_find_available_user_small_net);
 
