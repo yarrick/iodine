@@ -23,7 +23,7 @@ Quick alphabetical index / register:
 	Z	Upstream codec check
 
 
-CMC = 2 byte Cache Miss Counter, increased every time it is used
+CMC = Cache Miss Counter, increased every time it is used
 
 Version:
 Client sends:
@@ -171,13 +171,13 @@ Server sends:
 Upstream data header:
      76543 21076 54321076 54321076 5432
     +!----+!----+!----!--+--!----!+----+
-    |0UUUU|UDCMC|SSSSSSSS|DDDDDDDD|ACFL|
+    |0UUUU|UDCMC| Seq ID | Dn ACK |ACFL|
     +-----+-----+--------+--------+----+
 
-Downstream data header:        |=> only if P(ing) bit set          |
-     76543210 76543210 76543210 76543210 76543210 76543210 76543210
-    +--------+--------+--------+--------+--------+--------+--------+
-    |DDDDDDDD|SSSSSSSS|00IPACFL|ZZZZZZZZ|WWWWWWWW|XXXXXXXX|YYYYYYYY|
+Downstream data header:        |=> only if ping (P) flag set       |
+    0        1        2        3        4        5        6 
+    +--------+--------+76543210+--------+--------+--------+--------+
+    | Seq ID | Up ACK |00IPACFL|Dn Wsize|Up Wsize|DnWstart|UpWstart|
     +--------+--------+--------+--------+--------+--------+--------+
 
 UUUU = Userid
@@ -186,21 +186,20 @@ A = ACK flag
 F = First fragment flag
 C = Compression enabled for downstream packet
 P = ping flag: extra header present
-I = responded to immediately (for RTT calculation)
-SSSSSSSS = Upstream packet sequence number/ACK
-DDDDDDDD = Downstream packet sequence number/ACK
-ZZZZZZZZ = Downstream window size
-WWWWWWWW = Upstream window size
-XXXXXXXX = Downstream window start seqID
-YYYYYYYY = Upstream window start seqID
-UDCMC = Upstream Data CMC char (actually base36 [a-z0-9]), case-insensitive
+I = responded to immediately (for RTT calculation) - downstream only
+UDCMC = Upstream Data CMC char (base36 [a-z0-9])
+
+Up/Dn Wsize/Wstart = upstream/downstream window size/window start Seq ID 
 
 Upstream data packet starts with 1 byte ASCII hex coded user byte; then
 1 char data-CMC; then 4 bytes Base32 encoded header; then comes the payload
 data, encoded with the chosen upstream codec.
 
-Downstream data starts with 3 byte headerm, followed by data, which may be
-compressed. If Ping flag is set, another 4 bytes are appended to the header.
+Downstream data starts with 3 byte header, followed by data, which may be
+compressed. If Ping flag is set, another 4 bytes are appended to the header,
+containing upstream and downstream window sizes and window start sequence IDs.
+The response does not need to contain data. If the server has no data to send,
+the response will always include the ping header and the ping flag will be set.
 
 In NULL and PRIVATE responses, downstream data is always raw. In all other
 response types, downstream data is encoded (see Options above).
@@ -229,10 +228,10 @@ Client sends:
 	First byte p or P
 	Second byte CMC
 	Rest encoded with Base32:
-     76543210 76543210     76543210
-    +--------+--------+---+--------+
-    |0000UUUU|DownSQID|...|0000TANR|
-    +--------+--------+---+--------+
+    0        1        2...8        9-10
+    +--------+--------+---+76543210+---+
+    |0000UUUU|Dn SeqID|...|0000TANR|CMC|
+    +--------+--------+---+--------+---+
 	4 bits Userid
 	1 byte Downstream seq ID ACK
 	1 byte window size (upstream)
@@ -245,18 +244,19 @@ Client sends:
 		T = update server timeout
 		A = is ACKing downstream frag
 		N = is NACKing downstream frag (unused)
-		R = respond with a data/ping packet
+		R = response must contain ping header (data optional)
 	2 bytes CMC
 
-The server response to Ping and Data packets is a DNS NULL/TXT/.. type response,
-always starting with the 3 bytes downstream data header as shown above. If R bit
-set, server must respond with a ping downstream header. This also requires the
-server to set its windowsizes to the ones provided. 
+The server responses to Ping and Data packets are compatible, and are described
+above (refer to downstream data header).
+
+If R (respond) bit is set, the server responds immediately with a ping header.
+The server must also adjust its window sizes to those provided by the ping.
 If the T but is set, the server sets the user's DNS timeout to the value spec-
-ified by the packet. A timeout value of 0 implies disabling lazy mode.
-If server has nothing to send, no data is added after the header. 
-If server has something to send, it will add the downstream data packet
-(or some fragment of it) after the header.
+ified by the packet.
+
+In lazy mode, unless the R flag is set, the server will hold the ping until it
+times out or more data becomes available to send.
 
 
 "Lazy-mode" operation
@@ -271,34 +271,39 @@ implementation is original to iodine, no code or documentation from any other
 project was consulted during development.
 
 Server:
-Upstream data is acked immediately*, to keep the slow upstream data flowing
-as fast as possible (client waits for ack to send next frag).
+In lazy mode, except where otherwise specified, responses are sent using the
+oldest pending query held in the server's buffer (QMEM). The server responds
+to a stored pending query when the query times out, an upstream ACK is pending
+(for that user), or the server has an excess of pending queries (more than the
+user's downstream window size).
 
-Upstream pings are answered _only_ when 1) downstream data arrives from tun,
-OR 2) new upstream ping/data arrives from client.
-In most cases, this means we answer the previous DNS query instead of the
-current one. The current query is kept in queue and used as soon as
-downstream data has to be sent.
+Upstream data fragments are ACK'd immediately to keep data flowing.
 
-*: upstream data ack is usually done as reply on the previous ping packet,
-and the upstream-data packet itself is kept in queue.
+Upstream pings are answered immediately only when the Respond flag is set (see
+ping header), in which case the response is to the same DNS query as the ping.
+Immediate responses (<10ms old) to either ping or data requests are marked
+and used to calculate the round-trip-time for the connection.
 
 Client:
-Downstream data is acked immediately, to keep it flowing fast (includes a
-ping after last downstream frag).
-
-Also, after all available upstream data is sent & acked by the server (which
-in some cases uses up the last query), send an additional ping to prime the
-server for the next downstream data.
+The client keeps track of all queries it sends, and maintains a minimum of
+<downstream window size> pending queries to fill the server buffer.
+Downstream data is always ACK'd immediately with a new request (either a ping
+or data if available). The client sends excess requests (ie. already has enough
+pending queries) for ACKs or for new data.
 
 
 ======================================================
 2. Raw UDP protocol
 ======================================================
 
+This protocol does not implement data windowing and does not guarantee data
+delivery, however it is likely faster due to the fact that data is not split
+into fragments for sending. Full packets are compressed and sent when they
+arrive on the tun device, and are processed immediately on the other side.
+
 All Raw UDP protcol messages start with a 3 byte header: 0x10d19e
 This is not the start of a valid DNS message so it is easy to identify.
-The fourth byte contains the command and the user id.
+The fourth byte contains the command (C) and the user id (U).
 
 	 7654 3210
 	+----+----+
@@ -313,7 +318,7 @@ After the login message has been exchanged, both the server and the client
 switch to raw udp mode for the rest of the connection.
 
 Data message (command = 2):
-After the header comes the payload data, which may be compressed.
+After the header comes the payload data, which is always compressed.
 
 Ping message (command = 3):
 Sent from client to server and back to keep session open. Has no payload.
