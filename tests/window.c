@@ -50,10 +50,10 @@ START_TEST(test_window_everything)
 //			warnx("Nothing to send.");
 			continue;
 		}
-		fail_if((a = window_process_incoming_fragment(in, f)) != f->seqID, "Did not ACK last seqId!");
+		fail_if(window_process_incoming_fragment(in, f) < 0, "Dropped fragment!");
 //		warnx("Received fragment with seqid %u, remaining space %lu.", f->seqID, window_buffer_available(in));
 		window_tick(in);
-		window_ack(out, a);
+		window_ack(out, f->seqID);
 		window_tick(out);
 		fail_if(out->start_seq_id != in->start_seq_id, "in/out windows have different start IDs!");
 	}
