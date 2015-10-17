@@ -38,12 +38,13 @@
 #include <syslog.h>
 #endif
 
-#define DNSCACHE_LEN 10
-/* Undefine to disable. Should be less than 18; also see comments in iodined.c */
-
 /* Max number of incoming queries to hold at one time (recommended to be same as windowsize)
  * Memory = USERS * (sizeof(struct query_buffer) + sizeof(query) * QMEM_LEN) */
 #define QMEM_LEN 24
+
+#define USE_DNSCACHE
+/* QMEM entries contain additional space for DNS responses.
+ * Undefine to disable. */
 
 /* Number of fragments in outgoing buffer.
  * Mem usage: USERS * (MAX_FRAGLEN * OUTFRAGBUF_LEN + sizeof(struct window_buffer)) */
@@ -87,8 +88,21 @@ typedef enum {
 	VERSION_FULL
 } version_ack_t;
 
-struct query_buffer {
-	struct query queries[QMEM_LEN];
+struct query_answer {
+	uint8_t data[4096];
+	size_t len;
+};
+
+struct qmem_query {
+	struct query q;
+#ifdef USE_DNSCACHE
+	struct query_answer a;
+#endif
+};
+
+/* Struct used for QMEM + DNS cache */
+struct qmem_buffer {
+	struct qmem_query queries[QMEM_LEN];
 	size_t start_pending;	/* index of first "pending" query (ie. no response yet) */
 	size_t start;		/* index of first stored/pending query */
 	size_t end;			/* index of space after last stored/pending query */

@@ -47,15 +47,7 @@ struct tun_user {
 	int fragsize;
 	enum connection conn;
 	int lazy;
-#ifdef QMEM_LEN
-	struct query_buffer qmem;
-#endif
-#ifdef DNSCACHE_LEN
-	struct query dnscache_q[DNSCACHE_LEN];
-	char dnscache_answer[DNSCACHE_LEN][4096];
-	int dnscache_answerlen[DNSCACHE_LEN];
-	int dnscache_lastfilled;
-#endif
+	struct qmem_buffer qmem;
 };
 
 extern struct tun_user *users;

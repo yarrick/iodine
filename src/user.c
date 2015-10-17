@@ -132,10 +132,19 @@ all_users_waiting_to_send()
    outgoing buffer, so that sending back-to-back is possible
    without going through another select loop. */
 {
-	for (int i = 0; i < usercount; i++)
-		if (user_active(i))
+	int numactive = 0;
+	for (int i = 0; i < usercount; i++) {
+		if (user_active(i)) {
 			if (users[i].outgoing->length - users[i].outgoing->numitems > 8)
 				return 0;
+			numactive ++;
+		}
+	}
+
+	/* no users waiting if there are no users */
+	if (numactive == 0)
+		return 0;
+
 	return 1;
 }
 
