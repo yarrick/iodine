@@ -207,7 +207,7 @@ help() {
 static void
 version() {
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
-	fprintf(stderr, "Git version: %s\n; protocol version %08X", GITREVISION, PROTOCOL_VERSION);
+	fprintf(stderr, "Git version: %s; protocol version %08X\n", GITREVISION, PROTOCOL_VERSION);
 	exit(0);
 }
 

@@ -70,7 +70,7 @@ print_usage()
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-V sec] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-w downfrags] [-W upfrags] [-i sec] [-I sec] [-c 0|1] [-C 0|1] "
+			"[-w downfrags] [-W upfrags] [-i sec] [-I sec] [-c 0|1] [-C 0|1] [-s ms] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] "
 			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [nameserverN ...]]]\n", __progname);
 }
@@ -92,7 +92,8 @@ help()
 	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
 	fprintf(stderr, "     Base128, or (only for TXT:) Raw  (default: autodetect)\n");
 	fprintf(stderr, "  -I target interval between sending and receiving requests (default: 4 secs)\n");
-	fprintf(stderr, "     should be greater than the round-trip for the connection\n");
+	fprintf(stderr, "      or ping interval in immediate mode (default: 1 sec)\n");
+	fprintf(stderr, "  -s minimum interval between queries (default: 1ms)\n");
 	fprintf(stderr, "  -L 1: use lazy mode for low-latency (default). 0: don't (implies -I1)\n");
 	fprintf(stderr, "  -m max size of downstream fragments (default: autodetect)\n");
 	fprintf(stderr, "  -M max size of upstream hostnames (~100-255, default: 255)\n");
@@ -102,8 +103,7 @@ help()
 	fprintf(stderr, "Fine-tuning options:\n");
 	fprintf(stderr, "  -w downstream fragment window size (default: 8)\n");
 	fprintf(stderr, "  -W upstream fragment window size (default: 8)\n");
-	fprintf(stderr, "  -i server-side request timeout in lazy mode \n");
-	fprintf(stderr, "     (default: automatically adjust from max timeout and round-trip time)\n");
+	fprintf(stderr, "  -i server-side request timeout in lazy mode (default: auto)\n");
 	fprintf(stderr, "  -c 1: use downstream compression (default), 0: disable\n");
 	fprintf(stderr, "  -C 1: use upstream compression, 0: disable (default)\n\n");
 
@@ -131,7 +131,7 @@ static void
 version()
 {
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
-	fprintf(stderr, "Git version: %s\n; protocol version %08X", GITREVISION, PROTOCOL_VERSION);
+	fprintf(stderr, "Git version: %s; protocol version %08X\n", GITREVISION, PROTOCOL_VERSION);
 	exit(0);
 }
 
@@ -160,8 +160,9 @@ main(int argc, char **argv)
 	int retval;
 	int raw_mode;
 	int lazymode;
-	double max_interval_sec;
-	double server_timeout_sec ;
+	double target_interval_sec;
+	double server_timeout_sec;
+	int min_interval_ms;
 	int autodetect_server_timeout;
 	int up_compression;
 	int down_compression;
@@ -206,7 +207,8 @@ main(int argc, char **argv)
 	retval = 0;
 	raw_mode = 1;
 	lazymode = 1;
-	max_interval_sec = 5;	/* DNS RFC says 5 seconds minimum */
+	target_interval_sec = 5;	/* DNS RFC says 5 seconds minimum */
+	min_interval_ms = 1;
 	server_timeout_sec = 4;	/* Safe value for RTT <1s */
 	autodetect_server_timeout = 1;
 	hostname_maxlen = 0xFF;
@@ -232,7 +234,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfDhrV:c:C:i:u:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfDhrs:V:c:C:i:u:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -313,13 +315,13 @@ main(int argc, char **argv)
 				lazymode = 1;
 			if (lazymode < 0)
 				lazymode = 0;
-			if (!lazymode && max_interval_sec > 1)
-				max_interval_sec = 1;
+			if (!lazymode && target_interval_sec > 1)
+				target_interval_sec = 1;
 			break;
 		case 'I':
-			max_interval_sec = strtod(optarg, NULL);
-			if (max_interval_sec < 1)
-				max_interval_sec = 1;
+			target_interval_sec = strtod(optarg, NULL);
+			if (target_interval_sec < 1)
+				target_interval_sec = 1;
 			break;
 		case 'i':
 			server_timeout_sec = strtod(optarg, NULL);
@@ -327,6 +329,10 @@ main(int argc, char **argv)
 				server_timeout_sec = 0.4;
 			autodetect_server_timeout = 0;
 			break;
+		case 's':
+			min_interval_ms = atoi(optarg);
+			if (min_interval_ms < 1)
+				min_interval_ms = 1;
 		case 'w':
 			down_windowsize = atoi(optarg);
 			break;
@@ -388,7 +394,6 @@ main(int argc, char **argv)
 		nameserv_host = NULL;
 	}
 
-
 	if (nameserv_addrs_len <= 0 || !nameserv_hosts[0]) {
 		warnx("No nameserver found - not connected to any network?\n");
 		usage();
@@ -414,7 +419,8 @@ main(int argc, char **argv)
 	}
 
 	client_set_compression(up_compression, down_compression);
-	client_set_dnstimeout(max_interval_sec, server_timeout_sec, autodetect_server_timeout);
+	client_set_dnstimeout(target_interval_sec, server_timeout_sec, autodetect_server_timeout);
+	client_set_interval(target_interval_sec * 1000.0, min_interval_ms);
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
