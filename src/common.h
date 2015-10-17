@@ -84,11 +84,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 /* handy debug printing macro */
 #define DEBUG(level, ...) \
 		if (debug >= level) {\
-			if (level >= 3) {\
-				fprintf(stderr, "[D%d %s:%d] ", level, __FILE__, __LINE__); \
-			} else { \
-				fprintf(stderr, "[D%d] ", level);\
-			}\
+			fprintf(stderr, "[D%d %s:%d] ", level, __FILE__, __LINE__); \
 			fprintf(stderr, __VA_ARGS__);\
 			fprintf(stderr, "\n");\
 		}\
