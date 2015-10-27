@@ -150,21 +150,19 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct sockaddr
 
 static void
 qmem_init(int userid)
+/* initialize user QMEM and DNS cache (if enabled) */
 {
 	memset(&users[userid].qmem, 0, sizeof(struct qmem_buffer));
-//	users[userid].qmem.end = 1;
 	for (size_t i = 0; i < QMEM_LEN; i++) {
 		users[userid].qmem.queries[i].q.id = -1;
 	}
-
-	// TODO dns cache init in qmem
 }
 
 static int
 qmem_is_cached(int dns_fd, int userid, struct query *q)
 /* Check if an answer for a particular query is cached in qmem
  * If so, sends an "invalid" answer or one from DNS cache
- * Returns 1 if new query, 0 if cached (and then answered) */
+ * Returns 0 if new query (ie. not cached), 1 if cached (and then answered) */
 {
 	struct qmem_buffer *buf;
 	struct query *pq;
@@ -186,7 +184,9 @@ qmem_is_cached(int dns_fd, int userid, struct query *q)
 			continue;
 
 		/* Aha! A match! */
+
 #ifdef USE_DNSCACHE
+		/* Check if answer is in DNS cache */
 		if (buf->queries[p].a.len) {
 			data = (char *)buf->queries[p].a.data;
 			len = buf->queries[p].a.len;
@@ -194,13 +194,13 @@ qmem_is_cached(int dns_fd, int userid, struct query *q)
 			dnscache = 1;
 		}
 #endif
+
 		QMEM_DEBUG(2, userid, "OUT from qmem for '%s', %s", q->name,
-							   dnscache ? "answer from DNS cache" : "sending invalid response");
-		// TODO cache answers/respond using cache? (merge with dnscache)
+				dnscache ? "answer from DNS cache" : "sending invalid response");
 		write_dns(dns_fd, q, data, len, dataenc);
-		return 0;
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 static int
@@ -211,15 +211,16 @@ qmem_append(int userid, struct query *q)
 	buf = &users[userid].qmem;
 
 	if (buf->num_pending >= QMEM_LEN) {
-		/* this means we have QMEM_LEN *pending* queries; don't overwrite */
-		QMEM_DEBUG(2, userid, "full of pending queries. Not appending query with id %d.", q->id);
-		return 0;
+		/* this means we have QMEM_LEN *pending* queries; overwrite oldest one
+		 * to prevent buildup of ancient queries */
+		QMEM_DEBUG(2, userid, "Full of pending queries! Replacing old query %d with new %d.",
+				   buf->queries[buf->start].q.id, q->id);
 	}
 
 	if (buf->length < QMEM_LEN) {
 		buf->length++;
 	} else {
-		/* will replace already answered query in this spot */
+		/* will replace oldest query (in buf->queries[buf->start]) */
 		buf->start = (buf->start + 1) % QMEM_LEN;
 	}
 
@@ -1071,8 +1072,6 @@ write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc)
 	char buf[64*1024];
 	int len = 0;
 
-	// TODO: respond to duplicate queries here + handling qmem stuff
-
 	if (q->type == T_CNAME || q->type == T_A) {
 		char cnamebuf[1024];		/* max 255 */
 
@@ -1263,7 +1262,6 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 						tmp[0], tmp[1], my_mtu, netmask);
 
 				write_dns(dns_fd, q, (char *)out, read, users[userid].downenc);
-				q->id = 0;
 				syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
 
 				free(tmp[1]);
@@ -1303,7 +1301,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		write_dns(dns_fd, q, reply, length, 'T');
-	} else if(in[0] == 'Z' || in[0] == 'z') {
+	} else if(in[0] == 'Z' || in[0] == 'z') { /* Upstream codec check */
 		/* Check for case conservation and chars not allowed according to RFC */
 
 		/* Reply with received hostname as data */
@@ -1434,10 +1432,11 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if (bits) {
 			int f = users[userid].fragsize;
 			users[userid].outgoing->maxfraglen = (bits * f) / 8 - DOWNSTREAM_PING_HDR;
-			DEBUG(1, "Setting max downstream data length to %u bytes for user %d; bits %d (%c)",
-					  users[userid].outgoing->maxfraglen, userid, bits, users[userid].downenc);
 			users[userid].downenc_bits = bits;
 		}
+
+		DEBUG(1, "Options for user %d: down compression %d, data bits %d/maxlen %u (enc '%c'), lazy %d.",
+			  userid, tmp_comp, bits, users[userid].outgoing->maxfraglen, tmp_downenc, tmp_lazy);
 
 		/* Store any changes */
 		users[userid].down_compression = tmp_comp;
@@ -1561,17 +1560,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		return;
 	} else if(in[0] == 'P' || in[0] == 'p') { /* Ping request */
 		int dn_seq, up_seq, dn_winsize, up_winsize, dn_ack;
-		int respond;
-		unsigned timeout_ms, set_timeout;
-		struct timeval timeout;
-
-		/* We can't handle id=0, that's "no packet" to the dnscache. So drop
-		   request completely. Note that DNS servers rewrite the id.
-		   We'll drop 1 in 64k times. If DNS server retransmits with
-		   different id, then all okay.
-		   TODO don't use ID=0 to check if query */
-		if (q->id == 0)
-			return;
+		int respond, set_qtimeout, set_wtimeout;
+		unsigned qtimeout_ms, wtimeout_ms;
 
 		read = unpack_data(unpacked, sizeof(unpacked), in + 1, domain_len - 1, b32);
 		if (read < UPSTREAM_PING) {
@@ -1587,34 +1577,42 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		/* Check if cached */
-		if (!qmem_is_cached(dns_fd, userid, q))
+		if (qmem_is_cached(dns_fd, userid, q))
 			return;
 
-		dn_ack = ((unpacked[8] >> 2) & 1) ? unpacked[1] : -1;
+		dn_ack = ((unpacked[10] >> 2) & 1) ? unpacked[1] : -1;
 		up_winsize = unpacked[2];
 		dn_winsize = unpacked[3];
 		up_seq = unpacked[4];
 		dn_seq = unpacked[5];
 
-		timeout_ms = ntohs(*(uint16_t *) (unpacked + 6));
-		timeout = ms_to_timeval(timeout_ms);
+		/* Query timeout and window frag timeout */
+		qtimeout_ms = ntohs(*(uint16_t *) (unpacked + 6));
+		wtimeout_ms = ntohs(*(uint16_t *) (unpacked + 8));
 
-		respond = unpacked[8] & 1;
-		set_timeout = (unpacked[8] >> 3) & 1;
+		respond = unpacked[10] & 1;
+		set_qtimeout = (unpacked[10] >> 3) & 1;
+		set_wtimeout = (unpacked[10] >> 4) & 1;
 
-		DEBUG(3, "PING pkt user %d, down %d/%d, up %d/%d, ACK %d, %stimeout %u ms, respond %d (flags %02X)",
+		DEBUG(3, "PING pkt user %d, down %d/%d, up %d/%d, ACK %d, %sqtime %u ms, %swtime %u ms, respond %d (flags %02X)",
 					userid, dn_seq, dn_winsize, up_seq, up_winsize, dn_ack,
-					set_timeout ? "SET " : "", timeout_ms, respond, unpacked[8]);
+					set_qtimeout ? "SET " : "", qtimeout_ms, set_wtimeout ? "SET " : "",
+					wtimeout_ms, respond, unpacked[10]);
 
-		if (set_timeout) {
+		if (set_qtimeout) {
 			/* update user's query timeout if timeout flag set */
-			users[userid].dns_timeout = timeout;
+			users[userid].dns_timeout = ms_to_timeval(qtimeout_ms);
 
 			/* if timeout is 0, we do not enable lazy mode but it is effectively the same */
-			int newlazy = !(timeout_ms == 0);
+			int newlazy = !(qtimeout_ms == 0);
 			if (newlazy != users[userid].lazy)
 				DEBUG(2, "User %d: not setting lazymode to %d with timeout %u",
-					  userid, newlazy, timeout_ms);
+					  userid, newlazy, qtimeout_ms);
+		}
+
+		if (set_wtimeout) {
+			/* update sending window fragment ACK timeout */
+			users[userid].outgoing->timeout = ms_to_timeval(wtimeout_ms);
 		}
 
 		qmem_append(userid, q);
@@ -1642,16 +1640,6 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if (domain_len < UPSTREAM_HDR + 1)
 			return;
 
-		/* We can't handle id=0, that's "no packet" to us. So drop
-		   request completely. Note that DNS servers rewrite the id.
-		   We'll drop 1 in 64k times. If DNS server retransmits with
-		   different id, then all okay.
-		   Else client doesn't get our ack, and will retransmit in 1 second. */
-		if (q->id == 0) {
-			DEBUG(1, "Query with ID 0!");
-			return;
-		}
-
 		if ((in[0] >= '0' && in[0] <= '9'))
 			code = in[0] - '0';
 		if ((in[0] >= 'a' && in[0] <= 'f'))
@@ -1667,8 +1655,12 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		/* Check if cached */
-		if (!qmem_is_cached(dns_fd, userid, q))
-			qmem_append(userid, q);
+		if (qmem_is_cached(dns_fd, userid, q)) {
+			/* if is cached, by this point it has already been answered */
+			return;
+		}
+
+		qmem_append(userid, q);
 		/* Decode upstream data header - see docs/proto_XXXXXXXX.txt */
 		/* First byte (after userid) = CMC (ignored); skip 2 bytes */
 		len = sizeof(unpacked);
