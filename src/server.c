@@ -853,14 +853,18 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 {
 	char myhash[16];
 
-	if (len < 16) return;
+	if (len < 16) {
+		DEBUG(2, "Invalid raw login packet: length %lu < 16 bytes!", len);
+		return;
+	}
 
-	/* can't use check_authenticated_user_and_ip() since IP address will be different,
-	   so duplicate here except IP address */
-	if (userid < 0 || userid >= created_users) return;
-	if (!check_authenticated_user_and_ip(userid, q)) return;
+	if (userid < 0 || userid >= created_users ||
+		check_authenticated_user_and_ip(userid, q) != 0) {
+		DEBUG(2, "User %d not authenticated, ignoring raw login!", userid);
+		return;
+	}
 
-	DEBUG(1, "IN   login raw, len %lu, from user %d", len, userid);
+	DEBUG(1, "RX-raw: login, len %lu, from user %d", len, userid);
 
 	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, password, users[userid].seed + 1);
@@ -892,9 +896,9 @@ handle_raw_data(uint8_t *packet, size_t len, struct query *q, struct dnsfd *dns_
 	/* Update time info for user */
 	users[userid].last_pkt = time(NULL);
 
-	/* copy to packet buffer, update length TODO fix the raw UDP protocol */
+	/* copy to packet buffer, update length */
 
-	DEBUG(3, "IN   pkt raw, total %lu, from user %d", len, userid);
+	DEBUG(3, "RX-raw: full pkt raw, length %lu, from user %d", len, userid);
 
 	handle_full_packet(tun_fd, dns_fds, userid, packet, len, 1);
 }
@@ -910,7 +914,7 @@ handle_raw_ping(struct query *q, int dns_fd, int userid)
 	/* Update time info for user */
 	users[userid].last_pkt = time(NULL);
 
-	DEBUG(3, "IN   ping raw, from user %d", userid);
+	DEBUG(3, "RX-raw: ping from user %d", userid);
 
 	/* Send ping reply */
 	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, &q->from, q->fromlen);
@@ -920,30 +924,37 @@ static int
 raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd, struct dnsfd *dns_fds, int tun_fd)
 {
 	int raw_user;
+	uint8_t raw_cmd;
 
 	/* minimum length */
 	if (len < RAW_HDR_LEN) return 0;
 	/* should start with header */
-	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
+	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN))
+		return 0;
 
+	raw_cmd = RAW_HDR_GET_CMD(packet);
 	raw_user = RAW_HDR_GET_USR(packet);
-	DEBUG(3, "TX-raw: client %s, user %d, raw command '%c' length %lu",
-			  format_addr(&q->from, q->fromlen), raw_user, RAW_HDR_GET_CMD(packet), len);
-	switch (RAW_HDR_GET_CMD(packet)) {
+
+	DEBUG(3, "RX-raw: client %s, user %d, raw command 0x%02X, length %lu",
+			  format_addr(&q->from, q->fromlen), raw_user, raw_cmd, len);
+
+	packet += RAW_HDR_LEN;
+	len -= RAW_HDR_LEN;
+	switch (raw_cmd) {
 	case RAW_HDR_CMD_LOGIN:
 		/* Login challenge */
-		handle_raw_login(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, dns_fd, raw_user);
+		handle_raw_login(packet, len, q, dns_fd, raw_user);
 		break;
 	case RAW_HDR_CMD_DATA:
 		/* Data packet */
-		handle_raw_data(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, dns_fds, tun_fd, raw_user);
+		handle_raw_data(packet, len, q, dns_fds, tun_fd, raw_user);
 		break;
 	case RAW_HDR_CMD_PING:
 		/* Keepalive packet */
 		handle_raw_ping(q, dns_fd, raw_user);
 		break;
 	default:
-		DEBUG(1, "Unhandled raw command %02X from user %d", RAW_HDR_GET_CMD(packet), raw_user);
+		DEBUG(1, "Unhandled raw command %02X from user %d", raw_cmd, raw_user);
 		break;
 	}
 	return 1;

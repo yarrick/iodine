@@ -1123,14 +1123,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return -1;
 
-	/* Check if outgoing buffer can hold data */
-	if (window_buffer_available(outbuf) < (read / MAX_FRAGSIZE) + 1) {
-		DEBUG(1, "  Outgoing buffer full (%lu/%lu), not adding data!",
-					outbuf->numitems, outbuf->length);
-		return -1;
-	}
-
-	DEBUG(2, " IN: %lu bytes on tunnel, compression %d", read, compression_up);
+	DEBUG(2, " IN: %lu bytes on tunnel, to be compressed: %d", read, compression_up);
 
 	if (conn != CONN_DNS_NULL || compression_up) {
 		datalen = sizeof(out);
@@ -1142,6 +1135,13 @@ tunnel_tun(int tun_fd, int dns_fd)
 	}
 
 	if (conn == CONN_DNS_NULL) {
+		/* Check if outgoing buffer can hold data */
+		if (window_buffer_available(outbuf) < (read / MAX_FRAGSIZE) + 1) {
+			DEBUG(1, "  Outgoing buffer full (%lu/%lu), not adding data!",
+						outbuf->numitems, outbuf->length);
+			return -1;
+		}
+
 		window_add_outgoing_data(outbuf, data, datalen, compression_up);
 		/* Don't send anything here to respect min. send interval */
 	} else {
@@ -1353,40 +1353,43 @@ client_tunnel(int tun_fd, int dns_fd)
 
 		/* TODO: detect DNS servers which drop frequent requests
 		 * TODO: adjust number of pending queries based on current data rate */
-		sending = window_sending(outbuf);
-		total = sending;
-		check_pending_queries();
-		if (num_pending < windowsize_down && lazymode)
-			total = MAX(total, windowsize_down - num_pending);
-		else if (num_pending < 1 && !lazymode)
-			total = MAX(total, 1);
+		if (conn == CONN_DNS_NULL) {
+			sending = window_sending(outbuf);
+			total = sending;
+			check_pending_queries();
+			if (num_pending < windowsize_down && lazymode)
+				total = MAX(total, windowsize_down - num_pending);
+			else if (num_pending < 1 && !lazymode)
+				total = MAX(total, 1);
 
-		if (sending > 0 || total > 0 || next_downstream_ack >= 0) {
+			if (sending > 0 || total > 0 || next_downstream_ack >= 0) {
 
-			/* Upstream traffic - this is where all ping/data queries are sent */
-			if (sending > 0) {
-				/* More to send - next fragment */
-				send_next_frag(dns_fd);
-			} else {
-				/* Send ping if we didn't send anything yet */
-				send_ping(dns_fd, 0, next_downstream_ack, (num_pings > 20 && num_pings % 50 == 0));
-				next_downstream_ack = -1;
+				/* Upstream traffic - this is where all ping/data queries are sent */
+				if (sending > 0) {
+					/* More to send - next fragment */
+					send_next_frag(dns_fd);
+				} else {
+					/* Send ping if we didn't send anything yet */
+					send_ping(dns_fd, 0, next_downstream_ack, (num_pings > 20 && num_pings % 50 == 0));
+					next_downstream_ack = -1;
+				}
+
+				sending--;
+				total--;
+				QTRACK_DEBUG(3, "Sent a query to fill server lazy buffer to %lu, will send another %d",
+							 lazymode ? windowsize_down : 1, total);
+
+				if (sending > 0 || (total > 0 && lazymode)) {
+					/* TODO: enforce min send interval even if we get new data */
+					tv = ms_to_timeval(min_send_interval_ms);
+					tv.tv_usec += 1;
+				} else if (total > 0 && !lazymode) {
+					/* use immediate mode send interval if nothing pending */
+					tv = ms_to_timeval(send_interval_ms);
+				}
+
+				send_ping_soon = 0;
 			}
-
-			sending--;
-			total--;
-			QTRACK_DEBUG(3, "Sent a query to fill server lazy buffer to %lu, will send another %d",
-						 lazymode ? windowsize_down : 1, total);
-
-			if (sending > 0 || (total > 0 && lazymode)) {
-				tv = ms_to_timeval(min_send_interval_ms);
-				tv.tv_usec += 1;
-			} else if (total > 0 && !lazymode) {
-				/* use immediate mode send interval if nothing pending */
-				tv = ms_to_timeval(send_interval_ms);
-			}
-
-			send_ping_soon = 0;
 		}
 
 		if (stats) {
@@ -1404,11 +1407,12 @@ client_tunnel(int tun_fd, int dns_fd)
 						min_send_interval_ms, rtt_total_ms / num_immediate, server_timeout_ms);
 				fprintf(stderr, " Queries immediate: %5lu, timed out: %4lu    target: %4ld ms\n",
 						num_immediate, num_timeouts, max_timeout_ms);
-				fprintf(stderr, " Frags resent: %4u,   OOS: %4u          down frag: %4ld ms\n",
-						outbuf->resends, inbuf->oos, downstream_timeout_ms);
-				fprintf(stderr, " TX fragments: %8lu"  ",   RX: %8lu"  ",   pings: %8lu"  "\n\n",
-						num_frags_sent, num_frags_recv, num_pings);
-
+				if (conn == CONN_DNS_NULL) {
+					fprintf(stderr, " Frags resent: %4u,   OOS: %4u          down frag: %4ld ms\n",
+							outbuf->resends, inbuf->oos, downstream_timeout_ms);
+					fprintf(stderr, " TX fragments: %8lu" ",   RX: %8lu" ",   pings: %8lu" "\n\n",
+							num_frags_sent, num_frags_recv, num_pings);
+				}
 				/* update since-last-report stats */
 				sent_since_report = num_sent;
 				recv_since_report = num_recv;
@@ -1420,11 +1424,12 @@ client_tunnel(int tun_fd, int dns_fd)
 		if (send_ping_soon) {
 			tv.tv_sec = 0;
 			tv.tv_usec = send_ping_soon * 1000;
+			send_ping_soon = 0;
 		}
 
 		FD_ZERO(&fds);
-		if (window_buffer_available(outbuf) > 16) {
-			/* Fill up outgoing buffer with available data
+		if (conn != CONN_DNS_NULL || window_buffer_available(outbuf) > 16) {
+			/* Fill up outgoing buffer with available data if it has enough space
 			 * The windowing protocol manages data retransmits, timeouts etc. */
 			FD_SET(tun_fd, &fds);
 		}
