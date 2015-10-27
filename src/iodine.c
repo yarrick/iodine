@@ -70,7 +70,7 @@ print_usage()
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-V sec] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-w downfrags] [-W upfrags] [-i sec] [-I sec] [-c 0|1] [-C 0|1] [-s ms] "
+			"[-w downfrags] [-W upfrags] [-i sec -j sec] [-I sec] [-c 0|1] [-C 0|1] [-s ms] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] "
 			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [nameserverN ...]]]\n", __progname);
 }
@@ -93,7 +93,7 @@ help()
 	fprintf(stderr, "     Base128, or (only for TXT:) Raw  (default: autodetect)\n");
 	fprintf(stderr, "  -I target interval between sending and receiving requests (default: 4 secs)\n");
 	fprintf(stderr, "      or ping interval in immediate mode (default: 1 sec)\n");
-	fprintf(stderr, "  -s minimum interval between queries (default: 1ms)\n");
+	fprintf(stderr, "  -s minimum interval between queries (default: 0ms)\n");
 	fprintf(stderr, "  -L 1: use lazy mode for low-latency (default). 0: don't (implies -I1)\n");
 	fprintf(stderr, "  -m max size of downstream fragments (default: autodetect)\n");
 	fprintf(stderr, "  -M max size of upstream hostnames (~100-255, default: 255)\n");
@@ -101,11 +101,12 @@ help()
 	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n\n");
 
 	fprintf(stderr, "Fine-tuning options:\n");
-	fprintf(stderr, "  -w downstream fragment window size (default: 8)\n");
-	fprintf(stderr, "  -W upstream fragment window size (default: 8)\n");
+	fprintf(stderr, "  -w downstream fragment window size (default: 8 frags)\n");
+	fprintf(stderr, "  -W upstream fragment window size (default: 8 frags)\n");
 	fprintf(stderr, "  -i server-side request timeout in lazy mode (default: auto)\n");
+	fprintf(stderr, "  -j downstream fragment ACK timeout, implies -i4 (default: 2 sec)\n");
 	fprintf(stderr, "  -c 1: use downstream compression (default), 0: disable\n");
-	fprintf(stderr, "  -C 1: use upstream compression, 0: disable (default)\n\n");
+	fprintf(stderr, "  -C 1: use upstream compression (default), 0: disable\n\n");
 
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -v to print version info and exit\n");
@@ -162,6 +163,7 @@ main(int argc, char **argv)
 	int lazymode;
 	double target_interval_sec;
 	double server_timeout_sec;
+	double downstream_timeout_sec;
 	int min_interval_ms;
 	int autodetect_server_timeout;
 	int up_compression;
@@ -183,6 +185,7 @@ main(int argc, char **argv)
 	int nameservaddr_len;
 	int nameserv_family;
 
+	/* Set default values */
 	nameserv_addrs_len = 0;
 	nameservaddr_len = 0;
 	nameserv_host = NULL;
@@ -208,12 +211,13 @@ main(int argc, char **argv)
 	raw_mode = 1;
 	lazymode = 1;
 	target_interval_sec = 5;	/* DNS RFC says 5 seconds minimum */
-	min_interval_ms = 1;
+	min_interval_ms = 0;
 	server_timeout_sec = 4;	/* Safe value for RTT <1s */
+	downstream_timeout_sec = 2;
 	autodetect_server_timeout = 1;
 	hostname_maxlen = 0xFF;
 	nameserv_family = AF_UNSPEC;
-	up_compression = 0;
+	up_compression = 1;
 	down_compression = 1;
 
 	up_windowsize = 8;
@@ -234,7 +238,7 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfDhrs:V:c:C:i:u:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfDhrs:V:c:C:i:j:u:t:d:R:P:w:W:m:M:F:T:O:L:I:")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -315,24 +319,25 @@ main(int argc, char **argv)
 				lazymode = 1;
 			if (lazymode < 0)
 				lazymode = 0;
-			if (!lazymode && target_interval_sec > 1)
-				target_interval_sec = 1;
 			break;
 		case 'I':
 			target_interval_sec = strtod(optarg, NULL);
-			if (target_interval_sec < 1)
-				target_interval_sec = 1;
 			break;
 		case 'i':
 			server_timeout_sec = strtod(optarg, NULL);
-			if (server_timeout_sec < 0.4)
-				server_timeout_sec = 0.4;
 			autodetect_server_timeout = 0;
+			break;
+		case 'j':
+			downstream_timeout_sec = strtod(optarg, NULL);
+			if (autodetect_server_timeout) {
+				autodetect_server_timeout = 0;
+				server_timeout_sec = 4;
+			}
 			break;
 		case 's':
 			min_interval_ms = atoi(optarg);
-			if (min_interval_ms < 1)
-				min_interval_ms = 1;
+			if (min_interval_ms < 0)
+				min_interval_ms = 0;
 		case 'w':
 			down_windowsize = atoi(optarg);
 			break;
@@ -418,8 +423,28 @@ main(int argc, char **argv)
 		usage();
 	}
 
+	if (target_interval_sec < 0.1) {
+		warnx("Target interval must be greater than 0.1 seconds!");
+		usage();
+	}
+
+	if (server_timeout_sec < 0.1 || server_timeout_sec >= target_interval_sec) {
+		warnx("Server timeout must be greater than 0.1 sec and less than target interval!");
+		usage();
+	}
+
+	if (downstream_timeout_sec < 0.1) {
+		warnx("Downstream fragment timeout must be more than 0.1 sec to prevent excessive retransmits.");
+		usage();
+	}
+
+	if (!lazymode && target_interval_sec > 1) {
+		warnx("Warning: Target interval of >1 second in immediate mode will cause high latency.");
+		usage();
+	}
+
 	client_set_compression(up_compression, down_compression);
-	client_set_dnstimeout(target_interval_sec, server_timeout_sec, autodetect_server_timeout);
+	client_set_dnstimeout(target_interval_sec, server_timeout_sec, downstream_timeout_sec, autodetect_server_timeout);
 	client_set_interval(target_interval_sec * 1000.0, min_interval_ms);
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);

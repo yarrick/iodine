@@ -94,8 +94,9 @@ static time_t max_timeout_ms;
 static time_t send_interval_ms;
 static time_t min_send_interval_ms;
 
-/* Server response timeout in ms */
+/* Server response timeout in ms and downstream window timeout */
 static time_t server_timeout_ms;
+static time_t downstream_timeout_ms;
 static int autodetect_server_timeout;
 
 /* Cumulative Round-Trip-Time in ms */
@@ -185,6 +186,7 @@ client_init()
 	rtt_total_ms = 1000;
 	send_interval_ms = 1000;
 	min_send_interval_ms = 1;
+	downstream_timeout_ms = 5000;
 
 	outbuf = NULL;
 	inbuf = NULL;
@@ -282,10 +284,11 @@ client_set_compression(int up, int down)
 }
 
 void
-client_set_dnstimeout(double timeout, double servertimeout, int autodetect)
+client_set_dnstimeout(double timeout, double servertimeout, double downfrag, int autodetect)
 {
 	max_timeout_ms = timeout * 1000;
 	server_timeout_ms = servertimeout * 1000;
+	downstream_timeout_ms = downfrag * 1000;
 	autodetect_server_timeout = autodetect;
 }
 
@@ -385,11 +388,13 @@ update_server_timeout(int dns_fd, int handshake)
 		server_timeout_ms = max_timeout_ms - rtt_ms;
 		if (server_timeout_ms <= 0) {
 			server_timeout_ms = 0;
-			fprintf(stderr, "Setting server timeout to 0 ms: if this continues try disabling lazy mode.\n");
+			fprintf(stderr, "Setting server timeout to 0 ms: if this continues try disabling lazy mode. (-L0)\n");
 		}
 	}
 
-	/* TODO: update window timeout */
+	/* update up/down window timeouts to something reasonable */
+	downstream_timeout_ms = rtt_ms * 2;
+	outbuf->timeout = ms_to_timeval(downstream_timeout_ms);
 
 	if (handshake) {
 		/* Send ping handshake to set server timeout */
@@ -626,7 +631,7 @@ send_packet(int fd, char cmd, const uint8_t *data, const size_t datalen)
 }
 
 int
-send_ping(int fd, int ping_response, int ack, int timeout)
+send_ping(int fd, int ping_response, int ack, int set_timeout)
 {
 	num_pings++;
 	if (conn == CONN_DNS_NULL) {
@@ -645,15 +650,17 @@ send_ping(int fd, int ping_response, int ack, int timeout)
 		}
 
 		*(uint16_t *) (data + 6) = htons(server_timeout_ms);
+		*(uint16_t *) (data + 8) = htons(downstream_timeout_ms);
 
-		/* update server lazy timeout, ack flag, respond with ping flag */
-		data[8] = ((timeout & 1) << 3) | ((ack < 0 ? 0 : 1) << 2) | (ping_response & 1);
-		data[9] = (rand_seed >> 8) & 0xff;
-		data[10] = (rand_seed >> 0) & 0xff;
+		/* update server frag/lazy timeout, ack flag, respond with ping flag */
+		data[10] = ((set_timeout & 1) << 4) | ((set_timeout & 1) << 3) | ((ack < 0 ? 0 : 1) << 2) | (ping_response & 1);
+		data[11] = (rand_seed >> 8) & 0xff;
+		data[12] = (rand_seed >> 0) & 0xff;
 		rand_seed += 263;
 
-		DEBUG(3, " SEND PING: respond %d, ack %d, server timeout %ld, flags %02X",
-					ping_response, ack, server_timeout_ms, data[8]);
+		DEBUG(3, " SEND PING: respond %d, ack %d, %s(server %ld ms, downfrag %ld ms), flags %02X",
+				ping_response, ack, set_timeout ? "SET " : "", server_timeout_ms,
+				downstream_timeout_ms, data[8]);
 
 		id = send_packet(fd, 'p', data, sizeof(data));
 
@@ -1014,7 +1021,7 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 		if (r == 0)
 			return -3;	/* select timeout */
 
-		q.id = 0;
+		q.id = -1;
 		q.name[0] = '\0';
 		rv = read_dns_withq(dns_fd, 0, (uint8_t *)buf, buflen, &q);
 
@@ -1373,6 +1380,7 @@ client_tunnel(int tun_fd, int dns_fd)
 
 			if (sending > 0 || (total > 0 && lazymode)) {
 				tv = ms_to_timeval(min_send_interval_ms);
+				tv.tv_usec += 1;
 			} else if (total > 0 && !lazymode) {
 				/* use immediate mode send interval if nothing pending */
 				tv = ms_to_timeval(send_interval_ms);
@@ -1392,12 +1400,12 @@ client_tunnel(int tun_fd, int dns_fd)
 						num_recv - recv_since_report, (num_recv - recv_since_report) / stats);
 				fprintf(stderr, "  num IP rejected: %4lu,   untracked: %4lu,   lazy mode: %1d\n",
 						num_badip, num_untracked, lazymode);
-				fprintf(stderr, " Min send: %4ld ms, Avg RTT: %4ld ms, immediate replies: %5lu\n",
-						min_send_interval_ms, rtt_total_ms / num_immediate, num_immediate);
-				fprintf(stderr, " query timeouts: %4lu,    target: %4ld ms,   server: %4ld ms\n",
-						num_timeouts, max_timeout_ms, server_timeout_ms);
-				fprintf(stderr, " Resent fragments up: %4u,   downstream out of window: %4u\n",
-						outbuf->resends, inbuf->oos);
+				fprintf(stderr, " Min send: %5ld ms, Avg RTT: %5ld ms  Timeout server: %4ld ms\n",
+						min_send_interval_ms, rtt_total_ms / num_immediate, server_timeout_ms);
+				fprintf(stderr, " Queries immediate: %5lu, timed out: %4lu    target: %4ld ms\n",
+						num_immediate, num_timeouts, max_timeout_ms);
+				fprintf(stderr, " Frags resent: %4u,   OOS: %4u          down frag: %4ld ms\n",
+						outbuf->resends, inbuf->oos, downstream_timeout_ms);
 				fprintf(stderr, " TX fragments: %8lu"  ",   RX: %8lu"  ",   pings: %8lu"  "\n\n",
 						num_frags_sent, num_frags_recv, num_pings);
 
@@ -1568,8 +1576,8 @@ send_upenctest(int fd, char *s)
 	buf[3] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, s, 512);
-	strncat(buf, ".", 512);
+	strncat(buf, s, 512 - strlen(buf));
+	strncat(buf, ".", 512 - strlen(buf));
 	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, (uint8_t *)buf);
 }
@@ -2573,6 +2581,7 @@ handshake_set_timeout(int dns_fd)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'P', i + 1);
 		got_response(id, 1, 0);
 
+		fprintf(stderr, ".");
 		if (read > 0) {
 			if (strncmp("BADIP", in, 5) == 0) {
 				fprintf(stderr, "Server rejected sender IP address.\n");
@@ -2583,7 +2592,6 @@ handshake_set_timeout(int dns_fd)
 				break;
 		}
 
-		fprintf(stderr, ".");
 	}
 	if (!running)
 		return;
