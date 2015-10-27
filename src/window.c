@@ -206,7 +206,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 		}
 		if (fraglen > maxlen) {
 			WDEBUG("Data buffer too small! Reassembled %lu bytes.", datalen);
-			return datalen;
+			return 0;
 		}
 
 		/* Move window along to avoid weird issues */
