@@ -228,9 +228,10 @@ check_user_and_ip(int userid, struct query *q)
 	return 1;
 }
 
-/* This checks that user has passed normal (non-raw) login challenge */
 int
 check_authenticated_user_and_ip(int userid, struct query *q)
+/* This checks that user has passed normal (non-raw) login challenge
+ * Returns 0 on success, 1 if user is not authenticated/IP is wrong */
 {
 	int res = check_user_and_ip(userid, q);
 	if (res)
