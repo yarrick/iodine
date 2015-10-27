@@ -79,7 +79,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #define DOWNSTREAM_HDR 3
 #define DOWNSTREAM_PING_HDR 7
 #define UPSTREAM_HDR 6
-#define UPSTREAM_PING 6
+#define UPSTREAM_PING 11
 
 /* handy debug printing macro */
 #define DEBUG(level, ...) \

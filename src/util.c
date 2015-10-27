@@ -43,7 +43,10 @@ get_resolvconf_addr()
 		err(1, "/etc/resolv.conf");
 
 	while (feof(fp) == 0) {
-		fgets(buf, sizeof(buf), fp);
+		if (!fgets(buf, sizeof(buf), fp)) {
+			/* resolv.conf is empty (we got to EOF without reading anything yet */
+			err(1, "/etc/resolv.conf is empty! Please specify a nameserver.");
+		}
 
 		if (sscanf(buf, "nameserver %15s", addr) == 1) {
 			rv = addr;

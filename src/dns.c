@@ -408,7 +408,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	unsigned short type;
 	char *data;
 	unsigned short rlen;
-	int id;
+	uint16_t id;
 	int rv;
 
 	rv = 0;
@@ -428,7 +428,6 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 	ancount = ntohs(header->ancount);
 
 	id = ntohs(header->id);
-	id = id & 0xFFFF; /* Kill any sign extension */
 
 	rlen = 0;
 
