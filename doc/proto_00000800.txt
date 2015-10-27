@@ -230,7 +230,7 @@ Client sends:
 	Rest encoded with Base32:
     0        1        2...8        9-10
     +--------+--------+---+76543210+---+
-    |0000UUUU|Dn SeqID|...|0000TANR|CMC|
+    |0000UUUU|Dn SeqID|...|000WTANR|CMC|
     +--------+--------+---+--------+---+
 	4 bits Userid
 	1 byte Downstream seq ID ACK
@@ -239,8 +239,10 @@ Client sends:
 	1 byte window start (upstream)
 	1 byte window start (downstream)
 	2 bytes big-endian server timeout in ms
+	2 bytes big-endian downstream fragment ACK timeout in ms
 	
 	1 byte flags:
+		W = update window frag timeout
 		T = update server timeout
 		A = is ACKing downstream frag
 		N = is NACKing downstream frag (unused)
