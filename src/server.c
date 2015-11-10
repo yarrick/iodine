@@ -143,7 +143,7 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct sockaddr
 
 #define QMEM_DEBUG(l, u, ...) \
 	if (debug >= l) {\
-		fprintf(stderr, "[QMEM u%d (%lu/%u)] ", u, users[u].qmem.num_pending, users[u].outgoing->windowsize); \
+		TIMEPRINT("[QMEM u%d (%lu/%u)] ", u, users[u].qmem.num_pending, users[u].outgoing->windowsize); \
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
 	}
@@ -291,10 +291,10 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
  *  - the user has excess pending queries (>downstream window size)
  * Returns largest safe time to wait before next timeout */
 {
-	struct timeval now, timeout, soonest, tmp, age;
+	struct timeval now, timeout, soonest, tmp, age, nextresend;
 	soonest.tv_sec = 10;
 	soonest.tv_usec = 0;
-	int userid, qnum, nextuser = -1, immediate;
+	int userid, qnum, nextuser = -1, immediate, resend = 0;
 	struct query *q = NULL, *nextq = NULL;
 	size_t sending, total, sent;
 	time_t age_ms;
@@ -312,7 +312,15 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 
 		/* Keep track of how many fragments we can send */
 		if (u->lazy) {
-			total = window_sending(u->outgoing);
+			total = window_sending(u->outgoing, &nextresend);
+			if ((nextresend.tv_sec != 0 || nextresend.tv_usec != 0)
+				&& u->qmem.num_pending >= 1) {
+				/* will use nextresend as max wait time if it is smallest
+				 * and if user has spare queries */
+				resend = 1;
+				soonest = nextresend;
+			}
+
 			if (u->qmem.num_pending > u->outgoing->windowsize) {
 				/* calculate number of "excess" queries */
 				total = MAX(total, u->qmem.num_pending - u->outgoing->windowsize);
@@ -347,7 +355,7 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 
 				sent++;
 				QMEM_DEBUG(4, userid, "ANSWER q id %d, ACK %d; sent %lu of %lu + sending another %lu",
-										q->id, u->next_upstream_ack, sent, total, sending);
+						q->id, u->next_upstream_ack, sent, total, sending);
 
 				send_data_or_ping(dns_fds, userid, q, 0, immediate);
 
@@ -375,9 +383,12 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 		} else {
 			if (nextuser < 0)
 				nextuser = 0;
-			/* sanity check: soonest_ms should always be default value here (ie. 10000) */
-			if (soonest_ms != 10000)
-				QMEM_DEBUG(1, nextuser, "Don't need to send anything to any users, waiting %lu ms", soonest_ms);
+			if (soonest_ms != 10000 && resend) {
+				/* only if resending some frags */
+				QMEM_DEBUG(5, nextuser, "Resending some fragments")
+			} else {
+				QMEM_DEBUG(2, nextuser, "Don't need to send anything to any users, waiting %lu ms", soonest_ms);
+			}
 		}
 	}
 
