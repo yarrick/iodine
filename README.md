@@ -16,6 +16,7 @@ relevant header files are found in `/usr/include`.
 (See script at `./src/osflags`)
 
 Run `make` to compile the server and client binaries.
+Run `make debug` to compile the binaries with extra debugging enabled.
 Run `make install` to copy binaries and manpage to the destination directory.
 Run `make test` to compile and run the unit tests. (Requires the `check` library)
 
@@ -25,8 +26,8 @@ QUICKSTART
 
 Try it out within your own LAN! Follow these simple steps:
 - On your server, run: `./iodined -f test.com 10.0.0.1`.  
-  If you already use the `10.0.0.0` network, use another internal net like 
-  `172.16.0.0`.
+  If you already use the `10.0.0.0/8` network, use another internal net like 
+  `172.16.0.0/12`.
 - Enter a password.
 - On the client, run: `./iodine -f -r test.com 192.168.0.1`.  
   Replace `192.168.0.1` with your server's ip address.
@@ -88,7 +89,7 @@ If there is a chance you'll be using an iodine tunnel from unexpected
 environments, start `iodined` with a `-c` option.
 Resulting commandline in this example situation:
 
-	./iodined -f -c -P secretpassword t1.mydomain.com 192.168.99.1
+	./iodined -f -c -P secretpassword 192.168.99.1 t1.mydomain.com
 
 ### Client side
 All the setup is done, just start `iodine`. It takes one or more arguments, the
@@ -184,15 +185,15 @@ these DNS relays much more stable. This is also useful on some “de-optimizing�
 DNS relays that stuff the response with two full copies of the query, leaving
 very little space for downstream data (also not capable of EDNS0). The `-M`
 switch can trade some upstream bandwidth for downstream bandwidth. Note that
-the minimum `-M` value is about 100, since the protocol can split packets (1200
-bytes max) in only 16 fragments, requiring at least 75 real data bytes per
-fragment.
+the minimum `-M` value is about 20, since the first 10 bytes or so are the
+Base32 encoded data header and the remainder is the actual encoded data and
+packets can be split into up to 255 fragments.
 
 The upstream data is sent gzipped encoded with Base32; or Base64 if the relay
 server supports mixed case and `+` in domain names; or Base64u if `_` is
 supported instead; or Base128 if high-byte-value characters are supported.
 This upstream encoding is autodetected. The DNS protocol allows one query per
-packet, and one query can be max 256 chars. Each domain name part can be max
+packet, and one query can be max 255 chars. Each domain name part can be max
 63 chars. So your domain name and subdomain should be as short as possible to
 allow maximum upstream throughput.
 
@@ -220,24 +221,24 @@ when that hostname exceeds ca. 180 characters. In these and similar cases, use
 the `-O` option to try other downstream codecs; Base32 should always work.
 
 Normal operation now is for the server to _not_ answer a DNS request until
-the next DNS request has come in, a.k.a. being “lazy”. This way, the server
+it has timed out (see server timeout), a.k.a. being “lazy”. This way, the server
 will always have a DNS request handy when new downstream data has to be sent.
 This greatly improves (interactive) performance and latency, and allows to
 slow down the quiescent ping requests to 4 second intervals by default, and
-possibly much slower. In fact, the main purpose of the pings now is to force
-a reply to the previous ping, and prevent DNS server timeouts (usually at
-least 5-10 seconds per RFC1035). Some DNS servers are more impatient and will
-give SERVFAIL errors (timeouts) in periods without tunneled data traffic. All
-data should still get through in these cases, but `iodine` will reduce the ping
-interval to 1 second anyway (-I1) to reduce the number of error messages. This
-may not help for very impatient DNS relays like `dnsadvantage.com` (ultradns),
-which time out in 1 second or even less. Yet data will still get trough, and
-you can ignore the `SERVFAIL` errors.
+possibly much slower. Some DNS servers are more impatient and will give SERVFAIL
+errors (timeouts) randomly or consistently if the target timeout is too high. All
+data should still get through in these cases, but `iodine` will reduce the target
+interval slowly to reduce the number of SERVFAILS. In these scenarios, it is best
+to manually set the target interval to something which is definitely less than the
+most impatient DNS server timeout in the connection to ensure maximum reliability.
+Some very impatient DNS relays like `dnsadvantage.com` (ultradns), which time
+out in 1 second or even less can cause issues. Yet data will still get trough, and
+you can probably ignore the `SERVFAIL` errors.
 
 If you are running on a local network without any DNS server in-between, try
 `-I 50` (iodine and iodined close the connection after 60 seconds of silence).
 The only time you'll notice a slowdown, is when DNS reply packets go missing;
-the `iodined` server then has to wait for a new ping to re-send the data. You can
+the `iodined` server fragment will have to time-out to be resent. You can
 speed this up by generating some upstream traffic (keypress, ping). If this
 happens often, check your network for bottlenecks and/or run with `-I1`.
 
@@ -256,7 +257,8 @@ If you have problems, try inspecting the traffic with network monitoring tools
 like tcpdump or ethereal/wireshark, and make sure that the relaying DNS server
 has not cached the response. A cached error message could mean that you
 started the client before the server. The `-D` (and `-DD`) option on the server
-can also show received and sent queries.
+can also show received and sent queries. To assist in diagnosis, you may wish to
+recompile with `make debug` and use `-DDDDD` to see more debug output.
 
 
 TIPS & TRICKS
@@ -306,9 +308,8 @@ explains why some values are exactly equal.
 Ping round-trip times measured with `ping -c100`, presented are average rtt
 and mean deviation (indicating spread around the average), in milliseconds.
 
-
 ### Situation 1: `Laptop  ->   Wifi AP   ->  Home server  ->  DSL provider  ->  Datacenter`
-
+```
 	 iodine    DNS "relay"        bind9           DNS cache        iodined
 	
 	                        downstr.  upstream downstr.  ping-up       ping-down
@@ -336,9 +337,9 @@ and mean deviation (indicating spread around the average), in milliseconds.
 	
 	 [174.7* : these all have 2frag/packet]
 
-
+```
 ### Situation 2: `Laptop  ->  Wifi+vpn / wired  ->  Home server`
-
+```
 	 iodine                            iodined
 	
 	                        downstr.  upstream downstr.  ping-up       ping-down
@@ -348,7 +349,7 @@ and mean deviation (indicating spread around the average), in milliseconds.
 	wifi + openvpn  -Tnull      1186   166.0   1022.3    6.3    1.3    6.6    1.6
 	
 	wired  -Tnull               1186   677.2   2464.1    1.3    0.2    1.3    0.1
-
+```
 
 ### Notes
 
@@ -388,7 +389,7 @@ THANKS
 AUTHORS & LICENSE
 -----------------
 
-Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>, 2006-2009 Bjorn
+Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>, 2015 Frekky, 2006-2009 Bjorn
 Andersson <flex@kryo.se>. Also major contributions by Anne Bezemer.
 
 Permission to use, copy, modify, and/or distribute this software for any purpose
