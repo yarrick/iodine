@@ -71,8 +71,8 @@ print_usage()
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-V sec] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-w downfrags] [-W upfrags] [-i sec -j sec] [-I sec] [-c 0|1] [-C 0|1] [-s ms] "
-			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] "
-			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [nameserverN ...]]]\n", __progname);
+			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-R rdomain] "
+			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [...]]]\n", __progname);
 }
 
 static void
@@ -118,6 +118,7 @@ help()
 	fprintf(stderr, "  -t dir to chroot to directory dir\n");
 	fprintf(stderr, "  -d device to set tunnel device name\n");
 	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
+	fprintf(stderr, "  -R routing domain (OpenBSD only)\n");
 	fprintf(stderr, "  -F pidfile to write pid to a file\n\n");
 
 	fprintf(stderr, "nameserver is the IP/hostname of the relaying nameserver(s).\n");

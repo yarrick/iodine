@@ -154,13 +154,11 @@ static void
 print_usage() {
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] "
-		"[-4] [-6] [-c] [-s] [-f] [-D] [-u user] "
-		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
-		"[-l ipv4 listen address] [-L ipv6 listen address] "
-		"[-p port] [-n external ip] [-b dnsport] "
-		"[-P password] [-F pidfile] [-i max idle time] "
-		"tunnel_ip[/netmask] topdomain\n", __progname);
+	fprintf(stderr, "Usage: %s [-v] [-h] [-4] [-6] [-c] [-s] [-f] [-D] "
+		"[-u user] [-t chrootdir] [-d device] [-m mtu] [-z context] "
+		"[-l ipv4 listen address] [-L ipv6 listen address] [-p port] "
+		"[-n external ip] [-b dnsport] [-P password] [-F pidfile] "
+		"[-i max idle time] tunnel_ip[/netmask] topdomain\n", __progname);
 }
 
 static void
