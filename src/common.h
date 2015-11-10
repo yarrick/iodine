@@ -40,6 +40,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include <err.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 #endif
 
 #define DNS_PORT 53
@@ -82,12 +83,30 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #define UPSTREAM_PING 11
 
 /* handy debug printing macro */
+#ifdef DEBUG_BUILD
+#define TIMEPRINT(...) \
+		struct timeval currenttime;\
+		gettimeofday(&currenttime, NULL);\
+		fprintf(stderr, "%03ld.%03ld ", currenttime.tv_sec, currenttime.tv_usec / 1000);\
+		fprintf(stderr, __VA_ARGS__);
+
 #define DEBUG(level, ...) \
 		if (debug >= level) {\
-			fprintf(stderr, "[D%d %s:%d] ", level, __FILE__, __LINE__); \
+			TIMEPRINT("[D%d %s:%d] ", level, __FILE__, __LINE__); \
 			fprintf(stderr, __VA_ARGS__);\
 			fprintf(stderr, "\n");\
-		}\
+		}
+#else
+#define TIMEPRINT(...) \
+		fprintf(stderr, __VA_ARGS__);
+
+#define DEBUG(level, ...) \
+		if (debug >= level) {\
+			fprintf(stderr, "[D%d] ", level); \
+			fprintf(stderr, __VA_ARGS__);\
+			fprintf(stderr, "\n");\
+		}
+#endif
 
 
 struct query {

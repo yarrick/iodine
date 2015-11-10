@@ -17,15 +17,14 @@
 #ifndef __WINDOW_H__
 #define __WINDOW_H__
 
+/* Hard-coded sequence ID and fragment size limits
+ * These should match the limitations of the protocol. */
 #define MAX_SEQ_ID 256
 #define MAX_FRAGSIZE 4096
 
+/* Window function definitions. */
 #define WINDOW_SENDING 1
 #define WINDOW_RECVING 0
-
-
-/* Enables LOTS of annoying debug output */
-//#define WINDOW_DEBUG
 
 typedef struct fragment {
 	size_t len;					/* Length of fragment data (0 if fragment unused) */
@@ -35,34 +34,35 @@ typedef struct fragment {
 	uint8_t start;				/* start of chunk flag */
 	uint8_t end;				/* end of chunk flag */
 	uint8_t data[MAX_FRAGSIZE];	/* fragment data */
-	unsigned retries;			/* number of times fragment has been sent */
+	unsigned retries;			/* number of times has been sent or dupes recv'd */
 	struct timeval lastsent;	/* timestamp of most recent send attempt */
-	int acks;					/* number of times packet has been ack'd (should be <= 1) */
+	int acks;					/* number of times packet has been ack'd */
 } fragment;
 
 struct frag_buffer {
 	fragment *frags;		/* pointer to array of data fragments */
-	unsigned windowsize;	/* Max number of packets in flight */
-	unsigned maxfraglen;	/* Max fragment size */
+	unsigned windowsize;	/* Max number of fragments in flight */
+	unsigned maxfraglen;	/* Max outgoing fragment data size */
 	size_t length;			/* Length of buffer */
 	size_t numitems;		/* number of non-empty fragments stored in buffer */
-	size_t window_start;	/* Start of window */
+	size_t window_start;	/* Start of window (index) */
 	size_t window_end;		/* End of window (index) */
-	size_t last_write;		/* Last fragment read/written */
-	size_t chunk_start;		/* Start of current chunk of fragments, ie where fragno = 0 */
-	unsigned cur_seq_id;	/* Most recent sequence ID */
+	size_t last_write;		/* Last fragment appended (index) */
+	size_t chunk_start;		/* Start of current chunk of fragments (index) */
+	unsigned cur_seq_id;	/* Next unused sequence ID */
 	unsigned start_seq_id;	/* Start of window sequence ID */
-	unsigned resends;		/* number of fragments resent */
+	unsigned resends;		/* number of fragments resent or number of dupes received */
 	unsigned oos;			/* Number of out-of-sequence fragments received */
-	int direction;			/* Sending or recving */
-	struct timeval timeout;	/* Fragment timeout before resend */
+	int direction;			/* WINDOW_SENDING or WINDOW_RECVING */
+	struct timeval timeout;	/* Fragment ACK timeout before resend */
 };
 
 extern int window_debug;
 
+/* Window debugging macro */
 #ifdef DEBUG_BUILD
 #define WDEBUG(...) if (window_debug) {\
-		fprintf(stderr, "[WINDOW-DEBUG] (%s:%d) ", __FILE__, __LINE__);\
+		TIMEPRINT("[WINDOW-DEBUG] (%s:%d) ", __FILE__, __LINE__);\
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
 	}
@@ -70,23 +70,36 @@ extern int window_debug;
 #define WDEBUG(...)
 #endif
 
+/* Gets index of fragment o fragments after window start */
 #define AFTER(w, o) ((w->window_start + o) % w->length)
 
-// Distance (going forwards) between a and b in window of length l
+/* Distance (going forwards) between a and b in window of length l */
 #define DISTF(l, a, b) (((a > b) ? a-b : l-a+b-1) % l)
-// Distance backwards between a and b in window of length l
+
+/* Distance backwards between a and b in window of length l */
 #define DISTB(l, a, b) (((a < b) ? l-b+a-1 : a-b) % l)
+
+/* Check if fragment index a is within window_buffer *w */
 #define INWINDOW_INDEX(w, a) ((w->window_start < w->window_end) ? \
 		(a >= w->window_start && a <= w->window_end) : \
 		((a >= w->window_start && a <= w->length - 1) || \
 		(a >= 0 && a <= w->window_end)))
+
+/* Check if sequence ID a is within sequence range start to end */
 #define INWINDOW_SEQ(start, end, a) ((start < end) ? \
 		(a >= start && a <= end) : \
 		((a >= start && a <= MAX_SEQ_ID - 1) || \
 		(a <= end)))
-#define SEQ_OFFSET(start, a) ((a >= start) ? a - start : MAX_SEQ_ID + start - a - 1)
+
+/* Find the wrapped offset between sequence IDs start and a
+ * Note: the maximum possible offset is MAX_SEQ_ID - 1 */
+#define SEQ_OFFSET(start, a) ((a >= start) ? a - start : MAX_SEQ_ID - start + a)
+
+/* Wrap index x to a value within the window buffer length */
 #define WRAP(x) ((x) % w->length)
 
+/* Perform wrapped iteration of statement with pos = (begin to end) wrapped at
+ * max, executing statement f for every value of pos. */
 #define ITER_FORWARD(begin, end, max, pos, f) { \
 		if (end >= begin) \
 			for (pos = begin; pos < end && pos < max; pos++) {f}\
@@ -96,6 +109,7 @@ extern int window_debug;
 		}\
 	}
 
+/* Window buffer creation and housekeeping */
 struct frag_buffer *window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int dir);
 void window_buffer_resize(struct frag_buffer *w, size_t length);
 void window_buffer_destroy(struct frag_buffer *w);
@@ -120,7 +134,7 @@ ssize_t window_process_incoming_fragment(struct frag_buffer *w, fragment *f);
 size_t window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int *compression);
 
 /* Returns number of fragments to be sent */
-size_t window_sending(struct frag_buffer *w);
+size_t window_sending(struct frag_buffer *w, struct timeval *);
 
 /* Returns next fragment to be sent or NULL if nothing (SEND) */
 fragment *window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack);
