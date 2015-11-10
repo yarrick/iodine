@@ -122,7 +122,7 @@ user_sending(int user)
 int
 user_active(int i)
 {
-	return users[i].active && !users[i].disabled && difftime(time(NULL), users[i].last_pkt) < 60;
+	return users[i].active && difftime(time(NULL), users[i].last_pkt) < 60;
 }
 
 int

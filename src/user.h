@@ -29,14 +29,12 @@ struct tun_user {
 	int active;
 	int authenticated;
 	int authenticated_raw;
-	int disabled;
 	time_t last_pkt;
 	struct timeval dns_timeout;
 	int seed;
 	in_addr_t tun_ip;
 	struct sockaddr_storage host;
 	socklen_t hostlen;
-	/* TODO: multiple incoming query storage + handling */
 	struct frag_buffer *incoming;
 	struct frag_buffer *outgoing;
 	int next_upstream_ack;
