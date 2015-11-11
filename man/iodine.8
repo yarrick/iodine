@@ -7,7 +7,9 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodine [-h]
 
-.B iodine [-4] [-6] [-f] [-r] [-u
+.B iodine [-4] [-6] [-f] [-D] [-r] [-V
+.I sec
+.B [-u
 .I user
 .B ] [-P
 .I password
@@ -54,17 +56,15 @@ iodine, iodined \- tunnel IPv4 over DNS
 .B [
 .I nameserver
 .B [
-.I nameserver2
-.B [
-.I ...
-.B ] ] ]
+.I nameserver2 ...
+.B ] ]
 
 
 .B iodined [-v]
 
 .B iodined [-h]
 
-.B iodined [-4] [-6] [-c] [-s] [-f] [-D] [-u
+.B iodined [-4] [-6] [-f] [-D] [-c] [-s] [-u
 .I user
 .B ] [-t
 .I chrootdir
@@ -134,8 +134,8 @@ All of the above test scenarios used lazy mode with upstream/downstream windowsi
 8 fragments (default) and fixed fragment, DNS and server timeouts. These parameters
 were manually adjusted to best suit the environment, and can be specified using the
 .B iodine
-options described under
-.I "Fine-tuning options"
+options described under 
+.IR "Fine-tuning Options" .
 
 .SH OPTIONS
 .SS Common Options:
