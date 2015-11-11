@@ -392,10 +392,11 @@ window_ack(struct frag_buffer *w, int seqid)
 void
 window_tick(struct frag_buffer *w)
 {
-	unsigned old_start_id;
 	for (size_t i = 0; i < w->windowsize; i++) {
 		if (w->frags[w->window_start].acks >= 1) {
-			old_start_id = w->start_seq_id;
+#ifdef DEBUG_BUILD
+			unsigned old_start_id = w->start_seq_id;
+#endif
 			w->start_seq_id = (w->start_seq_id + 1) % MAX_SEQ_ID;
 			WDEBUG("moving window forwards; %lu-%lu (%u) to %lu-%lu (%u) len=%lu",
 					w->window_start, w->window_end, old_start_id, AFTER(w, 1),
