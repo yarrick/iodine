@@ -6,6 +6,11 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 master:
+	- Multiple fragments can be in transit at one time to improve
+	   throughput on high-latency connections
+	   Server can now store multiple pending queries per user.
+	- Added bidirectional compression flags 
+	- Added statistics report every few seconds in iodine (-V)
 	- Mac OS X: Support native utun VPN devices. Patch by
 		Peter Sagerson, ported from OpenVPN by Catalin Patulea.
 	- Fix compilation failure on kFreeBSD and Hurd, by Gregor Herrmann

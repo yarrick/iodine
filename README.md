@@ -292,8 +292,12 @@ undefine it to save a few more kilobytes.
 PERFORMANCE
 -----------
 
-This section tabulates some performance measurements. To view properly, use
-a fixed-width font like Courier.
+**Please note:** The following performance is outdated and does not apply to
+the current version of iodine. Since the protocol was updated to use a sliding
+window for sending fragments, the throughput was greatly increased and should
+be much higher even on high-latency connections.
+
+This section tabulates some performance measurements.
 
 Measurements were done in protocol 00000502 in lazy mode; upstream encoding
 always Base128; `iodine -M255`; `iodined -m1130`. Network conditions were not
@@ -353,12 +357,11 @@ and mean deviation (indicating spread around the average), in milliseconds.
 
 ### Notes
 
-Performance is strongly coupled to low ping times, as iodine requires
-confirmation for every data fragment before moving on to the next. Allowing
-multiple fragments in-flight like TCP could possibly increase performance,
-but it would likely cause serious overload for the intermediary DNS servers.
-The current protocol scales performance with DNS responsivity, since the
-DNS servers are on average handling at most one DNS request per client.
+Multiple fragments in-flight like TCP is allowed in iodine, which does increase
+performance, but it may overload some low-bandwidth intermediary DNS servers.
+Using carrier-grade DNS servers such as those provided by your ISP should be able
+to handle a high volume of DNS queries, and it is recommended to use as many DNS
+nameservers as possible to balance the load.
 
 
 PORTABILITY
@@ -389,8 +392,8 @@ THANKS
 AUTHORS & LICENSE
 -----------------
 
-Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>, 2015 Frekky, 2006-2009 Bjorn
-Andersson <flex@kryo.se>. Also major contributions by Anne Bezemer.
+Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>, 2015 Frekk van Blagh,
+2006-2009 Bjorn Andersson <flex@kryo.se>. Also major contributions by Anne Bezemer.
 
 Permission to use, copy, modify, and/or distribute this software for any purpose
 with or without fee is hereby granted, provided that the above copyright notice
