@@ -466,7 +466,7 @@ close_tun(int tun_fd)
 
 #ifdef WINDOWS32
 int
-write_tun(int tun_fd, char *data, size_t len)
+write_tun(int tun_fd, uint8_t *data, size_t len)
 {
 	DWORD written;
 	DWORD res;
@@ -490,12 +490,12 @@ write_tun(int tun_fd, char *data, size_t len)
 }
 
 ssize_t
-read_tun(int tun_fd, char *buf, size_t len)
+read_tun(int tun_fd, uint8_t *buf, size_t len)
 {
 	int bytes;
 	memset(buf, 0, 4);
 
-	bytes = recv(tun_fd, buf + 4, len - 4, 0);
+	bytes = recv(tun_fd, (char *)buf + 4, len - 4, 0);
 	if (bytes < 0) {
 		return bytes;
 	} else {

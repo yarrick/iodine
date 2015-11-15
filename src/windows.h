@@ -102,11 +102,16 @@ struct ip
 /* Convenience macros for operations on timevals.
    NOTE: `timercmp' does not work for >= or <=.  */
 #define timerisset(tvp)	((tvp)->tv_sec || (tvp)->tv_usec)
+
+#ifndef timerclear
 #define timerclear(tvp)	((tvp)->tv_sec = (tvp)->tv_usec = 0)
+#endif
+#ifndef timercmp
 #define timercmp(a, b, CMP) 						      \
 	(((a)->tv_sec == (b)->tv_sec) ? 					      \
 	 ((a)->tv_usec CMP (b)->tv_usec) : 					      \
 	 ((a)->tv_sec CMP (b)->tv_sec))
+#endif
 #define timeradd(a, b, result)						      \
 	do {									      \
 		(result)->tv_sec = (a)->tv_sec + (b)->tv_sec;			      \
@@ -127,18 +132,13 @@ struct ip
 		}									      \
 	} while (0)
 
-struct timezone
-{
-  int  tz_minuteswest; /* minutes W of Greenwich */
-  int  tz_dsttime;     /* type of dst correction */
-};
-
+#if 0
 inline int
 gettimeofday(struct timeval *tv, struct timezone *tz)
 {
 	FILETIME ft;
 	unsigned __int64 tmpres = 0;
-	static int tzflag = 0;
+	int tzflag = 0;
 
 	if (NULL != tv)
 		{
@@ -169,6 +169,7 @@ gettimeofday(struct timeval *tv, struct timezone *tz)
 
 	return 0;
 }
+#endif
 
 DWORD WINAPI tun_reader(LPVOID arg);
 struct tun_data {
