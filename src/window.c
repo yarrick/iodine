@@ -19,7 +19,9 @@
 #include <time.h>
 #include <sys/time.h>
 #include <stdio.h>
+#ifndef WINDOWS32
 #include <err.h>
+#endif
 #include <string.h>
 #include <stdlib.h>
 

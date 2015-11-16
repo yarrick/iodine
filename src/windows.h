@@ -20,6 +20,7 @@
 
 typedef unsigned int in_addr_t;
 
+#include <stdlib.h>
 #include <winsock2.h>
 #include <windows.h>
 #include <windns.h>

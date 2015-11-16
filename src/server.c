@@ -28,7 +28,6 @@
 #include <fcntl.h>
 #include <time.h>
 #include <zlib.h>
-#include <err.h>
 #include <ctype.h>
 
 #include "common.h"
@@ -55,6 +54,8 @@
 #ifdef WINDOWS32
 WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
+#else
+#include <err.h>
 #endif
 
 /* Global server variables */
