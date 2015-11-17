@@ -28,7 +28,6 @@
 #include <fcntl.h>
 #include <time.h>
 #include <zlib.h>
-#include <err.h>
 
 #include "common.h"
 #include "version.h"
@@ -37,6 +36,7 @@
 #include "windows.h"
 #include <winsock2.h>
 #else
+#include <err.h>
 #include <arpa/nameser.h>
 #ifdef DARWIN
 #define BIND_8_COMPAT
