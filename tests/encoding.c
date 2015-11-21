@@ -50,7 +50,7 @@ START_TEST(test_inline_dotify)
 	memset(temp, 0, sizeof(temp));
 	strcpy(temp, dottests[_i].a);
 	b = temp;
-	inline_dotify(b, sizeof(temp));
+	inline_dotify((uint8_t *)b, sizeof(temp));
 
 	fail_unless(strcmp(dottests[_i].b, temp) == 0,
 			"'%s' != '%s'", temp, dottests[_i].b);
@@ -65,7 +65,7 @@ START_TEST(test_inline_undotify)
 	memset(temp, 0, sizeof(temp));
 	strcpy(temp, dottests[_i].b);
 	b = temp;
-	inline_undotify(b, sizeof(temp));
+	inline_undotify((uint8_t *)b, sizeof(temp));
 
 	fail_unless(strcmp(dottests[_i].a, temp) == 0,
 			"'%s' != '%s'", temp, dottests[_i].a);
@@ -89,7 +89,7 @@ START_TEST(test_build_hostname)
 	for (int j = 0; j < 10; j++) /* dummy header length */
 	for (i = 1; i < sizeof(data); i++) {
 		buf[j] = j + 'A';
-		int len = build_hostname(buf, buflen, data, i, topdomain, get_base32_encoder(), buflen, j);
+		int len = build_hostname((uint8_t *)buf, buflen, (uint8_t *)data, i, topdomain, get_base32_encoder(), buflen, j);
 
 		fail_if(len > i);
 		fail_if((strstr(buf, ".") - buf) > 63, "First label in encoded hostname >63 bytes!");
