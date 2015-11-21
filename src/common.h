@@ -87,7 +87,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #define TIMEPRINT(...) \
 		struct timeval currenttime;\
 		gettimeofday(&currenttime, NULL);\
-		fprintf(stderr, "%03ld.%03ld ", currenttime.tv_sec, currenttime.tv_usec / 1000);\
+		fprintf(stderr, "%03ld.%03ld ", (long) currenttime.tv_sec, (long) currenttime.tv_usec / 1000);\
 		fprintf(stderr, __VA_ARGS__);
 
 #define DEBUG(level, ...) \

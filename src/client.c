@@ -571,7 +571,7 @@ send_query(int fd, uint8_t *hostname)
 	         and if user hasn't specified server timeout/window timeout etc. */
 
 	num_sent++;
-	if (send_query_sendcnt >= 0 && send_query_sendcnt < 100 &&
+	if (send_query_sendcnt > 0 && send_query_sendcnt < 100 &&
 		lazymode && connected && autodetect_server_timeout) {
 		send_query_sendcnt++;
 

@@ -18,6 +18,23 @@
 #include <stdio.h>
 #include "common.h"
 
+time_t
+timeval_to_ms(struct timeval *tv)
+{
+	time_t ms = tv->tv_sec * 1000;
+	ms += (tv->tv_usec + 500) / 1000;
+	return ms;
+}
+
+struct timeval
+ms_to_timeval(time_t ms)
+{
+	struct timeval tv;
+	tv.tv_sec = ms / 1000;
+	tv.tv_usec = (ms - tv.tv_sec * 1000) * 1000;
+	return tv;
+}
+
 char *
 get_resolvconf_addr()
 {

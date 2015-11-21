@@ -1,5 +1,5 @@
-COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o base64u.o base128.o md5.o window.o common.o
-CLIENTOBJS = iodine.o client.o util.o
+COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o base64u.o base128.o md5.o window.o common.o util.o
+CLIENTOBJS = iodine.o client.o
 CLIENT = ../bin/iodine
 SERVEROBJS = iodined.o user.o fw_query.o server.o
 SERVER = ../bin/iodined
@@ -13,7 +13,7 @@ LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
 CFLAGS += -std=c99 -c -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
 
 CFLAGS_RELEASE = -O3 -fno-strict-aliasing
-CFLAGS_DEBUG = -g -Og -DDEBUG_BUILD
+CFLAGS_DEBUG = -g -O0 -DDEBUG_BUILD
 
 all: CFLAGS += $(CFLAGS_RELEASE)
 all: executables
