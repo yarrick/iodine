@@ -27,7 +27,9 @@
 #define DOWNCODECCHECK1      "\000\000\000\000\377\377\377\377\125\125\125\125\252\252\252\252\201\143\310\322\307\174\262\027\137\117\316\311\111\055\122\041\141\251\161\040\045\263\006\163\346\330\104\060\171\120\127\277"
 #define DOWNCODECCHECK1_LEN  48
 
-#define DNS_MAXLABEL 63
+/* Don't push the limit with DNS servers: potentially unwanted behaviour
+ * if labels are all 63 chars long (DNS standard max label length) */
+#define DNS_MAXLABEL 59
 
 struct encoder {
 	char name[8];
