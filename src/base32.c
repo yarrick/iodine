@@ -42,7 +42,7 @@ static size_t base32_encoded_length(size_t inputlen);
 static size_t base32_raw_length(size_t inputlen);
 
 
-static struct encoder base32_encoder =
+struct encoder base32_encoder =
 {
 	"Base32",
 	base32_encode,
@@ -54,6 +54,8 @@ static struct encoder base32_encoder =
 	base32_encoded_length,
 	base32_raw_length
 };
+
+struct encoder *b32 = &base32_encoder;
 
 struct encoder
 *get_base32_encoder()

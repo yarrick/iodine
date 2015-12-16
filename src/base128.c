@@ -60,7 +60,7 @@ static size_t base128_blksize_enc();
 static size_t base128_encoded_length(size_t inputlen);
 static size_t base128_raw_length(size_t inputlen);
 
-static struct encoder base128_encoder =
+struct encoder base128_encoder =
 {
 	"Base128",
 	base128_encode,
@@ -72,6 +72,8 @@ static struct encoder base128_encoder =
 	base128_encoded_length,
 	base128_raw_length
 };
+
+struct encoder *b128 = &base128_encoder;
 
 struct encoder
 *get_base128_encoder()

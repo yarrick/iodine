@@ -41,7 +41,7 @@ static size_t base64_blksize_enc();
 static size_t base64_encoded_length(size_t inputlen);
 static size_t base64_raw_length(size_t inputlen);
 
-static struct encoder base64_encoder =
+struct encoder base64_encoder =
 {
 	"Base64",
 	base64_encode,
@@ -53,6 +53,8 @@ static struct encoder base64_encoder =
 	base64_encoded_length,
 	base64_raw_length
 };
+
+struct encoder *b64 = &base64_encoder;
 
 struct encoder
 *get_base64_encoder()
