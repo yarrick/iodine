@@ -72,7 +72,39 @@
 #ifdef WINDOWS32
 WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
+
+#define	LOG_EMERG	0
+#define	LOG_ALERT	1
+#define	LOG_CRIT	2
+#define	LOG_ERR		3
+#define	LOG_WARNING	4
+#define	LOG_NOTICE	5
+#define	LOG_INFO	6
+#define	LOG_DEBUG	7
+static void
+syslog(int a, const char *str, ...)
+{
+	/* TODO: implement (add to event log), move to common.c */
+	;
+}
 #endif
+
+/* Definition of main server instance */
+struct server_instance server;
+
+static struct server_instance preset_default = {
+	.check_ip = 1,
+	.netmask = 27,
+	.ns_ip = INADDR_ANY,
+	.mtu = 1130,	/* Very many relays give fragsize 1150 or slightly
+			   higher for NULL; tun/zlib adds ~17 bytes. */
+	.port = 53,
+	.addrfamily = AF_UNSPEC,
+
+	/* Mark both file descriptors as unused */
+	.dns_fds.v4fd = -1,
+	.dns_fds.v6fd = -1
+};
 
 /* Ask ipify.org webservice to get external ip */
 static int
@@ -130,25 +162,8 @@ get_external_ip(struct in_addr *ip)
 static void
 sigint(int sig)
 {
-	server_stop();
+	server.running = 0;
 }
-
-#ifdef WINDOWS32
-#define	LOG_EMERG	0
-#define	LOG_ALERT	1
-#define	LOG_CRIT	2
-#define	LOG_ERR		3
-#define	LOG_WARNING	4
-#define	LOG_NOTICE	5
-#define	LOG_INFO	6
-#define	LOG_DEBUG	7
-static void
-syslog(int a, const char *str, ...)
-{
-	/* TODO: implement (add to event log), move to common.c */
-	;
-}
-#endif
 
 static void
 print_usage() {
@@ -235,7 +250,7 @@ main(int argc, char **argv)
 	char *listen_ip6;
 	char *errormsg;
 #ifndef WINDOWS32
-	struct passwd *pw;
+	struct passwd *pw = NULL;
 #endif
 	int foreground;
 	char *username;
@@ -243,58 +258,34 @@ main(int argc, char **argv)
 	char *context;
 	char *device;
 	char *pidfile;
-	int addrfamily;
-	struct dnsfd dns_fds;
-	int tun_fd;
-
-	/* settings for forwarding normal DNS to
-	 * local real DNS server */
-	int bind_fd;
-	int bind_enable;
 
 	int choice;
-	int port;
-	int mtu;
+
 	int skipipconfig;
 	char *netsize;
 	int ns_get_externalip;
 	int retval;
-	int max_idle_time = 0;
-	struct sockaddr_storage dns4addr;
-	int dns4addr_len;
-	struct sockaddr_storage dns6addr;
-	int dns6addr_len;
+
 #ifdef HAVE_SYSTEMD
 	int nb_fds;
 #endif
 
-#ifndef WINDOWS32
-	pw = NULL;
-#endif
 	errormsg = NULL;
 	username = NULL;
 	newroot = NULL;
 	context = NULL;
 	device = NULL;
 	foreground = 0;
-	bind_enable = 0;
-	bind_fd = 0;
-	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
-			   higher for NULL; tun/zlib adds ~17 bytes. */
-	dns4addr_len = 0;
-	dns6addr_len = 0;
 	listen_ip4 = NULL;
 	listen_ip6 = NULL;
-	port = 53;
+
+
 	ns_get_externalip = 0;
-	addrfamily = AF_UNSPEC;
 	skipipconfig = 0;
 	pidfile = NULL;
 	srand(time(NULL));
 
 	retval = 0;
-
-	server_init();
 
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
@@ -311,16 +302,16 @@ main(int argc, char **argv)
 	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
 		switch(choice) {
 		case '4':
-			addrfamily = AF_INET;
+			server.addrfamily = AF_INET;
 			break;
 		case '6':
-			addrfamily = AF_INET6;
+			server.addrfamily = AF_INET6;
 			break;
 		case 'v':
 			version();
 			break;
 		case 'c':
-			check_ip = 0;
+			server.check_ip = 0;
 			break;
 		case 's':
 			skipipconfig = 1;
@@ -332,7 +323,7 @@ main(int argc, char **argv)
 			help();
 			break;
 		case 'D':
-			debug++;
+			server.debug++;
 			break;
 		case 'u':
 			username = optarg;
@@ -344,7 +335,7 @@ main(int argc, char **argv)
 			device = optarg;
 			break;
 		case 'm':
-			mtu = atoi(optarg);
+			server.mtu = atoi(optarg);
 			break;
 		case 'l':
 			listen_ip4 = optarg;
@@ -353,28 +344,28 @@ main(int argc, char **argv)
 			listen_ip6 = optarg;
 			break;
 		case 'p':
-			port = atoi(optarg);
+			server.port = atoi(optarg);
 			break;
 		case 'n':
 			if (optarg && strcmp("auto", optarg) == 0) {
 				ns_get_externalip = 1;
 			} else {
-				ns_ip = inet_addr(optarg);
+				server.ns_ip = inet_addr(optarg);
 			}
 			break;
 		case 'b':
-			bind_enable = 1;
-			bind_port = atoi(optarg);
+			server.bind_enable = 1;
+			server.bind_port = atoi(optarg);
 			break;
 		case 'F':
 			pidfile = optarg;
 			break;
 		case 'i':
-			max_idle_time = atoi(optarg);
+			server.max_idle_time = atoi(optarg);
 			break;
 		case 'P':
-			strncpy(password, optarg, sizeof(password));
-			password[sizeof(password)-1] = 0;
+			strncpy(server.password, optarg, sizeof(server.password));
+			server.password[sizeof(server.password)-1] = 0;
 
 			/* XXX: find better way of cleaning up ps(1) */
 			memset(optarg, 0, strlen(optarg));
@@ -400,18 +391,18 @@ main(int argc, char **argv)
 	if (netsize) {
 		*netsize = 0;
 		netsize++;
-		netmask = atoi(netsize);
+		server.netmask = atoi(netsize);
 	}
 
-	my_ip = inet_addr(argv[0]);
+	server.my_ip = inet_addr(argv[0]);
 
-	if (my_ip == INADDR_NONE) {
+	if (server.my_ip == INADDR_NONE) {
 		warnx("Bad IP address to use inside tunnel.");
 		usage();
 	}
 
-	topdomain = strdup(argv[1]);
-	if(check_topdomain(topdomain, &errormsg)) {
+	server.topdomain = strdup(argv[1]);
+	if(check_topdomain(server.topdomain, &errormsg)) {
 		warnx("Invalid topdomain: %s", errormsg);
 		usage();
 		/* NOTREACHED */
@@ -426,57 +417,59 @@ main(int argc, char **argv)
 #endif
 	}
 
-	if (mtu <= 0) {
+	if (server.mtu <= 0) {
 		warnx("Bad MTU given.");
 		usage();
 	}
 
-	if(port < 1 || port > 65535) {
+	if(server.port < 1 || server.port > 65535) {
 		warnx("Bad port number given.");
 		usage();
 	}
 
-	if (port != 53) {
+	if (server.port != 53) {
 		fprintf(stderr, "ALERT! Other dns servers expect you to run on port 53.\n");
-		fprintf(stderr, "You must manually forward port 53 to port %d for things to work.\n", port);
+		fprintf(stderr, "You must manually forward port 53 to port %d for things to work.\n", server.port);
 	}
 
-	if (debug) {
-		fprintf(stderr, "Debug level %d enabled, will stay in foreground.\n", debug);
+	if (server.debug) {
+		fprintf(stderr, "Debug level %d enabled, will stay in foreground.\n", server.debug);
 		fprintf(stderr, "Add more -D switches to set higher debug level.\n");
 		foreground = 1;
 	}
 
-	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET) {
-		dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
-		if (dns4addr_len < 0) {
+	if (server.addrfamily == AF_UNSPEC || server.addrfamily == AF_INET) {
+		server.dns4addr_len = get_addr(listen_ip4, server.port, AF_INET,
+									   AI_PASSIVE | AI_NUMERICHOST, &server.dns4addr);
+		if (server.dns4addr_len < 0) {
 			warnx("Bad IPv4 address to listen on.");
 			usage();
 		}
 	}
-	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
-		dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
-		if (dns6addr_len < 0) {
+	if (server.addrfamily == AF_UNSPEC || server.addrfamily == AF_INET6) {
+		server.dns6addr_len = get_addr(listen_ip6, server.port,AF_INET6,
+									   AI_PASSIVE | AI_NUMERICHOST, &server.dns6addr);
+		if (server.dns6addr_len < 0) {
 			warnx("Bad IPv6 address to listen on.");
 			usage();
 		}
 	}
-	if(bind_enable) {
-		in_addr_t dns_ip = ((struct sockaddr_in *) &dns4addr)->sin_addr.s_addr;
-		if (bind_port < 1 || bind_port > 65535) {
+	if(server.bind_enable) {
+		in_addr_t dns_ip = ((struct sockaddr_in *) &server.dns4addr)->sin_addr.s_addr;
+		if (server.bind_port < 1 || server.bind_port > 65535) {
 			warnx("Bad DNS server port number given.");
 			usage();
 			/* NOTREACHED */
 		}
 		/* Avoid forwarding loops */
-		if (bind_port == port && (dns_ip == INADDR_ANY || dns_ip == htonl(0x7f000001L))) {
-			warnx("Forward port is same as listen port (%d), will create a loop!", bind_port);
+		if (server.bind_port == server.port && (dns_ip == INADDR_ANY || dns_ip == htonl(0x7f000001L))) {
+			warnx("Forward port is same as listen port (%d), will create a loop!", server.bind_port);
 			fprintf(stderr, "Use -l to set listen ip to avoid this.\n");
 			usage();
 			/* NOTREACHED */
 		}
 		fprintf(stderr, "Requests for domains outside of %s will be forwarded to port %d\n",
-			topdomain, bind_port);
+				server.topdomain, server.bind_port);
 	}
 
 	if (ns_get_externalip) {
@@ -486,39 +479,35 @@ main(int argc, char **argv)
 			fprintf(stderr, "Failed to get external IP via web service.\n");
 			exit(3);
 		}
-		ns_ip = extip.s_addr;
+		server.ns_ip = extip.s_addr;
 		fprintf(stderr, "Using %s as external IP.\n", inet_ntoa(extip));
 	}
 
-	if (ns_ip == INADDR_NONE) {
+	if (server.ns_ip == INADDR_NONE) {
 		warnx("Bad IP address to return as nameserver.");
 		usage();
 	}
-	if (netmask > 30 || netmask < 8) {
-		warnx("Bad netmask (%d bits). Use 8-30 bits.", netmask);
+	if (server.netmask > 30 || server.netmask < 8) {
+		warnx("Bad netmask (%d bits). Use 8-30 bits.", server.netmask);
 		usage();
 	}
 
-	if (strlen(password) == 0) {
+	if (strlen(server.password) == 0) {
 		if (NULL != getenv(PASSWORD_ENV_VAR))
-			snprintf(password, sizeof(password), "%s", getenv(PASSWORD_ENV_VAR));
+			snprintf(server.password, sizeof(server.password), "%s", getenv(PASSWORD_ENV_VAR));
 		else
-			read_password(password, sizeof(password));
+			read_password(server.password, sizeof(server.password));
 	}
 
-	/* Mark both file descriptors as unused */
-	dns_fds.v4fd = -1;
-	dns_fds.v6fd = -1;
+	created_users = init_users(server.my_ip, server.netmask);
 
-	created_users = init_users(my_ip, netmask);
-
-	if ((tun_fd = open_tun(device)) == -1) {
+	if ((server.tun_fd = open_tun(device)) == -1) {
 		/* nothing to clean up, just return */
 		return 1;
 	}
 	if (!skipipconfig) {
 		const char *other_ip = users_get_first_ip();
-		if (tun_setip(argv[0], other_ip, netmask) != 0 || tun_setmtu(mtu) != 0) {
+		if (tun_setip(argv[0], other_ip, server.netmask) != 0 || tun_setmtu(server.mtu) != 0) {
 			retval = 1;
 			free((void*) other_ip);
 			goto cleanup;
@@ -537,15 +526,15 @@ main(int argc, char **argv)
 		dns_fds.v4fd = SD_LISTEN_FDS_START;
 	} else {
 #endif
-		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET) &&
-			(dns_fds.v4fd = open_dns(&dns4addr, dns4addr_len)) < 0) {
+		if ((server.addrfamily == AF_UNSPEC || server.addrfamily == AF_INET) &&
+			(server.dns_fds.v4fd = open_dns(&server.dns4addr, server.dns4addr_len)) < 0) {
 
 			retval = 1;
 			goto cleanup;
 		}
-		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET6) &&
+		if ((server.addrfamily == AF_UNSPEC || server.addrfamily == AF_INET6) &&
 			/* Set IPv6 socket to V6ONLY */
-			(dns_fds.v6fd = open_dns_opt(&dns6addr, dns6addr_len, 1)) < 0) {
+			(server.dns_fds.v6fd = open_dns_opt(&server.dns6addr, server.dns6addr_len, 1)) < 0) {
 
 			retval = 1;
 			goto cleanup;
@@ -555,25 +544,23 @@ main(int argc, char **argv)
 #endif
 
 	/* Setup dns file descriptors to get destination IP address */
-	if (dns_fds.v4fd >= 0)
-		prepare_dns_fd(dns_fds.v4fd);
-	if (dns_fds.v6fd >= 0)
-		prepare_dns_fd(dns_fds.v6fd);
+	if (server.dns_fds.v4fd >= 0)
+		prepare_dns_fd(server.dns_fds.v4fd);
+	if (server.dns_fds.v6fd >= 0)
+		prepare_dns_fd(server.dns_fds.v6fd);
 
-	if (bind_enable) {
-		if ((bind_fd = open_dns_from_host(NULL, 0, AF_INET, 0)) < 0) {
+	if (server.bind_enable) {
+		if ((server.bind_fd = open_dns_from_host(NULL, 0, AF_INET, 0)) < 0) {
 			retval = 1;
 			goto cleanup;
 		}
 	}
 
-	my_mtu = mtu;
-
 	if (created_users < USERS) {
 		fprintf(stderr, "Limiting to %d simultaneous users because of netmask /%d\n",
-			created_users, netmask);
+			created_users, server.netmask);
 	}
-	fprintf(stderr, "Listening to dns for domain %s\n", topdomain);
+	fprintf(stderr, "Listening to dns for domain %s\n", server.topdomain);
 
 	if (foreground == 0)
 		do_detach();
@@ -606,18 +593,18 @@ main(int argc, char **argv)
 	if (context != NULL)
 		do_setcon(context);
 
-	syslog(LOG_INFO, "started, listening on port %d", port);
+	syslog(LOG_INFO, "started, listening on port %d", server.port);
 
-	server_tunnel(tun_fd, &dns_fds, bind_fd, max_idle_time);
+	server_tunnel();
 
 	syslog(LOG_INFO, "stopping");
-	close_dns(bind_fd);
+	close_dns(server.bind_fd);
 cleanup:
-	if (dns_fds.v6fd >= 0)
-		close_dns(dns_fds.v6fd);
-	if (dns_fds.v4fd >= 0)
-		close_dns(dns_fds.v4fd);
-	close_tun(tun_fd);
+	if (server.dns_fds.v6fd >= 0)
+		close_dns(server.dns_fds.v6fd);
+	if (server.dns_fds.v4fd >= 0)
+		close_dns(server.dns_fds.v4fd);
+	close_tun(server.tun_fd);
 
 	return retval;
 }

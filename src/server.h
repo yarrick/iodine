@@ -40,7 +40,7 @@
 
 /* Max number of incoming queries to hold at one time (recommended to be same as windowsize)
  * Memory = USERS * (sizeof(struct query_buffer) + sizeof(query) * QMEM_LEN) */
-#define QMEM_LEN 24
+#define QMEM_LEN 32
 
 #define USE_DNSCACHE
 /* QMEM entries contain additional space for DNS responses.
@@ -56,6 +56,8 @@
 #define INFRAGBUF_LEN 64
 
 #define PASSWORD_ENV_VAR "IODINED_PASS"
+
+#define INSTANCE server
 
 #if defined IP_RECVDSTADDR
 # define DSTADDR_SOCKOPT IP_RECVDSTADDR
@@ -81,6 +83,38 @@ struct dnsfd {
 	int v4fd;
 	int v6fd;
 };
+
+struct server_instance {
+	/* Global server variables */
+	int running;
+	char *topdomain;
+	char password[33];
+	int check_ip;
+	int my_mtu;
+	in_addr_t my_ip;
+	int netmask;
+	in_addr_t ns_ip;
+	int bind_port;
+	int debug;
+
+	int addrfamily;
+	struct dnsfd dns_fds;
+	int tun_fd;
+	int port;
+	int mtu;
+	int max_idle_time;
+	struct sockaddr_storage dns4addr;
+	int dns4addr_len;
+	struct sockaddr_storage dns6addr;
+	int dns6addr_len;
+
+	/* settings for forwarding normal DNS to
+	 * local real DNS server */
+	int bind_fd;
+	int bind_enable;
+};
+
+extern struct server_instance server;
 
 typedef enum {
 	VERSION_ACK,
@@ -110,34 +144,17 @@ struct qmem_buffer {
 	size_t num_pending;	/* number of pending queries */
 };
 
-extern char *topdomain;
-extern char password[33];
-extern struct encoder *b32;
-extern struct encoder *b64;
-extern struct encoder *b64u;
-extern struct encoder *b128;
-
-extern int check_ip;
-extern int my_mtu;
-extern in_addr_t my_ip;
-extern int netmask;
-
-extern in_addr_t ns_ip;
-
-extern int bind_port;
-extern int debug;
-
 void server_init();
 void server_stop();
-int server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time);
+int server_tunnel();
 
-int read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q);
+int read_dns(int fd, struct query *q);
 void write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc);
-void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data, size_t len, int);
-void handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len);
+void handle_full_packet(int userid, uint8_t *data, size_t len, int);
+void handle_null_request(int dns_fd, struct query *q, int domain_len);
 void handle_ns_request(int dns_fd, struct query *q);
 void handle_a_request(int dns_fd, struct query *q, int fakeip);
 
-void send_data_or_ping(struct dnsfd *, int, struct query *, int, int);
+void send_data_or_ping(int, struct query *, int, int);
 
 #endif /* __SERVER_H__ */

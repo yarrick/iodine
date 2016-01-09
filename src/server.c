@@ -58,47 +58,6 @@ WSADATA wsa_data;
 #include <err.h>
 #endif
 
-/* Global server variables */
-int running = 1;
-char *topdomain;
-char password[33];
-struct encoder *b32;
-struct encoder *b64;
-struct encoder *b64u;
-struct encoder *b128;
-
-int check_ip;
-int my_mtu;
-in_addr_t my_ip;
-int netmask;
-
-in_addr_t ns_ip;
-
-int bind_port;
-int debug;
-
-void
-server_init()
-{
-	running = 1;
-	ns_ip = INADDR_ANY;
-	netmask = 27;
-	debug = 0;
-	check_ip = 1;
-	memset(password, 0, sizeof(password));
-	fw_query_init();
-	b32 = get_base32_encoder();
-	b64 = get_base64_encoder();
-	b64u = get_base64u_encoder();
-	b128 = get_base128_encoder();
-}
-
-void
-server_stop()
-{
-	running = 0;
-}
-
 static void
 send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct sockaddr_storage *from, socklen_t fromlen)
 {
@@ -143,7 +102,7 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct sockaddr
    during a session (given QMEM_LEN is not very large). */
 
 #define QMEM_DEBUG(l, u, ...) \
-	if (debug >= l) {\
+	if (server.debug >= l) {\
 		TIMEPRINT("[QMEM u%d (%lu/%u)] ", u, users[u].qmem.num_pending, users[u].outgoing->windowsize); \
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
@@ -284,7 +243,7 @@ qmem_get_next_response(int userid)
 }
 
 static struct timeval
-qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
+qmem_max_wait(int *touser, struct query **sendq)
 /* Gets max interval before the next query has to be responded to
  * Response(s) are sent automatically for queries if:
  *  - the query has timed out
@@ -358,7 +317,7 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 				QMEM_DEBUG(4, userid, "ANSWER q id %d, ACK %d; sent %lu of %lu + sending another %lu",
 						q->id, u->next_upstream_ack, sent, total, sending);
 
-				send_data_or_ping(dns_fds, userid, q, 0, immediate);
+				send_data_or_ping(userid, q, 0, immediate);
 
 				if (sending > 0)
 					sending--;
@@ -377,7 +336,7 @@ qmem_max_wait(struct dnsfd *dns_fds, int *touser, struct query **sendq)
 		}
 	}
 
-	if (debug >= 5) {
+	if (server.debug >= 5) {
 		time_t soonest_ms = timeval_to_ms(&soonest);
 		if (nextq && nextuser >= 0) {
 			QMEM_DEBUG(5, nextuser, "can wait for %lu ms, will send id %d", soonest_ms, nextq->id);
@@ -435,7 +394,7 @@ forward_query(int bind_fd, struct query *q)
 	newaddr = inet_addr("127.0.0.1");
 	myaddr = (struct sockaddr_in *) &(q->from);
 	memcpy(&(myaddr->sin_addr), &newaddr, sizeof(in_addr_t));
-	myaddr->sin_port = htons(bind_port);
+	myaddr->sin_port = htons(server.bind_port);
 
 	DEBUG(2, "TX: NS reply");
 
@@ -471,8 +430,7 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 }
 
 void
-send_data_or_ping(struct dnsfd *dns_fds, int userid, struct query *q,
-				  int ping, int immediate)
+send_data_or_ping(int userid, struct query *q, int ping, int immediate)
 /* Sends current fragment to user, or a ping if no data available.
    ping: 1=force send ping (even if data available), 0=only send if no data.
    immediate: 1=not from qmem (ie. fresh query), 0=query is from qmem */
@@ -527,7 +485,7 @@ send_data_or_ping(struct dnsfd *dns_fds, int userid, struct query *q,
 	if (f)
 		memcpy(pkt + headerlen, f->data, datalen);
 
-	write_dns(get_dns_fd(dns_fds, &q->from), q, (char *)pkt,
+	write_dns(get_dns_fd(&server.dns_fds, &q->from), q, (char *)pkt,
 			  datalen + headerlen, users[userid].downenc);
 
 	/* mark query as answered */
@@ -536,7 +494,7 @@ send_data_or_ping(struct dnsfd *dns_fds, int userid, struct query *q,
 }
 
 void
-user_process_incoming_data(int tun_fd, struct dnsfd *dns_fds, int userid, int ack)
+user_process_incoming_data(int userid, int ack)
 {
 	uint8_t pkt[65536];
 	size_t datalen;
@@ -553,13 +511,12 @@ user_process_incoming_data(int tun_fd, struct dnsfd *dns_fds, int userid, int ac
 
 	if (datalen > 0) {
 		/* Data reassembled successfully + cleared out of buffer */
-		handle_full_packet(tun_fd, dns_fds, userid, pkt, datalen, compressed);
+		handle_full_packet(userid, pkt, datalen, compressed);
 	}
 }
 
 static int
-user_send_data(int userid, struct dnsfd *dns_fds, uint8_t *indata,
-		size_t len, int compressed)
+user_send_data(int userid, uint8_t *indata, size_t len, int compressed)
 /* Appends data to a user's outgoing queue and sends it (in raw mode only) */
 {
 	size_t datalen;
@@ -592,7 +549,7 @@ user_send_data(int userid, struct dnsfd *dns_fds, uint8_t *indata,
 	} else if (data && datalen) { /* CONN_RAW_UDP */
 		if (!compressed)
 			DEBUG(1, "Sending in RAW mode uncompressed to user %d!", userid);
-		int dns_fd = get_dns_fd(dns_fds, &users[userid].host);
+		int dns_fd = get_dns_fd(&server.dns_fds, &users[userid].host);
 		send_raw(dns_fd, data, datalen, userid, RAW_HDR_CMD_DATA,
 					&users[userid].host, users[userid].hostlen);
 		ret = 1;
@@ -602,7 +559,7 @@ user_send_data(int userid, struct dnsfd *dns_fds, uint8_t *indata,
 }
 
 static int
-tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
+tunnel_bind()
 {
 	char packet[64*1024];
 	struct sockaddr_storage from;
@@ -613,7 +570,7 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 	int r;
 
 	fromlen = sizeof(struct sockaddr);
-	r = recvfrom(bind_fd, packet, sizeof(packet), 0,
+	r = recvfrom(server.bind_fd, packet, sizeof(packet), 0,
 		(struct sockaddr*)&from, &fromlen);
 
 	if (r <= 0)
@@ -633,7 +590,7 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 	DEBUG(3, "TX: client %s id %u, %d bytes",
 			format_addr(&query->addr, query->addrlen), (id & 0xffff), r);
 
-	dns_fd = get_dns_fd(dns_fds, &query->addr);
+	dns_fd = get_dns_fd(&server.dns_fds, &query->addr);
 	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr),
 		query->addrlen) <= 0) {
 		warn("forward reply error");
@@ -643,14 +600,14 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 }
 
 static int
-tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
+tunnel_tun()
 {
 	struct ip *header;
 	static uint8_t in[64*1024];
 	int userid;
 	int read;
 
-	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
+	if ((read = read_tun(server.tun_fd, in, sizeof(in))) <= 0)
 		return 0;
 
 	/* find target ip in packet, in is padded with 4 bytes TUN header */
@@ -662,25 +619,25 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 	DEBUG(3, "IN: %d byte pkt from tun to user %d; compression %d",
 				read, userid, users[userid].down_compression);
 
-	return user_send_data(userid, dns_fds, in, read, 0);
+	return user_send_data(userid, in, read, 0);
 }
 
 static int
-tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
+tunnel_dns(int dns_fd)
 {
 	struct query q;
 	int read;
 	int domain_len;
 	int inside_topdomain = 0;
 
-	if ((read = read_dns(dns_fd, dns_fds, tun_fd, &q)) <= 0)
+	if ((read = read_dns(dns_fd, &q)) <= 0)
 		return 0;
 
 	DEBUG(3, "RX: client %s ID %5d, type %d, name %s",
 			format_addr(&q.from, q.fromlen), q.id, q.type, q.name);
 
-	domain_len = strlen(q.name) - strlen(topdomain);
-	if (domain_len >= 0 && !strcasecmp(q.name + domain_len, topdomain))
+	domain_len = strlen(q.name) - strlen(server.topdomain);
+	if (domain_len >= 0 && !strcasecmp(q.name + domain_len, server.topdomain))
 		inside_topdomain = 1;
 	/* require dot before topdomain */
 	if (domain_len >= 1 && q.name[domain_len - 1] != '.')
@@ -719,7 +676,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		case T_SRV:
 		case T_TXT:
 			/* encoding is "transparent" here */
-			handle_null_request(tun_fd, dns_fd, dns_fds, &q, domain_len);
+			handle_null_request(dns_fd, &q, domain_len);
 			break;
 		case T_NS:
 			handle_ns_request(dns_fd, &q);
@@ -730,15 +687,15 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	} else {
 		/* Forward query to other port ? */
 		DEBUG(2, "Requested domain outside our topdomain.");
-		if (bind_fd) {
-			forward_query(bind_fd, &q);
+		if (server.bind_fd) {
+			forward_query(server.bind_fd, &q);
 		}
 	}
 	return 0;
 }
 
 int
-server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
+server_tunnel()
 {
 	struct timeval tv;
 	fd_set fds;
@@ -747,72 +704,72 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 	struct query *answer_now = NULL;
 	time_t last_action = time(NULL);
 
-	if (debug >= 5)
-		window_debug = debug - 3;
+	if (server.debug >= 5)
+		window_debug = server.debug - 3;
 
-	while (running) {
+	while (server.running) {
 		int maxfd;
 		/* max wait time based on pending queries */
-		tv = qmem_max_wait(dns_fds, &userid, &answer_now);
+		tv = qmem_max_wait(&userid, &answer_now);
 
 		FD_ZERO(&fds);
 		maxfd = 0;
 
-		if (dns_fds->v4fd >= 0) {
-			FD_SET(dns_fds->v4fd, &fds);
-			maxfd = MAX(dns_fds->v4fd, maxfd);
+		if (server.dns_fds.v4fd >= 0) {
+			FD_SET(server.dns_fds.v4fd, &fds);
+			maxfd = MAX(server.dns_fds.v4fd, maxfd);
 		}
-		if (dns_fds->v6fd >= 0) {
-			FD_SET(dns_fds->v6fd, &fds);
-			maxfd = MAX(dns_fds->v6fd, maxfd);
+		if (server.dns_fds.v6fd >= 0) {
+			FD_SET(server.dns_fds.v6fd, &fds);
+			maxfd = MAX(server.dns_fds.v6fd, maxfd);
 		}
 
-		if (bind_fd) {
+		if (server.bind_fd) {
 			/* wait for replies from real DNS */
-			FD_SET(bind_fd, &fds);
-			maxfd = MAX(bind_fd, maxfd);
+			FD_SET(server.bind_fd, &fds);
+			maxfd = MAX(server.bind_fd, maxfd);
 		}
 
 		/* Don't read from tun if all users have filled outpacket queues */
 		if(!all_users_waiting_to_send()) {
-			FD_SET(tun_fd, &fds);
-			maxfd = MAX(tun_fd, maxfd);
+			FD_SET(server.tun_fd, &fds);
+			maxfd = MAX(server.tun_fd, maxfd);
 		}
 
 		i = select(maxfd + 1, &fds, NULL, NULL, &tv);
 
 		if(i < 0) {
-			if (running)
+			if (server.running)
 				warn("select");
 			return 1;
 		}
 
 		if (i == 0) {
-			if (max_idle_time) {
+			if (server.max_idle_time) {
 				/* only trigger the check if that's worth ( ie, no need to loop over if there
 				is something to send */
-				if (difftime(time(NULL), last_action) > max_idle_time) {
+				if (difftime(time(NULL), last_action) > server.max_idle_time) {
 					for (userid = 0; userid < created_users; userid++) {
 						last_action = (users[userid].last_pkt > last_action) ? users[userid].last_pkt : last_action;
 					}
-					if (difftime(time(NULL), last_action) > max_idle_time) {
+					if (difftime(time(NULL), last_action) > server.max_idle_time) {
 						fprintf(stderr, "Server idle for too long, shutting down...\n");
-						running = 0;
+						server.running = 0;
 					}
 				}
 			}
 		} else {
-			if (FD_ISSET(tun_fd, &fds)) {
-				tunnel_tun(tun_fd, dns_fds);
+			if (FD_ISSET(server.tun_fd, &fds)) {
+				tunnel_tun();
 			}
-			if (FD_ISSET(dns_fds->v4fd, &fds)) {
-				tunnel_dns(tun_fd, dns_fds->v4fd, dns_fds, bind_fd);
+			if (FD_ISSET(server.dns_fds.v4fd, &fds)) {
+				tunnel_dns(server.dns_fds.v4fd);
 			}
-			if (FD_ISSET(dns_fds->v6fd, &fds)) {
-				tunnel_dns(tun_fd, dns_fds->v6fd, dns_fds, bind_fd);
+			if (FD_ISSET(server.dns_fds.v6fd, &fds)) {
+				tunnel_dns(server.dns_fds.v6fd);
 			}
-			if (FD_ISSET(bind_fd, &fds)) {
-				tunnel_bind(bind_fd, dns_fds);
+			if (FD_ISSET(server.bind_fd, &fds)) {
+				tunnel_bind();
 			}
 		}
 	}
@@ -821,7 +778,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 }
 
 void
-handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data, size_t len, int compressed)
+handle_full_packet(int userid, uint8_t *data, size_t len, int compressed)
 {
 	size_t rawlen;
 	uint8_t out[64*1024], *rawdata;
@@ -846,13 +803,13 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid, uint8_t *data,
 		DEBUG(2, "FULL PKT: %lu bytes from user %d (touser %d)", len, userid, touser);
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
-			write_tun(tun_fd, rawdata, rawlen);
+			write_tun(server.tun_fd, rawdata, rawlen);
 		} else {
 			/* don't re-compress if possible */
 			if (users[touser].down_compression && compressed) {
-				user_send_data(touser, dns_fds, data, len, 1);
+				user_send_data(touser, data, len, 1);
 			} else {
-				user_send_data(touser, dns_fds, rawdata, rawlen, 0);
+				user_send_data(touser, rawdata, rawlen, 0);
 			}
 		}
 	} else {
@@ -879,7 +836,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 	DEBUG(1, "RX-raw: login, len %lu, from user %d", len, userid);
 
 	/* User sends hash of seed + 1 */
-	login_calculate(myhash, 16, password, users[userid].seed + 1);
+	login_calculate(myhash, 16, server.password, users[userid].seed + 1);
 	if (memcmp(packet, myhash, 16) == 0) {
 		/* Update time info for user */
 		users[userid].last_pkt = time(NULL);
@@ -890,7 +847,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
-		login_calculate(myhash, 16, password, users[userid].seed - 1);
+		login_calculate(myhash, 16, server.password, users[userid].seed - 1);
 		send_raw(fd, (uint8_t *)myhash, 16, userid, RAW_HDR_CMD_LOGIN, &q->from, q->fromlen);
 
 		users[userid].authenticated_raw = 1;
@@ -898,7 +855,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 }
 
 static void
-handle_raw_data(uint8_t *packet, size_t len, struct query *q, struct dnsfd *dns_fds, int tun_fd, int userid)
+handle_raw_data(uint8_t *packet, size_t len, struct query *q, int userid)
 {
 	if (check_authenticated_user_and_ip(userid, q) != 0) {
 		return;
@@ -912,7 +869,7 @@ handle_raw_data(uint8_t *packet, size_t len, struct query *q, struct dnsfd *dns_
 
 	DEBUG(3, "RX-raw: full pkt raw, length %lu, from user %d", len, userid);
 
-	handle_full_packet(tun_fd, dns_fds, userid, packet, len, 1);
+	handle_full_packet(userid, packet, len, 1);
 }
 
 static void
@@ -933,7 +890,7 @@ handle_raw_ping(struct query *q, int dns_fd, int userid)
 }
 
 static int
-raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd, struct dnsfd *dns_fds, int tun_fd)
+raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd)
 {
 	int raw_user;
 	uint8_t raw_cmd;
@@ -959,7 +916,7 @@ raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd, struct dnsf
 		break;
 	case RAW_HDR_CMD_DATA:
 		/* Data packet */
-		handle_raw_data(packet, len, q, dns_fds, tun_fd, raw_user);
+		handle_raw_data(packet, len, q, raw_user);
 		break;
 	case RAW_HDR_CMD_PING:
 		/* Keepalive packet */
@@ -973,8 +930,7 @@ raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd, struct dnsf
 }
 
 int
-read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
-/* FIXME: dns_fds and tun_fd are because of raw_decode() below */
+read_dns(int fd, struct query *q)
 {
 	struct sockaddr_storage from;
 	socklen_t addrlen;
@@ -1010,7 +966,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 		gettimeofday(&q->time_recv, NULL);
 
 		/* TODO do not handle raw packets here! */
-		if (raw_decode(packet, r, q, fd, dns_fds, tun_fd)) {
+		if (raw_decode(packet, r, q, fd)) {
 			return 0;
 		}
 		if (dns_decode(NULL, 0, q, QR_QUERY, (char *)packet, r) < 0) {
@@ -1173,7 +1129,7 @@ write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc)
 }
 
 void
-handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
+handle_null_request(int dns_fd, struct query *q, int domain_len)
 /* Handles a NULL DNS request. See doc/proto_XXXXXXXX.txt for details on iodine protocol. */
 {
 	struct in_addr tempip;
@@ -1269,20 +1225,20 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return;
 		} else {
 			users[userid].last_pkt = time(NULL);
-			login_calculate(logindata, 16, password, users[userid].seed);
+			login_calculate(logindata, 16, server.password, users[userid].seed);
 
 			if (read >= 18 && (memcmp(logindata, unpacked + 1, 16) == 0)) {
 				/* Store login ok */
 				users[userid].authenticated = 1;
 
 				/* Send ip/mtu/netmask info */
-				tempip.s_addr = my_ip;
+				tempip.s_addr = server.my_ip;
 				tmp[0] = strdup(inet_ntoa(tempip));
 				tempip.s_addr = users[userid].tun_ip;
 				tmp[1] = strdup(inet_ntoa(tempip));
 
 				read = snprintf((char *)out, sizeof(out), "%s-%s-%d-%d",
-						tmp[0], tmp[1], my_mtu, netmask);
+						tmp[0], tmp[1], server.mtu, server.netmask);
 
 				write_dns(dns_fd, q, (char *)out, read, users[userid].downenc);
 				syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
@@ -1308,9 +1264,9 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 		reply[0] = 'I';
 		if (q->from.ss_family == AF_INET) {
-			if (ns_ip != INADDR_ANY) {
+			if (server.ns_ip != INADDR_ANY) {
 				/* If set, use assigned external ip (-n option) */
-				memcpy(&reply[1], &ns_ip, sizeof(ns_ip));
+				memcpy(&reply[1], &server.ns_ip, sizeof(server.ns_ip));
 			} else {
 				/* otherwise return destination ip from packet */
 				struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
@@ -1647,11 +1603,11 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 				  users[userid].outgoing->windowsize, dn_winsize, users[userid].incoming->windowsize, up_winsize);
 			users[userid].outgoing->windowsize = dn_winsize;
 			users[userid].incoming->windowsize = up_winsize;
-			send_data_or_ping(dns_fds, userid, q, 1, 1);
+			send_data_or_ping(userid, q, 1, 1);
 			return;
 		}
 
-		user_process_incoming_data(tun_fd, dns_fds, userid, dn_ack);
+		user_process_incoming_data(userid, dn_ack);
 
 		/* if respond flag not set, query waits in qmem and is used later */
 	} else if (isxdigit(in[0])) { /* Upstream data packet */
@@ -1712,7 +1668,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		window_process_incoming_fragment(users[userid].incoming, &f);
 		users[userid].next_upstream_ack = f.seqID;
 
-		user_process_incoming_data(tun_fd, dns_fds, userid, f.ack_other);
+		user_process_incoming_data(userid, f.ack_other);
 
 		/* Nothing to do. ACK for this fragment is sent later in qmem_max_wait,
 		 * using an old query. This is left in qmem until needed/times out */
@@ -1727,14 +1683,14 @@ handle_ns_request(int dns_fd, struct query *q)
 	char buf[64*1024];
 	int len;
 
-	if (ns_ip != INADDR_ANY) {
+	if (server.ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
 		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
-		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
+		memcpy(&addr->sin_addr, &server.ns_ip, sizeof(server.ns_ip));
 	}
 
-	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
+	len = dns_encode_ns_response(buf, sizeof(buf), q, server.topdomain);
 	if (len < 1) {
 		warnx("dns_encode_ns_response doesn't fit");
 		return;
@@ -1759,11 +1715,11 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
 		memcpy(&addr->sin_addr, &ip, sizeof(ip));
 
-	} else if (ns_ip != INADDR_ANY) {
+	} else if (server.ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
 		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
-		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
+		memcpy(&addr->sin_addr, &server.ns_ip, sizeof(server.ns_ip));
 	}
 
 	len = dns_encode_a_response(buf, sizeof(buf), q);

@@ -78,7 +78,7 @@ init_users(in_addr_t my_ip, int netbits)
 			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 			ip = ipstart.s_addr + inet_addr(newip);
 		}
-		if (debug >= 2) {
+		if (server.debug >= 2) {
 			struct in_addr IP;
 			IP.s_addr = ip;
 			DEBUG(2, "User %d: IP %s", i, inet_ntoa(IP));
@@ -201,7 +201,7 @@ check_user_and_ip(int userid, struct query *q)
 	if (!user_active(userid)) return 1;
 
 	/* return early if IP checking is disabled */
-	if (!check_ip) {
+	if (!server.check_ip) {
 		return 0;
 	}
 
