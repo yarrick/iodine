@@ -91,7 +91,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 		fprintf(stderr, __VA_ARGS__);
 
 #define DEBUG(level, ...) \
-		if (debug >= level) {\
+		if (INSTANCE.debug >= level) {\
 			TIMEPRINT("[D%d %s:%d] ", level, __FILE__, __LINE__); \
 			fprintf(stderr, __VA_ARGS__);\
 			fprintf(stderr, "\n");\
@@ -101,7 +101,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 		fprintf(stderr, __VA_ARGS__);
 
 #define DEBUG(level, ...) \
-		if (debug >= level) {\
+		if (INSTANCE.debug >= level) {\
 			fprintf(stderr, "[D%d] ", level); \
 			fprintf(stderr, __VA_ARGS__);\
 			fprintf(stderr, "\n");\
