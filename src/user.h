@@ -54,8 +54,8 @@ extern int created_users;
 int user_sending(int user);
 int all_users_waiting_to_send();
 int user_active(int i);
-int check_authenticated_user_and_ip(int userid, struct query *q);
-int check_user_and_ip(int userid, struct query *q);
+int check_authenticated_user_and_ip(int userid, struct query *q, int check_ip);
+int check_user_and_ip(int userid, struct query *q, int check_ip);
 
 int init_users(in_addr_t, int);
 const char* users_get_first_ip();

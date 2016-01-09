@@ -35,7 +35,6 @@
 #include "encoding.h"
 #include "user.h"
 #include "window.h"
-#include "server.h"
 
 struct tun_user *users;
 unsigned usercount;
@@ -77,11 +76,6 @@ init_users(in_addr_t my_ip, int netbits)
 			skip++;
 			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 			ip = ipstart.s_addr + inet_addr(newip);
-		}
-		if (server.debug >= 2) {
-			struct in_addr IP;
-			IP.s_addr = ip;
-			DEBUG(2, "User %d: IP %s", i, inet_ntoa(IP));
 		}
 		users[i].tun_ip = ip;
 		net.s_addr = ip;
@@ -191,7 +185,7 @@ user_set_conn_type(int userid, enum connection c)
 
 /* This will not check that user has passed login challenge */
 int
-check_user_and_ip(int userid, struct query *q)
+check_user_and_ip(int userid, struct query *q, int check_ip)
 {
 	/* Note: duplicate in handle_raw_login() except IP-address check */
 
@@ -201,7 +195,7 @@ check_user_and_ip(int userid, struct query *q)
 	if (!user_active(userid)) return 1;
 
 	/* return early if IP checking is disabled */
-	if (!server.check_ip) {
+	if (!check_ip) {
 		return 0;
 	}
 
@@ -229,11 +223,11 @@ check_user_and_ip(int userid, struct query *q)
 }
 
 int
-check_authenticated_user_and_ip(int userid, struct query *q)
+check_authenticated_user_and_ip(int userid, struct query *q, int check_ip)
 /* This checks that user has passed normal (non-raw) login challenge
  * Returns 0 on success, 1 if user is not authenticated/IP is wrong */
 {
-	int res = check_user_and_ip(userid, q);
+	int res = check_user_and_ip(userid, q, check_ip);
 	if (res)
 		return res;
 

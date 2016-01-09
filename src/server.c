@@ -828,7 +828,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 	}
 
 	if (userid < 0 || userid >= created_users ||
-		check_authenticated_user_and_ip(userid, q) != 0) {
+		check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 		DEBUG(2, "User %d not authenticated, ignoring raw login!", userid);
 		return;
 	}
@@ -857,7 +857,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 static void
 handle_raw_data(uint8_t *packet, size_t len, struct query *q, int userid)
 {
-	if (check_authenticated_user_and_ip(userid, q) != 0) {
+	if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 		return;
 	}
 	if (!users[userid].authenticated_raw) return;
@@ -875,7 +875,7 @@ handle_raw_data(uint8_t *packet, size_t len, struct query *q, int userid)
 static void
 handle_raw_ping(struct query *q, int dns_fd, int userid)
 {
-	if (check_authenticated_user_and_ip(userid, q) != 0) {
+	if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 		return;
 	}
 	if (!users[userid].authenticated_raw) return;
@@ -1218,7 +1218,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 		userid = unpacked[0];
 		DEBUG(2, "Received login request for user %d from %s.",
 					userid, format_addr(&q->from, q->fromlen));
-		if (check_user_and_ip(userid, q) != 0) {
+		if (check_user_and_ip(userid, q, server.check_ip) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			syslog(LOG_WARNING, "dropped login request from user #%d from %s; expected source %s",
 				userid, format_addr(&q->from, q->fromlen), format_addr(&users[userid].host, users[userid].hostlen));
@@ -1257,7 +1257,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 		int length;
 
 		userid = b32_8to5(in[1]);
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1297,7 +1297,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 
 		userid = b32_8to5(in[1]);
 
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1343,7 +1343,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 
 		userid = b32_8to5(in[1]);
 
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1482,7 +1482,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 		read = unpack_data(unpacked, sizeof(unpacked), in + 1, 5, b32);
 
 		userid = unpacked[0];
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1519,7 +1519,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 
 		/* Downstream fragsize packet */
 		userid = unpacked[0];
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1550,7 +1550,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 
 		/* Check userid */
 		userid = unpacked[0];
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1628,7 +1628,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 
 		userid = code;
 		/* Check user and sending IP address */
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, q, server.check_ip) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal IP */
 		}
