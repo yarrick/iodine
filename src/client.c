@@ -170,7 +170,7 @@ update_server_timeout(int handshake)
 	static size_t num_rtt_timeouts = 0;
 
 	/* Get average RTT in ms */
-	rtt_ms = this.rtt_total_ms / this.num_immediate;
+	rtt_ms = (this.num_immediate == 0) ? 1 : this.rtt_total_ms / this.num_immediate;
 	if (rtt_ms >= this.max_timeout_ms && this.num_immediate > 5) {
 		num_rtt_timeouts++;
 		if (num_rtt_timeouts < 3) {
@@ -308,7 +308,7 @@ got_response(int id, int immediate, int fail)
 				this.rtt_total_ms += rtt_ms;
 				this.num_immediate++;
 
-				if (this.autodetect_server_timeout)
+				if (this.autodetect_server_timeout && this.lazymode)
 					update_server_timeout(0);
 			}
 
@@ -2409,12 +2409,14 @@ handshake_set_timeout()
 	char in[4096];
 	int read, id;
 
-	if (this.autodetect_server_timeout && this.lazymode) {
-		fprintf(stderr, "Calculating round-trip time for optimum server timeout...");
-	} else {
-		fprintf(stderr, "Setting window sizes to %lu frags upstream, %lu frags downstream...",
-				this.windowsize_up, this.windowsize_down);
-	}
+	fprintf(stderr, "Setting window sizes to %lu frags upstream, %lu frags downstream...\n",
+		this.windowsize_up, this.windowsize_down);
+
+	fprintf(stderr, "Calculating round-trip time...");
+
+	/* Reset RTT stats */
+	this.num_immediate = 0;
+	this.rtt_total_ms = 0;
 
 	for (int i = 0; this.running && i < 5; i++) {
 
@@ -2429,21 +2431,15 @@ handshake_set_timeout()
 			if (strncmp("BADIP", in, 5) == 0) {
 				fprintf(stderr, "Server rejected sender IP address.\n");
 			}
-			if (this.autodetect_server_timeout)
-				continue;
-			else
-				break;
+			continue;
 		}
 
 	}
 	if (!this.running)
 		return;
 
-	if (this.autodetect_server_timeout)
-		fprintf(stderr, "\nDetermined round-trip time of %ld ms, server timeout of %ld ms.\n",
-			this.rtt_total_ms / this.num_immediate, this.server_timeout_ms);
-	else
-		fprintf(stderr, " done\n");
+	fprintf(stderr, "\nDetermined round-trip time of %ld ms, using server timeout of %ld ms.\n",
+		this.rtt_total_ms / this.num_immediate, this.server_timeout_ms);
 }
 
 int
