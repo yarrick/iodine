@@ -93,13 +93,6 @@ struct ip
     struct in_addr ip_src, ip_dst;      /* source and dest address */
 };
 
-/* windows gettimeofday from https://gist.github.com/ugovaretto/5875385 */
-#if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
-  #define DELTA_EPOCH_IN_MICROSECS 116444736000000000Ui64
-#else
-  #define DELTA_EPOCH_IN_MICROSECS 116444736000000000ULL
-#endif
-
 /* Convenience macros for operations on timevals.
    NOTE: `timercmp' does not work for >= or <=.  */
 #define timerisset(tvp)	((tvp)->tv_sec || (tvp)->tv_usec)
