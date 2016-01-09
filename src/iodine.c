@@ -77,8 +77,6 @@ struct client_instance this;
 #define PRESET_STATIC_VALUES \
 	.conn = CONN_DNS_NULL, \
 	.send_ping_soon = 1, \
-	.downenc = ' ', \
-	.do_qtype = T_UNSET, \
 	.maxfragsize_up = 100, \
 	.next_downstream_ack = -1, \
 	.num_immediate = 1, \
@@ -100,6 +98,8 @@ static struct client_instance preset_default = {
 	.windowsize_up = 8,
 	.windowsize_down = 8,
 	.hostname_maxlen = 0xFF,
+	.downenc = ' ',
+	.do_qtype = T_UNSET,
 	PRESET_STATIC_VALUES
 };
 
@@ -119,6 +119,8 @@ static struct client_instance preset_original = {
 	.max_downstream_frag_size = MAX_FRAGSIZE,
 	.compression_down = 1,
 	.compression_up = 0,
+	.downenc = ' ',
+	.do_qtype = T_UNSET,
 	PRESET_STATIC_VALUES
 };
 
@@ -138,6 +140,8 @@ static struct client_instance preset_fast = {
 	.windowsize_up = 64,
 	.windowsize_down = 32,
 	.hostname_maxlen = 0xFF,
+	.downenc = ' ',
+	.do_qtype = T_UNSET,
 	PRESET_STATIC_VALUES
 };
 
@@ -301,8 +305,8 @@ main(int argc, char **argv)
 #ifndef WINDOWS32
 	struct passwd *pw = NULL;
 #endif
-	int choice;
-	int retval;
+	int choice = -1;
+	int retval = 0;
 
 	char *username = NULL;
 	char *newroot = NULL;
