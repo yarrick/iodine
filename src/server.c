@@ -705,7 +705,7 @@ server_tunnel()
 	time_t last_action = time(NULL);
 
 	if (server.debug >= 5)
-		window_debug = server.debug - 3;
+		window_debug = server.debug - 4;
 
 	while (server.running) {
 		int maxfd;

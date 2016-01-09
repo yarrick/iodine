@@ -299,6 +299,11 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
+	// Load default values from preset
+	memcpy(&server, &preset_default, sizeof(struct server_instance));
+
+	server.running = 1;
+
 	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
 		switch(choice) {
 		case '4':
