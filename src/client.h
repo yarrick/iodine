@@ -153,12 +153,12 @@ char *format_qtype();
 char parse_encoding(char *encoding);
 void client_set_hostname_maxlen(size_t i);
 
-int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize);
-int client_tunnel(int tun_fd, int dns_fd);
+int client_handshake();
+int client_tunnel();
 
 int parse_data(uint8_t *data, size_t len, fragment *f, int *immediate);
-int handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout);
-void handshake_switch_options(int dns_fd, int lazy, int compression, char denc);
-int send_ping(int fd, int ping_response, int ack, int timeout);
+int handshake_waitdns(char *buf, size_t buflen, char cmd, int timeout);
+void handshake_switch_options(int lazy, int compression, char denc);
+int send_ping(int ping_response, int ack, int timeout);
 
 #endif

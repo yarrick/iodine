@@ -162,7 +162,7 @@ immediate_mode_defaults()
 #endif
 
 static int
-update_server_timeout(int dns_fd, int handshake)
+update_server_timeout(int handshake)
 /* Calculate server timeout based on average RTT, send ping "handshake" to set
  * if handshake sent, return query ID */
 {
@@ -201,7 +201,7 @@ update_server_timeout(int dns_fd, int handshake)
 
 	if (handshake) {
 		/* Send ping handshake to set server timeout */
-		return send_ping(dns_fd, 1, -1, 1);
+		return send_ping(1, -1, 1);
 	}
 	return -1;
 }
@@ -309,7 +309,7 @@ got_response(int id, int immediate, int fail)
 				this.num_immediate++;
 
 				if (this.autodetect_server_timeout)
-					update_server_timeout(-1, 0);
+					update_server_timeout(0);
 			}
 
 			/* Remove query info from buffer to mark it as answered */
@@ -326,7 +326,7 @@ got_response(int id, int immediate, int fail)
 }
 
 static int
-send_query(int fd, uint8_t *hostname)
+send_query(uint8_t *hostname)
 /* Returns DNS ID of sent query */
 {
 	uint8_t packet[4096];
@@ -351,7 +351,7 @@ send_query(int fd, uint8_t *hostname)
 
 	DEBUG(4, "  Sendquery: id %5d name[0] '%c'", q.id, hostname[0]);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*) &this.nameserv_addrs[this.current_nameserver],
+	sendto(this.dns_fd, packet, len, 0, (struct sockaddr*) &this.nameserv_addrs[this.current_nameserver],
 			sizeof(struct sockaddr_storage));
 
 	client_rotate_nameserver();
@@ -391,14 +391,14 @@ send_query(int fd, uint8_t *hostname)
 				this.lazymode = 0;
 				this.server_timeout_ms = 0;
 			}
-			update_server_timeout(fd, 1);
+			update_server_timeout(1);
 		}
 	}
 	return q.id;
 }
 
 static void
-send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd)
+send_raw(uint8_t *buf, size_t buflen, int cmd)
 {
 	char packet[4096];
 	int len;
@@ -411,20 +411,20 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd)
 	}
 
 	len += RAW_HDR_LEN;
-	packet[RAW_HDR_CMD] = (cmd & 0xF0) | (user & 0x0F);
+	packet[RAW_HDR_CMD] = (cmd & 0xF0) | (this.userid & 0x0F);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&this.raw_serv, sizeof(this.raw_serv));
+	sendto(this.dns_fd, packet, len, 0, (struct sockaddr*)&this.raw_serv, sizeof(this.raw_serv));
 }
 
 static void
-send_raw_data(int dns_fd, uint8_t *data, size_t datalen)
+send_raw_data(uint8_t *data, size_t datalen)
 {
-	send_raw(dns_fd, data, datalen, this.userid, RAW_HDR_CMD_DATA);
+	send_raw(data, datalen, RAW_HDR_CMD_DATA);
 }
 
 
 static int
-send_packet(int fd, char cmd, const uint8_t *data, const size_t datalen)
+send_packet(char cmd, const uint8_t *data, const size_t datalen)
 /* Base32 encodes data and sends as single DNS query
  * Returns ID of sent query */
 {
@@ -434,11 +434,11 @@ send_packet(int fd, char cmd, const uint8_t *data, const size_t datalen)
 
 	build_hostname(buf, sizeof(buf), data, datalen, this.topdomain, b32, this.hostname_maxlen, 1);
 
-	return send_query(fd, buf);
+	return send_query(buf);
 }
 
 int
-send_ping(int fd, int ping_response, int ack, int set_timeout)
+send_ping(int ping_response, int ack, int set_timeout)
 {
 	this.num_pings++;
 	if (this.conn == CONN_DNS_NULL) {
@@ -469,19 +469,19 @@ send_ping(int fd, int ping_response, int ack, int set_timeout)
 				ping_response, ack, set_timeout ? "SET " : "", this.server_timeout_ms,
 				this.downstream_timeout_ms, data[8]);
 
-		id = send_packet(fd, 'p', data, sizeof(data));
+		id = send_packet('p', data, sizeof(data));
 
 		/* Log query ID as being sent now */
 		query_sent_now(id);
 		return id;
 	} else {
-		send_raw(fd, NULL, 0, this.userid, RAW_HDR_CMD_PING);
+		send_raw(NULL, 0, RAW_HDR_CMD_PING);
 		return -1;
 	}
 }
 
 static void
-send_next_frag(int fd)
+send_next_frag()
 /* Sends next available fragment of data from the outgoing window buffer */
 {
 	static uint8_t buf[MAX_FRAGSIZE], hdr[5];
@@ -497,7 +497,7 @@ send_next_frag(int fd)
 		if (this.outbuf->numitems > 0) {
 			/* There is stuff to send but we're out of sync, so send a ping
 			 * to get things back in order and keep the packets flowing */
-			send_ping(fd, 1, this.next_downstream_ack, 1);
+			send_ping(1, this.next_downstream_ack, 1);
 			this.next_downstream_ack = -1;
 			window_tick(this.outbuf);
 		}
@@ -532,7 +532,7 @@ send_next_frag(int fd)
 	DEBUG(3, " SEND DATA: seq %d, ack %d, len %lu, s%d e%d c%d flags %1X",
 			f->seqID, f->ack_other, f->len, f->start, f->end, f->compressed, hdr[2] >> 4);
 
-	id = send_query(fd, buf);
+	id = send_query(buf);
 	/* Log query ID as being sent now */
 	query_sent_now(id);
 
@@ -684,7 +684,7 @@ dns_namedec(uint8_t *outdata, size_t outdatalen, uint8_t *buf, size_t buflen)
 }
 
 static int
-read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query *q)
+read_dns_withq(uint8_t *buf, size_t buflen, struct query *q)
 /* Returns -1 on receive error or decode error, including DNS error replies.
    Returns 0 on replies that could be correct but are useless, and are not
    DNS error replies.
@@ -697,7 +697,7 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query
 	int r;
 
 	addrlen = sizeof(from);
-	if ((r = recvfrom(dns_fd, data, sizeof(data), 0,
+	if ((r = recvfrom(this.dns_fd, data, sizeof(data), 0,
 			  (struct sockaddr*)&from, &addrlen)) < 0) {
 		warn("recvfrom");
 		return -1;
@@ -787,7 +787,7 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query
 		r -= RAW_HDR_LEN;
 		datalen = sizeof(buf);
 		if (uncompress(buf, &datalen, data + RAW_HDR_LEN, r) == Z_OK) {
-			write_tun(tun_fd, buf, datalen);
+			write_tun(this.tun_fd, buf, datalen);
 		}
 
 		/* all done */
@@ -796,7 +796,7 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query
 }
 
 int
-handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
+handshake_waitdns(char *buf, size_t buflen, char cmd, int timeout)
 /* Wait for DNS reply fitting to our latest query and returns it.
    Returns length of reply = #bytes used in buf.
    Returns 0 if fitting reply happens to be useless.
@@ -821,8 +821,8 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 		tv.tv_sec = timeout;
 		tv.tv_usec = 0;
 		FD_ZERO(&fds);
-		FD_SET(dns_fd, &fds);
-		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+		FD_SET(this.dns_fd, &fds);
+		r = select(this.dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if (r < 0)
 			return -1;	/* select error */
@@ -831,7 +831,7 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 
 		q.id = -1;
 		q.name[0] = '\0';
-		rv = read_dns_withq(dns_fd, 0, (uint8_t *)buf, buflen, &q);
+		rv = read_dns_withq((uint8_t *)buf, buflen, &q);
 
 		qcmd = toupper(q.name[0]);
 		if (q.id != this.chunkid || qcmd != cmd) {
@@ -920,7 +920,7 @@ parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
 }
 
 static int
-tunnel_tun(int tun_fd, int dns_fd)
+tunnel_tun()
 {
 	size_t datalen;
 	uint8_t out[64*1024];
@@ -928,7 +928,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 	uint8_t *data;
 	ssize_t read;
 
-	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
+	if ((read = read_tun(this.tun_fd, in, sizeof(in))) <= 0)
 		return -1;
 
 	DEBUG(2, " IN: %lu bytes on tunnel, to be compressed: %d", read, this.compression_up);
@@ -953,14 +953,14 @@ tunnel_tun(int tun_fd, int dns_fd)
 		window_add_outgoing_data(this.outbuf, data, datalen, this.compression_up);
 		/* Don't send anything here to respect min. send interval */
 	} else {
-		send_raw_data(dns_fd, data, datalen);
+		send_raw_data(data, datalen);
 	}
 
 	return read;
 }
 
 static int
-tunnel_dns(int tun_fd, int dns_fd)
+tunnel_dns()
 {
 	struct query q;
 	size_t datalen, buflen;
@@ -971,7 +971,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	memset(&q, 0, sizeof(q));
 	memset(buf, 0, sizeof(buf));
 	memset(cbuf, 0, sizeof(cbuf));
-	read = read_dns_withq(dns_fd, tun_fd, cbuf, sizeof(cbuf), &q);
+	read = read_dns_withq(cbuf, sizeof(cbuf), &q);
 
 	if (this.conn != CONN_DNS_NULL)
 		return 1;  /* everything already done */
@@ -1016,7 +1016,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 					/* Reset query counts this.stats */
 					this.send_query_sendcnt = 0;
 					this.send_query_recvcnt = 0;
-					update_server_timeout(dns_fd, 1);
+					update_server_timeout(1);
 
 				} else if (this.send_query_recvcnt < 500 && this.num_servfail >= 40 &&
 					this.autodetect_server_timeout && this.max_timeout_ms < 500) {
@@ -1024,7 +1024,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 					/* last-ditch attempt to fix SERVFAILs - disable lazy mode */
 					immediate_mode_defaults();
 					fprintf(stderr, "Attempting to disable lazy mode due to excessive SERVFAILs\n");
-					handshake_switch_options(dns_fd, 0, this.compression_down, this.downenc);
+					handshake_switch_options(0, this.compression_down, this.downenc);
 				}
 			}
 		}
@@ -1111,7 +1111,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		}
 
 		if (datalen)
-			write_tun(tun_fd, data, datalen);
+			write_tun(this.tun_fd, data, datalen);
 	}
 
 	/* Move window along after doing all data processing */
@@ -1121,7 +1121,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 }
 
 int
-client_tunnel(int tun_fd, int dns_fd)
+client_tunnel()
 {
 	struct timeval tv, nextresend, tmp, now, now2;
 	fd_set fds;
@@ -1180,10 +1180,10 @@ client_tunnel(int tun_fd, int dns_fd)
 
 				if (sending > 0) {
 					/* More to send - next fragment */
-					send_next_frag(dns_fd);
+					send_next_frag();
 				} else {
 					/* Send ping if we didn't send anything yet */
-					send_ping(dns_fd, 0, this.next_downstream_ack, (this.num_pings > 20 && this.num_pings % 50 == 0));
+					send_ping(0, this.next_downstream_ack, (this.num_pings > 20 && this.num_pings % 50 == 0));
 					this.next_downstream_ack = -1;
 				}
 
@@ -1255,9 +1255,9 @@ client_tunnel(int tun_fd, int dns_fd)
 		if (this.conn != CONN_DNS_NULL || window_buffer_available(this.outbuf) > 16) {
 			/* Fill up outgoing buffer with available data if it has enough space
 			 * The windowing protocol manages data retransmits, timeouts etc. */
-			FD_SET(tun_fd, &fds);
+			FD_SET(this.tun_fd, &fds);
 		}
-		FD_SET(dns_fd, &fds);
+		FD_SET(this.dns_fd, &fds);
 
 		DEBUG(4, "Waiting %ld ms before sending more... (min_send %d)", timeval_to_ms(&tv), use_min_send);
 
@@ -1265,7 +1265,7 @@ client_tunnel(int tun_fd, int dns_fd)
 			gettimeofday(&now, NULL);
 		}
 
-		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
+		i = select(MAX(this.tun_fd, this.dns_fd) + 1, &fds, NULL, NULL, &tv);
 
 		if (use_min_send && i > 0) {
 			/* enforce min_send_interval if we get interrupted by new tun data */
@@ -1291,8 +1291,8 @@ client_tunnel(int tun_fd, int dns_fd)
 		if (i == 0) {
 			/* timed out - no new packets recv'd */
 		} else {
-			if (FD_ISSET(tun_fd, &fds)) {
-				if (tunnel_tun(tun_fd, dns_fd) <= 0)
+			if (FD_ISSET(this.tun_fd, &fds)) {
+				if (tunnel_tun() <= 0)
 					continue;
 				/* Returns -1 on error OR when quickly
 				   dropping data in case of DNS congestion;
@@ -1300,8 +1300,8 @@ client_tunnel(int tun_fd, int dns_fd)
 				   If chunk sent, sets this.send_ping_soon=0. */
 			}
 
-			if (FD_ISSET(dns_fd, &fds)) {
-				tunnel_dns(tun_fd, dns_fd);
+			if (FD_ISSET(this.dns_fd, &fds)) {
+				tunnel_dns();
 			}
 		}
 	}
@@ -1310,7 +1310,7 @@ client_tunnel(int tun_fd, int dns_fd)
 }
 
 static void
-send_login(int fd, char *login, int len)
+send_login(char *login, int len)
 {
 	uint8_t data[19];
 
@@ -1323,11 +1323,11 @@ send_login(int fd, char *login, int len)
 
 	this.rand_seed++;
 
-	send_packet(fd, 'l', data, sizeof(data));
+	send_packet('l', data, sizeof(data));
 }
 
 static void
-send_fragsize_probe(int fd, uint16_t fragsize)
+send_fragsize_probe(uint16_t fragsize)
 {
 	uint8_t probedata[256];
 	uint8_t buf[MAX_FRAGSIZE];
@@ -1350,11 +1350,11 @@ send_fragsize_probe(int fd, uint16_t fragsize)
 	build_hostname(buf, sizeof(buf), probedata, sizeof(probedata), this.topdomain,
 				   this.dataenc, this.hostname_maxlen, 6);
 
-	send_query(fd, buf);
+	send_query(buf);
 }
 
 static void
-send_set_downstream_fragsize(int fd, uint16_t fragsize)
+send_set_downstream_fragsize(uint16_t fragsize)
 {
 	uint8_t data[5];
 
@@ -1365,11 +1365,11 @@ send_set_downstream_fragsize(int fd, uint16_t fragsize)
 
 	this.rand_seed++;
 
-	send_packet(fd, 'n', data, sizeof(data));
+	send_packet('n', data, sizeof(data));
 }
 
 static void
-send_version(int fd, uint32_t version)
+send_version(uint32_t version)
 {
 	uint8_t data[6];
 
@@ -1381,11 +1381,11 @@ send_version(int fd, uint32_t version)
 
 	this.rand_seed++;
 
-	send_packet(fd, 'v', data, sizeof(data));
+	send_packet('v', data, sizeof(data));
 }
 
 static void
-send_ip_request(int fd, int userid)
+send_ip_request()
 {
 	uint8_t buf[512] = "i____.";
 	buf[1] = b32_5to8(this.userid);
@@ -1396,20 +1396,20 @@ send_ip_request(int fd, int userid)
 	this.rand_seed++;
 
 	strncat((char *)buf, this.topdomain, 512 - strlen((char *)buf));
-	send_query(fd, buf);
+	send_query(buf);
 }
 
 static void
-send_raw_udp_login(int dns_fd, int userid, int seed)
+send_raw_udp_login(int seed)
 {
 	char buf[16];
 	login_calculate(buf, 16, this.password, seed + 1);
 
-	send_raw(dns_fd, (uint8_t *) buf, sizeof(buf), this.userid, RAW_HDR_CMD_LOGIN);
+	send_raw((uint8_t *) buf, sizeof(buf), RAW_HDR_CMD_LOGIN);
 }
 
 static void
-send_upenctest(int fd, char *s)
+send_upenctest(char *s)
 /* NOTE: String may be at most 63-4=59 chars to fit in 1 dns chunk. */
 {
 	char buf[512] = "z___";
@@ -1422,16 +1422,16 @@ send_upenctest(int fd, char *s)
 	strncat(buf, s, 512 - strlen(buf));
 	strncat(buf, ".", 512 - strlen(buf));
 	strncat(buf, this.topdomain, 512 - strlen(buf));
-	send_query(fd, (uint8_t *)buf);
+	send_query((uint8_t *)buf);
 }
 
 static void
-send_downenctest(int fd, char downenc, int variant, char *s, int slen)
+send_downenctest(char downenc, int variant, char *s, int slen)
 /* Note: content/handling of s is not defined yet. */
 {
 	char buf[512] = "y_____.";
 
-	buf[1] = tolower(this.downenc);
+	buf[1] = tolower(downenc);
 	buf[2] = b32_5to8(variant);
 
 	buf[3] = b32_5to8((this.rand_seed >> 10) & 0x1f);
@@ -1440,11 +1440,11 @@ send_downenctest(int fd, char downenc, int variant, char *s, int slen)
 	this.rand_seed++;
 
 	strncat(buf, this.topdomain, 512 - strlen(buf));
-	send_query(fd, (uint8_t *)buf);
+	send_query((uint8_t *)buf);
 }
 
 static void
-send_codec_switch(int fd, int userid, int bits)
+send_codec_switch(int bits)
 {
 	char buf[512] = "s_____.";
 	buf[1] = b32_5to8(this.userid);
@@ -1456,11 +1456,11 @@ send_codec_switch(int fd, int userid, int bits)
 	this.rand_seed++;
 
 	strncat(buf, this.topdomain, 512 - strlen(buf));
-	send_query(fd, (uint8_t *)buf);
+	send_query((uint8_t *)buf);
 }
 
 static void
-send_server_options(int fd, int userid, int lazy, int compression, char denc, char *options)
+send_server_options(int lazy, int compression, char denc, char *options)
 /* Options must be length >=4 */
 {
 	char buf[512] = "oU3___CMC.";
@@ -1478,11 +1478,11 @@ send_server_options(int fd, int userid, int lazy, int compression, char denc, ch
 	this.rand_seed++;
 
 	strncat(buf, this.topdomain, 512 - strlen(buf));
-	send_query(fd, (uint8_t *)buf);
+	send_query((uint8_t *)buf);
 }
 
 static int
-handshake_version(int dns_fd, int *seed)
+handshake_version(int *seed)
 {
 	char hex[] = "0123456789abcdef";
 	char hex2[] = "0123456789ABCDEF";
@@ -1493,9 +1493,9 @@ handshake_version(int dns_fd, int *seed)
 
 	for (i = 0; this.running && i < 5; i++) {
 
-		send_version(dns_fd, PROTOCOL_VERSION);
+		send_version(PROTOCOL_VERSION);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'V', i+1);
+		read = handshake_waitdns(in, sizeof(in), 'V', i+1);
 
 		if (read >= 9) {
 			payload =  (((in[4] & 0xff) << 24) |
@@ -1530,7 +1530,7 @@ handshake_version(int dns_fd, int *seed)
 }
 
 static int
-handshake_login(int dns_fd, int seed)
+handshake_login(int seed)
 {
 	char in[4096];
 	char login[16];
@@ -1544,9 +1544,9 @@ handshake_login(int dns_fd, int seed)
 
 	for (i=0; this.running && i<5 ;i++) {
 
-		send_login(dns_fd, login, 16);
+		send_login(login, 16);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'L', i+1);
+		read = handshake_waitdns(in, sizeof(in), 'L', i+1);
 
 		if (read > 0) {
 			int netmask;
@@ -1578,7 +1578,7 @@ handshake_login(int dns_fd, int seed)
 }
 
 static int
-handshake_raw_udp(int dns_fd, int seed)
+handshake_raw_udp(int seed)
 {
 	struct timeval tv;
 	char in[4096];
@@ -1594,9 +1594,9 @@ handshake_raw_udp(int dns_fd, int seed)
 	fprintf(stderr, "Testing raw UDP data to the server (skip with -r)");
 	for (i=0; this.running && i<3 ;i++) {
 
-		send_ip_request(dns_fd, this.userid);
+		send_ip_request();
 
-		len = handshake_waitdns(dns_fd, in, sizeof(in), 'I', i+1);
+		len = handshake_waitdns(in, sizeof(in), 'I', i+1);
 
 		if (len == 5 && in[0] == 'I') {
 			/* Received IPv4 address */
@@ -1640,16 +1640,16 @@ handshake_raw_udp(int dns_fd, int seed)
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		send_raw_udp_login(dns_fd, this.userid, seed);
+		send_raw_udp_login(seed);
 
 		FD_ZERO(&fds);
-		FD_SET(dns_fd, &fds);
+		FD_SET(this.dns_fd, &fds);
 
-		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+		r = select(this.dns_fd + 1, &fds, NULL, NULL, &tv);
 
 		if(r > 0) {
 			/* recv() needed for windows, dont change to read() */
-			len = recv(dns_fd, in, sizeof(in), 0);
+			len = recv(this.dns_fd, in, sizeof(in), 0);
 			if (len >= (16 + RAW_HDR_LEN)) {
 				char hash[16];
 				login_calculate(hash, 16, this.password, seed - 1);
@@ -1671,7 +1671,7 @@ handshake_raw_udp(int dns_fd, int seed)
 }
 
 static int
-handshake_upenctest(int dns_fd, char *s)
+handshake_upenctest(char *s)
 /* NOTE: *s may be max 59 chars; must start with "aA" for case-swap check
    Returns:
    -1: case swap, no need for any further test: error printed; or Ctrl-C
@@ -1689,9 +1689,9 @@ handshake_upenctest(int dns_fd, char *s)
 	slen = strlen(s);
 	for (i=0; this.running && i<3 ;i++) {
 
-		send_upenctest(dns_fd, s);
+		send_upenctest(s);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'Z', i+1);
+		read = handshake_waitdns(in, sizeof(in), 'Z', i+1);
 
 		if (read == -2)
 			return 0;	/* hard error */
@@ -1741,7 +1741,7 @@ handshake_upenctest(int dns_fd, char *s)
 }
 
 static int
-handshake_upenc_autodetect(int dns_fd)
+handshake_upenc_autodetect()
 /* Returns:
    0: keep Base32
    1: Base64 is okay
@@ -1771,7 +1771,7 @@ handshake_upenc_autodetect(int dns_fd)
 
 	/* Try Base128, starting very gently to not draw attention */
 	while (1) {
-		res = handshake_upenctest(dns_fd, pat128a);
+		res = handshake_upenctest(pat128a);
 		if (res < 0) {
 			/* DNS swaps case, msg already printed; or Ctrl-C */
 			return 0;
@@ -1780,7 +1780,7 @@ handshake_upenc_autodetect(int dns_fd)
 			break;
 		}
 
-		res = handshake_upenctest(dns_fd, pat128b);
+		res = handshake_upenctest(pat128b);
 		if (res < 0)
 			return 0;
 		else if (res == 0)
@@ -1788,19 +1788,19 @@ handshake_upenc_autodetect(int dns_fd)
 
 		/* if this works, we can test the real stuff */
 
-		res = handshake_upenctest(dns_fd, pat128c);
+		res = handshake_upenctest(pat128c);
 		if (res < 0)
 			return 0;
 		else if (res == 0)
 			break;
 
-		res = handshake_upenctest(dns_fd, pat128d);
+		res = handshake_upenctest(pat128d);
 		if (res < 0)
 			return 0;
 		else if (res == 0)
 			break;
 
-		res = handshake_upenctest(dns_fd, pat128e);
+		res = handshake_upenctest(pat128e);
 		if (res < 0)
 			return 0;
 		else if (res == 0)
@@ -1811,7 +1811,7 @@ handshake_upenc_autodetect(int dns_fd)
 	}
 
 	/* Try Base64 (with plus sign) */
-	res = handshake_upenctest(dns_fd, pat64);
+	res = handshake_upenctest(pat64);
 	if (res < 0) {
 		/* DNS swaps case, msg already printed; or Ctrl-C */
 		return 0;
@@ -1821,7 +1821,7 @@ handshake_upenc_autodetect(int dns_fd)
 	}
 
 	/* Try Base64u (with _u_nderscore) */
-	res = handshake_upenctest(dns_fd, pat64u);
+	res = handshake_upenctest(pat64u);
 	if (res < 0) {
 		/* DNS swaps case, msg already printed; or Ctrl-C */
 		return 0;
@@ -1836,7 +1836,7 @@ handshake_upenc_autodetect(int dns_fd)
 }
 
 static int
-handshake_downenctest(int dns_fd, char trycodec)
+handshake_downenctest(char trycodec)
 /* Returns:
    0: not identical or error or timeout
    1: identical string returned
@@ -1850,9 +1850,9 @@ handshake_downenctest(int dns_fd, char trycodec)
 
 	for (i=0; this.running && i<3 ;i++) {
 
-		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
+		send_downenctest(trycodec, 1, NULL, 0);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'Y', i+1);
+		read = handshake_waitdns(in, sizeof(in), 'Y', i+1);
 
 		if (read == -2)
 			return 0;	/* hard error */
@@ -1880,7 +1880,7 @@ handshake_downenctest(int dns_fd, char trycodec)
 }
 
 static char
-handshake_downenc_autodetect(int dns_fd)
+handshake_downenc_autodetect()
 /* Returns codec char (or ' ' if no advanced codec works) */
 {
 	int base64ok = 0;
@@ -1896,20 +1896,20 @@ handshake_downenc_autodetect(int dns_fd)
 	fprintf(stderr, "Autodetecting downstream codec (use -O to override)\n");
 
 	/* Try Base64 */
-	if (handshake_downenctest(dns_fd, 'S'))
+	if (handshake_downenctest('S'))
 		base64ok = 1;
-	else if (this.running && handshake_downenctest(dns_fd, 'U'))
+	else if (this.running && handshake_downenctest('U'))
 		base64uok = 1;
 
 	/* Try Base128 only if 64 gives us some perspective */
 	if (this.running && (base64ok || base64uok)) {
-		if (handshake_downenctest(dns_fd, 'V'))
+		if (handshake_downenctest('V'))
 			base128ok = 1;
 	}
 
 	/* If 128 works, then TXT may give us Raw as well */
 	if (this.running && (base128ok && this.do_qtype == T_TXT)) {
-		if (handshake_downenctest(dns_fd, 'R'))
+		if (handshake_downenctest('R'))
 			return 'R';
 	}
 
@@ -1928,7 +1928,7 @@ handshake_downenc_autodetect(int dns_fd)
 }
 
 static int
-handshake_qtypetest(int dns_fd, int timeout)
+handshake_qtypetest(int timeout)
 /* Returns:
    0: doesn't work with this timeout
    1: works properly
@@ -1950,9 +1950,9 @@ handshake_qtypetest(int dns_fd, int timeout)
 	   byte values can be returned, which is needed for NULL/PRIVATE
 	   to work. */
 
-	send_downenctest(dns_fd, trycodec, 1, NULL, 0);
+	send_downenctest(trycodec, 1, NULL, 0);
 
-	read = handshake_waitdns(dns_fd, in, sizeof(in), 'Y', timeout);
+	read = handshake_waitdns(in, sizeof(in), 'Y', timeout);
 
 	if (read != slen)
 		return 0;	/* incorrect */
@@ -1984,7 +1984,7 @@ handshake_qtype_numcvt(int num)
 }
 
 static int
-handshake_qtype_autodetect(int dns_fd)
+handshake_qtype_autodetect()
 /* Returns:
    0: okay, this.do_qtype set
    1: problem, program exit
@@ -2016,7 +2016,7 @@ handshake_qtype_autodetect(int dns_fd)
 			fprintf(stderr, ".");
 			fflush(stderr);
 
-			if (handshake_qtypetest(dns_fd, timeout)) {
+			if (handshake_qtypetest(timeout)) {
 				/* okay */
 				highestworking = qtypenum;
 				DEBUG(1, " Type %s timeout %d works", client_get_qtype(), timeout);
@@ -2053,7 +2053,7 @@ handshake_qtype_autodetect(int dns_fd)
 }
 
 static int
-handshake_edns0_check(int dns_fd)
+handshake_edns0_check()
 /* Returns:
    0: EDNS0 not supported; or Ctrl-C
    1: EDNS0 works
@@ -2073,9 +2073,9 @@ handshake_edns0_check(int dns_fd)
 
 	for (i=0; this.running && i<3 ;i++) {
 
-		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
+		send_downenctest(trycodec, 1, NULL, 0);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'Y', i+1);
+		read = handshake_waitdns(in, sizeof(in), 'Y', i+1);
 
 		if (read == -2)
 			return 0;	/* hard error */
@@ -2103,7 +2103,7 @@ handshake_edns0_check(int dns_fd)
 }
 
 static void
-handshake_switch_codec(int dns_fd, int bits)
+handshake_switch_codec(int bits)
 {
 	char in[4096];
 	int i;
@@ -2124,9 +2124,9 @@ handshake_switch_codec(int dns_fd, int bits)
 
 	for (i=0; this.running && i<5 ;i++) {
 
-		send_codec_switch(dns_fd, this.userid, bits);
+		send_codec_switch(bits);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'S', i+1);
+		read = handshake_waitdns(in, sizeof(in), 'S', i+1);
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
@@ -2160,7 +2160,7 @@ codec_revert:
 }
 
 void
-handshake_switch_options(int dns_fd, int lazy, int compression, char denc)
+handshake_switch_options(int lazy, int compression, char denc)
 {
 	char in[4096];
 	int read;
@@ -2185,9 +2185,9 @@ handshake_switch_options(int dns_fd, int lazy, int compression, char denc)
 			lazy_status, dname, comp_status);
 	for (int i = 0; this.running && i < 5; i++) {
 
-		send_server_options(dns_fd, this.userid, lazy, compression, denc, opts);
+		send_server_options(lazy, compression, denc, opts);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in) - 1, 'O', i + 1);
+		read = handshake_waitdns(in, sizeof(in) - 1, 'O', i + 1);
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
@@ -2295,7 +2295,7 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 
 
 static int
-handshake_autoprobe_fragsize(int dns_fd)
+handshake_autoprobe_fragsize()
 {
 	char in[MAX_FRAGSIZE];
 	int i;
@@ -2310,9 +2310,9 @@ handshake_autoprobe_fragsize(int dns_fd)
 		/* stop the slow probing early when we have enough bytes anyway */
 		for (i=0; this.running && i<3 ;i++) {
 
-			send_fragsize_probe(dns_fd, proposed_fragsize);
+			send_fragsize_probe(proposed_fragsize);
 
-			read = handshake_waitdns(dns_fd, in, sizeof(in), 'R', 1);
+			read = handshake_waitdns(in, sizeof(in), 'R', 1);
 
 			if (read > 0) {
 				/* We got a reply */
@@ -2367,7 +2367,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 }
 
 static void
-handshake_set_fragsize(int dns_fd, int fragsize)
+handshake_set_fragsize(int fragsize)
 {
 	char in[4096];
 	int i;
@@ -2376,9 +2376,9 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 	fprintf(stderr, "Setting downstream fragment size to max %d...\n", fragsize);
 	for (i=0; this.running && i<5 ;i++) {
 
-		send_set_downstream_fragsize(dns_fd, fragsize);
+		send_set_downstream_fragsize(fragsize);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'N', i+1);
+		read = handshake_waitdns(in, sizeof(in), 'N', i+1);
 
 		if (read > 0) {
 
@@ -2404,7 +2404,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 }
 
 static void
-handshake_set_timeout(int dns_fd)
+handshake_set_timeout()
 {
 	char in[4096];
 	int read, id;
@@ -2419,9 +2419,9 @@ handshake_set_timeout(int dns_fd)
 	for (int i = 0; this.running && i < 5; i++) {
 
 		id = this.autodetect_server_timeout ?
-			update_server_timeout(dns_fd, 1) : send_ping(dns_fd, 1, -1, 1);
+			update_server_timeout(1) : send_ping(1, -1, 1);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'P', i + 1);
+		read = handshake_waitdns(in, sizeof(in), 'P', i + 1);
 		got_response(id, 1, 0);
 
 		fprintf(stderr, ".");
@@ -2447,7 +2447,7 @@ handshake_set_timeout(int dns_fd)
 }
 
 int
-client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize)
+client_handshake()
 {
 	int seed;
 	int upcodec;
@@ -2457,7 +2457,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 
 	/* qtype message printed in handshake function */
 	if (this.do_qtype == T_UNSET) {
-		r = handshake_qtype_autodetect(dns_fd);
+		r = handshake_qtype_autodetect();
 		if (r) {
 			return r;
 		}
@@ -2465,28 +2465,28 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 
 	fprintf(stderr, "Using DNS type %s queries\n", client_get_qtype());
 
-	r = handshake_version(dns_fd, &seed);
+	r = handshake_version(&seed);
 	if (r) {
 		return r;
 	}
 
-	r = handshake_login(dns_fd, seed);
+	r = handshake_login(seed);
 	if (r) {
 		return r;
 	}
 
-	if (raw_mode && handshake_raw_udp(dns_fd, seed)) {
+	if (this.raw_mode && handshake_raw_udp(seed)) {
 		this.conn = CONN_RAW_UDP;
 		this.max_timeout_ms = 10000;
 		this.compression_down = 1;
 		this.compression_up = 1;
 	} else {
-		if (raw_mode == 0) {
+		if (this.raw_mode == 0) {
 			fprintf(stderr, "Skipping raw mode\n");
 		}
 
 		dnsc_use_edns0 = 1;
-		if (handshake_edns0_check(dns_fd) && this.running) {
+		if (handshake_edns0_check() && this.running) {
 			fprintf(stderr, "Using EDNS0 extension\n");
 		} else if (!this.running) {
 			return -1;
@@ -2495,45 +2495,45 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 			dnsc_use_edns0 = 0;
 		}
 
-		upcodec = handshake_upenc_autodetect(dns_fd);
+		upcodec = handshake_upenc_autodetect();
 		if (!this.running)
 			return -1;
 
 		if (upcodec == 1) { /* Base64 */
-			handshake_switch_codec(dns_fd, 6);
+			handshake_switch_codec(6);
 		} else if (upcodec == 2) { /* Base64u */
-			handshake_switch_codec(dns_fd, 26);
+			handshake_switch_codec(26);
 		} else if (upcodec == 3) { /* Base128 */
-			handshake_switch_codec(dns_fd, 7);
+			handshake_switch_codec(7);
 		}
 		if (!this.running)
 			return -1;
 
 		if (this.downenc == ' ') {
-			this.downenc = handshake_downenc_autodetect(dns_fd);
+			this.downenc = handshake_downenc_autodetect();
 		}
 		if (!this.running)
 			return -1;
 
 		/* Set options for compression, this.lazymode and downstream codec */
-		handshake_switch_options(dns_fd, this.lazymode, this.compression_down, this.downenc);
+		handshake_switch_options(this.lazymode, this.compression_down, this.downenc);
 		if (!this.running)
 			return -1;
 
-		if (autodetect_frag_size) {
-			fragsize = handshake_autoprobe_fragsize(dns_fd);
-			if (fragsize > MAX_FRAGSIZE) {
+		if (this.autodetect_frag_size) {
+			this.max_downstream_frag_size = handshake_autoprobe_fragsize();
+			if (this.max_downstream_frag_size > MAX_FRAGSIZE) {
 				/* This is very unlikely except perhaps over LAN */
 				fprintf(stderr, "Can transfer fragsize of %d, however iodine has been compiled with MAX_FRAGSIZE = %d."
-					" To fully utilize this connection, please recompile iodine/iodined.\n", fragsize, MAX_FRAGSIZE);
-				fragsize = MAX_FRAGSIZE;
+					" To fully utilize this connection, please recompile iodine/iodined.\n", this.max_downstream_frag_size, MAX_FRAGSIZE);
+				this.max_downstream_frag_size = MAX_FRAGSIZE;
 			}
-			if (!fragsize) {
+			if (!this.max_downstream_frag_size) {
 				return 1;
 			}
 		}
 
-		handshake_set_fragsize(dns_fd, fragsize);
+		handshake_set_fragsize(this.max_downstream_frag_size);
 		if (!this.running)
 			return -1;
 
@@ -2551,7 +2551,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 			this.pending_queries[i].id = -1;
 
 		/* set server window/timeout parameters and calculate RTT */
-		handshake_set_timeout(dns_fd);
+		handshake_set_timeout();
 	}
 
 	return 0;

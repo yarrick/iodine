@@ -24,6 +24,7 @@
 #include <getopt.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <time.h>
 
@@ -57,11 +58,20 @@ static char *__progname;
 
 struct client_instance this;
 
+/* BEGIN PRESET DEFINITIONS */
+
+/* static startup values - should not be changed in presets */
+#define PRESET_STATIC_VALUES \
+	.conn = CONN_DNS_NULL, \
+	.send_ping_soon = 1, \
+	.downenc = ' ', \
+	.do_qtype = T_UNSET, \
+	.maxfragsize_up = 100, \
+	.next_downstream_ack = -1, \
+	.num_immediate = 1, \
+	.rtt_total_ms = 200
+
 static struct client_instance preset_default = {
-	.foreground = 0,
-#ifdef OPENBSD
-	.rtable = 0,
-#endif
 	.debug = 0,
 	.stats = 0,
 	.raw_mode = 1,
@@ -79,17 +89,55 @@ static struct client_instance preset_default = {
 	.windowsize_up = 8,
 	.windowsize_down = 8,
 	.hostname_maxlen = 0xFF,
-
-	/* static startup values - should not be changed in presets */
-	.conn = CONN_DNS_NULL,
-	.send_ping_soon = 1,
-	.downenc = ' ',
-	.do_qtype = T_UNSET,
-	.maxfragsize_up = 100,
-	.next_downstream_ack = -1,
-	.num_immediate = 1,
-	.rtt_total_ms = 200
+	PRESET_STATIC_VALUES
 };
+
+static struct client_instance preset_original = {
+	.raw_mode = 1,
+	.lazymode = 1,
+	.max_timeout_ms = 4000,
+	.send_interval_ms = 0,
+	.server_timeout_ms = 3000,
+	.autodetect_server_timeout = 1,
+	.windowsize_down = 1,
+	.windowsize_up = 1,
+	.hostname_maxlen = 0xFF,
+	.downstream_timeout_ms = 4000,
+	.dataenc = &base32_encoder,
+	.autodetect_frag_size = 1,
+	.max_downstream_frag_size = MAX_FRAGSIZE,
+	.compression_down = 1,
+	.compression_up = 0,
+	PRESET_STATIC_VALUES
+};
+
+struct option_presets {
+	size_t preset_data_len; /* sizeof(struct client/server_instance) */
+	size_t num_presets;
+	struct option_preset {
+		void *preset_data; /* Pointer to client/server "instance" struct */
+		char short_name;
+		char *long_name;
+	} presets[];
+};
+
+#define NUM_CLIENT_PRESETS 2
+
+static struct {
+	struct client_instance *preset_data;
+	char short_name;
+} client_presets[NUM_CLIENT_PRESETS] = {
+	{
+		.preset_data = &preset_default,
+		.short_name = 'D'
+	},
+	{
+		.preset_data = &preset_original,
+		.short_name = 'O'
+	}
+};
+
+/* END PRESET DEFINITIONS */
 
 static void
 sighandler(int sig)
@@ -151,14 +199,16 @@ help()
 	fprintf(stderr, "  -v, --version  print version info and exit\n");
 	fprintf(stderr, "  -h, --help  print this help and exit\n");
 	fprintf(stderr, "  -V, --stats  print connection statistics at given intervals (default: 5 sec)\n");
-	fprintf(stderr, "  -X  skip tun device and forward data to/from stdin/out, telling the iodined to\n");
+	/*fprintf(stderr, "  -X  skip tun device and forward data to/from stdin/out, telling iodined to\n");
 	fprintf(stderr, "        connect to the specified port listening on the server host.\n");
-	fprintf(stderr, "        Can be used with SSH ProxyCommand option. (-X 22)\n");
+	fprintf(stderr, "        Can be used with SSH ProxyCommand option. (-X 22)\n");*/
 	fprintf(stderr, "  -f  keep running in foreground\n");
 	fprintf(stderr, "  -D  enable debug mode (add more D's to increase debug level)\n");
 	fprintf(stderr, "  -d  set tunnel device name\n");
 	fprintf(stderr, "  -u  drop privileges and run as specified user\n");
 	fprintf(stderr, "  -F  write PID to specified file\n");
+	fprintf(stderr, "  -Y, --preset  use a set of predefined options (can be overridden manually)\n");
+	fprintf(stderr, "      Available presets: 'O' for iodine 0.7 behaviour, 'F' for fast/low latency settings\n");
 	fprintf(stderr, "  --chroot  chroot to given directory\n");
 	fprintf(stderr, "  --context  apply specified SELinux context after initialization\n");
 	fprintf(stderr, "  --rdomain  use specified routing domain (OpenBSD only)\n\n");
@@ -204,11 +254,6 @@ main(int argc, char **argv)
 	WSAStartup(req_version, &wsa_data);
 #endif
 
-	srand((unsigned) time(NULL));
-	this.rand_seed = (uint16_t) rand();
-	this.chunkid = (uint16_t) rand();
-	this.running = 1;
-
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
@@ -227,13 +272,52 @@ main(int argc, char **argv)
 		{"rdomain", required_argument, 0, 'R'},
 		{"chrootdir", required_argument, 0, 't'},
 		{"proxycommand", no_argument, 0, 'X'},
+		{"preset", required_argument, 0, 'Y'},
 		{NULL, 0, 0, 0}
 	};
 
-	static char *iodine_args_short = "46vfDhrXs:V:c:C:i:j:u:t:d:R:P:w:W:m:M:F:T:O:L:I:";
+	/* Pre-parse command line to get preset
+	 * This is so that all options override preset values regardless of order in command line */
+	int optind_orig = optind, preset_id = -1;
 
+	static char *iodine_args_short = "46vfDhrX:Y:s:V:c:C:i:j:u:t:d:R:P:w:W:m:M:F:T:O:L:I:";
 
-	while ((choice = getopt_long(argc, argv, iodine_args_short, iodine_args, NULL)) != -1) {
+	while ((choice = getopt_long(argc, argv, iodine_args_short, iodine_args, NULL))) {
+		if (preset_id < 0) {
+			if (choice == -1) {
+				/* reached end of command line and no preset specified - use default */
+				preset_id = 0;
+			} else if (choice == 'Y') {
+				/* find index of preset */
+				if (optarg) {
+					for (int i = 0; i < NUM_CLIENT_PRESETS; i++) {
+						if (toupper(optarg[0] == client_presets[i].short_name)) {
+							preset_id = i;
+							break;
+						}
+					}
+				}
+			} else {
+				/* skip all other options until we find preset */
+				continue;
+			}
+
+			if (preset_id < 0) {
+				/* invalid preset or none specified */
+				fprintf(stderr, "Invalid preset or none specified with -Y or --preset! Run 'iodine -h' to see available presets.\n");
+				usage();
+				/* not reached */
+			}
+
+			memcpy(&this, client_presets[preset_id].preset_data, sizeof(struct client_instance));
+
+			/* Reset optind to reparse command line */
+			optind = optind_orig;
+			continue;
+		} else if (choice == -1) {
+			break;
+		}
+
 		switch (choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -318,6 +402,9 @@ main(int argc, char **argv)
 			break;
 		case 'I':
 			this.max_timeout_ms = strtod(optarg, NULL) * 1000;
+			if (this.autodetect_server_timeout) {
+				this.server_timeout_ms = this.max_timeout_ms / 2;
+			}
 			break;
 		case 'i':
 			this.server_timeout_ms = strtod(optarg, NULL) * 1000;
@@ -346,6 +433,9 @@ main(int argc, char **argv)
 		case 'C':
 			this.compression_up = atoi(optarg) & 1;
 			break;
+		case 'Y':
+			/* Already processed preset: ignore */
+			continue;
 		case 'X':
 			// TODO implement option for remote host/port to pipe stdin/out
 		default:
@@ -353,6 +443,11 @@ main(int argc, char **argv)
 			/* NOTREACHED */
 		}
 	}
+
+	srand((unsigned) time(NULL));
+	this.rand_seed = (uint16_t) rand();
+	this.chunkid = (uint16_t) rand();
+	this.running = 1;
 
 	check_superuser(usage);
 
@@ -404,9 +499,6 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	// TODO remove client_set_... functions
-//	client_set_nameservers(nameserv_addrs, nameserv_addrs_len);
-
 	if (this.max_downstream_frag_size < 10 || this.max_downstream_frag_size > MAX_FRAGSIZE) {
 		warnx("Use a max frag size between 10 and %d bytes.", MAX_FRAGSIZE);
 		usage();
@@ -431,7 +523,8 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (this.server_timeout_ms < 100 || this.server_timeout_ms >= this.max_timeout_ms) {
+	if ((this.server_timeout_ms < 100 || this.server_timeout_ms >= this.max_timeout_ms)
+		&& !this.autodetect_server_timeout) {
 		warnx("Server timeout (-i) must be greater than 0.1 sec and less than target interval!");
 		usage();
 	}
@@ -444,14 +537,6 @@ main(int argc, char **argv)
 	if (!this.lazymode && this.max_timeout_ms > 1000) {
 		fprintf(stderr, "Warning: Target interval of >1 second in immediate mode will cause high latency.\n");
 	}
-
-//	client_set_compression(up_compression, down_compression);
-//	client_set_dnstimeout(target_interval_sec, server_timeout_sec, downstream_timeout_sec, autodetect_server_timeout);
-//	client_set_interval(target_interval_sec * 1000.0, min_interval_ms);
-//	client_set_lazymode(lazymode);
-//	client_set_topdomain(topdomain);
-//	client_set_hostname_maxlen(hostname_maxlen);
-//	client_set_windowsize(up_windowsize, down_windowsize);
 
 	if (username != NULL) {
 #ifndef WINDOWS32
@@ -494,8 +579,7 @@ main(int argc, char **argv)
 				(a != this.nameserv_addrs_len - 1) ?  ", " : "");
 	fprintf(stderr, "\n");
 
-	// TODO not pass args to client stuff - use "this" as shared instance
-	if (client_handshake(this.dns_fd, this.raw_mode, this.autodetect_frag_size, this.max_downstream_frag_size)) {
+	if (client_handshake()) {
 		retval = 1;
 		goto cleanup2;
 	}
@@ -530,8 +614,7 @@ main(int argc, char **argv)
 	if (context != NULL)
 		do_setcon(context);
 
-	// todo don't pass args again.
-	client_tunnel(this.tun_fd, this.dns_fd);
+	client_tunnel();
 
 cleanup2:
 	close_dns(this.dns_fd);
