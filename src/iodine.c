@@ -46,8 +46,21 @@
 #include "base32.h"
 
 #ifdef WINDOWS32
+#include "windows.h"
 WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
+#else
+#include <arpa/nameser.h>
+#ifdef ANDROID
+#include "android_dns.h"
+#endif
+#ifdef DARWIN
+#define BIND_8_COMPAT
+#include <arpa/nameser_compat.h>
+#endif
+#include <grp.h>
+#include <pwd.h>
+#include <netdb.h>
 #endif
 
 #if !defined(BSD) && !defined(__GLIBC__)
@@ -72,8 +85,6 @@ struct client_instance this;
 	.rtt_total_ms = 200
 
 static struct client_instance preset_default = {
-	.debug = 0,
-	.stats = 0,
 	.raw_mode = 1,
 	.lazymode = 1,
 	.max_timeout_ms = 5000,
@@ -93,7 +104,7 @@ static struct client_instance preset_default = {
 };
 
 static struct client_instance preset_original = {
-	.raw_mode = 1,
+	.raw_mode = 0,
 	.lazymode = 1,
 	.max_timeout_ms = 4000,
 	.send_interval_ms = 0,
@@ -111,29 +122,72 @@ static struct client_instance preset_original = {
 	PRESET_STATIC_VALUES
 };
 
-struct option_presets {
-	size_t preset_data_len; /* sizeof(struct client/server_instance) */
-	size_t num_presets;
-	struct option_preset {
-		void *preset_data; /* Pointer to client/server "instance" struct */
-		char short_name;
-		char *long_name;
-	} presets[];
+static struct client_instance preset_fast = {
+	.raw_mode = 0,
+	.lazymode = 1,
+	.max_timeout_ms = 3000,
+	.send_interval_ms = 0,
+	.server_timeout_ms = 2500,
+	.downstream_timeout_ms = 100,
+	.autodetect_server_timeout = 1,
+	.dataenc = &base32_encoder,
+	.autodetect_frag_size = 1,
+	.max_downstream_frag_size = 1176,
+	.compression_up = 1,
+	.compression_down = 1,
+	.windowsize_up = 64,
+	.windowsize_down = 32,
+	.hostname_maxlen = 0xFF,
+	PRESET_STATIC_VALUES
 };
 
-#define NUM_CLIENT_PRESETS 2
+static struct client_instance preset_fallback = {
+	.raw_mode = 1,
+	.lazymode = 1,
+	.max_timeout_ms = 1000,
+	.send_interval_ms = 20,
+	.server_timeout_ms = 500,
+	.downstream_timeout_ms = 1000,
+	.autodetect_server_timeout = 1,
+	.dataenc = &base32_encoder,
+	.autodetect_frag_size = 1,
+	.max_downstream_frag_size = 500,
+	.compression_up = 1,
+	.compression_down = 1,
+	.windowsize_up = 1,
+	.windowsize_down = 1,
+	.hostname_maxlen = 100,
+	.downenc = 'T',
+	.do_qtype = T_CNAME,
+	PRESET_STATIC_VALUES
+};
+
+#define NUM_CLIENT_PRESETS 4
 
 static struct {
 	struct client_instance *preset_data;
 	char short_name;
+	char *desc;
 } client_presets[NUM_CLIENT_PRESETS] = {
 	{
 		.preset_data = &preset_default,
-		.short_name = 'D'
+		.short_name = 'D',
+		.desc = "Defaults"
 	},
 	{
 		.preset_data = &preset_original,
-		.short_name = 'O'
+		.short_name = '7',
+		.desc = "Imitate iodine 0.7"
+	},
+	{
+		.preset_data = &preset_fast,
+		.short_name = 'F',
+		.desc = "Fast and low latency"
+	},
+	{
+		.preset_data = &preset_fallback,
+		.short_name = 'M',
+		.desc = "Minimal DNS queries and short DNS timeouts"
 	}
 };
 
@@ -156,7 +210,7 @@ print_usage()
 {
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] [-V sec] [-X port] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
+	fprintf(stderr, "Usage: %s [-v] [-h] [-Y preset] [-V sec] [-X port] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-w downfrags] [-W upfrags] [-i sec -j sec] [-I sec] [-c 0|1] [-C 0|1] [-s ms] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-R rdomain] "
 			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [...]]]\n", __progname);
@@ -167,6 +221,17 @@ usage()
 {
 	print_usage();
 	exit(2);
+}
+
+static void
+print_presets(int spaces)
+{
+#define INDENT fprintf(stderr, "%*s", spaces, "");
+	INDENT fprintf(stderr, "Available presets: (use -Y <preset ID>)\n");
+	spaces += 2;
+	for (int i = 0; i < NUM_CLIENT_PRESETS; i++) {
+		INDENT fprintf(stderr, "'%c': %s\n", client_presets[i].short_name, client_presets[i].desc);
+	}
 }
 
 static void
@@ -207,8 +272,8 @@ help()
 	fprintf(stderr, "  -d  set tunnel device name\n");
 	fprintf(stderr, "  -u  drop privileges and run as specified user\n");
 	fprintf(stderr, "  -F  write PID to specified file\n");
-	fprintf(stderr, "  -Y, --preset  use a set of predefined options (can be overridden manually)\n");
-	fprintf(stderr, "      Available presets: 'O' for iodine 0.7 behaviour, 'F' for fast/low latency settings\n");
+	fprintf(stderr, "  -Y, --preset  use a set of predefined options for DNS tunnel (can be overridden manually)\n");
+	print_presets(6);
 	fprintf(stderr, "  --chroot  chroot to given directory\n");
 	fprintf(stderr, "  --context  apply specified SELinux context after initialization\n");
 	fprintf(stderr, "  --rdomain  use specified routing domain (OpenBSD only)\n\n");
@@ -291,7 +356,7 @@ main(int argc, char **argv)
 				/* find index of preset */
 				if (optarg) {
 					for (int i = 0; i < NUM_CLIENT_PRESETS; i++) {
-						if (toupper(optarg[0] == client_presets[i].short_name)) {
+						if (toupper(optarg[0]) == client_presets[i].short_name) {
 							preset_id = i;
 							break;
 						}
@@ -304,7 +369,8 @@ main(int argc, char **argv)
 
 			if (preset_id < 0) {
 				/* invalid preset or none specified */
-				fprintf(stderr, "Invalid preset or none specified with -Y or --preset! Run 'iodine -h' to see available presets.\n");
+				fprintf(stderr, "Invalid preset or none specified with -Y or --preset!\n");
+				print_presets(2);
 				usage();
 				/* not reached */
 			}
