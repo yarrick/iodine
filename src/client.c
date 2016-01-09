@@ -60,189 +60,24 @@
 #include "util.h"
 #include "client.h"
 
-/* Output flags for debug and time between stats update */
-int debug;
-int stats;
-
-static int running;
-static const char *password;
-
-/* Nameserver/domain info */
-static struct sockaddr_storage *nameserv_addrs;
-static int nameserv_addrs_len;
-static int current_nameserver;
-static struct sockaddr_storage raw_serv;
-static int raw_serv_len;
-static const char *topdomain;
-
-static uint16_t rand_seed;
-
-/* Current up/downstream window data */
-static struct frag_buffer *outbuf;
-static struct frag_buffer *inbuf;
-static size_t windowsize_up;
-static size_t windowsize_down;
-static size_t maxfragsize_up;
-
-/* Next downstream seqID to be ACK'd (-1 if none pending) */
-static int next_downstream_ack;
-
-/* Remembering queries we sent for tracking purposes */
-static struct query_tuple *pending_queries;
-static size_t num_pending;
-static time_t max_timeout_ms;
-static time_t send_interval_ms;
-static time_t min_send_interval_ms;
-
-/* Server response timeout in ms and downstream window timeout */
-static time_t server_timeout_ms;
-static time_t downstream_timeout_ms;
-static int autodetect_server_timeout;
-
-/* Cumulative Round-Trip-Time in ms */
-static time_t rtt_total_ms;
-static size_t num_immediate;
-
-/* Connection statistics */
-static size_t num_timeouts;
-static size_t num_untracked;
-static size_t num_servfail;
-static size_t num_badip;
-static size_t num_sent;
-static size_t num_recv;
-static size_t send_query_sendcnt = 0;
-static size_t send_query_recvcnt = 0;
-static size_t num_frags_sent;
-static size_t num_frags_recv;
-static size_t num_pings;
-
-/* My userid at the server */
-static char userid;
-static char userid_char;		/* used when sending (lowercase) */
-static char userid_char2;		/* also accepted when receiving (uppercase) */
-
-static uint16_t chunkid;
-
-/* Base32 encoder used for non-data packets and replies */
-static struct encoder *b32;
-/* Base64 etc encoders for replies */
-static struct encoder *b64;
-static struct encoder *b64u;
-static struct encoder *b128;
-
-/* The encoder used for data packets
- * Defaults to Base32, can be changed after handshake */
-static struct encoder *dataenc;
-
-/* Upstream/downstream compression flags */
-static int compression_up;
-static int compression_down;
-
-/* The encoder to use for downstream data */
-static char downenc = ' ';
-
-/* set query type to send */
-static uint16_t do_qtype = T_UNSET;
-
-/* My connection mode */
-static enum connection conn;
-static int connected;
-
-static int lazymode;
-static long send_ping_soon;
-static time_t lastdownstreamtime;
-static size_t hostname_maxlen = 0xFF;
-
-void
-client_init()
-{
-	running = 1;
-	b32 = get_base32_encoder();
-	b64 = get_base64_encoder();
-	b64u = get_base64u_encoder();
-	b128 = get_base128_encoder();
-	dataenc = get_base32_encoder();
-	rand_seed = (uint16_t) rand();
-	send_ping_soon = 1;	/* send ping immediately after startup */
-	conn = CONN_DNS_NULL;
-
-	chunkid = (uint16_t) rand();
-
-	/* RFC says timeout minimum 5sec */
-	max_timeout_ms = 5000;
-
-	windowsize_up = 8;
-	windowsize_down = 8;
-
-	compression_up = 0;
-	compression_down = 1;
-
-	next_downstream_ack = -1;
-	current_nameserver = 0;
-
-	maxfragsize_up = 100;
-
-	num_immediate = 1;
-	rtt_total_ms = 1000;
-	send_interval_ms = 1000;
-	min_send_interval_ms = 1;
-	downstream_timeout_ms = 5000;
-
-	outbuf = NULL;
-	inbuf = NULL;
-	pending_queries = NULL;
-	connected = 0;
-}
-
-void
-client_stop()
-{
-	running = 0;
-}
-
-enum connection
-client_get_conn()
-{
-	return conn;
-}
-
-void
-client_set_nameservers(struct sockaddr_storage *addr, int addrslen)
-{
-	nameserv_addrs = addr;
-	nameserv_addrs_len = addrslen;
-}
-
-void
-client_set_topdomain(const char *cp)
-{
-	topdomain = cp;
-}
-
-void
-client_set_password(const char *cp)
-{
-	password = cp;
-}
-
 int
 client_set_qtype(char *qtype)
 {
 	if (!strcasecmp(qtype, "NULL"))
-      		do_qtype = T_NULL;
+      		this.do_qtype = T_NULL;
 	else if (!strcasecmp(qtype, "PRIVATE"))
-		do_qtype = T_PRIVATE;
+		this.do_qtype = T_PRIVATE;
 	else if (!strcasecmp(qtype, "CNAME"))
-		do_qtype = T_CNAME;
+		this.do_qtype = T_CNAME;
 	else if (!strcasecmp(qtype, "A"))
-		do_qtype = T_A;
+		this.do_qtype = T_A;
 	else if (!strcasecmp(qtype, "MX"))
-		do_qtype = T_MX;
+		this.do_qtype = T_MX;
 	else if (!strcasecmp(qtype, "SRV"))
-		do_qtype = T_SRV;
+		this.do_qtype = T_SRV;
 	else if (!strcasecmp(qtype, "TXT"))
-		do_qtype = T_TXT;
-	return (do_qtype == T_UNSET);
+		this.do_qtype = T_TXT;
+	return (this.do_qtype == T_UNSET);
 }
 
 char *
@@ -250,111 +85,75 @@ client_get_qtype()
 {
 	char *c = "UNDEFINED";
 
-	if (do_qtype == T_NULL)		c = "NULL";
-	else if (do_qtype == T_PRIVATE)	c = "PRIVATE";
-	else if (do_qtype == T_CNAME)	c = "CNAME";
-	else if (do_qtype == T_A)	c = "A";
-	else if (do_qtype == T_MX)	c = "MX";
-	else if (do_qtype == T_SRV)	c = "SRV";
-	else if (do_qtype == T_TXT)	c = "TXT";
+	if (this.do_qtype == T_NULL)		c = "NULL";
+	else if (this.do_qtype == T_PRIVATE)	c = "PRIVATE";
+	else if (this.do_qtype == T_CNAME)	c = "CNAME";
+	else if (this.do_qtype == T_A)	c = "A";
+	else if (this.do_qtype == T_MX)	c = "MX";
+	else if (this.do_qtype == T_SRV)	c = "SRV";
+	else if (this.do_qtype == T_TXT)	c = "TXT";
 
 	return c;
 }
 
-void
-client_set_downenc(char *encoding)
+char
+parse_encoding(char *encoding)
 {
+	char enc_char = 0;
 	if (!strcasecmp(encoding, "base32"))
-		downenc = 'T';
+		enc_char = 'T';
 	else if (!strcasecmp(encoding, "base64"))
-		downenc = 'S';
+		enc_char = 'S';
 	else if (!strcasecmp(encoding, "base64u"))
-		downenc = 'U';
+		enc_char = 'U';
 	else if (!strcasecmp(encoding, "base128"))
-		downenc = 'V';
+		enc_char = 'V';
 	else if (!strcasecmp(encoding, "raw"))
-		downenc = 'R';
-}
-
-void
-client_set_compression(int up, int down)
-{
-	compression_up = up;
-	compression_down = down;
-}
-
-void
-client_set_dnstimeout(double timeout, double servertimeout, double downfrag, int autodetect)
-{
-	max_timeout_ms = timeout * 1000;
-	server_timeout_ms = servertimeout * 1000;
-	downstream_timeout_ms = downfrag * 1000;
-	autodetect_server_timeout = autodetect;
-}
-
-void
-client_set_interval(double interval_msec, double mininterval_msec)
-{
-	send_interval_ms = interval_msec;
-	min_send_interval_ms = mininterval_msec;
-}
-
-void
-client_set_lazymode(int lazy_mode)
-{
-	lazymode = lazy_mode;
-}
-
-void
-client_set_windowsize(size_t up, size_t down)
-/* set window sizes for upstream and downstream
- * XXX upstream/downstream windowsizes might as well be the same */
-{
-	windowsize_up = up;
-	windowsize_down = down;
+		enc_char = 'R';
+	return enc_char;
 }
 
 void
 client_set_hostname_maxlen(size_t i)
 {
-	if (i <= 0xFF && i != hostname_maxlen) {
-		hostname_maxlen = i;
-		maxfragsize_up = get_raw_length_from_dns(hostname_maxlen - UPSTREAM_HDR, dataenc, topdomain);
-		if (outbuf)
-			outbuf->maxfraglen = maxfragsize_up;
+	if (i <= 0xFF && i != this.hostname_maxlen) {
+		this.hostname_maxlen = i;
+		this.maxfragsize_up = get_raw_length_from_dns(this.hostname_maxlen - UPSTREAM_HDR, this.dataenc, this.topdomain);
+		if (this.outbuf)
+			this.outbuf->maxfraglen = this.maxfragsize_up;
 	}
 }
 
 const char *
 client_get_raw_addr()
 {
-	return format_addr(&raw_serv, raw_serv_len);
+	return format_addr(&this.raw_serv, this.raw_serv_len);
 }
 
 void
 client_rotate_nameserver()
 {
-	current_nameserver ++;
-	if (current_nameserver >= nameserv_addrs_len)
-		current_nameserver = 0;
+	this.current_nameserver ++;
+	if (this.current_nameserver >= this.nameserv_addrs_len)
+		this.current_nameserver = 0;
 }
 
 void
 immediate_mode_defaults()
 {
-	send_interval_ms = MIN(rtt_total_ms / num_immediate, 1000);
-	max_timeout_ms = MAX(4 * rtt_total_ms / num_immediate, 5000);
-	server_timeout_ms = 0;
+	this.send_interval_ms = MIN(this.rtt_total_ms / this.num_immediate, 1000);
+	this.max_timeout_ms = MAX(4 * this.rtt_total_ms / this.num_immediate, 5000);
+	this.server_timeout_ms = 0;
 }
 
 /* Client-side query tracking for lazy mode */
 
-/* Handy macro for printing stats with messages */
+/* Handy macro for printing this.stats with messages */
 #ifdef DEBUG_BUILD
 #define QTRACK_DEBUG(l, ...) \
-	if (debug >= l) {\
-		TIMEPRINT("[QTRACK (%lu/%lu), ? %lu, TO %lu, S %lu/%lu] ", num_pending, PENDING_QUERIES_LENGTH, \
-				num_untracked, num_timeouts, window_sending(outbuf, NULL), outbuf->numitems); \
+	if (this.debug >= l) {\
+		TIMEPRINT("[QTRACK (%lu/%lu), ? %lu, TO %lu, S %lu/%lu] ", this.num_pending, PENDING_QUERIES_LENGTH, \
+				this.num_untracked, this.num_timeouts, window_sending(this.outbuf, NULL), this.outbuf->numitems); \
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
 	}
@@ -371,34 +170,34 @@ update_server_timeout(int dns_fd, int handshake)
 	static size_t num_rtt_timeouts = 0;
 
 	/* Get average RTT in ms */
-	rtt_ms = rtt_total_ms / num_immediate;
-	if (rtt_ms >= max_timeout_ms && num_immediate > 5) {
+	rtt_ms = this.rtt_total_ms / this.num_immediate;
+	if (rtt_ms >= this.max_timeout_ms && this.num_immediate > 5) {
 		num_rtt_timeouts++;
 		if (num_rtt_timeouts < 3) {
 			fprintf(stderr, "Target interval of %ld ms less than average round-trip of "
-					"%ld ms! Try increasing interval with -I.\n", max_timeout_ms, rtt_ms);
+					"%ld ms! Try increasing interval with -I.\n", this.max_timeout_ms, rtt_ms);
 		} else {
 			/* bump up target timeout */
-			max_timeout_ms = rtt_ms + 1000;
-			server_timeout_ms = 1000;
-			if (lazymode)
+			this.max_timeout_ms = rtt_ms + 1000;
+			this.server_timeout_ms = 1000;
+			if (this.lazymode)
 				fprintf(stderr, "Adjusting server timeout to %ld ms, target interval %ld ms. Try -I%.1f next time with this network.\n",
-						server_timeout_ms, max_timeout_ms, max_timeout_ms / 1000.0);
+						this.server_timeout_ms, this.max_timeout_ms, this.max_timeout_ms / 1000.0);
 
 			num_rtt_timeouts = 0;
 		}
 	} else {
 		/* Set server timeout based on target interval and RTT */
-		server_timeout_ms = max_timeout_ms - rtt_ms;
-		if (server_timeout_ms <= 0) {
-			server_timeout_ms = 0;
+		this.server_timeout_ms = this.max_timeout_ms - rtt_ms;
+		if (this.server_timeout_ms <= 0) {
+			this.server_timeout_ms = 0;
 			fprintf(stderr, "Setting server timeout to 0 ms: if this continues try disabling lazy mode. (-L0)\n");
 		}
 	}
 
 	/* update up/down window timeouts to something reasonable */
-	downstream_timeout_ms = rtt_ms * 2;
-	outbuf->timeout = ms_to_timeval(downstream_timeout_ms);
+	this.downstream_timeout_ms = rtt_ms * 2;
+	this.outbuf->timeout = ms_to_timeval(this.downstream_timeout_ms);
 
 	if (handshake) {
 		/* Send ping handshake to set server timeout */
@@ -411,20 +210,20 @@ static void
 check_pending_queries()
 /* Updates pending queries list */
 {
-	num_pending = 0;
+	this.num_pending = 0;
 	struct timeval now, qtimeout, max_timeout;
 	gettimeofday(&now, NULL);
 	/* Max timeout for queries is max interval + 1 second extra */
-	max_timeout = ms_to_timeval(max_timeout_ms + 1000);
+	max_timeout = ms_to_timeval(this.max_timeout_ms + 1000);
 	for (int i = 0; i < PENDING_QUERIES_LENGTH; i++) {
-		if (pending_queries[i].time.tv_sec > 0 && pending_queries[i].id >= 0) {
-			timeradd(&pending_queries[i].time, &max_timeout, &qtimeout);
+		if (this.pending_queries[i].time.tv_sec > 0 && this.pending_queries[i].id >= 0) {
+			timeradd(&this.pending_queries[i].time, &max_timeout, &qtimeout);
 			if (!timercmp(&qtimeout, &now, >)) {
 				/* Query has timed out, clear timestamp but leave ID */
-				pending_queries[i].time.tv_sec = 0;
-				num_timeouts++;
+				this.pending_queries[i].time.tv_sec = 0;
+				this.num_timeouts++;
 			}
-			num_pending++;
+			this.num_pending++;
 		}
 	}
 }
@@ -433,7 +232,7 @@ static void
 query_sent_now(int id)
 {
 	int i = 0, found = 0;
-	if (!pending_queries)
+	if (!this.pending_queries)
 		return;
 
 	if (id < 0 || id > 65535)
@@ -441,14 +240,14 @@ query_sent_now(int id)
 
 	/* Replace any empty queries first, then timed out ones if necessary */
 	for (i = 0; i < PENDING_QUERIES_LENGTH; i++) {
-		if (pending_queries[i].id < 0) {
+		if (this.pending_queries[i].id < 0) {
 			found = 1;
 			break;
 		}
 	}
 	if (!found) {
 		for (i = 0; i < PENDING_QUERIES_LENGTH; i++) {
-			if (pending_queries[i].time.tv_sec == 0) {
+			if (this.pending_queries[i].time.tv_sec == 0) {
 				found = 1;
 				break;
 			}
@@ -459,10 +258,10 @@ query_sent_now(int id)
 		QTRACK_DEBUG(1, "Buffer full! Failed to add id %d.", id);
 	} else {
 		/* Add query into found location */
-		pending_queries[i].id = id;
-		gettimeofday(&pending_queries[i].time, NULL);
-		num_pending ++;
-		QTRACK_DEBUG(4, "Adding query id %d into pending_queries[%d]", id, i);
+		this.pending_queries[i].id = id;
+		gettimeofday(&this.pending_queries[i].time, NULL);
+		this.num_pending ++;
+		QTRACK_DEBUG(4, "Adding query id %d into this.pending_queries[%d]", id, i);
 		id = -1;
 	}
 }
@@ -478,15 +277,15 @@ got_response(int id, int immediate, int fail)
 		fail ? ", FAIL" : "");
 
 	for (int i = 0; i < PENDING_QUERIES_LENGTH; i++) {
-		if (id >= 0 && pending_queries[i].id == id) {
-			if (num_pending > 0)
-				num_pending--;
+		if (id >= 0 && this.pending_queries[i].id == id) {
+			if (this.num_pending > 0)
+				this.num_pending--;
 
-			if (pending_queries[i].time.tv_sec == 0) {
-				if (num_timeouts > 0) {
+			if (this.pending_queries[i].time.tv_sec == 0) {
+				if (this.num_timeouts > 0) {
 					/* If query has timed out but is still stored - just in case
 					 * ID is kept on timeout in check_pending_queries() */
-					num_timeouts --;
+					this.num_timeouts --;
 					immediate = 0;
 				} else {
 					/* query is empty */
@@ -494,8 +293,8 @@ got_response(int id, int immediate, int fail)
 				}
 			}
 
-			if (immediate || debug >= 4) {
-				timersub(&now, &pending_queries[i].time, &rtt);
+			if (immediate || this.debug >= 4) {
+				timersub(&now, &this.pending_queries[i].time, &rtt);
 				rtt_ms = timeval_to_ms(&rtt);
 			}
 
@@ -506,23 +305,23 @@ got_response(int id, int immediate, int fail)
 				   more detailed connection statistics like RTT.
 				   This lets us determine and adjust server lazy response time
 				   during the session much more accurately. */
-				rtt_total_ms += rtt_ms;
-				num_immediate++;
+				this.rtt_total_ms += rtt_ms;
+				this.num_immediate++;
 
-				if (autodetect_server_timeout)
+				if (this.autodetect_server_timeout)
 					update_server_timeout(-1, 0);
 			}
 
 			/* Remove query info from buffer to mark it as answered */
 			id = -1;
-			pending_queries[i].id = -1;
-			pending_queries[i].time.tv_sec = 0;
+			this.pending_queries[i].id = -1;
+			this.pending_queries[i].time.tv_sec = 0;
 			break;
 		}
 	}
 	if (id > 0) {
 		QTRACK_DEBUG(4, "    got untracked response to id %d.", id);
-		num_untracked++;
+		this.num_untracked++;
 	}
 }
 
@@ -536,13 +335,13 @@ send_query(int fd, uint8_t *hostname)
 
 	DEBUG(3, "TX: pkt len %lu: hostname '%s'", strlen((char *)hostname), hostname);
 
-	chunkid += 7727;
-	if (chunkid == 0)
+	this.chunkid += 7727;
+	if (this.chunkid == 0)
 		/* 0 is used as "no-query" in iodined.c */
-		chunkid = rand() & 0xFF;
+		this.chunkid = rand() & 0xFF;
 
-	q.id = chunkid;
-	q.type = do_qtype;
+	q.id = this.chunkid;
+	q.type = this.do_qtype;
 
 	len = dns_encode((char *)packet, sizeof(packet), &q, QR_QUERY, (char *)hostname, strlen((char *)hostname));
 	if (len < 1) {
@@ -552,7 +351,7 @@ send_query(int fd, uint8_t *hostname)
 
 	DEBUG(4, "  Sendquery: id %5d name[0] '%c'", q.id, hostname[0]);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*) &nameserv_addrs[current_nameserver],
+	sendto(fd, packet, len, 0, (struct sockaddr*) &this.nameserv_addrs[this.current_nameserver],
 			sizeof(struct sockaddr_storage));
 
 	client_rotate_nameserver();
@@ -567,30 +366,30 @@ send_query(int fd, uint8_t *hostname)
 	   Here we detect and fix these situations.
 	   (Can't very well do this anywhere else; this is the only place
 	   we'll reliably get to in such situations.)
-	   Note: only start fixing up connection AFTER we have connected
+	   Note: only start fixing up connection AFTER we have this.connected
 	         and if user hasn't specified server timeout/window timeout etc. */
 
-	num_sent++;
-	if (send_query_sendcnt > 0 && send_query_sendcnt < 100 &&
-		lazymode && connected && autodetect_server_timeout) {
-		send_query_sendcnt++;
+	this.num_sent++;
+	if (this.send_query_sendcnt > 0 && this.send_query_sendcnt < 100 &&
+		this.lazymode && this.connected && this.autodetect_server_timeout) {
+		this.send_query_sendcnt++;
 
-		if ((send_query_sendcnt > windowsize_down && send_query_recvcnt <= 0) ||
-		    (send_query_sendcnt > 2 * windowsize_down && 4 * send_query_recvcnt < send_query_sendcnt)) {
-			if (max_timeout_ms > 500) {
-				max_timeout_ms -= 200;
-				double secs = (double) max_timeout_ms / 1000.0;
+		if ((this.send_query_sendcnt > this.windowsize_down && this.send_query_recvcnt <= 0) ||
+		    (this.send_query_sendcnt > 2 * this.windowsize_down && 4 * this.send_query_recvcnt < this.send_query_sendcnt)) {
+			if (this.max_timeout_ms > 500) {
+				this.max_timeout_ms -= 200;
+				double secs = (double) this.max_timeout_ms / 1000.0;
 				fprintf(stderr, "Receiving too few answers. Setting target timeout to %.1fs (-I%.1f)\n", secs, secs);
 
 				/* restart counting */
-				send_query_sendcnt = 0;
-				send_query_recvcnt = 0;
+				this.send_query_sendcnt = 0;
+				this.send_query_recvcnt = 0;
 
-			} else if (lazymode) {
+			} else if (this.lazymode) {
 				fprintf(stderr, "Receiving too few answers. Will try to switch lazy mode off, but that may not"
 					" always work any more. Start with -L0 next time on this network.\n");
-				lazymode = 0;
-				server_timeout_ms = 0;
+				this.lazymode = 0;
+				this.server_timeout_ms = 0;
 			}
 			update_server_timeout(fd, 1);
 		}
@@ -614,13 +413,13 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd)
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = (cmd & 0xF0) | (user & 0x0F);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv, sizeof(raw_serv));
+	sendto(fd, packet, len, 0, (struct sockaddr*)&this.raw_serv, sizeof(this.raw_serv));
 }
 
 static void
 send_raw_data(int dns_fd, uint8_t *data, size_t datalen)
 {
-	send_raw(dns_fd, data, datalen, userid, RAW_HDR_CMD_DATA);
+	send_raw(dns_fd, data, datalen, this.userid, RAW_HDR_CMD_DATA);
 }
 
 
@@ -633,7 +432,7 @@ send_packet(int fd, char cmd, const uint8_t *data, const size_t datalen)
 
 	buf[0] = cmd;
 
-	build_hostname(buf, sizeof(buf), data, datalen, topdomain, b32, hostname_maxlen, 1);
+	build_hostname(buf, sizeof(buf), data, datalen, this.topdomain, b32, this.hostname_maxlen, 1);
 
 	return send_query(fd, buf);
 }
@@ -641,34 +440,34 @@ send_packet(int fd, char cmd, const uint8_t *data, const size_t datalen)
 int
 send_ping(int fd, int ping_response, int ack, int set_timeout)
 {
-	num_pings++;
-	if (conn == CONN_DNS_NULL) {
+	this.num_pings++;
+	if (this.conn == CONN_DNS_NULL) {
 		uint8_t data[13];
 		int id;
 
 		/* Build ping header (see doc/proto_xxxxxxxx.txt) */
-		data[0] = userid;
+		data[0] = this.userid;
 		data[1] = ack & 0xFF;
 
-		if (outbuf && inbuf) {
-			data[2] = outbuf->windowsize & 0xff;	/* Upstream window size */
-			data[3] = inbuf->windowsize & 0xff;		/* Downstream window size */
-			data[4] = outbuf->start_seq_id & 0xff;	/* Upstream window start */
-			data[5] = inbuf->start_seq_id & 0xff;	/* Downstream window start */
+		if (this.outbuf && this.inbuf) {
+			data[2] = this.outbuf->windowsize & 0xff;	/* Upstream window size */
+			data[3] = this.inbuf->windowsize & 0xff;		/* Downstream window size */
+			data[4] = this.outbuf->start_seq_id & 0xff;	/* Upstream window start */
+			data[5] = this.inbuf->start_seq_id & 0xff;	/* Downstream window start */
 		}
 
-		*(uint16_t *) (data + 6) = htons(server_timeout_ms);
-		*(uint16_t *) (data + 8) = htons(downstream_timeout_ms);
+		*(uint16_t *) (data + 6) = htons(this.server_timeout_ms);
+		*(uint16_t *) (data + 8) = htons(this.downstream_timeout_ms);
 
 		/* update server frag/lazy timeout, ack flag, respond with ping flag */
 		data[10] = ((set_timeout & 1) << 4) | ((set_timeout & 1) << 3) | ((ack < 0 ? 0 : 1) << 2) | (ping_response & 1);
-		data[11] = (rand_seed >> 8) & 0xff;
-		data[12] = (rand_seed >> 0) & 0xff;
-		rand_seed += 1;
+		data[11] = (this.rand_seed >> 8) & 0xff;
+		data[12] = (this.rand_seed >> 0) & 0xff;
+		this.rand_seed += 1;
 
 		DEBUG(3, " SEND PING: respond %d, ack %d, %s(server %ld ms, downfrag %ld ms), flags %02X",
-				ping_response, ack, set_timeout ? "SET " : "", server_timeout_ms,
-				downstream_timeout_ms, data[8]);
+				ping_response, ack, set_timeout ? "SET " : "", this.server_timeout_ms,
+				this.downstream_timeout_ms, data[8]);
 
 		id = send_packet(fd, 'p', data, sizeof(data));
 
@@ -676,7 +475,7 @@ send_ping(int fd, int ping_response, int ack, int set_timeout)
 		query_sent_now(id);
 		return id;
 	} else {
-		send_raw(fd, NULL, 0, userid, RAW_HDR_CMD_PING);
+		send_raw(fd, NULL, 0, this.userid, RAW_HDR_CMD_PING);
 		return -1;
 	}
 }
@@ -693,20 +492,20 @@ send_next_frag(int fd)
 	size_t buflen;
 
 	/* Get next fragment to send */
-	f = window_get_next_sending_fragment(outbuf, &next_downstream_ack);
+	f = window_get_next_sending_fragment(this.outbuf, &this.next_downstream_ack);
 	if (!f) {
-		if (outbuf->numitems > 0) {
+		if (this.outbuf->numitems > 0) {
 			/* There is stuff to send but we're out of sync, so send a ping
 			 * to get things back in order and keep the packets flowing */
-			send_ping(fd, 1, next_downstream_ack, 1);
-			next_downstream_ack = -1;
-			window_tick(outbuf);
+			send_ping(fd, 1, this.next_downstream_ack, 1);
+			this.next_downstream_ack = -1;
+			window_tick(this.outbuf);
 		}
 		return; /* nothing to send */
 	}
 
 	/* Build upstream data header (see doc/proto_xxxxxxxx.txt) */
-	buf[0] = userid_char;		/* First byte is hex userid */
+	buf[0] = this.userid_char;		/* First byte is hex this.userid */
 
 	buf[1] = datacmcchars[datacmc]; /* Second byte is data-CMC */
 
@@ -723,8 +522,8 @@ send_next_frag(int fd)
 	b32->encode(buf + 2, &buflen, hdr, 3);
 
 	/* Encode data into buf after header (6 = user + CMC + 4 bytes header) */
-	build_hostname(buf, sizeof(buf), f->data, f->len, topdomain,
-				   dataenc, hostname_maxlen, 6);
+	build_hostname(buf, sizeof(buf), f->data, f->len, this.topdomain,
+				   this.dataenc, this.hostname_maxlen, 6);
 
 	datacmc++;
 	if (datacmc >= 36)
@@ -737,8 +536,8 @@ send_next_frag(int fd)
 	/* Log query ID as being sent now */
 	query_sent_now(id);
 
-	window_tick(outbuf);
-	num_frags_sent++;
+	window_tick(this.outbuf);
+	this.num_frags_sent++;
 }
 
 static void
@@ -904,7 +703,7 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query
 		return -1;
 	}
 
-	if (conn == CONN_DNS_NULL) {
+	if (this.conn == CONN_DNS_NULL) {
 		int rv;
 		if (r <= 0)
 			/* useless packet */
@@ -974,12 +773,12 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query
 		if (memcmp(data, raw_header, RAW_HDR_IDENT_LEN))
 			return 0;
 		/* should be my user id */
-		if (RAW_HDR_GET_USR(data) != userid)
+		if (RAW_HDR_GET_USR(data) != this.userid)
 			return 0;
 
 		if (RAW_HDR_GET_CMD(data) == RAW_HDR_CMD_DATA ||
 		    RAW_HDR_GET_CMD(data) == RAW_HDR_CMD_PING)
-			lastdownstreamtime = time(NULL);
+			this.lastdownstreamtime = time(NULL);
 
 		/* should be data packet */
 		if (RAW_HDR_GET_CMD(data) != RAW_HDR_CMD_DATA)
@@ -1035,7 +834,7 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 		rv = read_dns_withq(dns_fd, 0, (uint8_t *)buf, buflen, &q);
 
 		qcmd = toupper(q.name[0]);
-		if (q.id != chunkid || qcmd != cmd) {
+		if (q.id != this.chunkid || qcmd != cmd) {
 			DEBUG(1, "Ignoring unfitting reply id %d starting with '%c'", q.id, q.name[0]);
 			continue;
 		}
@@ -1053,7 +852,7 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 		     q.name[0] == 'V' || q.name[0] == 'v')) {
 			fprintf(stderr, "Got empty reply. This nameserver may not be resolving recursively, use another.\n");
 			fprintf(stderr, "Try \"iodine [options] ns.%s %s\" first, it might just work.\n",
-				topdomain, topdomain);
+				this.topdomain, this.topdomain);
 			return -2;
 		}
 
@@ -1063,7 +862,7 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 		   mostly long after we've moved along to some other queries.
 		   However, some DNS relays, once they throw a SERVFAIL, will
 		   for several seconds apply it immediately to _any_ new query
-		   for the same topdomain. When this happens, waiting a while
+		   for the same this.topdomain. When this happens, waiting a while
 		   is the only option that works.
 		 */
 		if (rv < 0 && q.rcode == SERVFAIL)
@@ -1132,9 +931,9 @@ tunnel_tun(int tun_fd, int dns_fd)
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return -1;
 
-	DEBUG(2, " IN: %lu bytes on tunnel, to be compressed: %d", read, compression_up);
+	DEBUG(2, " IN: %lu bytes on tunnel, to be compressed: %d", read, this.compression_up);
 
-	if (conn != CONN_DNS_NULL || compression_up) {
+	if (this.conn != CONN_DNS_NULL || this.compression_up) {
 		datalen = sizeof(out);
 		compress2(out, &datalen, in, read, 9);
 		data = out;
@@ -1143,15 +942,15 @@ tunnel_tun(int tun_fd, int dns_fd)
 		data = in;
 	}
 
-	if (conn == CONN_DNS_NULL) {
+	if (this.conn == CONN_DNS_NULL) {
 		/* Check if outgoing buffer can hold data */
-		if (window_buffer_available(outbuf) < (read / MAX_FRAGSIZE) + 1) {
+		if (window_buffer_available(this.outbuf) < (read / MAX_FRAGSIZE) + 1) {
 			DEBUG(1, "  Outgoing buffer full (%lu/%lu), not adding data!",
-						outbuf->numitems, outbuf->length);
+						this.outbuf->numitems, this.outbuf->length);
 			return -1;
 		}
 
-		window_add_outgoing_data(outbuf, data, datalen, compression_up);
+		window_add_outgoing_data(this.outbuf, data, datalen, this.compression_up);
 		/* Don't send anything here to respect min. send interval */
 	} else {
 		send_raw_data(dns_fd, data, datalen);
@@ -1174,7 +973,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	memset(cbuf, 0, sizeof(cbuf));
 	read = read_dns_withq(dns_fd, tun_fd, cbuf, sizeof(cbuf), &q);
 
-	if (conn != CONN_DNS_NULL)
+	if (this.conn != CONN_DNS_NULL)
 		return 1;  /* everything already done */
 
 	/* Don't process anything that isn't data for us; usually error
@@ -1183,8 +982,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 	   timeout, which means we won't send a proper ping for a while.
 	   So make select a bit faster, <1sec. */
 	if (q.name[0] != 'P' && q.name[0] != 'p' &&
-	    q.name[0] != userid_char && q.name[0] != userid_char2) {
-		send_ping_soon = 700;
+	    q.name[0] != this.userid_char && q.name[0] != this.userid_char2) {
+		this.send_ping_soon = 700;
 		got_response(q.id, 0, 0);
 		return -1;	/* nothing done */
 	}
@@ -1198,60 +997,60 @@ tunnel_dns(int tun_fd, int dns_fd)
 			write_dns_error(&q, 0);
 
 		if (q.rcode == SERVFAIL && read < 0) {
-			num_servfail++;
+			this.num_servfail++;
 
-			if (lazymode) {
+			if (this.lazymode) {
 
-				if (send_query_recvcnt < 500 && num_servfail < 4) {
-					fprintf(stderr, "Hmm, that's %ld SERVFAILs. Your data should still go through...\n", num_servfail);
+				if (this.send_query_recvcnt < 500 && this.num_servfail < 4) {
+					fprintf(stderr, "Hmm, that's %ld SERVFAILs. Your data should still go through...\n", this.num_servfail);
 
-				} else if (send_query_recvcnt < 500 && num_servfail >= 10 &&
-					autodetect_server_timeout && max_timeout_ms >= 500 && num_servfail % 5 == 0) {
+				} else if (this.send_query_recvcnt < 500 && this.num_servfail >= 10 &&
+					this.autodetect_server_timeout && this.max_timeout_ms >= 500 && this.num_servfail % 5 == 0) {
 
-					max_timeout_ms -= 200;
-					double target_timeout = (float) max_timeout_ms / 1000.0;
+					this.max_timeout_ms -= 200;
+					double target_timeout = (float) this.max_timeout_ms / 1000.0;
 					fprintf(stderr, "Too many SERVFAILs (%ld), reducing timeout to"
 						" %.1f secs. (use -I%.1f next time on this network)\n",
-							num_servfail, target_timeout, target_timeout);
+							this.num_servfail, target_timeout, target_timeout);
 
-					/* Reset query counts stats */
-					send_query_sendcnt = 0;
-					send_query_recvcnt = 0;
+					/* Reset query counts this.stats */
+					this.send_query_sendcnt = 0;
+					this.send_query_recvcnt = 0;
 					update_server_timeout(dns_fd, 1);
 
-				} else if (send_query_recvcnt < 500 && num_servfail >= 40 &&
-					autodetect_server_timeout && max_timeout_ms < 500) {
+				} else if (this.send_query_recvcnt < 500 && this.num_servfail >= 40 &&
+					this.autodetect_server_timeout && this.max_timeout_ms < 500) {
 
 					/* last-ditch attempt to fix SERVFAILs - disable lazy mode */
 					immediate_mode_defaults();
 					fprintf(stderr, "Attempting to disable lazy mode due to excessive SERVFAILs\n");
-					handshake_switch_options(dns_fd, 0, compression_down, downenc);
+					handshake_switch_options(dns_fd, 0, this.compression_down, this.downenc);
 				}
 			}
 		}
 
-		send_ping_soon = 900;
+		this.send_ping_soon = 900;
 
 		/* Mark query as received */
 		got_response(q.id, 0, 1);
 		return -1;	/* nothing done */
 	}
 
-	send_query_recvcnt++;  /* unlikely we will ever overflow (2^64 queries is a LOT) */
+	this.send_query_recvcnt++;  /* unlikely we will ever overflow (2^64 queries is a LOT) */
 
 	if (read == 5 && !strncmp("BADIP", (char *)cbuf, 5)) {
-		num_badip++;
-		if (num_badip % 5 == 1) {
+		this.num_badip++;
+		if (this.num_badip % 5 == 1) {
 			fprintf(stderr, "BADIP (%ld): Server rejected sender IP address (maybe iodined -c will help), or server "
-					"kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.\n", num_badip);
+					"kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.\n", this.num_badip);
 		}
 		return -1;	/* nothing done */
 	}
 
 	/* Okay, we have a recent downstream packet */
-	lastdownstreamtime = time(NULL);
+	this.lastdownstreamtime = time(NULL);
 
-	num_recv++;
+	this.num_recv++;
 
 	/* Decode the downstream data header and fragment-ify ready for processing */
 	res = parse_data(cbuf, read, &f, &immediate);
@@ -1259,13 +1058,13 @@ tunnel_dns(int tun_fd, int dns_fd)
 	/* Mark query as received */
 	got_response(q.id, immediate, 0);
 
-	if ((debug >= 3 && res) || (debug >= 2 && !res))
+	if ((this.debug >= 3 && res) || (this.debug >= 2 && !res))
 		fprintf(stderr, " RX %s; frag ID %3u, ACK %3d, compression %d, datalen %lu, s%d e%d\n",
 				res ? "PING" : "DATA", f.seqID, f.ack_other, f.compressed, f.len, f.start, f.end);
 
 
-	window_ack(outbuf, f.ack_other);
-	window_tick(outbuf);
+	window_ack(this.outbuf, f.ack_other);
+	window_tick(this.outbuf);
 
 	/* In lazy mode, we shouldn't get immediate replies to our most-recent
 	 query, only during heavy data transfer. Since this means the server
@@ -1275,28 +1074,28 @@ tunnel_dns(int tun_fd, int dns_fd)
 	if (f.len == 0) {
 		if (!res)
 			DEBUG(1, "[WARNING] Received downstream data fragment with 0 length and NOT a ping!");
-		if (!lazymode)
-			send_ping_soon = 100;
+		if (!this.lazymode)
+			this.send_ping_soon = 100;
 		else
-			send_ping_soon = 700;
+			this.send_ping_soon = 700;
 		return -1;
 	}
 
 	/* Get next ACK if nothing already pending: if we get a new ack
 	 * then we must send it immediately. */
-	if (next_downstream_ack >= 0) {
+	if (this.next_downstream_ack >= 0) {
 		/* If this happens something is wrong (or last frag was a re-send)
 		 * May result in ACKs being delayed. */
-		DEBUG(1, "next_downstream_ack NOT -1! (%d), %u resends, %u oos", next_downstream_ack, outbuf->resends, outbuf->oos);
+		DEBUG(1, "this.next_downstream_ack NOT -1! (%d), %u resends, %u oos", this.next_downstream_ack, this.outbuf->resends, this.outbuf->oos);
 	}
 
 	/* Downstream data traffic + ack data fragment */
-	next_downstream_ack = f.seqID;
-	window_process_incoming_fragment(inbuf, &f);
+	this.next_downstream_ack = f.seqID;
+	window_process_incoming_fragment(this.inbuf, &f);
 
-	num_frags_recv++;
+	this.num_frags_recv++;
 
-	datalen = window_reassemble_data(inbuf, cbuf, sizeof(cbuf), &compressed);
+	datalen = window_reassemble_data(this.inbuf, cbuf, sizeof(cbuf), &compressed);
 	if (datalen > 0) {
 		if (compressed) {
 			buflen = sizeof(buf);
@@ -1316,7 +1115,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	}
 
 	/* Move window along after doing all data processing */
-	window_tick(inbuf);
+	window_tick(this.inbuf);
 
 	return read;
 }
@@ -1332,79 +1131,79 @@ client_tunnel(int tun_fd, int dns_fd)
 	time_t last_stats;
 	size_t sent_since_report, recv_since_report;
 
-	connected = 1;
+	this.connected = 1;
 
 	/* start counting now */
 	rv = 0;
-	lastdownstreamtime = time(NULL);
+	this.lastdownstreamtime = time(NULL);
 	last_stats = time(NULL);
 
 	/* reset connection statistics */
-	num_badip = 0;
-	num_servfail = 0;
-	num_timeouts = 0;
-	send_query_recvcnt = 0;
-	send_query_sendcnt = 0;
-	num_sent = 0;
-	num_recv = 0;
-	num_frags_sent = 0;
-	num_frags_recv = 0;
-	num_pings = 0;
+	this.num_badip = 0;
+	this.num_servfail = 0;
+	this.num_timeouts = 0;
+	this.send_query_recvcnt = 0;
+	this.send_query_sendcnt = 0;
+	this.num_sent = 0;
+	this.num_recv = 0;
+	this.num_frags_sent = 0;
+	this.num_frags_recv = 0;
+	this.num_pings = 0;
 
 	sent_since_report = 0;
 	recv_since_report = 0;
 
 	use_min_send = 0;
 
-	if (debug >= 5)
-		window_debug = debug - 3;
+	if (this.debug >= 5)
+		window_debug = this.debug - 3;
 
-	while (running) {
+	while (this.running) {
 		if (!use_min_send)
-			tv = ms_to_timeval(max_timeout_ms);
+			tv = ms_to_timeval(this.max_timeout_ms);
 
 		/* TODO: detect DNS servers which drop frequent requests
 		 * TODO: adjust number of pending queries based on current data rate */
-		if (conn == CONN_DNS_NULL && !use_min_send) {
+		if (this.conn == CONN_DNS_NULL && !use_min_send) {
 
 			/* Send a single query per loop */
-			sending = window_sending(outbuf, &nextresend);
+			sending = window_sending(this.outbuf, &nextresend);
 			total = sending;
 			check_pending_queries();
-			if (num_pending < windowsize_down && lazymode)
-				total = MAX(total, windowsize_down - num_pending);
-			else if (num_pending < 1 && !lazymode)
+			if (this.num_pending < this.windowsize_down && this.lazymode)
+				total = MAX(total, this.windowsize_down - this.num_pending);
+			else if (this.num_pending < 1 && !this.lazymode)
 				total = MAX(total, 1);
 
 			/* Upstream traffic - this is where all ping/data queries are sent */
-			if (sending > 0 || total > 0 || next_downstream_ack >= 0) {
+			if (sending > 0 || total > 0 || this.next_downstream_ack >= 0) {
 
 				if (sending > 0) {
 					/* More to send - next fragment */
 					send_next_frag(dns_fd);
 				} else {
 					/* Send ping if we didn't send anything yet */
-					send_ping(dns_fd, 0, next_downstream_ack, (num_pings > 20 && num_pings % 50 == 0));
-					next_downstream_ack = -1;
+					send_ping(dns_fd, 0, this.next_downstream_ack, (this.num_pings > 20 && this.num_pings % 50 == 0));
+					this.next_downstream_ack = -1;
 				}
 
 				sending--;
 				total--;
 				QTRACK_DEBUG(3, "Sent a query to fill server lazy buffer to %lu, will send another %d",
-							 lazymode ? windowsize_down : 1, total);
+							 this.lazymode ? this.windowsize_down : 1, total);
 
-				if (sending > 0 || (total > 0 && lazymode)) {
+				if (sending > 0 || (total > 0 && this.lazymode)) {
 					/* If sending any data fragments, or server has too few
 					 * pending queries, send another one after min. interval */
 					/* TODO: enforce min send interval even if we get new data */
-					tv = ms_to_timeval(min_send_interval_ms);
-					if (min_send_interval_ms)
+					tv = ms_to_timeval(this.min_send_interval_ms);
+					if (this.min_send_interval_ms)
 						use_min_send = 1;
 					tv.tv_usec += 1;
-				} else if (total > 0 && !lazymode) {
+				} else if (total > 0 && !this.lazymode) {
 					/* In immediate mode, use normal interval when needing
 					 * to send non-data queries to probe server. */
-					tv = ms_to_timeval(send_interval_ms);
+					tv = ms_to_timeval(this.send_interval_ms);
 				}
 
 				if (sending == 0 && !use_min_send) {
@@ -1413,47 +1212,47 @@ client_tunnel(int tun_fd, int dns_fd)
 						tv = nextresend;
 				}
 
-				send_ping_soon = 0;
+				this.send_ping_soon = 0;
 			}
 		}
 
-		if (stats) {
-			if (difftime(time(NULL), last_stats) >= stats) {
+		if (this.stats) {
+			if (difftime(time(NULL), last_stats) >= this.stats) {
 				/* print useful statistics report */
-				fprintf(stderr, "\n============ iodine connection statistics (user %1d) ============\n", userid);
+				fprintf(stderr, "\n============ iodine connection statistics (user %1d) ============\n", this.userid);
 				fprintf(stderr, " Queries   sent: %8lu"  ", answered: %8lu"  ", SERVFAILs: %4lu\n",
-						num_sent, num_recv, num_servfail);
+						this.num_sent, this.num_recv, this.num_servfail);
 				fprintf(stderr, "  last %3d secs: %7lu" " (%4lu/s),   replies: %7lu" " (%4lu/s)\n",
-						stats, num_sent - sent_since_report, (num_sent - sent_since_report) / stats,
-						num_recv - recv_since_report, (num_recv - recv_since_report) / stats);
+						this.stats, this.num_sent - sent_since_report, (this.num_sent - sent_since_report) / this.stats,
+						this.num_recv - recv_since_report, (this.num_recv - recv_since_report) / this.stats);
 				fprintf(stderr, "  num IP rejected: %4lu,   untracked: %4lu,   lazy mode: %1d\n",
-						num_badip, num_untracked, lazymode);
+						this.num_badip, this.num_untracked, this.lazymode);
 				fprintf(stderr, " Min send: %5ld ms, Avg RTT: %5ld ms  Timeout server: %4ld ms\n",
-						min_send_interval_ms, rtt_total_ms / num_immediate, server_timeout_ms);
+						this.min_send_interval_ms, this.rtt_total_ms / this.num_immediate, this.server_timeout_ms);
 				fprintf(stderr, " Queries immediate: %5lu, timed out: %4lu    target: %4ld ms\n",
-						num_immediate, num_timeouts, max_timeout_ms);
-				if (conn == CONN_DNS_NULL) {
+						this.num_immediate, this.num_timeouts, this.max_timeout_ms);
+				if (this.conn == CONN_DNS_NULL) {
 					fprintf(stderr, " Frags resent: %4u,   OOS: %4u          down frag: %4ld ms\n",
-							outbuf->resends, inbuf->oos, downstream_timeout_ms);
+							this.outbuf->resends, this.inbuf->oos, this.downstream_timeout_ms);
 					fprintf(stderr, " TX fragments: %8lu" ",   RX: %8lu" ",   pings: %8lu" "\n\n",
-							num_frags_sent, num_frags_recv, num_pings);
+							this.num_frags_sent, this.num_frags_recv, this.num_pings);
 				}
-				/* update since-last-report stats */
-				sent_since_report = num_sent;
-				recv_since_report = num_recv;
+				/* update since-last-report this.stats */
+				sent_since_report = this.num_sent;
+				recv_since_report = this.num_recv;
 				last_stats = time(NULL);
 
 			}
 		}
 
-		if (send_ping_soon && !use_min_send) {
+		if (this.send_ping_soon && !use_min_send) {
 			tv.tv_sec = 0;
-			tv.tv_usec = send_ping_soon * 1000;
-			send_ping_soon = 0;
+			tv.tv_usec = this.send_ping_soon * 1000;
+			this.send_ping_soon = 0;
 		}
 
 		FD_ZERO(&fds);
-		if (conn != CONN_DNS_NULL || window_buffer_available(outbuf) > 16) {
+		if (this.conn != CONN_DNS_NULL || window_buffer_available(this.outbuf) > 16) {
 			/* Fill up outgoing buffer with available data if it has enough space
 			 * The windowing protocol manages data retransmits, timeouts etc. */
 			FD_SET(tun_fd, &fds);
@@ -1478,12 +1277,12 @@ client_tunnel(int tun_fd, int dns_fd)
 			use_min_send = 0;
 		}
 
-		if (difftime(time(NULL), lastdownstreamtime) > 60) {
+		if (difftime(time(NULL), this.lastdownstreamtime) > 60) {
  			fprintf(stderr, "No downstream data received in 60 seconds, shutting down.\n");
- 			running = 0;
+ 			this.running = 0;
  		}
 
-		if (running == 0)
+		if (this.running == 0)
 			break;
 
 		if (i < 0)
@@ -1498,7 +1297,7 @@ client_tunnel(int tun_fd, int dns_fd)
 				/* Returns -1 on error OR when quickly
 				   dropping data in case of DNS congestion;
 				   we need to _not_ do tunnel_dns() then.
-				   If chunk sent, sets send_ping_soon=0. */
+				   If chunk sent, sets this.send_ping_soon=0. */
 			}
 
 			if (FD_ISSET(dns_fd, &fds)) {
@@ -1516,13 +1315,13 @@ send_login(int fd, char *login, int len)
 	uint8_t data[19];
 
 	memset(data, 0, sizeof(data));
-	data[0] = userid;
+	data[0] = this.userid;
 	memcpy(&data[1], login, MIN(len, 16));
 
-	data[17] = (rand_seed >> 8) & 0xff;
-	data[18] = (rand_seed >> 0) & 0xff;
+	data[17] = (this.rand_seed >> 8) & 0xff;
+	data[18] = (this.rand_seed >> 0) & 0xff;
 
-	rand_seed++;
+	this.rand_seed++;
 
 	send_packet(fd, 'l', data, sizeof(data));
 }
@@ -1537,19 +1336,19 @@ send_fragsize_probe(int fd, uint16_t fragsize)
 
 	buf[0] = 'r'; /* Probe downstream fragsize packet */
 
-	hdr[0] = userid;
+	hdr[0] = this.userid;
 	*(uint16_t *) (hdr + 1) = htons(fragsize);
 
 	b32->encode(buf + 1, &hdr_len_enc, hdr, 3);
 	/* build a large query domain which is random and maximum size,
 	 * will also take up maximum space in the return packet */
-	memset(probedata, MAX(1, rand_seed & 0xff), sizeof(probedata));
-	probedata[1] = MAX(1, (rand_seed >> 8) & 0xff);
-	rand_seed++;
+	memset(probedata, MAX(1, this.rand_seed & 0xff), sizeof(probedata));
+	probedata[1] = MAX(1, (this.rand_seed >> 8) & 0xff);
+	this.rand_seed++;
 
 	/* Note: must either be same, or larger, than send_chunk() */
-	build_hostname(buf, sizeof(buf), probedata, sizeof(probedata), topdomain,
-				   dataenc, hostname_maxlen, 6);
+	build_hostname(buf, sizeof(buf), probedata, sizeof(probedata), this.topdomain,
+				   this.dataenc, this.hostname_maxlen, 6);
 
 	send_query(fd, buf);
 }
@@ -1559,12 +1358,12 @@ send_set_downstream_fragsize(int fd, uint16_t fragsize)
 {
 	uint8_t data[5];
 
-	data[0] = userid;
+	data[0] = this.userid;
 	*(uint16_t *) (data + 1) = htons(fragsize);
-	data[3] = (rand_seed >> 8) & 0xff;
-	data[4] = (rand_seed >> 0) & 0xff;
+	data[3] = (this.rand_seed >> 8) & 0xff;
+	data[4] = (this.rand_seed >> 0) & 0xff;
 
-	rand_seed++;
+	this.rand_seed++;
 
 	send_packet(fd, 'n', data, sizeof(data));
 }
@@ -1577,10 +1376,10 @@ send_version(int fd, uint32_t version)
 	version = htonl(version);
 	*(uint32_t *) data = version;
 
-	data[4] = (rand_seed >> 8) & 0xff;
-	data[5] = (rand_seed >> 0) & 0xff;
+	data[4] = (this.rand_seed >> 8) & 0xff;
+	data[5] = (this.rand_seed >> 0) & 0xff;
 
-	rand_seed++;
+	this.rand_seed++;
 
 	send_packet(fd, 'v', data, sizeof(data));
 }
@@ -1589,14 +1388,14 @@ static void
 send_ip_request(int fd, int userid)
 {
 	uint8_t buf[512] = "i____.";
-	buf[1] = b32_5to8(userid);
+	buf[1] = b32_5to8(this.userid);
 
-	buf[2] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[3] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[4] = b32_5to8((rand_seed ) & 0x1f);
-	rand_seed++;
+	buf[2] = b32_5to8((this.rand_seed >> 10) & 0x1f);
+	buf[3] = b32_5to8((this.rand_seed >> 5) & 0x1f);
+	buf[4] = b32_5to8((this.rand_seed ) & 0x1f);
+	this.rand_seed++;
 
-	strncat((char *)buf, topdomain, 512 - strlen((char *)buf));
+	strncat((char *)buf, this.topdomain, 512 - strlen((char *)buf));
 	send_query(fd, buf);
 }
 
@@ -1604,9 +1403,9 @@ static void
 send_raw_udp_login(int dns_fd, int userid, int seed)
 {
 	char buf[16];
-	login_calculate(buf, 16, password, seed + 1);
+	login_calculate(buf, 16, this.password, seed + 1);
 
-	send_raw(dns_fd, (uint8_t *) buf, sizeof(buf), userid, RAW_HDR_CMD_LOGIN);
+	send_raw(dns_fd, (uint8_t *) buf, sizeof(buf), this.userid, RAW_HDR_CMD_LOGIN);
 }
 
 static void
@@ -1615,14 +1414,14 @@ send_upenctest(int fd, char *s)
 {
 	char buf[512] = "z___";
 
-	buf[1] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[2] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[3] = b32_5to8((rand_seed ) & 0x1f);
-	rand_seed++;
+	buf[1] = b32_5to8((this.rand_seed >> 10) & 0x1f);
+	buf[2] = b32_5to8((this.rand_seed >> 5) & 0x1f);
+	buf[3] = b32_5to8((this.rand_seed ) & 0x1f);
+	this.rand_seed++;
 
 	strncat(buf, s, 512 - strlen(buf));
 	strncat(buf, ".", 512 - strlen(buf));
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, this.topdomain, 512 - strlen(buf));
 	send_query(fd, (uint8_t *)buf);
 }
 
@@ -1632,15 +1431,15 @@ send_downenctest(int fd, char downenc, int variant, char *s, int slen)
 {
 	char buf[512] = "y_____.";
 
-	buf[1] = tolower(downenc);
+	buf[1] = tolower(this.downenc);
 	buf[2] = b32_5to8(variant);
 
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed ) & 0x1f);
-	rand_seed++;
+	buf[3] = b32_5to8((this.rand_seed >> 10) & 0x1f);
+	buf[4] = b32_5to8((this.rand_seed >> 5) & 0x1f);
+	buf[5] = b32_5to8((this.rand_seed ) & 0x1f);
+	this.rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, this.topdomain, 512 - strlen(buf));
 	send_query(fd, (uint8_t *)buf);
 }
 
@@ -1648,15 +1447,15 @@ static void
 send_codec_switch(int fd, int userid, int bits)
 {
 	char buf[512] = "s_____.";
-	buf[1] = b32_5to8(userid);
+	buf[1] = b32_5to8(this.userid);
 	buf[2] = b32_5to8(bits);
 
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed ) & 0x1f);
-	rand_seed++;
+	buf[3] = b32_5to8((this.rand_seed >> 10) & 0x1f);
+	buf[4] = b32_5to8((this.rand_seed >> 5) & 0x1f);
+	buf[5] = b32_5to8((this.rand_seed ) & 0x1f);
+	this.rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, this.topdomain, 512 - strlen(buf));
 	send_query(fd, (uint8_t *)buf);
 }
 
@@ -1665,7 +1464,7 @@ send_server_options(int fd, int userid, int lazy, int compression, char denc, ch
 /* Options must be length >=4 */
 {
 	char buf[512] = "oU3___CMC.";
-	buf[1] = b32_5to8(userid);
+	buf[1] = b32_5to8(this.userid);
 
 	options[0] = tolower(denc);
 	options[1] = lazy ? 'l' : 'i';
@@ -1673,12 +1472,12 @@ send_server_options(int fd, int userid, int lazy, int compression, char denc, ch
 	options[3] = 0;
 	strncpy(buf + 3, options, 3);
 
-	buf[6] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[7] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[8] = b32_5to8((rand_seed) & 0x1f);
-	rand_seed++;
+	buf[6] = b32_5to8((this.rand_seed >> 10) & 0x1f);
+	buf[7] = b32_5to8((this.rand_seed >> 5) & 0x1f);
+	buf[8] = b32_5to8((this.rand_seed) & 0x1f);
+	this.rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, this.topdomain, 512 - strlen(buf));
 	send_query(fd, (uint8_t *)buf);
 }
 
@@ -1692,7 +1491,7 @@ handshake_version(int dns_fd, int *seed)
 	int i;
 	int read;
 
-	for (i = 0; running && i < 5; i++) {
+	for (i = 0; this.running && i < 5; i++) {
 
 		send_version(dns_fd, PROTOCOL_VERSION);
 
@@ -1706,12 +1505,12 @@ handshake_version(int dns_fd, int *seed)
 
 			if (strncmp("VACK", (char *)in, 4) == 0) {
 				*seed = payload;
-				userid = in[8];
-				userid_char = hex[userid & 15];
-				userid_char2 = hex2[userid & 15];
+				this.userid = in[8];
+				this.userid_char = hex[this.userid & 15];
+				this.userid_char2 = hex2[this.userid & 15];
 
 				fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n",
-					PROTOCOL_VERSION, userid);
+					PROTOCOL_VERSION, this.userid);
 				return 0;
 			} else if (strncmp("VNAK", (char *)in, 4) == 0) {
 				warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up",
@@ -1741,9 +1540,9 @@ handshake_login(int dns_fd, int seed)
 	int i;
 	int read;
 
-	login_calculate(login, 16, password, seed);
+	login_calculate(login, 16, this.password, seed);
 
-	for (i=0; running && i<5 ;i++) {
+	for (i=0; this.running && i<5 ;i++) {
 
 		send_login(dns_fd, login, 16);
 
@@ -1752,7 +1551,7 @@ handshake_login(int dns_fd, int seed)
 		if (read > 0) {
 			int netmask;
 			if (strncmp("LNAK", in, 4) == 0) {
-				fprintf(stderr, "Bad password\n");
+				fprintf(stderr, "Bad this.password\n");
 				return 1;
 			} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d",
 				server, client, &mtu, &netmask) == 4) {
@@ -1789,33 +1588,33 @@ handshake_raw_udp(int dns_fd, int seed)
 	int len;
 	int got_addr;
 
-	memset(&raw_serv, 0, sizeof(raw_serv));
+	memset(&this.raw_serv, 0, sizeof(this.raw_serv));
 	got_addr = 0;
 
 	fprintf(stderr, "Testing raw UDP data to the server (skip with -r)");
-	for (i=0; running && i<3 ;i++) {
+	for (i=0; this.running && i<3 ;i++) {
 
-		send_ip_request(dns_fd, userid);
+		send_ip_request(dns_fd, this.userid);
 
 		len = handshake_waitdns(dns_fd, in, sizeof(in), 'I', i+1);
 
 		if (len == 5 && in[0] == 'I') {
 			/* Received IPv4 address */
-			struct sockaddr_in *raw4_serv = (struct sockaddr_in *) &raw_serv;
+			struct sockaddr_in *raw4_serv = (struct sockaddr_in *) &this.raw_serv;
 			raw4_serv->sin_family = AF_INET;
 			memcpy(&raw4_serv->sin_addr, &in[1], sizeof(struct in_addr));
 			raw4_serv->sin_port = htons(53);
-			raw_serv_len = sizeof(struct sockaddr_in);
+			this.raw_serv_len = sizeof(struct sockaddr_in);
 			got_addr = 1;
 			break;
 		}
 		if (len == 17 && in[0] == 'I') {
 			/* Received IPv6 address */
-			struct sockaddr_in6 *raw6_serv = (struct sockaddr_in6 *) &raw_serv;
+			struct sockaddr_in6 *raw6_serv = (struct sockaddr_in6 *) &this.raw_serv;
 			raw6_serv->sin6_family = AF_INET6;
 			memcpy(&raw6_serv->sin6_addr, &in[1], sizeof(struct in6_addr));
 			raw6_serv->sin6_port = htons(53);
-			raw_serv_len = sizeof(struct sockaddr_in6);
+			this.raw_serv_len = sizeof(struct sockaddr_in6);
 			got_addr = 1;
 			break;
 		}
@@ -1824,24 +1623,24 @@ handshake_raw_udp(int dns_fd, int seed)
 		fflush(stderr);
 	}
 	fprintf(stderr, "\n");
-	if (!running)
+	if (!this.running)
 		return 0;
 
 	if (!got_addr) {
 		fprintf(stderr, "Failed to get raw server IP, will use DNS mode.\n");
 		return 0;
 	}
-	fprintf(stderr, "Server is at %s, trying raw login: ", format_addr(&raw_serv, raw_serv_len));
+	fprintf(stderr, "Server is at %s, trying raw login: ", format_addr(&this.raw_serv, this.raw_serv_len));
 	fflush(stderr);
 
 	/* do login against port 53 on remote server
 	 * based on the old seed. If reply received,
 	 * switch to raw udp mode */
-	for (i=0; running && i<4 ;i++) {
+	for (i=0; this.running && i<4 ;i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		send_raw_udp_login(dns_fd, userid, seed);
+		send_raw_udp_login(dns_fd, this.userid, seed);
 
 		FD_ZERO(&fds);
 		FD_SET(dns_fd, &fds);
@@ -1853,7 +1652,7 @@ handshake_raw_udp(int dns_fd, int seed)
 			len = recv(dns_fd, in, sizeof(in), 0);
 			if (len >= (16 + RAW_HDR_LEN)) {
 				char hash[16];
-				login_calculate(hash, 16, password, seed - 1);
+				login_calculate(hash, 16, this.password, seed - 1);
 				if (memcmp(in, raw_header, RAW_HDR_IDENT_LEN) == 0
 					&& RAW_HDR_GET_CMD(in) == RAW_HDR_CMD_LOGIN
 					&& memcmp(&in[RAW_HDR_LEN], hash, sizeof(hash)) == 0) {
@@ -1888,7 +1687,7 @@ handshake_upenctest(int dns_fd, char *s)
         int slen;
 
 	slen = strlen(s);
-	for (i=0; running && i<3 ;i++) {
+	for (i=0; this.running && i<3 ;i++) {
 
 		send_upenctest(dns_fd, s);
 
@@ -1934,7 +1733,7 @@ handshake_upenctest(int dns_fd, char *s)
 		fprintf(stderr, "Retrying upstream codec test...\n");
 	}
 
-	if (!running)
+	if (!this.running)
 		return -1;
 
 	/* timeout */
@@ -2049,7 +1848,7 @@ handshake_downenctest(int dns_fd, char trycodec)
 	char *s = DOWNCODECCHECK1;
         int slen = DOWNCODECCHECK1_LEN;
 
-	for (i=0; running && i<3 ;i++) {
+	for (i=0; this.running && i<3 ;i++) {
 
 		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
 
@@ -2088,7 +1887,7 @@ handshake_downenc_autodetect(int dns_fd)
 	int base64uok = 0;
 	int base128ok = 0;
 
-	if (do_qtype == T_NULL || do_qtype == T_PRIVATE) {
+	if (this.do_qtype == T_NULL || this.do_qtype == T_PRIVATE) {
 		/* no other choice than raw */
 		fprintf(stderr, "No alternative downstream codec available, using default (Raw)\n");
 		return 'R';
@@ -2099,22 +1898,22 @@ handshake_downenc_autodetect(int dns_fd)
 	/* Try Base64 */
 	if (handshake_downenctest(dns_fd, 'S'))
 		base64ok = 1;
-	else if (running && handshake_downenctest(dns_fd, 'U'))
+	else if (this.running && handshake_downenctest(dns_fd, 'U'))
 		base64uok = 1;
 
 	/* Try Base128 only if 64 gives us some perspective */
-	if (running && (base64ok || base64uok)) {
+	if (this.running && (base64ok || base64uok)) {
 		if (handshake_downenctest(dns_fd, 'V'))
 			base128ok = 1;
 	}
 
 	/* If 128 works, then TXT may give us Raw as well */
-	if (running && (base128ok && do_qtype == T_TXT)) {
+	if (this.running && (base128ok && this.do_qtype == T_TXT)) {
 		if (handshake_downenctest(dns_fd, 'R'))
 			return 'R';
 	}
 
-	if (!running)
+	if (!this.running)
 		return ' ';
 
 	if (base128ok)
@@ -2142,7 +1941,7 @@ handshake_qtypetest(int dns_fd, int timeout)
 	int trycodec;
 	int k;
 
-	if (do_qtype == T_NULL || do_qtype == T_PRIVATE)
+	if (this.do_qtype == T_NULL || this.do_qtype == T_PRIVATE)
 		trycodec = 'R';
 	else
 		trycodec = 'T';
@@ -2187,7 +1986,7 @@ handshake_qtype_numcvt(int num)
 static int
 handshake_qtype_autodetect(int dns_fd)
 /* Returns:
-   0: okay, do_qtype set
+   0: okay, this.do_qtype set
    1: problem, program exit
 */
 {
@@ -2208,10 +2007,10 @@ handshake_qtype_autodetect(int dns_fd)
 	   to see if things will start working after a while.
 	 */
 
-	for (timeout = 1; running && timeout <= 3; timeout++) {
-		for (qtypenum = 0; running && qtypenum < highestworking; qtypenum++) {
-			do_qtype = handshake_qtype_numcvt(qtypenum);
-			if (do_qtype == T_UNSET)
+	for (timeout = 1; this.running && timeout <= 3; timeout++) {
+		for (qtypenum = 0; this.running && qtypenum < highestworking; qtypenum++) {
+			this.do_qtype = handshake_qtype_numcvt(qtypenum);
+			if (this.do_qtype == T_UNSET)
 				break;	/* this round finished */
 
 			fprintf(stderr, ".");
@@ -2233,17 +2032,17 @@ handshake_qtype_autodetect(int dns_fd)
 
 	fprintf(stderr, "\n");
 
-	if (!running) {
+	if (!this.running) {
 		warnx("Stopped while autodetecting DNS query type (try setting manually with -T)");
 		return 1;  /* problem */
 	}
 
 	/* finished */
-	do_qtype = handshake_qtype_numcvt(highestworking);
+	this.do_qtype = handshake_qtype_numcvt(highestworking);
 
-	if (do_qtype == T_UNSET) {
+	if (this.do_qtype == T_UNSET) {
 		/* also catches highestworking still 100 */
-		warnx("No suitable DNS query type found. Are you connected to a network?");
+		warnx("No suitable DNS query type found. Are you this.connected to a network?");
 		warnx("If you expect very long roundtrip delays, use -T explicitly.");
 		warnx("(Also, connecting to an \"ancient\" version of iodined won't work.)");
 		return 1;  /* problem */
@@ -2267,12 +2066,12 @@ handshake_edns0_check(int dns_fd)
         int slen = DOWNCODECCHECK1_LEN;
 	char trycodec;
 
-	if (do_qtype == T_NULL)
+	if (this.do_qtype == T_NULL)
 		trycodec = 'R';
 	else
 		trycodec = 'T';
 
-	for (i=0; running && i<3 ;i++) {
+	for (i=0; this.running && i<3 ;i++) {
 
 		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
 
@@ -2323,9 +2122,9 @@ handshake_switch_codec(int dns_fd, int bits)
 
 	fprintf(stderr, "Switching upstream to codec %s\n", tempenc->name);
 
-	for (i=0; running && i<5 ;i++) {
+	for (i=0; this.running && i<5 ;i++) {
 
-		send_codec_switch(dns_fd, userid, bits);
+		send_codec_switch(dns_fd, this.userid, bits);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'S', i+1);
 
@@ -2342,22 +2141,22 @@ handshake_switch_codec(int dns_fd, int bits)
 			}
 			in[read] = 0; /* zero terminate */
 			fprintf(stderr, "Server switched upstream to codec %s\n", in);
-			dataenc = tempenc;
+			this.dataenc = tempenc;
 
 			/* Update outgoing buffer max (decoded) fragsize */
-			maxfragsize_up = get_raw_length_from_dns(hostname_maxlen - UPSTREAM_HDR, dataenc, topdomain);
+			this.maxfragsize_up = get_raw_length_from_dns(this.hostname_maxlen - UPSTREAM_HDR, this.dataenc, this.topdomain);
 			return;
 		}
 
 		fprintf(stderr, "Retrying codec switch...\n");
 	}
-	if (!running)
+	if (!this.running)
 		return;
 
 	fprintf(stderr, "No reply from server on codec switch.\n");
 
 codec_revert:
-	fprintf(stderr, "Falling back to upstream codec %s\n", dataenc->name);
+	fprintf(stderr, "Falling back to upstream codec %s\n", this.dataenc->name);
 }
 
 void
@@ -2384,9 +2183,9 @@ handshake_switch_options(int dns_fd, int lazy, int compression, char denc)
 
 	fprintf(stderr, "Switching server options: %s mode, downstream codec %s, compression %s...\n",
 			lazy_status, dname, comp_status);
-	for (int i = 0; running && i < 5; i++) {
+	for (int i = 0; this.running && i < 5; i++) {
 
-		send_server_options(dns_fd, userid, lazy, compression, denc, opts);
+		send_server_options(dns_fd, this.userid, lazy, compression, denc, opts);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in) - 1, 'O', i + 1);
 
@@ -2402,25 +2201,25 @@ handshake_switch_options(int dns_fd, int lazy, int compression, char denc)
 				goto opt_revert;
 			}
 			fprintf(stderr, "Switched server options successfully. (%s)\n", opts);
-			lazymode = lazy;
-			compression_down = compression;
-			downenc = denc;
+			this.lazymode = lazy;
+			this.compression_down = compression;
+			this.downenc = denc;
 			return;
 		}
 
 		fprintf(stderr, "Retrying options switch...\n");
 	}
-	if (!running)
+	if (!this.running)
 		return;
 
 	fprintf(stderr, "No reply from server on options switch.\n");
 
 opt_revert:
-	comp_status = compression_down ? "enabled" : "disabled";
-	lazy_status = lazymode ? "lazy" : "immediate";
+	comp_status = this.compression_down ? "enabled" : "disabled";
+	lazy_status = this.lazymode ? "lazy" : "immediate";
 
 	fprintf(stderr, "Falling back to previous configuration: downstream codec %s, %s mode, compression %s.\n",
-			dataenc->name, lazy_status, comp_status);
+			this.dataenc->name, lazy_status, comp_status);
 }
 
 static int
@@ -2481,7 +2280,7 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 		*max_fragsize = acked_fragsize;
 		return 1;
 	} else {
-		if (downenc != ' ' && downenc != 'T') {
+		if (this.downenc != ' ' && this.downenc != 'T') {
 			fprintf(stderr, "%d corrupted at %d.. (Try -O Base32)\n", acked_fragsize, i);
 		} else {
 			fprintf(stderr, "%d corrupted at %d.. ", acked_fragsize, i);
@@ -2507,9 +2306,9 @@ handshake_autoprobe_fragsize(int dns_fd)
 
 	max_fragsize = 0;
 	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)");
-	while (running && range > 0 && (range >= 8 || max_fragsize < 300)) {
+	while (this.running && range > 0 && (range >= 8 || max_fragsize < 300)) {
 		/* stop the slow probing early when we have enough bytes anyway */
-		for (i=0; running && i<3 ;i++) {
+		for (i=0; this.running && i<3 ;i++) {
 
 			send_fragsize_probe(dns_fd, proposed_fragsize);
 
@@ -2538,7 +2337,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 			proposed_fragsize -= range;
 		}
 	}
-	if (!running) {
+	if (!this.running) {
 		warnx("\nstopped while autodetecting fragment size (Try setting manually with -m)");
 		return 0;
 	}
@@ -2558,8 +2357,8 @@ handshake_autoprobe_fragsize(int dns_fd)
 		fprintf(stderr, "Note: this probably won't work well.\n");
 		fprintf(stderr, "Try setting -M to 200 or lower, or try other DNS types (-T option).\n");
 	} else if (max_fragsize < 202 &&
-	    (do_qtype == T_NULL || do_qtype == T_PRIVATE || do_qtype == T_TXT ||
-	     do_qtype == T_SRV || do_qtype == T_MX)) {
+	    (this.do_qtype == T_NULL || this.do_qtype == T_PRIVATE || this.do_qtype == T_TXT ||
+	     this.do_qtype == T_SRV || this.do_qtype == T_MX)) {
 		fprintf(stderr, "Note: this isn't very much.\n");
 		fprintf(stderr, "Try setting -M to 200 or lower, or try other DNS types (-T option).\n");
 	}
@@ -2575,7 +2374,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 	int read;
 
 	fprintf(stderr, "Setting downstream fragment size to max %d...\n", fragsize);
-	for (i=0; running && i<5 ;i++) {
+	for (i=0; this.running && i<5 ;i++) {
 
 		send_set_downstream_fragsize(dns_fd, fragsize);
 
@@ -2598,7 +2397,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 
 		fprintf(stderr, "Retrying set fragsize...\n");
 	}
-	if (!running)
+	if (!this.running)
 		return;
 
 	fprintf(stderr, "No reply from server when setting fragsize. Keeping default.\n");
@@ -2610,16 +2409,16 @@ handshake_set_timeout(int dns_fd)
 	char in[4096];
 	int read, id;
 
-	if (autodetect_server_timeout && lazymode) {
+	if (this.autodetect_server_timeout && this.lazymode) {
 		fprintf(stderr, "Calculating round-trip time for optimum server timeout...");
 	} else {
 		fprintf(stderr, "Setting window sizes to %lu frags upstream, %lu frags downstream...",
-				windowsize_up, windowsize_down);
+				this.windowsize_up, this.windowsize_down);
 	}
 
-	for (int i = 0; running && i < 5; i++) {
+	for (int i = 0; this.running && i < 5; i++) {
 
-		id = autodetect_server_timeout ?
+		id = this.autodetect_server_timeout ?
 			update_server_timeout(dns_fd, 1) : send_ping(dns_fd, 1, -1, 1);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'P', i + 1);
@@ -2630,19 +2429,19 @@ handshake_set_timeout(int dns_fd)
 			if (strncmp("BADIP", in, 5) == 0) {
 				fprintf(stderr, "Server rejected sender IP address.\n");
 			}
-			if (autodetect_server_timeout)
+			if (this.autodetect_server_timeout)
 				continue;
 			else
 				break;
 		}
 
 	}
-	if (!running)
+	if (!this.running)
 		return;
 
-	if (autodetect_server_timeout)
+	if (this.autodetect_server_timeout)
 		fprintf(stderr, "\nDetermined round-trip time of %ld ms, server timeout of %ld ms.\n",
-			rtt_total_ms / num_immediate, server_timeout_ms);
+			this.rtt_total_ms / this.num_immediate, this.server_timeout_ms);
 	else
 		fprintf(stderr, " done\n");
 }
@@ -2657,7 +2456,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 	dnsc_use_edns0 = 0;
 
 	/* qtype message printed in handshake function */
-	if (do_qtype == T_UNSET) {
+	if (this.do_qtype == T_UNSET) {
 		r = handshake_qtype_autodetect(dns_fd);
 		if (r) {
 			return r;
@@ -2677,19 +2476,19 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 	}
 
 	if (raw_mode && handshake_raw_udp(dns_fd, seed)) {
-		conn = CONN_RAW_UDP;
-		max_timeout_ms = 10000;
-		compression_down = 1;
-		compression_up = 1;
+		this.conn = CONN_RAW_UDP;
+		this.max_timeout_ms = 10000;
+		this.compression_down = 1;
+		this.compression_up = 1;
 	} else {
 		if (raw_mode == 0) {
 			fprintf(stderr, "Skipping raw mode\n");
 		}
 
 		dnsc_use_edns0 = 1;
-		if (handshake_edns0_check(dns_fd) && running) {
+		if (handshake_edns0_check(dns_fd) && this.running) {
 			fprintf(stderr, "Using EDNS0 extension\n");
-		} else if (!running) {
+		} else if (!this.running) {
 			return -1;
 		} else {
 			fprintf(stderr, "DNS relay does not support EDNS0 extension\n");
@@ -2697,7 +2496,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		}
 
 		upcodec = handshake_upenc_autodetect(dns_fd);
-		if (!running)
+		if (!this.running)
 			return -1;
 
 		if (upcodec == 1) { /* Base64 */
@@ -2707,18 +2506,18 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		} else if (upcodec == 3) { /* Base128 */
 			handshake_switch_codec(dns_fd, 7);
 		}
-		if (!running)
+		if (!this.running)
 			return -1;
 
-		if (downenc == ' ') {
-			downenc = handshake_downenc_autodetect(dns_fd);
+		if (this.downenc == ' ') {
+			this.downenc = handshake_downenc_autodetect(dns_fd);
 		}
-		if (!running)
+		if (!this.running)
 			return -1;
 
-		/* Set options for compression, lazymode and downstream codec */
-		handshake_switch_options(dns_fd, lazymode, compression_down, downenc);
-		if (!running)
+		/* Set options for compression, this.lazymode and downstream codec */
+		handshake_switch_options(dns_fd, this.lazymode, this.compression_down, this.downenc);
+		if (!this.running)
 			return -1;
 
 		if (autodetect_frag_size) {
@@ -2735,21 +2534,21 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		}
 
 		handshake_set_fragsize(dns_fd, fragsize);
-		if (!running)
+		if (!this.running)
 			return -1;
 
 		/* init windowing protocol */
-		outbuf = window_buffer_init(64, windowsize_up, maxfragsize_up, WINDOW_SENDING);
-		outbuf->timeout = ms_to_timeval(downstream_timeout_ms);
+		this.outbuf = window_buffer_init(64, this.windowsize_up, this.maxfragsize_up, WINDOW_SENDING);
+		this.outbuf->timeout = ms_to_timeval(this.downstream_timeout_ms);
 		/* Incoming buffer max fragsize doesn't matter */
-		inbuf = window_buffer_init(64, windowsize_down, MAX_FRAGSIZE, WINDOW_RECVING);
+		this.inbuf = window_buffer_init(64, this.windowsize_down, MAX_FRAGSIZE, WINDOW_RECVING);
 
 		/* init query tracking */
-		num_untracked = 0;
-		num_pending = 0;
-		pending_queries = calloc(PENDING_QUERIES_LENGTH, sizeof(struct query_tuple));
+		this.num_untracked = 0;
+		this.num_pending = 0;
+		this.pending_queries = calloc(PENDING_QUERIES_LENGTH, sizeof(struct query_tuple));
 		for (int i = 0; i < PENDING_QUERIES_LENGTH; i++)
-			pending_queries[i].id = -1;
+			this.pending_queries[i].id = -1;
 
 		/* set server window/timeout parameters and calculate RTT */
 		handshake_set_timeout(dns_fd);

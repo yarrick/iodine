@@ -23,12 +23,123 @@
 extern int debug;
 extern int stats;
 
-#define PENDING_QUERIES_LENGTH (MAX(windowsize_up, windowsize_down) * 3)
+#define PENDING_QUERIES_LENGTH (MAX(this.windowsize_up, this.windowsize_down) * 4)
+#define INSTANCE this
+
+struct client_instance {
+	int max_downstream_frag_size;
+	int autodetect_frag_size;
+	int hostname_maxlen;
+	int raw_mode;
+	int foreground;
+	char password[33];
+
+	/* DNS nameserver info */
+	char **nameserv_hosts;
+	size_t nameserv_hosts_len;
+	struct sockaddr_storage *nameserv_addrs;
+	size_t nameserv_addrs_len;
+	int current_nameserver;
+	struct sockaddr_storage raw_serv;
+	int raw_serv_len;
+	char *topdomain;
+
+	int tun_fd;
+	int dns_fd;
+
+#ifdef OPENBSD
+	int rtable;
+#endif
+	int running;
+
+	/* Output flags for debug and time between stats update */
+	int debug;
+	int stats;
+
+	uint16_t rand_seed;
+
+	/* Current up/downstream window data */
+	struct frag_buffer *outbuf;
+	struct frag_buffer *inbuf;
+	size_t windowsize_up;
+	size_t windowsize_down;
+	size_t maxfragsize_up;
+
+	/* Next downstream seqID to be ACK'd (-1 if none pending) */
+	int next_downstream_ack;
+
+	/* Remembering queries we sent for tracking purposes */
+	struct query_tuple *pending_queries;
+	size_t num_pending;
+	time_t max_timeout_ms;
+	time_t send_interval_ms;
+	time_t min_send_interval_ms;
+
+	/* Server response timeout in ms and downstream window timeout */
+	time_t server_timeout_ms;
+	time_t downstream_timeout_ms;
+	int autodetect_server_timeout;
+
+	/* Cumulative Round-Trip-Time in ms */
+	time_t rtt_total_ms;
+	size_t num_immediate;
+
+	/* Connection statistics */
+	size_t num_timeouts;
+	size_t num_untracked;
+	size_t num_servfail;
+	size_t num_badip;
+	size_t num_sent;
+	size_t num_recv;
+	size_t send_query_sendcnt;
+	size_t send_query_recvcnt;
+	size_t num_frags_sent;
+	size_t num_frags_recv;
+	size_t num_pings;
+
+	/* My userid at the server */
+	char userid;
+	char userid_char;		/* used when sending (lowercase) */
+	char userid_char2;		/* also accepted when receiving (uppercase) */
+
+	uint16_t chunkid;
+
+	/* Base32 encoder used for non-data packets and replies */
+	struct encoder *b32;
+	/* Base64 etc encoders for replies */
+	struct encoder *b64;
+	struct encoder *b64u;
+	struct encoder *b128;
+
+	/* The encoder used for data packets
+	 * Defaults to Base32, can be changed after handshake */
+	struct encoder *dataenc;
+
+	/* Upstream/downstream compression flags */
+	int compression_up;
+	int compression_down;
+
+	/* The encoder to use for downstream data */
+	char downenc;
+
+	/* set query type to send */
+	uint16_t do_qtype;
+
+	/* My connection mode */
+	enum connection conn;
+	int connected;
+
+	int lazymode;
+	long send_ping_soon;
+	time_t lastdownstreamtime;
+};
 
 struct query_tuple {
 	int id; /* DNS query / response ID */
 	struct timeval time; /* time sent or 0 if cleared */
 };
+
+extern struct client_instance this;
 
 void client_init();
 void client_stop();
@@ -37,18 +148,10 @@ enum connection client_get_conn();
 const char *client_get_raw_addr();
 
 void client_rotate_nameserver();
-void client_set_nameservers(struct sockaddr_storage *, int);
-void client_set_topdomain(const char *cp);
-void client_set_password(const char *cp);
 int client_set_qtype(char *qtype);
-char *client_get_qtype();
-void client_set_downenc(char *encoding);
-void client_set_compression(int up, int down);
-void client_set_dnstimeout(double, double, double, int);
-void client_set_lazymode(int lazy_mode);
-void client_set_windowsize(size_t, size_t);
+char *format_qtype();
+char parse_encoding(char *encoding);
 void client_set_hostname_maxlen(size_t i);
-void client_set_interval(double, double);
 
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize);
 int client_tunnel(int tun_fd, int dns_fd);
