@@ -155,7 +155,7 @@ window_process_incoming_fragment(struct frag_buffer *w, fragment *f)
 	}
 	/* Place fragment into correct location in buffer */
 	ssize_t dest = WRAP(w->window_start + SEQ_OFFSET(startid, f->seqID));
-	WDEBUG("   Putting frag seq %u into frags[%lu + %u = %lu]",
+	WDEBUG("   Putting frag seq %u into frags[%" L "u + %u = %" L "u]",
 		   f->seqID, w->window_start, SEQ_OFFSET(startid, f->seqID), dest);
 
 	/* Check if fragment already received */
@@ -192,7 +192,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 	if (w->direction != WINDOW_RECVING)
 		return 0;
 	if (w->frags[w->chunk_start].start == 0 && w->numitems > 0) {
-		WDEBUG("chunk_start (%lu) pointing to non-start fragment (seq %u, len %lu)!",
+		WDEBUG("chunk_start (%" L "u) pointing to non-start fragment (seq %u, len %" L "u)!",
 			  w->chunk_start, w->frags[w->chunk_start].seqID, w->frags[w->chunk_start].len);
 		return 0;
 	}
@@ -208,12 +208,12 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 		f = &w->frags[woffs];
 		fraglen = f->len;
 		if (fraglen == 0 || f->seqID != curseq) {
-			WDEBUG("Missing next frag %u [%lu], got seq %u (%lu bytes) instead! Not reassembling!",
+			WDEBUG("Missing next frag %u [%" L "u], got seq %u (%" L "u bytes) instead! Not reassembling!",
 				   curseq, woffs, f->seqID, fraglen);
 			return 0;
 		}
 
-		WDEBUG("   Fragment seq %u, data length %lu, data offset %lu, total len %lu, maxlen %lu",
+		WDEBUG("   Fragment seq %u, data length %" L "u, data offset %" L "u, total len %" L "u, maxlen %" L "u",
 				f->seqID, fraglen, dest - data, datalen, maxlen);
 		memcpy(dest, f->data, MIN(fraglen, maxlen));
 		dest += fraglen;
@@ -225,7 +225,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 			}
 		}
 		if (fraglen > maxlen) {
-			WDEBUG("Data buffer too small! Reassembled %lu bytes.", datalen);
+			WDEBUG("Data buffer too small! Reassembled %" L "u bytes.", datalen);
 			return 0;
 		}
 
@@ -233,7 +233,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 		window_tick(w);
 
 		if (f->end == 1) {
-			WDEBUG("Found end of chunk! (seqID %u, chunk len %lu, datalen %lu)", f->seqID, i, datalen);
+			WDEBUG("Found end of chunk! (seqID %u, chunk len %" L "u, datalen %" L "u)", f->seqID, i, datalen);
 			end = 1;
 			break;
 		}
@@ -249,7 +249,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 		return 0;
 	}
 
-	WDEBUG("Reassembled %lu bytes from %lu frags; %scompressed!", datalen, i + 1, *compression ? "" : "un");
+	WDEBUG("Reassembled %" L "u bytes from %" L "u frags; %scompressed!", datalen, i + 1, *compression ? "" : "un");
 	/* Clear all used fragments */
 	size_t p;
 	ITER_FORWARD(w->chunk_start, WRAP(w->chunk_start + i + 1), w->length, p,
@@ -340,7 +340,7 @@ window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack)
 		}
 	}
 	if (f)
-		WDEBUG("Not sending any fragments (last frag checked: retries %u, seqid %u, len %lu)",
+		WDEBUG("Not sending any fragments (last frag checked: retries %u, seqid %u, len %" L "u)",
 				f->retries, f->seqID, f->len);
 	return NULL;
 
@@ -383,7 +383,7 @@ window_ack(struct frag_buffer *w, int seqid)
 			if (f->acks > 0)
 				WDEBUG("DUPE ACK: %d ACKs for seqId %u", f->acks, seqid);
 			f->acks ++;
-			WDEBUG("   ACK frag seq %u, ACKs %u, len %lu, s %u e %u", f->seqID, f->acks, f->len, f->start, f->end);
+			WDEBUG("   ACK frag seq %u, ACKs %u, len %" L "u, s %u e %u", f->seqID, f->acks, f->len, f->start, f->end);
 			break;
 		}
 	}
@@ -400,7 +400,7 @@ window_tick(struct frag_buffer *w)
 			unsigned old_start_id = w->start_seq_id;
 #endif
 			w->start_seq_id = (w->start_seq_id + 1) % MAX_SEQ_ID;
-			WDEBUG("moving window forwards; %lu-%lu (%u) to %lu-%lu (%u) len=%lu",
+			WDEBUG("moving window forwards; %" L "u-%" L "u (%u) to %" L "u-%" L "u (%u) len=%" L "u",
 					w->window_start, w->window_end, old_start_id, AFTER(w, 1),
 					AFTER(w, w->windowsize + 1), w->start_seq_id, w->length);
 			if (w->direction == WINDOW_SENDING) {
@@ -429,7 +429,7 @@ window_add_outgoing_data(struct frag_buffer *w, uint8_t *data, size_t len, int c
 	compressed &= 1;
 	size_t offset = 0;
 	static fragment f;
-	WDEBUG("add data len %lu, %lu frags, max fragsize %u", len, n, w->maxfraglen);
+	WDEBUG("add data len %" L "u, %" L "u frags, max fragsize %u", len, n, w->maxfraglen);
 	for (size_t i = 0; i < n; i++) {
 		memset(&f, 0, sizeof(f));
 		f.len = MIN(len - offset, w->maxfraglen);
@@ -441,7 +441,7 @@ window_add_outgoing_data(struct frag_buffer *w, uint8_t *data, size_t len, int c
 		f.ack_other = -1;
 		window_append_fragment(w, &f);
 		w->cur_seq_id = (w->cur_seq_id + 1) % MAX_SEQ_ID;
-		WDEBUG("     fragment len %lu, seqID %u, s %u, end %u, dOffs %lu", f.len, f.seqID, f.start, f.end, offset);
+		WDEBUG("     fragment len %" L "u, seqID %u, s %u, end %u, dOffs %" L "u", f.len, f.seqID, f.start, f.end, offset);
 		offset += f.len;
 	}
 	return n;

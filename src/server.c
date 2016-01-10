@@ -103,7 +103,7 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd, struct sockaddr
 
 #define QMEM_DEBUG(l, u, ...) \
 	if (server.debug >= l) {\
-		TIMEPRINT("[QMEM u%d (%lu/%u)] ", u, users[u].qmem.num_pending, users[u].outgoing->windowsize); \
+		TIMEPRINT("[QMEM u%d (%" L "u/%u)] ", u, users[u].qmem.num_pending, users[u].outgoing->windowsize); \
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
 	}
@@ -184,7 +184,7 @@ qmem_append(int userid, struct query *q)
 		buf->start = (buf->start + 1) % QMEM_LEN;
 	}
 
-	QMEM_DEBUG(5, userid, "add query ID %d, timeout %lu ms", q->id, timeval_to_ms(&users[userid].dns_timeout));
+	QMEM_DEBUG(5, userid, "add query ID %d, timeout %" L "u ms", q->id, timeval_to_ms(&users[userid].dns_timeout));
 
 	/* Copy query into buffer */
 	memcpy(&buf->queries[buf->end].q, q, sizeof(struct query));
@@ -314,7 +314,7 @@ qmem_max_wait(int *touser, struct query **sendq)
 						q->id, age_ms, immediate ? "immediate" : "lazy", timeval_to_ms(&u->dns_timeout));
 
 				sent++;
-				QMEM_DEBUG(4, userid, "ANSWER q id %d, ACK %d; sent %lu of %lu + sending another %lu",
+				QMEM_DEBUG(4, userid, "ANSWER q id %d, ACK %d; sent %" L "u of %" L "u + sending another %" L "u",
 						q->id, u->next_upstream_ack, sent, total, sending);
 
 				send_data_or_ping(userid, q, 0, immediate);
@@ -339,7 +339,7 @@ qmem_max_wait(int *touser, struct query **sendq)
 	if (server.debug >= 5) {
 		time_t soonest_ms = timeval_to_ms(&soonest);
 		if (nextq && nextuser >= 0) {
-			QMEM_DEBUG(5, nextuser, "can wait for %lu ms, will send id %d", soonest_ms, nextq->id);
+			QMEM_DEBUG(5, nextuser, "can wait for %" L "u ms, will send id %d", soonest_ms, nextq->id);
 		} else {
 			if (nextuser < 0)
 				nextuser = 0;
@@ -347,7 +347,7 @@ qmem_max_wait(int *touser, struct query **sendq)
 				/* only if resending some frags */
 				QMEM_DEBUG(5, nextuser, "Resending some fragments")
 			} else {
-				QMEM_DEBUG(2, nextuser, "Don't need to send anything to any users, waiting %lu ms", soonest_ms);
+				QMEM_DEBUG(2, nextuser, "Don't need to send anything to any users, waiting %" L "u ms", soonest_ms);
 			}
 		}
 	}
@@ -479,7 +479,7 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate)
 	if (datalen + headerlen > sizeof(pkt)) {
 		/* Should never happen, or at least user should be warned about
 		 * fragsize > MAX_FRAGLEN earlier on */
-		warnx("send_frag_or_dataless: fragment too large to send! (%lu)", datalen);
+		warnx("send_frag_or_dataless: fragment too large to send! (%" L "u)", datalen);
 		return;
 	}
 	if (f)
@@ -535,7 +535,7 @@ user_send_data(int userid, uint8_t *indata, size_t len, int compressed)
 		datalen = sizeof(out);
 		ret = uncompress(out, &datalen, indata, len);
 		if (ret != Z_OK) {
-			DEBUG(1, "FAIL: Uncompress == %d: %lu bytes to user %d!", ret, len, userid);
+			DEBUG(1, "FAIL: Uncompress == %d: %" L "u bytes to user %d!", ret, len, userid);
 			return 0;
 		}
 	}
@@ -800,7 +800,7 @@ handle_full_packet(int userid, uint8_t *data, size_t len, int compressed)
 	if (ret == Z_OK) {
 		hdr = (struct ip*) (out + 4);
 		touser = find_user_by_ip(hdr->ip_dst.s_addr);
-		DEBUG(2, "FULL PKT: %lu bytes from user %d (touser %d)", len, userid, touser);
+		DEBUG(2, "FULL PKT: %" L "u bytes from user %d (touser %d)", len, userid, touser);
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
 			write_tun(server.tun_fd, rawdata, rawlen);
@@ -823,7 +823,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 	char myhash[16];
 
 	if (len < 16) {
-		DEBUG(2, "Invalid raw login packet: length %lu < 16 bytes!", len);
+		DEBUG(2, "Invalid raw login packet: length %" L "u < 16 bytes!", len);
 		return;
 	}
 
@@ -833,7 +833,7 @@ handle_raw_login(uint8_t *packet, size_t len, struct query *q, int fd, int useri
 		return;
 	}
 
-	DEBUG(1, "RX-raw: login, len %lu, from user %d", len, userid);
+	DEBUG(1, "RX-raw: login, len %" L "u, from user %d", len, userid);
 
 	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, server.password, users[userid].seed + 1);
@@ -867,7 +867,7 @@ handle_raw_data(uint8_t *packet, size_t len, struct query *q, int userid)
 
 	/* copy to packet buffer, update length */
 
-	DEBUG(3, "RX-raw: full pkt raw, length %lu, from user %d", len, userid);
+	DEBUG(3, "RX-raw: full pkt raw, length %" L "u, from user %d", len, userid);
 
 	handle_full_packet(userid, packet, len, 1);
 }
@@ -904,7 +904,7 @@ raw_decode(uint8_t *packet, size_t len, struct query *q, int dns_fd)
 	raw_cmd = RAW_HDR_GET_CMD(packet);
 	raw_user = RAW_HDR_GET_USR(packet);
 
-	DEBUG(3, "RX-raw: client %s, user %d, raw command 0x%02X, length %lu",
+	DEBUG(3, "RX-raw: client %s, user %d, raw command 0x%02X, length %" L "u",
 			  format_addr(&q->from, q->fromlen), raw_user, raw_cmd, len);
 
 	packet += RAW_HDR_LEN;
@@ -1122,7 +1122,7 @@ write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc)
 		return;
 	}
 
-	DEBUG(3, "TX: client %s ID %5d, %lu bytes data, type %d, name '%10s'",
+	DEBUG(3, "TX: client %s ID %5d, %" L "u bytes data, type %d, name '%10s'",
 			format_addr(&q->from, q->fromlen), q->id, datalen, q->type, q->name);
 
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
@@ -1149,7 +1149,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 
 	memcpy(in, q->name, MIN(domain_len, sizeof(in)));
 
-	DEBUG(3, "NULL request length %d/%lu, command '%c'", domain_len, sizeof(in), in[0]);
+	DEBUG(3, "NULL request length %d/%" L "u, command '%c'", domain_len, sizeof(in), in[0]);
 
 	if(in[0] == 'V' || in[0] == 'v') { /* Version request */
 		uint32_t version = !PROTOCOL_VERSION;
@@ -1544,7 +1544,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 
 		read = unpack_data(unpacked, sizeof(unpacked), in + 1, domain_len - 1, b32);
 		if (read < UPSTREAM_PING) {
-			DEBUG(1, "Invalid ping! Length %lu", read);
+			DEBUG(1, "Invalid ping! Length %" L "u", read);
 			return;
 		}
 

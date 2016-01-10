@@ -152,7 +152,7 @@ immediate_mode_defaults()
 #ifdef DEBUG_BUILD
 #define QTRACK_DEBUG(l, ...) \
 	if (this.debug >= l) {\
-		TIMEPRINT("[QTRACK (%lu/%lu), ? %lu, TO %lu, S %lu/%lu] ", this.num_pending, PENDING_QUERIES_LENGTH, \
+		TIMEPRINT("[QTRACK (%" L "u/%" L "u), ? %" L "u, TO %" L "u, S %" L "u/%" L "u] ", this.num_pending, PENDING_QUERIES_LENGTH, \
 				this.num_untracked, this.num_timeouts, window_sending(this.outbuf, NULL), this.outbuf->numitems); \
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
@@ -333,7 +333,7 @@ send_query(uint8_t *hostname)
 	struct query q;
 	size_t len;
 
-	DEBUG(3, "TX: pkt len %lu: hostname '%s'", strlen((char *)hostname), hostname);
+	DEBUG(3, "TX: pkt len %" L "u: hostname '%s'", strlen((char *)hostname), hostname);
 
 	this.chunkid += 7727;
 	if (this.chunkid == 0)
@@ -529,7 +529,7 @@ send_next_frag()
 	if (datacmc >= 36)
 		datacmc = 0;
 
-	DEBUG(3, " SEND DATA: seq %d, ack %d, len %lu, s%d e%d c%d flags %1X",
+	DEBUG(3, " SEND DATA: seq %d, ack %d, len %" L "u, s%d e%d c%d flags %1X",
 			f->seqID, f->ack_other, f->len, f->start, f->end, f->compressed, hdr[2] >> 4);
 
 	id = send_query(buf);
@@ -910,7 +910,7 @@ parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
 		up_wsize = data[4];
 		dn_start_seq = data[5];
 		up_start_seq = data[6];
-		DEBUG(3, "PING pkt data=%lu WS: up=%u, dn=%u; Start: up=%u, dn=%u",
+		DEBUG(3, "PING pkt data=%" L "u WS: up=%u, dn=%u; Start: up=%u, dn=%u",
 					len - headerlen, up_wsize, dn_wsize, up_start_seq, dn_start_seq);
 	}
 	f->len = len - headerlen;
@@ -931,7 +931,7 @@ tunnel_tun()
 	if ((read = read_tun(this.tun_fd, in, sizeof(in))) <= 0)
 		return -1;
 
-	DEBUG(2, " IN: %lu bytes on tunnel, to be compressed: %d", read, this.compression_up);
+	DEBUG(2, " IN: %" L "u bytes on tunnel, to be compressed: %d", read, this.compression_up);
 
 	if (this.conn != CONN_DNS_NULL || this.compression_up) {
 		datalen = sizeof(out);
@@ -945,7 +945,7 @@ tunnel_tun()
 	if (this.conn == CONN_DNS_NULL) {
 		/* Check if outgoing buffer can hold data */
 		if (window_buffer_available(this.outbuf) < (read / MAX_FRAGSIZE) + 1) {
-			DEBUG(1, "  Outgoing buffer full (%lu/%lu), not adding data!",
+			DEBUG(1, "  Outgoing buffer full (%" L "u/%" L "u), not adding data!",
 						this.outbuf->numitems, this.outbuf->length);
 			return -1;
 		}
@@ -1002,14 +1002,14 @@ tunnel_dns()
 			if (this.lazymode) {
 
 				if (this.send_query_recvcnt < 500 && this.num_servfail < 4) {
-					fprintf(stderr, "Hmm, that's %ld SERVFAILs. Your data should still go through...\n", this.num_servfail);
+					fprintf(stderr, "Hmm, that's %" L "d SERVFAILs. Your data should still go through...\n", this.num_servfail);
 
 				} else if (this.send_query_recvcnt < 500 && this.num_servfail >= 10 &&
 					this.autodetect_server_timeout && this.max_timeout_ms >= 500 && this.num_servfail % 5 == 0) {
 
 					this.max_timeout_ms -= 200;
 					double target_timeout = (float) this.max_timeout_ms / 1000.0;
-					fprintf(stderr, "Too many SERVFAILs (%ld), reducing timeout to"
+					fprintf(stderr, "Too many SERVFAILs (%" L "d), reducing timeout to"
 						" %.1f secs. (use -I%.1f next time on this network)\n",
 							this.num_servfail, target_timeout, target_timeout);
 
@@ -1041,7 +1041,7 @@ tunnel_dns()
 	if (read == 5 && !strncmp("BADIP", (char *)cbuf, 5)) {
 		this.num_badip++;
 		if (this.num_badip % 5 == 1) {
-			fprintf(stderr, "BADIP (%ld): Server rejected sender IP address (maybe iodined -c will help), or server "
+			fprintf(stderr, "BADIP (%" L "d): Server rejected sender IP address (maybe iodined -c will help), or server "
 					"kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.\n", this.num_badip);
 		}
 		return -1;	/* nothing done */
@@ -1059,7 +1059,7 @@ tunnel_dns()
 	got_response(q.id, immediate, 0);
 
 	if ((this.debug >= 3 && res) || (this.debug >= 2 && !res))
-		fprintf(stderr, " RX %s; frag ID %3u, ACK %3d, compression %d, datalen %lu, s%d e%d\n",
+		fprintf(stderr, " RX %s; frag ID %3u, ACK %3d, compression %d, datalen %" L "u, s%d e%d\n",
 				res ? "PING" : "DATA", f.seqID, f.ack_other, f.compressed, f.len, f.start, f.end);
 
 
@@ -1100,7 +1100,7 @@ tunnel_dns()
 		if (compressed) {
 			buflen = sizeof(buf);
 			if ((res = uncompress(buf, &buflen, cbuf, datalen)) != Z_OK) {
-				DEBUG(1, "Uncompress failed (%d) for data len %lu: reassembled data corrupted or incomplete!", res, datalen);
+				DEBUG(1, "Uncompress failed (%d) for data len %" L "u: reassembled data corrupted or incomplete!", res, datalen);
 				datalen = 0;
 			} else {
 				datalen = buflen;
@@ -1189,7 +1189,7 @@ client_tunnel()
 
 				sending--;
 				total--;
-				QTRACK_DEBUG(3, "Sent a query to fill server lazy buffer to %lu, will send another %d",
+				QTRACK_DEBUG(3, "Sent a query to fill server lazy buffer to %" L "u, will send another %d",
 							 this.lazymode ? this.windowsize_down : 1, total);
 
 				if (sending > 0 || (total > 0 && this.lazymode)) {
@@ -2409,7 +2409,7 @@ handshake_set_timeout()
 	char in[4096];
 	int read, id;
 
-	fprintf(stderr, "Setting window sizes to %lu frags upstream, %lu frags downstream...\n",
+	fprintf(stderr, "Setting window sizes to %" L "u frags upstream, %" L "u frags downstream...\n",
 		this.windowsize_up, this.windowsize_down);
 
 	fprintf(stderr, "Calculating round-trip time...");

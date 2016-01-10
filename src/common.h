@@ -45,6 +45,32 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 
 #define DNS_PORT 53
 
+#if _WIN32 || _WIN64
+#if _WIN64
+#define BITS_64
+#else
+#define BITS_32
+#endif
+#endif
+
+#if __GNUC__
+#if __x86_64__ || __ppc64__
+#define BITS_64 1
+#else
+#define BITS_32 1
+#endif
+#endif
+
+/* Determine appropriate format specifier for long int on 32/64 bit systems */
+#if BITS_64
+#define FMT_LONG "l"
+#else
+#define FMT_LONG ""
+#endif
+
+/* For convenience and shortness */
+#define L FMT_LONG
+
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
