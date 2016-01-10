@@ -1220,21 +1220,21 @@ client_tunnel()
 			if (difftime(time(NULL), last_stats) >= this.stats) {
 				/* print useful statistics report */
 				fprintf(stderr, "\n============ iodine connection statistics (user %1d) ============\n", this.userid);
-				fprintf(stderr, " Queries   sent: %8lu"  ", answered: %8lu"  ", SERVFAILs: %4lu\n",
+				fprintf(stderr, " Queries   sent: %8" L "u"  ", answered: %8" L "u"  ", SERVFAILs: %4" L "u\n",
 						this.num_sent, this.num_recv, this.num_servfail);
-				fprintf(stderr, "  last %3d secs: %7lu" " (%4lu/s),   replies: %7lu" " (%4lu/s)\n",
+				fprintf(stderr, "  last %3d secs: %7" L "u" " (%4" L "u/s),   replies: %7" L "u" " (%4" L "u/s)\n",
 						this.stats, this.num_sent - sent_since_report, (this.num_sent - sent_since_report) / this.stats,
 						this.num_recv - recv_since_report, (this.num_recv - recv_since_report) / this.stats);
-				fprintf(stderr, "  num IP rejected: %4lu,   untracked: %4lu,   lazy mode: %1d\n",
+				fprintf(stderr, "  num IP rejected: %4" L "u,   untracked: %4" L "u,   lazy mode: %1d\n",
 						this.num_badip, this.num_untracked, this.lazymode);
-				fprintf(stderr, " Min send: %5ld ms, Avg RTT: %5ld ms  Timeout server: %4ld ms\n",
+				fprintf(stderr, " Min send: %5" L "d ms, Avg RTT: %5" L "d ms  Timeout server: %4" L "d ms\n",
 						this.min_send_interval_ms, this.rtt_total_ms / this.num_immediate, this.server_timeout_ms);
-				fprintf(stderr, " Queries immediate: %5lu, timed out: %4lu    target: %4ld ms\n",
+				fprintf(stderr, " Queries immediate: %5" L "u, timed out: %4" L "u    target: %4" L "d ms\n",
 						this.num_immediate, this.num_timeouts, this.max_timeout_ms);
 				if (this.conn == CONN_DNS_NULL) {
-					fprintf(stderr, " Frags resent: %4u,   OOS: %4u          down frag: %4ld ms\n",
+					fprintf(stderr, " Frags resent: %4u,   OOS: %4u          down frag: %4" L "d ms\n",
 							this.outbuf->resends, this.inbuf->oos, this.downstream_timeout_ms);
-					fprintf(stderr, " TX fragments: %8lu" ",   RX: %8lu" ",   pings: %8lu" "\n\n",
+					fprintf(stderr, " TX fragments: %8" L "u" ",   RX: %8" L "u" ",   pings: %8" L "u" "\n\n",
 							this.num_frags_sent, this.num_frags_recv, this.num_pings);
 				}
 				/* update since-last-report this.stats */
