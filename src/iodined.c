@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <zlib.h>
+#include <getopt.h>
 
 #include "common.h"
 #include "version.h"
@@ -186,31 +187,31 @@ static void
 help() {
 	fprintf(stderr, "iodine IP over DNS tunneling server\n");
 	print_usage();
-	fprintf(stderr, "  -v to print version info and exit\n");
-	fprintf(stderr, "  -h to print this help and exit\n");
-	fprintf(stderr, "  -4 to listen only on IPv4\n");
-	fprintf(stderr, "  -6 to listen only on IPv6\n");
-	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
-	fprintf(stderr, "  -s to skip creating and configuring the tun device, "
+	fprintf(stderr, "  -v, --version  print version info and exit\n");
+	fprintf(stderr, "  -h, --help  print this help and exit\n");
+	fprintf(stderr, "  -4  listen only on IPv4\n");
+	fprintf(stderr, "  -6  listen only on IPv6\n");
+	fprintf(stderr, "  -c, --noipcheck  disable check of client IP/port on each request\n");
+	fprintf(stderr, "  -s, --notun  skip creating and configuring the tun device, "
 		"which then has to be created manually\n");
-	fprintf(stderr, "  -f to keep running in foreground\n");
-	fprintf(stderr, "  -D to increase debug level\n");
+	fprintf(stderr, "  -f  to keep running in foreground\n");
+	fprintf(stderr, "  -D  increase debug level\n");
 	fprintf(stderr, "     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n");
-	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
-	fprintf(stderr, "  -t dir to chroot to directory dir\n");
-	fprintf(stderr, "  -d device to set tunnel device name\n");
-	fprintf(stderr, "  -m mtu to set tunnel device mtu\n");
-	fprintf(stderr, "  -z context to apply SELinux context after initialization\n");
-	fprintf(stderr, "  -l IPv4 address to listen on for incoming dns traffic "
+	fprintf(stderr, "  -u, --user  drop privileges and run as user\n");
+	fprintf(stderr, "  -t, --chrootdir  chroot to directory after init\n");
+	fprintf(stderr, "  -d  specify tunnel device name\n");
+	fprintf(stderr, "  -m, --mtu  specify tunnel device mtu\n");
+	fprintf(stderr, "  -z, --context  apply SELinux context after initialization\n");
+	fprintf(stderr, "  -l, --listen4  IPv4 address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n");
-	fprintf(stderr, "  -L IPv6 address to listen on for incoming dns traffic "
+	fprintf(stderr, "  -L, --listen6  IPv6 address to listen on for incoming dns traffic "
 		"(default ::)\n");
-	fprintf(stderr, "  -p port to listen on for incoming dns traffic (default 53)\n");
-	fprintf(stderr, "  -n ip to respond with to NS queries\n");
-	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
-	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
-	fprintf(stderr, "  -F pidfile to write pid to a file\n");
-	fprintf(stderr, "  -i maximum idle time before shutting down\n");
+	fprintf(stderr, "  -p  port to listen on for incoming dns traffic (default 53)\n");
+	fprintf(stderr, "  -n, --nsip  ip to respond with to NS queries\n");
+	fprintf(stderr, "  -b, --forwardto  forward normal DNS queries to a UDP port on localhost\n");
+	fprintf(stderr, "  -P  password used for authentication (max 32 chars will be used)\n");
+	fprintf(stderr, "  -F, --pidfile  write pid to a file\n");
+	fprintf(stderr, "  -i, --idlequit  maximum idle time before shutting down\n");
 	fprintf(stderr, "tunnel_ip is the IP number of the local tunnel interface.\n");
 	fprintf(stderr, "   /netmask sets the size of the tunnel network.\n");
 	fprintf(stderr, "topdomain is the FQDN that is delegated to this server.\n");
@@ -279,7 +280,6 @@ main(int argc, char **argv)
 	listen_ip4 = NULL;
 	listen_ip6 = NULL;
 
-
 	ns_get_externalip = 0;
 	skipipconfig = 0;
 	pidfile = NULL;
@@ -302,9 +302,31 @@ main(int argc, char **argv)
 	// Load default values from preset
 	memcpy(&server, &preset_default, sizeof(struct server_instance));
 
+	/* each option has format:
+	   char *name, int has_arg, int *flag, int val */
+	static struct option iodined_args[] = {
+		{"version", no_argument, 0, 'v'},
+		{"noipcheck", no_argument, 0, 'c'},
+		{"notun", no_argument, 0, 's'},
+		{"user", required_argument, 0, 'u'},
+		{"listen4", required_argument, 0, 'l'},
+		{"listen6", required_argument, 0, 'L'},
+		{"nsip", required_argument, 0, 'n'},
+		{"mtu", required_argument, 0, 'm'},
+		{"idlequit", required_argument, 0, 'i'},
+		{"forwardto", required_argument, 0, 'b'},
+		{"help", no_argument, 0, 'h'},
+		{"context", required_argument, 0, 'z'},
+		{"chrootdir", required_argument, 0, 't'},
+		{"pidfile", required_argument, 0, 'F'},
+		{NULL, 0, 0, 0}
+	};
+
+	static char *iodined_args_short = "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:";
+
 	server.running = 1;
 
-	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
+	while ((choice = getopt_long(argc, argv, iodined_args_short, iodined_args, NULL)) != -1) {
 		switch(choice) {
 		case '4':
 			server.addrfamily = AF_INET;
