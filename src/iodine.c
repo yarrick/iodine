@@ -366,6 +366,9 @@ main(int argc, char **argv)
 						}
 					}
 				}
+			} else if (choice == '?') {
+				usage();
+				/* Not reached */
 			} else {
 				/* skip all other options until we find preset */
 				continue;
