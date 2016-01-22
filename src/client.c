@@ -426,13 +426,22 @@ send_raw_data(uint8_t *data, size_t datalen)
 static int
 send_packet(char cmd, const uint8_t *data, const size_t datalen)
 /* Base32 encodes data and sends as single DNS query
+ * cmd becomes first byte of query, followed by hex userid, encoded
+ * data and 3 bytes base32 encoded CMC
  * Returns ID of sent query */
 {
-	uint8_t buf[4096];
+	uint8_t buf[512], data_with_cmc[datalen + 2];
+
+	if (data)
+		memcpy(data_with_cmc, data, datalen);
+	*(uint16_t *) (data_with_cmc + datalen) = this.rand_seed;
+	this.rand_seed++;
 
 	buf[0] = cmd;
+	buf[1] = this.userid_char;
 
-	build_hostname(buf, sizeof(buf), data, datalen, this.topdomain, b32, this.hostname_maxlen, 1);
+	build_hostname(buf, sizeof(buf), data_with_cmc, datalen + 2,
+				   this.topdomain, b32, this.hostname_maxlen, 2);
 
 	return send_query(buf);
 }
@@ -442,27 +451,26 @@ send_ping(int ping_response, int ack, int set_timeout)
 {
 	this.num_pings++;
 	if (this.conn == CONN_DNS_NULL) {
-		uint8_t data[13];
+		uint8_t data[12];
 		int id;
 
 		/* Build ping header (see doc/proto_xxxxxxxx.txt) */
-		data[0] = this.userid;
-		data[1] = ack & 0xFF;
+		data[0] = ack & 0xFF;
 
 		if (this.outbuf && this.inbuf) {
-			data[2] = this.outbuf->windowsize & 0xff;	/* Upstream window size */
-			data[3] = this.inbuf->windowsize & 0xff;		/* Downstream window size */
-			data[4] = this.outbuf->start_seq_id & 0xff;	/* Upstream window start */
-			data[5] = this.inbuf->start_seq_id & 0xff;	/* Downstream window start */
+			data[1] = this.outbuf->windowsize & 0xff;	/* Upstream window size */
+			data[2] = this.inbuf->windowsize & 0xff;		/* Downstream window size */
+			data[3] = this.outbuf->start_seq_id & 0xff;	/* Upstream window start */
+			data[4] = this.inbuf->start_seq_id & 0xff;	/* Downstream window start */
 		}
 
-		*(uint16_t *) (data + 6) = htons(this.server_timeout_ms);
-		*(uint16_t *) (data + 8) = htons(this.downstream_timeout_ms);
+		*(uint16_t *) (data + 5) = htons(this.server_timeout_ms);
+		*(uint16_t *) (data + 7) = htons(this.downstream_timeout_ms);
 
 		/* update server frag/lazy timeout, ack flag, respond with ping flag */
-		data[10] = ((set_timeout & 1) << 4) | ((set_timeout & 1) << 3) | ((ack < 0 ? 0 : 1) << 2) | (ping_response & 1);
-		data[11] = (this.rand_seed >> 8) & 0xff;
-		data[12] = (this.rand_seed >> 0) & 0xff;
+		data[9] = ((set_timeout & 1) << 4) | ((set_timeout & 1) << 3) | ((ack < 0 ? 0 : 1) << 2) | (ping_response & 1);
+		data[10] = (this.rand_seed >> 8) & 0xff;
+		data[11] = (this.rand_seed >> 0) & 0xff;
 		this.rand_seed += 1;
 
 		DEBUG(3, " SEND PING: respond %d, ack %d, %s(server %ld ms, downfrag %ld ms), flags %02X",
@@ -1310,115 +1318,16 @@ client_tunnel()
 }
 
 static void
-send_login(char *login, int len)
-{
-	uint8_t data[19];
-
-	memset(data, 0, sizeof(data));
-	data[0] = this.userid;
-	memcpy(&data[1], login, MIN(len, 16));
-
-	data[17] = (this.rand_seed >> 8) & 0xff;
-	data[18] = (this.rand_seed >> 0) & 0xff;
-
-	this.rand_seed++;
-
-	send_packet('l', data, sizeof(data));
-}
-
-static void
-send_fragsize_probe(uint16_t fragsize)
-{
-	uint8_t probedata[256];
-	uint8_t buf[MAX_FRAGSIZE];
-	uint8_t hdr[3];
-	size_t hdr_len_enc = 6;
-
-	buf[0] = 'r'; /* Probe downstream fragsize packet */
-
-	hdr[0] = this.userid;
-	*(uint16_t *) (hdr + 1) = htons(fragsize);
-
-	b32->encode(buf + 1, &hdr_len_enc, hdr, 3);
-	/* build a large query domain which is random and maximum size,
-	 * will also take up maximum space in the return packet */
-	memset(probedata, MAX(1, this.rand_seed & 0xff), sizeof(probedata));
-	probedata[1] = MAX(1, (this.rand_seed >> 8) & 0xff);
-	this.rand_seed++;
-
-	/* Note: must either be same, or larger, than send_chunk() */
-	build_hostname(buf, sizeof(buf), probedata, sizeof(probedata), this.topdomain,
-				   this.dataenc, this.hostname_maxlen, 6);
-
-	send_query(buf);
-}
-
-static void
-send_set_downstream_fragsize(uint16_t fragsize)
-{
-	uint8_t data[5];
-
-	data[0] = this.userid;
-	*(uint16_t *) (data + 1) = htons(fragsize);
-	data[3] = (this.rand_seed >> 8) & 0xff;
-	data[4] = (this.rand_seed >> 0) & 0xff;
-
-	this.rand_seed++;
-
-	send_packet('n', data, sizeof(data));
-}
-
-static void
-send_version(uint32_t version)
-{
-	uint8_t data[6];
-
-	version = htonl(version);
-	*(uint32_t *) data = version;
-
-	data[4] = (this.rand_seed >> 8) & 0xff;
-	data[5] = (this.rand_seed >> 0) & 0xff;
-
-	this.rand_seed++;
-
-	send_packet('v', data, sizeof(data));
-}
-
-static void
-send_ip_request()
-{
-	uint8_t buf[512] = "i____.";
-	buf[1] = b32_5to8(this.userid);
-
-	buf[2] = b32_5to8((this.rand_seed >> 10) & 0x1f);
-	buf[3] = b32_5to8((this.rand_seed >> 5) & 0x1f);
-	buf[4] = b32_5to8((this.rand_seed ) & 0x1f);
-	this.rand_seed++;
-
-	strncat((char *)buf, this.topdomain, 512 - strlen((char *)buf));
-	send_query(buf);
-}
-
-static void
-send_raw_udp_login(int seed)
-{
-	char buf[16];
-	login_calculate(buf, 16, this.password, seed + 1);
-
-	send_raw((uint8_t *) buf, sizeof(buf), RAW_HDR_CMD_LOGIN);
-}
-
-static void
 send_upenctest(char *s)
 /* NOTE: String may be at most 63-4=59 chars to fit in 1 dns chunk. */
 {
-	char buf[512] = "z___";
+	char buf[512] = "z___.";
+	size_t buf_space = 3;
 
-	buf[1] = b32_5to8((this.rand_seed >> 10) & 0x1f);
-	buf[2] = b32_5to8((this.rand_seed >> 5) & 0x1f);
-	buf[3] = b32_5to8((this.rand_seed ) & 0x1f);
+	b32->encode((uint8_t *)buf + 1, &buf_space,(uint8_t *)&this.rand_seed, sizeof(this.rand_seed));
 	this.rand_seed++;
 
+	/* Append test string without changing it */
 	strncat(buf, s, 512 - strlen(buf));
 	strncat(buf, ".", 512 - strlen(buf));
 	strncat(buf, this.topdomain, 512 - strlen(buf));
@@ -1426,59 +1335,110 @@ send_upenctest(char *s)
 }
 
 static void
-send_downenctest(char downenc, int variant, char *s, int slen)
-/* Note: content/handling of s is not defined yet. */
+send_downenctest(char downenc, int variant)
 {
-	char buf[512] = "y_____.";
+	uint8_t buf[512] = "y_____.", hdr[3];
 
 	buf[1] = tolower(downenc);
-	buf[2] = b32_5to8(variant);
 
-	buf[3] = b32_5to8((this.rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((this.rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((this.rand_seed ) & 0x1f);
+	hdr[0] = variant;
+	*(uint16_t *) (hdr + 1) = this.rand_seed;
 	this.rand_seed++;
 
-	strncat(buf, this.topdomain, 512 - strlen(buf));
-	send_query((uint8_t *)buf);
+	build_hostname(buf, sizeof(buf), hdr, sizeof(hdr),
+				   this.topdomain, b32, this.hostname_maxlen, 2);
+
+	send_query(buf);
 }
 
 static void
-send_codec_switch(int bits)
+send_version(uint32_t version)
 {
-	char buf[512] = "s_____.";
-	buf[1] = b32_5to8(this.userid);
-	buf[2] = b32_5to8(bits);
+	uint8_t data[4], buf[512];
 
-	buf[3] = b32_5to8((this.rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((this.rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((this.rand_seed ) & 0x1f);
-	this.rand_seed++;
+	*(uint32_t *) data = htonl(version);
 
-	strncat(buf, this.topdomain, 512 - strlen(buf));
-	send_query((uint8_t *)buf);
+	buf[0] = 'v';
+
+	build_hostname(buf, sizeof(buf), data, sizeof(data),
+				   this.topdomain, b32, this.hostname_maxlen, 1);
+
+	send_query(buf);
 }
 
 static void
-send_server_options(int lazy, int compression, char denc, char *options)
-/* Options must be length >=4 */
+send_login(char *login, int len)
 {
-	char buf[512] = "oU3___CMC.";
-	buf[1] = b32_5to8(this.userid);
+	send_packet('l', (uint8_t *) login, len);
+}
 
-	options[0] = tolower(denc);
-	options[1] = lazy ? 'l' : 'i';
-	options[2] = compression ? 'c' : 'd';
-	options[3] = 0;
-	strncpy(buf + 3, options, 3);
+static void
+send_fragsize_probe(uint16_t fragsize)
+{
+	uint8_t data[256];
 
-	buf[6] = b32_5to8((this.rand_seed >> 10) & 0x1f);
-	buf[7] = b32_5to8((this.rand_seed >> 5) & 0x1f);
-	buf[8] = b32_5to8((this.rand_seed) & 0x1f);
+	/* Probe downstream fragsize packet */
+
+	/* build a large query domain which is random and maximum size,
+	 * will also take up maximum space in the return packet */
+	memset(data, MAX(1, this.rand_seed & 0xff), sizeof(data));
+
+	*(uint16_t *) (data) = htons(fragsize);
 	this.rand_seed++;
 
-	strncat(buf, this.topdomain, 512 - strlen(buf));
-	send_query((uint8_t *)buf);
+	send_packet('r', data, sizeof(data));
+}
+
+static void
+send_set_downstream_fragsize(uint16_t fragsize)
+{
+	uint8_t data[2];
+	*(uint16_t *) data = htons(fragsize);
+
+	send_packet('n', data, sizeof(data));
+}
+
+static void
+send_ip_request()
+{
+	send_packet('i', NULL, 0);
+}
+
+static void
+send_raw_udp_login(int seed)
+{
+	char buf[16];
+	login_calculate(buf, sizeof(buf), this.password, seed + 1);
+
+	send_raw((uint8_t *) buf, sizeof(buf), RAW_HDR_CMD_LOGIN);
+}
+
+static void
+send_codec_switch(uint8_t bits)
+{
+	send_packet('s', &bits, 1);
+}
+
+static void
+send_server_options(int lazy, int compression, char denc)
+{
+	uint8_t optflags = 0;
+
+	if (denc == 'T') /* Base32 */
+		optflags |= 1 << 6;
+	else if (denc == 'S') /* Base64 */
+		optflags |= 1 << 5;
+	else if (denc == 'U') /* Base64u */
+		optflags |= 1 << 4;
+	else if (denc == 'V') /* Base128 */
+		optflags |= 1 << 3;
+	else if (denc == 'R') /* Raw */
+		optflags |= 1 << 2;
+
+	optflags |= (compression & 1) << 1;
+	optflags |= lazy & 1;
+
+	send_packet('o', &optflags, 1);
 }
 
 static int
@@ -1498,25 +1458,27 @@ handshake_version(int *seed)
 		read = handshake_waitdns(in, sizeof(in), 'V', i+1);
 
 		if (read >= 9) {
-			payload =  (((in[4] & 0xff) << 24) |
-					((in[5] & 0xff) << 16) |
-					((in[6] & 0xff) << 8) |
-					((in[7] & 0xff)));
+			payload = ntohl(*(uint32_t *) (in + 4));
 
 			if (strncmp("VACK", (char *)in, 4) == 0) {
+				/* Payload is login challenge */
 				*seed = payload;
 				this.userid = in[8];
 				this.userid_char = hex[this.userid & 15];
 				this.userid_char2 = hex2[this.userid & 15];
 
+				DEBUG(2, "Login challenge: 0x%08x", *seed);
+
 				fprintf(stderr, "Version ok, both using protocol v 0x%08x. You are user #%d\n",
 					PROTOCOL_VERSION, this.userid);
 				return 0;
 			} else if (strncmp("VNAK", (char *)in, 4) == 0) {
+				/* Payload is server version */
 				warnx("You use protocol v 0x%08x, server uses v 0x%08x. Giving up",
 						PROTOCOL_VERSION, payload);
 				return 1;
 			} else if (strncmp("VFUL", (char *)in, 4) == 0) {
+				/* Payload is max number of users on server */
 				warnx("Server full, all %d slots are taken. Try again later", payload);
 				return 1;
 			}
@@ -1547,11 +1509,12 @@ handshake_login(int seed)
 		send_login(login, 16);
 
 		read = handshake_waitdns(in, sizeof(in), 'L', i+1);
+		in[MIN(read, sizeof(in))] = 0; /* Null terminate */
 
 		if (read > 0) {
 			int netmask;
 			if (strncmp("LNAK", in, 4) == 0) {
-				fprintf(stderr, "Bad this.password\n");
+				fprintf(stderr, "Bad password\n");
 				return 1;
 			} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d",
 				server, client, &mtu, &netmask) == 4) {
@@ -1567,7 +1530,7 @@ handshake_login(int seed)
 					errx(4, "Failed to set IP and MTU");
 				}
 			} else {
-				fprintf(stderr, "Received bad handshake\n");
+				fprintf(stderr, "Received bad handshake: %.*s\n", read, in);
 			}
 		}
 
@@ -1682,9 +1645,7 @@ handshake_upenctest(char *s)
 	char in[4096];
 	unsigned char *uin = (unsigned char *) in;
 	unsigned char *us = (unsigned char *) s;
-	int i;
-	int read;
-        int slen;
+	int i, read, slen;
 
 	slen = strlen(s);
 	for (i=0; this.running && i<3 ;i++) {
@@ -1850,7 +1811,7 @@ handshake_downenctest(char trycodec)
 
 	for (i=0; this.running && i<3 ;i++) {
 
-		send_downenctest(trycodec, 1, NULL, 0);
+		send_downenctest(trycodec, 1);
 
 		read = handshake_waitdns(in, sizeof(in), 'Y', i+1);
 
@@ -1950,7 +1911,7 @@ handshake_qtypetest(int timeout)
 	   byte values can be returned, which is needed for NULL/PRIVATE
 	   to work. */
 
-	send_downenctest(trycodec, 1, NULL, 0);
+	send_downenctest(trycodec, 1);
 
 	read = handshake_waitdns(in, sizeof(in), 'Y', timeout);
 
@@ -2073,7 +2034,7 @@ handshake_edns0_check()
 
 	for (i=0; this.running && i<3 ;i++) {
 
-		send_downenctest(trycodec, 1, NULL, 0);
+		send_downenctest(trycodec, 1);
 
 		read = handshake_waitdns(in, sizeof(in), 'Y', i+1);
 
@@ -2162,10 +2123,9 @@ codec_revert:
 void
 handshake_switch_options(int lazy, int compression, char denc)
 {
-	char in[4096];
+	char in[100];
 	int read;
 	char *dname, *comp_status, *lazy_status;
-	char opts[4];
 
 	comp_status = compression ? "enabled" : "disabled";
 
@@ -2185,11 +2145,13 @@ handshake_switch_options(int lazy, int compression, char denc)
 			lazy_status, dname, comp_status);
 	for (int i = 0; this.running && i < 5; i++) {
 
-		send_server_options(lazy, compression, denc, opts);
+		send_server_options(lazy, compression, denc);
 
 		read = handshake_waitdns(in, sizeof(in) - 1, 'O', i + 1);
 
 		if (read > 0) {
+			in[read] = 0; /* zero terminate */
+
 			if (strncmp("BADLEN", in, 6) == 0) {
 				fprintf(stderr, "Server got bad message length.\n");
 				goto opt_revert;
@@ -2199,12 +2161,15 @@ handshake_switch_options(int lazy, int compression, char denc)
 			} else if (strncmp("BADCODEC", in, 8) == 0) {
 				fprintf(stderr, "Server rejected the selected options.\n");
 				goto opt_revert;
+			} else if (strcasecmp(dname, in) == 0) {
+				fprintf(stderr, "Switched server options, using downsteam codec %s.\n", in);
+				this.lazymode = lazy;
+				this.compression_down = compression;
+				this.downenc = denc;
+				return;
+			} else {
+				fprintf(stderr, "Got invalid response. ");
 			}
-			fprintf(stderr, "Switched server options successfully. (%s)\n", opts);
-			this.lazymode = lazy;
-			this.compression_down = compression;
-			this.downenc = denc;
-			return;
 		}
 
 		fprintf(stderr, "Retrying options switch...\n");
