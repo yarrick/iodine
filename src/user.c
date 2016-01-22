@@ -231,7 +231,7 @@ check_authenticated_user_and_ip(int userid, struct query *q, int check_ip)
 	if (res)
 		return res;
 
-	if (!users[userid].authenticated)
+	if (!(users[userid].authenticated >= 1))
 		return 1;
 
 	return 0;
