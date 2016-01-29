@@ -170,8 +170,8 @@ static void
 print_usage() {
 	extern char *__progname;
 
-	fprintf(stderr, "Usage: %s [-v] [-h] [-4] [-6] [-c] [-s] [-f] [-D] "
-		"[-u user] [-t chrootdir] [-d device] [-m mtu] [-z context] "
+	fprintf(stderr, "Usage: %s [options] [-v] [-h] [-4] [-6] [-c] [-s] [-f] [-D] "
+		"[-u user] [-d device] [-m mtu] "
 		"[-l ipv4 listen address] [-L ipv6 listen address] [-p port] "
 		"[-n external ip] [-b dnsport] [-P password] [-F pidfile] "
 		"[-i max idle time] tunnel_ip[/netmask] topdomain\n", __progname);
@@ -198,10 +198,10 @@ help() {
 	fprintf(stderr, "  -D  increase debug level\n");
 	fprintf(stderr, "     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n");
 	fprintf(stderr, "  -u, --user  drop privileges and run as user\n");
-	fprintf(stderr, "  -t, --chrootdir  chroot to directory after init\n");
+	fprintf(stderr, "  --chrootdir  chroot to directory after init\n");
 	fprintf(stderr, "  -d  specify tunnel device name\n");
 	fprintf(stderr, "  -m, --mtu  specify tunnel device mtu\n");
-	fprintf(stderr, "  -z, --context  apply SELinux context after initialization\n");
+	fprintf(stderr, "  --context  apply SELinux context after initialization\n");
 	fprintf(stderr, "  -l, --listen4  IPv4 address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n");
 	fprintf(stderr, "  -L, --listen6  IPv6 address to listen on for incoming dns traffic "
@@ -209,6 +209,8 @@ help() {
 	fprintf(stderr, "  -p  port to listen on for incoming dns traffic (default 53)\n");
 	fprintf(stderr, "  -n, --nsip  ip to respond with to NS queries\n");
 	fprintf(stderr, "  -b, --forwardto  forward normal DNS queries to a UDP port on localhost\n");
+	fprintf(stderr, "  -A, --localforward  allow TCP data pipe to local ports only (default: disabled)\n");
+	fprintf(stderr, "  -R, --remoteforward  allow TCP data pipe to remote hosts (default: disabled)\n");
 	fprintf(stderr, "  -P  password used for authentication (max 32 chars will be used)\n");
 	fprintf(stderr, "  -F, --pidfile  write pid to a file\n");
 	fprintf(stderr, "  -i, --idlequit  maximum idle time before shutting down\n");
@@ -315,6 +317,8 @@ main(int argc, char **argv)
 		{"mtu", required_argument, 0, 'm'},
 		{"idlequit", required_argument, 0, 'i'},
 		{"forwardto", required_argument, 0, 'b'},
+		{"localforward", no_argument, 0, 'A'},
+		{"remoteforward", no_argument, 0, 'R'},
 		{"help", no_argument, 0, 'h'},
 		{"context", required_argument, 0, 'z'},
 		{"chrootdir", required_argument, 0, 't'},
@@ -322,7 +326,7 @@ main(int argc, char **argv)
 		{NULL, 0, 0, 0}
 	};
 
-	static char *iodined_args_short = "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:";
+	static char *iodined_args_short = "46vcsfhDARu:t:d:m:l:L:p:n:b:P:z:F:i:";
 
 	server.running = 1;
 
@@ -383,6 +387,13 @@ main(int argc, char **argv)
 		case 'b':
 			server.bind_enable = 1;
 			server.bind_port = atoi(optarg);
+			break;
+		case 'A':
+			server.allow_forward_local_port = 1;
+			break;
+		case 'R':
+			server.allow_forward_local_port = 1;
+			server.allow_forward_remote = 1;
 			break;
 		case 'F':
 			pidfile = optarg;

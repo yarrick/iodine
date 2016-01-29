@@ -27,6 +27,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <time.h>
+#include <arpa/inet.h>
 
 #ifdef WINDOWS32
 #include "windows.h"
@@ -137,8 +138,8 @@ static struct client_instance preset_fast = {
 	.max_downstream_frag_size = 1176,
 	.compression_up = 1,
 	.compression_down = 1,
-	.windowsize_up = 64,
-	.windowsize_down = 32,
+	.windowsize_up = 30,
+	.windowsize_down = 30,
 	.hostname_maxlen = 0xFF,
 	.downenc = ' ',
 	.do_qtype = T_UNSET,
@@ -216,7 +217,7 @@ print_usage()
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-Y preset] [-V sec] [-X port] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-w downfrags] [-W upfrags] [-i sec -j sec] [-I sec] [-c 0|1] [-C 0|1] [-s ms] "
-			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-R rdomain] "
+			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-R port[,host] ] "
 			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [...]]]\n", __progname);
 }
 
@@ -261,6 +262,7 @@ help()
 	fprintf(stderr, "  -W  upstream fragment window size (default: 8 frags)\n");
 	fprintf(stderr, "  -i  server-side request timeout in lazy mode (default: auto)\n");
 	fprintf(stderr, "  -j  downstream fragment ACK timeout, implies -i4 (default: 2 sec)\n");
+	//fprintf(stderr, "  --nodrop  disable TCP packet-dropping optimisations\n");
 	fprintf(stderr, "  -c 1: use downstream compression (default), 0: disable\n");
 	fprintf(stderr, "  -C 1: use upstream compression (default), 0: disable\n\n");
 
@@ -268,9 +270,6 @@ help()
 	fprintf(stderr, "  -v, --version  print version info and exit\n");
 	fprintf(stderr, "  -h, --help  print this help and exit\n");
 	fprintf(stderr, "  -V, --stats  print connection statistics at given intervals (default: 5 sec)\n");
-	/*fprintf(stderr, "  -X  skip tun device and forward data to/from stdin/out, telling iodined to\n");
-	fprintf(stderr, "        connect to the specified port listening on the server host.\n");
-	fprintf(stderr, "        Can be used with SSH ProxyCommand option. (-X 22)\n");*/
 	fprintf(stderr, "  -f  keep running in foreground\n");
 	fprintf(stderr, "  -D  enable debug mode (add more D's to increase debug level)\n");
 	fprintf(stderr, "  -d  set tunnel device name\n");
@@ -278,6 +277,11 @@ help()
 	fprintf(stderr, "  -F  write PID to specified file\n");
 	fprintf(stderr, "  -Y, --preset  use a set of predefined options for DNS tunnel (can be overridden manually)\n");
 	print_presets(6);
+	fprintf(stderr, "  -R, --remote [host:]port  skip tun device and forward data to/from\n");
+	fprintf(stderr, "        stdin/out, telling iodined to forward data to a remote port\n");
+	fprintf(stderr, "        locally or to a specific host (accessed by server). Implies --nodrop.\n");
+	fprintf(stderr, "        To specify an IPv6 address, host must be enclosed in square brackets.\n");
+	fprintf(stderr, "        Can be used with SSH ProxyCommand option. ('iodine -R 22 ...')\n");
 	fprintf(stderr, "  --chroot  chroot to given directory\n");
 	fprintf(stderr, "  --context  apply specified SELinux context after initialization\n");
 	fprintf(stderr, "  --rdomain  use specified routing domain (OpenBSD only)\n\n");
@@ -314,6 +318,8 @@ main(int argc, char **argv)
 	char *device = NULL;
 	char *pidfile = NULL;
 
+	char *remote_host_str = NULL, *remote_port_str = NULL;
+
 	char *nameserv_host = NULL;
 	struct sockaddr_storage nameservaddr;
 	int nameservaddr_len = 0;
@@ -331,6 +337,9 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
+#define OPT_RDOMAIN 0x80
+#define OPT_NODROP 0x81
+
 	/* each option has format:
 	 * char *name, int has_arg, int *flag, int val */
 	static struct option iodine_args[] = {
@@ -338,10 +347,12 @@ main(int argc, char **argv)
 		{"help", no_argument, 0, 'h'},
 		{"stats", optional_argument, 0, 'V'},
 		{"context", required_argument, 0, 'z'},
-		{"rdomain", required_argument, 0, 'R'},
+		{"rdomain", required_argument, 0, OPT_RDOMAIN},
 		{"chrootdir", required_argument, 0, 't'},
-		{"proxycommand", no_argument, 0, 'X'},
 		{"preset", required_argument, 0, 'Y'},
+		{"proxycommand", no_argument, 0, 'R'},
+//		{"nodrop", no_argument, 0, OPT_NODROP},
+		{"remote", required_argument, 0, 'R'},
 		{NULL, 0, 0, 0}
 	};
 
@@ -349,9 +360,10 @@ main(int argc, char **argv)
 	 * This is so that all options override preset values regardless of order in command line */
 	int optind_orig = optind, preset_id = -1;
 
-	static char *iodine_args_short = "46vfDhrX:Y:s:V:c:C:i:j:u:t:d:R:P:w:W:m:M:F:T:O:L:I:";
+	static char *iodine_args_short = "46vfDhrY:s:V:c:C:i:j:u:t:d:R:P:w:W:m:M:F:T:O:L:I:";
 
 	while ((choice = getopt_long(argc, argv, iodine_args_short, iodine_args, NULL))) {
+		/* Check if preset has been found yet so we don't process any other options */
 		if (preset_id < 0) {
 			if (choice == -1) {
 				/* reached end of command line and no preset specified - use default */
@@ -390,6 +402,9 @@ main(int argc, char **argv)
 		} else if (choice == -1) {
 			break;
 		}
+
+		/* Once a preset is used, it is copied into memory. This way other
+		 * options can override preset values regardless of order in command line */
 
 		switch (choice) {
 		case '4':
@@ -430,10 +445,51 @@ main(int argc, char **argv)
 			device = optarg;
 			break;
 #ifdef OPENBSD
-		case 'R':
+		case OPT_RDOMAIN:
 			rtable = atoi(optarg);
 			break;
 #endif
+		case 'R':
+			/* Argument format: [host:]port */
+			if (!optarg) break;
+
+			if (strrchr(optarg, ':')) {
+				remote_port_str = strrchr(optarg, ':') + 1;
+				if (optarg[0] == '[') {
+					/* IPv6 address enclosed in square brackets */
+					remote_host_str = optarg + 1;
+					/* replace closing bracket with null terminator */
+					*strchr(remote_host_str, ']') = 0;
+					this.remote_forward_addr.ss_family = AF_INET6;
+					retval = inet_pton(AF_INET6, remote_host_str,
+									   &((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_addr);
+				} else {
+					remote_host_str = optarg;
+					/* replace separator with null terminator */
+					*strchr(remote_host_str, ':') = 0;
+					this.remote_forward_addr.ss_family = AF_INET;
+					retval = inet_aton(remote_host_str,
+									   &((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr);
+				}
+			} else {
+				/* no address specified, optarg is port */
+				remote_port_str = optarg;
+			}
+
+			/* parse port */
+			this.remote_forward_port = atoi(remote_port_str);
+			if (this.remote_forward_port < 0 || this.remote_forward_port > 65535)
+				this.remote_forward_port = -1;
+
+			if (retval <= 0) {
+				errx(12, "Invalid remote TCP forwarding specification! Check help for info.");
+				usage();
+				/* not reached */
+			}
+			break;
+		case OPT_NODROP:
+			// TODO implement TCP-over-tun optimisations
+			break;
 		case 'P':
 			strncpy(this.password, optarg, sizeof(this.password));
 			this.password[sizeof(this.password)-1] = 0;
@@ -509,8 +565,6 @@ main(int argc, char **argv)
 		case 'Y':
 			/* Already processed preset: ignore */
 			continue;
-		case 'X':
-			// TODO implement option for remote host/port to pipe stdin/out
 		default:
 			usage();
 			/* NOTREACHED */
@@ -531,6 +585,12 @@ main(int argc, char **argv)
 		fprintf(stderr, "Debug level %d enabled, will stay in foreground.\n", this.debug);
 		fprintf(stderr, "Add more -D switches to set higher debug level.\n");
 		this.foreground = 1;
+	}
+
+	if (this.remote_forward_port == -1) {
+		fprintf(stderr, "Remote TCP port must be between 1 and 65535.");
+		usage();
+		/* not reached */
 	}
 
 	this.nameserv_hosts_len = argc - 1;
@@ -651,6 +711,10 @@ main(int argc, char **argv)
 		fprintf(stderr, "%s%s", format_addr(&this.nameserv_addrs[a], sizeof(struct sockaddr_storage)),
 				(a != this.nameserv_addrs_len - 1) ?  ", " : "");
 	fprintf(stderr, "\n");
+
+	if (this.remote_forward_port)
+		fprintf(stderr, "Requesting TCP data forwarding from server to %s:%d\n",
+				format_addr(&this.remote_forward_addr, sizeof(struct sockaddr_storage)), this.remote_forward_port);
 
 	if (client_handshake()) {
 		retval = 1;
