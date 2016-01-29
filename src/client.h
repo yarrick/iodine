@@ -44,6 +44,11 @@ struct client_instance {
 	int raw_serv_len;
 	char *topdomain;
 
+	/* Remote TCP forwarding stuff (for -R) */
+	struct sockaddr_storage remote_forward_addr;
+	socklen_t remote_forward_addr_len; /* 0 if connecting to localhost */
+	int remote_forward_port; /* 0 if no forwarding used */
+
 	int tun_fd;
 	int dns_fd;
 

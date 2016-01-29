@@ -1321,13 +1321,14 @@ static void
 send_upenctest(char *s)
 /* NOTE: String may be at most 63-4=59 chars to fit in 1 dns chunk. */
 {
-	char buf[512] = "z___.";
-	size_t buf_space = 3;
+	char buf[512] = "zCMC";
+	size_t buf_space = 10;
+	uint32_t cmc = rand();
 
-	b32->encode((uint8_t *)buf + 1, &buf_space,(uint8_t *)&this.rand_seed, sizeof(this.rand_seed));
-	this.rand_seed++;
+	b32->encode((uint8_t *)buf + 1, &buf_space, (uint8_t *) &cmc, 4);
 
 	/* Append test string without changing it */
+	strncat(buf, ".", 512 - strlen(buf));
 	strncat(buf, s, 512 - strlen(buf));
 	strncat(buf, ".", 512 - strlen(buf));
 	strncat(buf, this.topdomain, 512 - strlen(buf));
@@ -1337,13 +1338,12 @@ send_upenctest(char *s)
 static void
 send_downenctest(char downenc, int variant)
 {
-	uint8_t buf[512] = "y_____.", hdr[3];
+	uint8_t buf[512] = "y_____.", hdr[5];
 
-	buf[1] = tolower(downenc);
+	buf[1] = downenc;
 
 	hdr[0] = variant;
-	*(uint16_t *) (hdr + 1) = this.rand_seed;
-	this.rand_seed++;
+	*(uint32_t *) (hdr + 1) = rand();
 
 	build_hostname(buf, sizeof(buf), hdr, sizeof(hdr),
 				   this.topdomain, b32, this.hostname_maxlen, 2);
@@ -1354,9 +1354,10 @@ send_downenctest(char downenc, int variant)
 static void
 send_version(uint32_t version)
 {
-	uint8_t data[4], buf[512];
+	uint8_t data[8], buf[512];
 
 	*(uint32_t *) data = htonl(version);
+	*(uint32_t *) (data + 4) = (uint32_t) rand(); /* CMC */
 
 	buf[0] = 'v';
 
@@ -1369,7 +1370,41 @@ send_version(uint32_t version)
 static void
 send_login(char *login, int len)
 {
-	send_packet('l', (uint8_t *) login, len);
+	uint8_t flags = 0, data[100];
+	int length = 17, addrlen = 0;
+
+	if (len != 16)
+		DEBUG(1, "Login calculated incorrect length hash! len=%d", len);
+
+	memcpy(data + 1, login, 16);
+
+	if (this.remote_forward_port > 0) {
+		flags |= 1;
+		*(uint16_t *) (data + length) = (uint16_t) this.remote_forward_port;
+		length += 2;
+		/* set remote IP to be non-localhost if this.remote_forward_addr set */
+		if (this.remote_forward_addr_len) {
+			if (this.remote_forward_addr.ss_family == AF_INET6) { /* IPv6 address */
+				addrlen = sizeof(struct in6_addr);
+				flags |= 4;
+				memcpy(data + length, &((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_addr, addrlen);
+			} else { /* IPv4 address */
+				flags |= 2;
+				addrlen = sizeof(struct in_addr);
+				memcpy(data + length, &((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr, addrlen);
+			}
+			length += addrlen;
+		}
+		DEBUG(2, "Sending TCP forward login request: port %d, length %d, addr %d",
+			  this.remote_forward_port, length, addrlen);
+	}
+
+	data[0] = flags;
+
+	DEBUG(6, "Sending login request: length=%d, flags=0x%02x, hash=0x%016llx%016llx",
+		  length, flags, *(unsigned long long *) (data + 1), *(unsigned long long *) (data + 9));
+
+	send_packet('l', data, length);
 }
 
 static void
@@ -1494,21 +1529,16 @@ handshake_version(int *seed)
 static int
 handshake_login(int seed)
 {
-	char in[4096];
-	char login[16];
-	char server[65];
-	char client[65];
-	int mtu;
-	int i;
-	int read;
+	char in[4096], login[16], server[65], client[65], flag;
+	int mtu, read;
 
 	login_calculate(login, 16, this.password, seed);
 
-	for (i=0; this.running && i<5 ;i++) {
+	for (int i = 0; this.running && i < 5; i++) {
 
 		send_login(login, 16);
 
-		read = handshake_waitdns(in, sizeof(in), 'L', i+1);
+		read = handshake_waitdns(in, sizeof(in), 'L', i + 1);
 		in[MIN(read, sizeof(in))] = 0; /* Null terminate */
 
 		if (read > 0) {
@@ -1516,8 +1546,8 @@ handshake_login(int seed)
 			if (strncmp("LNAK", in, 4) == 0) {
 				fprintf(stderr, "Bad password\n");
 				return 1;
-			} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d",
-				server, client, &mtu, &netmask) == 4) {
+			} else if (sscanf(in, "%c-%64[^-]-%64[^-]-%d-%d",
+				&flag, server, client, &mtu, &netmask) == 4) {
 
 				server[64] = 0;
 				client[64] = 0;
