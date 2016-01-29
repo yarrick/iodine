@@ -35,6 +35,10 @@ struct tun_user {
 	in_addr_t tun_ip;
 	struct sockaddr_storage host;
 	socklen_t hostlen;
+	struct sockaddr_storage remoteforward_addr;
+	socklen_t remoteforward_addr_len; /* 0 if connecting to localhost */
+	uint16_t remote_port; /* 0 if no remote forwarding enabled */
+	int remote_forward_connected;
 	struct frag_buffer *incoming;
 	struct frag_buffer *outgoing;
 	int next_upstream_ack;

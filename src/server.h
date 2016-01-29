@@ -108,6 +108,9 @@ struct server_instance {
 	struct sockaddr_storage dns6addr;
 	int dns6addr_len;
 
+	int allow_forward_local_port;
+	int allow_forward_remote;
+
 	/* settings for forwarding normal DNS to
 	 * local real DNS server */
 	int bind_fd;
