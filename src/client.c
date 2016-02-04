@@ -1372,31 +1372,39 @@ send_login(char *login, int len)
 {
 	uint8_t flags = 0, data[100];
 	int length = 17, addrlen = 0;
+	uint16_t port;
 
 	if (len != 16)
 		DEBUG(1, "Login calculated incorrect length hash! len=%d", len);
 
 	memcpy(data + 1, login, 16);
 
-	if (this.remote_forward_port > 0) {
+	if (this.remote_forward_addr.ss_family != AF_UNSPEC) {
+		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *) &this.remote_forward_addr;
+		struct sockaddr_in *s = (struct sockaddr_in *) &this.remote_forward_addr;
+
+		port = (this.remote_forward_addr.ss_family == AF_INET ? s->sin_port : s6->sin6_port);
+
+		*(uint16_t *) (data + length) = port;
+
 		flags |= 1;
-		*(uint16_t *) (data + length) = (uint16_t) this.remote_forward_port;
 		length += 2;
 		/* set remote IP to be non-localhost if this.remote_forward_addr set */
-		if (this.remote_forward_addr_len) {
+		if (this.remote_forward_addr.ss_family == AF_INET && s->sin_addr.s_addr != INADDR_LOOPBACK) {
 			if (this.remote_forward_addr.ss_family == AF_INET6) { /* IPv6 address */
-				addrlen = sizeof(struct in6_addr);
+				addrlen = sizeof(s6);
 				flags |= 4;
-				memcpy(data + length, &((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_addr, addrlen);
+				memcpy(data + length, &s6->sin6_addr, addrlen);
 			} else { /* IPv4 address */
 				flags |= 2;
-				addrlen = sizeof(struct in_addr);
-				memcpy(data + length, &((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr, addrlen);
+				addrlen = sizeof(s);
+				memcpy(data + length, &s->sin_addr, addrlen);
 			}
+
 			length += addrlen;
 		}
-		DEBUG(2, "Sending TCP forward login request: port %d, length %d, addr %d",
-			  this.remote_forward_port, length, addrlen);
+		DEBUG(2, "Sending TCP forward login request: port %hu, length %d, addrlen %d",
+			  port, length, addrlen);
 	}
 
 	data[0] = flags;

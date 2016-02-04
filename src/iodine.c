@@ -81,7 +81,8 @@ struct client_instance this;
 	.maxfragsize_up = 100, \
 	.next_downstream_ack = -1, \
 	.num_immediate = 1, \
-	.rtt_total_ms = 200
+	.rtt_total_ms = 200, \
+	.remote_forward_addr = {.ss_family = AF_UNSPEC}
 
 static struct client_instance preset_default = {
 	.raw_mode = 1,
@@ -302,6 +303,62 @@ version()
 	exit(0);
 }
 
+static int
+parse_tcp_forward_option()
+{
+	char *remote_port_str, *remote_host_str;
+	int retval;
+
+	if (strrchr(optarg, ':')) {
+		remote_port_str = strrchr(optarg, ':') + 1;
+		if (optarg[0] == '[') {
+			/* IPv6 address enclosed in square brackets */
+			remote_host_str = optarg + 1;
+			/* replace closing bracket with null terminator */
+			*strchr(remote_host_str, ']') = 0;
+			this.remote_forward_addr.ss_family = AF_INET6;
+			retval = inet_pton(AF_INET6, remote_host_str,
+							   &((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_addr);
+		} else {
+			remote_host_str = optarg;
+			/* replace separator with null terminator */
+			*strchr(remote_host_str, ':') = 0;
+			this.remote_forward_addr.ss_family = AF_INET;
+			retval = inet_aton(remote_host_str,
+							   &((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr);
+		}
+	} else {
+		/* no address specified (use server localhost IPv4), optarg is port */
+		remote_port_str = optarg;
+		this.remote_forward_addr.ss_family = AF_INET;
+		((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr.s_addr = INADDR_LOOPBACK;
+	}
+
+	if (retval <= 0) {
+		errx(12, "Invalid remote forward address (-R)! Must be [host:]port,\n"
+			"where IPv6 addresses are enclosed in literal square brackets [].");
+		usage();
+		/* not reached */
+	}
+
+	/* parse port */
+	int port = atoi(remote_port_str);
+	if (port < 1 || port > 65535) {
+		fprintf(stderr, "Remote forward (-R) TCP port must be between 1 and 65535.");
+		usage();
+		/* not reached */
+	}
+
+	if (this.remote_forward_addr.ss_family == AF_INET) {
+		/* set port as sockaddr_in (IPv4) */
+		((struct sockaddr_in *) &this.remote_forward_addr)->sin_port = port;
+	} else {
+		/* set port in IPv6 sockaddr */
+		((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_port = port;
+	}
+	return port;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -318,7 +375,7 @@ main(int argc, char **argv)
 	char *device = NULL;
 	char *pidfile = NULL;
 
-	char *remote_host_str = NULL, *remote_port_str = NULL;
+	int remote_forward_port;
 
 	char *nameserv_host = NULL;
 	struct sockaddr_storage nameservaddr;
@@ -452,40 +509,8 @@ main(int argc, char **argv)
 		case 'R':
 			/* Argument format: [host:]port */
 			if (!optarg) break;
-
-			if (strrchr(optarg, ':')) {
-				remote_port_str = strrchr(optarg, ':') + 1;
-				if (optarg[0] == '[') {
-					/* IPv6 address enclosed in square brackets */
-					remote_host_str = optarg + 1;
-					/* replace closing bracket with null terminator */
-					*strchr(remote_host_str, ']') = 0;
-					this.remote_forward_addr.ss_family = AF_INET6;
-					retval = inet_pton(AF_INET6, remote_host_str,
-									   &((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_addr);
-				} else {
-					remote_host_str = optarg;
-					/* replace separator with null terminator */
-					*strchr(remote_host_str, ':') = 0;
-					this.remote_forward_addr.ss_family = AF_INET;
-					retval = inet_aton(remote_host_str,
-									   &((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr);
-				}
-			} else {
-				/* no address specified, optarg is port */
-				remote_port_str = optarg;
-			}
-
-			/* parse port */
-			this.remote_forward_port = atoi(remote_port_str);
-			if (this.remote_forward_port < 0 || this.remote_forward_port > 65535)
-				this.remote_forward_port = -1;
-
-			if (retval <= 0) {
-				errx(12, "Invalid remote TCP forwarding specification! Check help for info.");
-				usage();
-				/* not reached */
-			}
+			this.use_remote_forward = 1;
+			remote_forward_port = parse_tcp_forward_option();
 			break;
 		case OPT_NODROP:
 			// TODO implement TCP-over-tun optimisations
@@ -587,11 +612,7 @@ main(int argc, char **argv)
 		this.foreground = 1;
 	}
 
-	if (this.remote_forward_port == -1) {
-		fprintf(stderr, "Remote TCP port must be between 1 and 65535.");
-		usage();
-		/* not reached */
-	}
+
 
 	this.nameserv_hosts_len = argc - 1;
 	if (this.nameserv_hosts_len <= 0)
@@ -712,9 +733,9 @@ main(int argc, char **argv)
 				(a != this.nameserv_addrs_len - 1) ?  ", " : "");
 	fprintf(stderr, "\n");
 
-	if (this.remote_forward_port)
+	if (this.remote_forward_addr.ss_family != AF_UNSPEC)
 		fprintf(stderr, "Requesting TCP data forwarding from server to %s:%d\n",
-				format_addr(&this.remote_forward_addr, sizeof(struct sockaddr_storage)), this.remote_forward_port);
+				format_addr(&this.remote_forward_addr, sizeof(struct sockaddr_storage)), remote_forward_port);
 
 	if (client_handshake()) {
 		retval = 1;
