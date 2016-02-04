@@ -485,14 +485,14 @@ main(int argc, char **argv)
 		}
 	}
 	if (server.addrfamily == AF_UNSPEC || server.addrfamily == AF_INET6) {
-		server.dns6addr_len = get_addr(listen_ip6, server.port,AF_INET6,
+		server.dns6addr_len = get_addr(listen_ip6, server.port, AF_INET6,
 									   AI_PASSIVE | AI_NUMERICHOST, &server.dns6addr);
 		if (server.dns6addr_len < 0) {
 			warnx("Bad IPv6 address to listen on.");
 			usage();
 		}
 	}
-	if(server.bind_enable) {
+	if (server.bind_enable) {
 		in_addr_t dns_ip = ((struct sockaddr_in *) &server.dns4addr)->sin_addr.s_addr;
 		if (server.bind_port < 1 || server.bind_port > 65535) {
 			warnx("Bad DNS server port number given.");
@@ -500,7 +500,7 @@ main(int argc, char **argv)
 			/* NOTREACHED */
 		}
 		/* Avoid forwarding loops */
-		if (server.bind_port == server.port && (dns_ip == INADDR_ANY || dns_ip == htonl(0x7f000001L))) {
+		if (server.bind_port == server.port && (dns_ip == INADDR_ANY || dns_ip == INADDR_LOOPBACK)) {
 			warnx("Forward port is same as listen port (%d), will create a loop!", server.bind_port);
 			fprintf(stderr, "Use -l to set listen ip to avoid this.\n");
 			usage();
