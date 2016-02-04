@@ -161,6 +161,9 @@ int open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6o
 int open_dns_from_host(char *host, int port, int addr_family, int flags);
 void close_dns(int);
 
+int open_tcp_nonblocking(struct sockaddr_storage *addr, char **error);
+int check_tcp_status(int fd, char **error);
+
 void do_chroot(char *);
 void do_setcon(char *);
 void do_detach();
