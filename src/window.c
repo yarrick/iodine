@@ -273,8 +273,13 @@ window_sending(struct frag_buffer *w, struct timeval *nextresend)
 	oldest.tv_sec = 0;
 	oldest.tv_usec = 0;
 
-	if (w->numitems == 0)
+	if (w->numitems == 0) {
+		if (nextresend) {
+			nextresend->tv_sec = 0;
+			nextresend->tv_usec = 0;
+		}
 		return 0;
+	}
 
 	gettimeofday(&now, NULL);
 
