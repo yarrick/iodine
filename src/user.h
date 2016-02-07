@@ -37,8 +37,8 @@ struct tun_user {
 	socklen_t hostlen;
 	struct sockaddr_storage remoteforward_addr;
 	socklen_t remoteforward_addr_len; /* 0 if no remote forwarding enabled */
-	int tcp_fd;
-	int remote_forward_connected;
+	int remote_tcp_fd;
+	int remote_forward_connected; /* 0 if not connected, -1 if error or 1 if OK */
 	struct frag_buffer *incoming;
 	struct frag_buffer *outgoing;
 	int next_upstream_ack;
@@ -67,5 +67,6 @@ int find_user_by_ip(uint32_t);
 int find_available_user();
 void user_switch_codec(int userid, struct encoder *enc);
 void user_set_conn_type(int userid, enum connection c);
+int set_user_tcp_fds(fd_set *fds, int);
 
 #endif

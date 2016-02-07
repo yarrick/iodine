@@ -636,13 +636,15 @@ main(int argc, char **argv)
 	server_tunnel();
 
 	syslog(LOG_INFO, "stopping");
-	close_dns(server.bind_fd);
+	close_socket(server.bind_fd);
 cleanup:
-	if (server.dns_fds.v6fd >= 0)
-		close_dns(server.dns_fds.v6fd);
-	if (server.dns_fds.v4fd >= 0)
-		close_dns(server.dns_fds.v4fd);
-	close_tun(server.tun_fd);
+	close_socket(server.dns_fds.v6fd);
+	close_socket(server.dns_fds.v4fd);
+	close_socket(server.tun_fd);
+#ifdef WINDOWS32
+	WSACleanup();
+#endif
+	/* TODO close user TCP forward sockets */
 
 	return retval;
 }

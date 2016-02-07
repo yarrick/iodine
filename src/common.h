@@ -159,10 +159,10 @@ int get_addr(char *, int, int, int, struct sockaddr_storage *);
 int open_dns(struct sockaddr_storage *, size_t);
 int open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only);
 int open_dns_from_host(char *host, int port, int addr_family, int flags);
-void close_dns(int);
+void close_socket(int);
 
 int open_tcp_nonblocking(struct sockaddr_storage *addr, char **error);
-int check_tcp_status(int fd, char **error);
+int check_tcp_error(int fd, char **error);
 
 void do_chroot(char *);
 void do_setcon(char *);

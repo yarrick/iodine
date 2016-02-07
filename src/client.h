@@ -47,6 +47,7 @@ struct client_instance {
 	/* Remote TCP forwarding stuff (for -R) */
 	struct sockaddr_storage remote_forward_addr;
 	int use_remote_forward; /* 0 if no forwarding used */
+	int remote_forward_connected;
 
 	int tun_fd;
 	int dns_fd;
@@ -160,9 +161,9 @@ void client_set_hostname_maxlen(size_t i);
 int client_handshake();
 int client_tunnel();
 
-int parse_data(uint8_t *data, size_t len, fragment *f, int *immediate);
+int parse_data(uint8_t *data, size_t len, fragment *f, int *immediate, int*);
 int handshake_waitdns(char *buf, size_t buflen, char cmd, int timeout);
 void handshake_switch_options(int lazy, int compression, char denc);
-int send_ping(int ping_response, int ack, int timeout);
+int send_ping(int ping_response, int ack, int timeout, int);
 
 #endif

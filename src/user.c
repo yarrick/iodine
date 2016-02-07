@@ -236,3 +236,19 @@ check_authenticated_user_and_ip(int userid, struct query *q, int check_ip)
 
 	return 0;
 }
+
+int
+set_user_tcp_fds(fd_set *fds, int conn_status)
+/* Add TCP forward FDs to fd_set for users with given connection status; returns largest FD added */
+{
+	int max_fd = 0;
+	for (int userid = 0; userid < created_users; userid ++) {
+		if (user_active(userid) && users[userid].remoteforward_addr_len > 0
+			&& users[userid].remote_forward_connected == conn_status) {
+			FD_SET(users[userid].remote_tcp_fd, fds);
+			max_fd = MAX(max_fd, users[userid].remote_tcp_fd);
+		}
+	}
+	return max_fd;
+}
+

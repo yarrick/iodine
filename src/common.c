@@ -228,9 +228,15 @@ open_dns_from_host(char *host, int port, int addr_family, int flags)
 }
 
 void
-close_dns(int fd)
+close_socket(int fd)
 {
+	if (fd <= 0)
+		return;
+#ifdef WINDOWS32
+	closesocket(fd);
+#else
 	close(fd);
+#endif
 }
 
 void
@@ -411,7 +417,7 @@ socket_set_blocking(int fd, int blocking)
 	    return flags;
 	}
 
-	if (fcntl(fd, F_SETFL, blocking ? (flags | O_NONBLOCK) : (flags & (~O_NONBLOCK))) == -1)
+	if (fcntl(fd, F_SETFL, !blocking ? (flags | O_NONBLOCK) : (flags & (~O_NONBLOCK))) == -1)
 		return errno;
 
 #endif
@@ -442,11 +448,14 @@ open_tcp_nonblocking(struct sockaddr_storage *addr, char **errormsg)
 		return -1;
 	}
 
+	if (errormsg)
+		*errormsg = strerror(errno);
+
 	return fd;
 }
 
 int
-check_tcp_status(int fd, char **error)
+check_tcp_error(int fd, char **error)
 /* checks connected status of given socket.
  * returns error code. 0 if connected or EINPROGRESS if connecting */
 {

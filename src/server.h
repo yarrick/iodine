@@ -158,6 +158,6 @@ void handle_null_request(int dns_fd, struct query *q, int domain_len);
 void handle_ns_request(int dns_fd, struct query *q);
 void handle_a_request(int dns_fd, struct query *q, int fakeip);
 
-void send_data_or_ping(int, struct query *, int, int);
+void send_data_or_ping(int, struct query *, int, int, char*);
 
 #endif /* __SERVER_H__ */

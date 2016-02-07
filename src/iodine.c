@@ -304,23 +304,23 @@ version()
 }
 
 static int
-parse_tcp_forward_option()
+parse_tcp_forward_option(char *optstr)
 {
 	char *remote_port_str, *remote_host_str;
 	int retval;
 
-	if (strrchr(optarg, ':')) {
-		remote_port_str = strrchr(optarg, ':') + 1;
-		if (optarg[0] == '[') {
+	if (strrchr(optstr, ':')) {
+		remote_port_str = strrchr(optstr, ':') + 1;
+		if (optstr[0] == '[') {
 			/* IPv6 address enclosed in square brackets */
-			remote_host_str = optarg + 1;
+			remote_host_str = optstr + 1;
 			/* replace closing bracket with null terminator */
 			*strchr(remote_host_str, ']') = 0;
 			this.remote_forward_addr.ss_family = AF_INET6;
 			retval = inet_pton(AF_INET6, remote_host_str,
 							   &((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_addr);
 		} else {
-			remote_host_str = optarg;
+			remote_host_str = optstr;
 			/* replace separator with null terminator */
 			*strchr(remote_host_str, ':') = 0;
 			this.remote_forward_addr.ss_family = AF_INET;
@@ -328,14 +328,15 @@ parse_tcp_forward_option()
 							   &((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr);
 		}
 	} else {
-		/* no address specified (use server localhost IPv4), optarg is port */
-		remote_port_str = optarg;
+		/* no address specified (use server localhost IPv4), optstr is port */
+		remote_port_str = optstr;
 		this.remote_forward_addr.ss_family = AF_INET;
-		((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr.s_addr = INADDR_LOOPBACK;
+		((struct sockaddr_in *) &this.remote_forward_addr)->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		retval = 1;
 	}
 
-	if (retval <= 0) {
-		errx(12, "Invalid remote forward address (-R)! Must be [host:]port,\n"
+	if (!retval) {
+		warnx("Invalid remote forward address (-R)! Must be [host:]port,\n"
 			"where IPv6 addresses are enclosed in literal square brackets [].");
 		usage();
 		/* not reached */
@@ -351,10 +352,10 @@ parse_tcp_forward_option()
 
 	if (this.remote_forward_addr.ss_family == AF_INET) {
 		/* set port as sockaddr_in (IPv4) */
-		((struct sockaddr_in *) &this.remote_forward_addr)->sin_port = port;
+		((struct sockaddr_in *) &this.remote_forward_addr)->sin_port = htons(port);
 	} else {
 		/* set port in IPv6 sockaddr */
-		((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_port = port;
+		((struct sockaddr_in6 *) &this.remote_forward_addr)->sin6_port = htons(port);
 	}
 	return port;
 }
@@ -510,7 +511,7 @@ main(int argc, char **argv)
 			/* Argument format: [host:]port */
 			if (!optarg) break;
 			this.use_remote_forward = 1;
-			remote_forward_port = parse_tcp_forward_option();
+			remote_forward_port = parse_tcp_forward_option(optarg);
 			break;
 		case OPT_NODROP:
 			// TODO implement TCP-over-tun optimisations
@@ -711,13 +712,16 @@ main(int argc, char **argv)
 			read_password(this.password, sizeof(this.password));
 	}
 
-	if ((this.tun_fd = open_tun(device)) == -1) {
-		retval = 1;
-		goto cleanup1;
+	if (!this.use_remote_forward) {
+		if ((this.tun_fd = open_tun(device)) == -1) {
+			retval = 1;
+			goto cleanup;
+		}
 	}
+
 	if ((this.dns_fd = open_dns_from_host(NULL, 0, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
 		retval = 1;
-		goto cleanup2;
+		goto cleanup;
 	}
 #ifdef OPENBSD
 	if (rtable > 0)
@@ -739,7 +743,7 @@ main(int argc, char **argv)
 
 	if (client_handshake()) {
 		retval = 1;
-		goto cleanup2;
+		goto cleanup;
 	}
 
 	if (this.conn == CONN_RAW_UDP) {
@@ -774,10 +778,14 @@ main(int argc, char **argv)
 
 	client_tunnel();
 
-cleanup2:
-	close_dns(this.dns_fd);
-	close_tun(this.tun_fd);
-cleanup1:
+cleanup:
+	if (this.use_remote_forward)
+		close(STDOUT_FILENO);
+	close_socket(this.dns_fd);
+	close_socket(this.tun_fd);
+#ifdef WINDOWS32
+	WSACleanup();
+#endif
 
 	return retval;
 }

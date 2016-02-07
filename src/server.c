@@ -318,7 +318,7 @@ qmem_max_wait(int *touser, struct query **sendq)
 				QMEM_DEBUG(4, userid, "ANSWER q id %d, ACK %d; sent %" L "u of %" L "u + sending another %" L "u",
 						q->id, u->next_upstream_ack, sent, total, sending);
 
-				send_data_or_ping(userid, q, 0, immediate);
+				send_data_or_ping(userid, q, 0, immediate, NULL);
 
 				if (sending > 0)
 					sending--;
@@ -428,14 +428,15 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 }
 
 void
-send_data_or_ping(int userid, struct query *q, int ping, int immediate)
+send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tcperror)
 /* Sends current fragment to user, or a ping if no data available.
    ping: 1=force send ping (even if data available), 0=only send if no data.
-   immediate: 1=not from qmem (ie. fresh query), 0=query is from qmem */
+   immediate: 1=not from qmem (ie. fresh query), 0=query is from qmem
+   disconnect: whether to tell user that TCP socket is closed (NULL if OK or pointer to error message) */
 {
 	uint8_t pkt[MAX_FRAGSIZE + DOWNSTREAM_PING_HDR];
 	size_t datalen, headerlen;
-	fragment *f;
+	fragment *f = NULL;
 	struct frag_buffer *out, *in;
 
 	in = users[userid].incoming;
@@ -443,7 +444,21 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate)
 
 	window_tick(out);
 
-	f = window_get_next_sending_fragment(out, &users[userid].next_upstream_ack);
+	if (!tcperror) {
+		f = window_get_next_sending_fragment(out, &users[userid].next_upstream_ack);
+	} else {
+		/* construct fake fragment containing error message. */
+		fragment fr;
+		f = &fr;
+		memset(f, 0, sizeof(fragment));
+		f->ack_other = -1;
+		f->len = strlen(tcperror);
+		memcpy(f->data, tcperror, f->len);
+		f->data[f->len] = 0;
+		f->start = 1;
+		f->end = 1;
+		DEBUG(2, "Sending ping with TCP forward disconnect; error: %s", f->data);
+	}
 
 	/* Build downstream data/ping header (see doc/proto_xxxxxxxx.txt) for details */
 	if (!f) {
@@ -464,6 +479,8 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate)
 
 	/* If this is being responded to immediately (ie. not from qmem) */
 	pkt[2] |= (immediate & 1) << 5;
+	if (tcperror)
+		pkt[2] |= (1 << 6);
 
 	if (ping) {
 		/* set ping flag and build extra header */
@@ -557,6 +574,23 @@ user_send_data(int userid, uint8_t *indata, size_t len, int compressed)
 }
 
 static int
+user_send_tcp_disconnect(int userid, struct query *q, char *errormsg)
+/* tell user that TCP socket has been disconnected */
+{
+	users[userid].remote_forward_connected = -1;
+	close_socket(users[userid].remote_tcp_fd);
+	if (q == NULL)
+		q = qmem_get_next_response(userid);
+	if (q != NULL) {
+		send_data_or_ping(userid, q, 1, 0, errormsg);
+		users[userid].active = 0;
+		return 1;
+	}
+	users[userid].active = 0;
+	return 0;
+}
+
+static int
 tunnel_bind()
 {
 	char packet[64*1024];
@@ -595,6 +629,37 @@ tunnel_bind()
 	}
 
 	return 0;
+}
+
+static ssize_t
+tunnel_tcp(int userid)
+{
+	ssize_t len;
+	uint8_t buf[64*1024];
+	char *errormsg = NULL;
+
+	if (users[userid].remote_forward_connected != 1) {
+		DEBUG(2, "tunnel_tcp: user %d TCP socket not connected!", userid);
+		return 0;
+	}
+
+	len = read(users[userid].remote_tcp_fd, buf, sizeof(buf));
+
+	DEBUG(5, "read %ld bytes on TCP", len);
+	if (len == 0) {
+		DEBUG(1, "EOF on TCP forward for user %d; closing connection.", userid);
+		errormsg = "Connection closed by remote host.";
+		user_send_tcp_disconnect(userid, NULL, errormsg);
+		return -1;
+	} else if (len < 0) {
+		errormsg = strerror(errno);
+		DEBUG(1, "Error %d on TCP forward for user %d: %s", errno, userid, errormsg);
+		user_send_tcp_disconnect(userid, NULL, errormsg);
+		return -1;
+	}
+
+	user_send_data(userid, buf, (size_t) len, 0);
+	return len;
 }
 
 static int
@@ -696,7 +761,7 @@ int
 server_tunnel()
 {
 	struct timeval tv;
-	fd_set fds;
+	fd_set read_fds, write_fds;
 	int i;
 	int userid;
 	struct query *answer_now = NULL;
@@ -710,31 +775,38 @@ server_tunnel()
 		/* max wait time based on pending queries */
 		tv = qmem_max_wait(&userid, &answer_now);
 
-		FD_ZERO(&fds);
+		FD_ZERO(&read_fds);
+		FD_ZERO(&write_fds);
 		maxfd = 0;
 
 		if (server.dns_fds.v4fd >= 0) {
-			FD_SET(server.dns_fds.v4fd, &fds);
+			FD_SET(server.dns_fds.v4fd, &read_fds);
 			maxfd = MAX(server.dns_fds.v4fd, maxfd);
 		}
 		if (server.dns_fds.v6fd >= 0) {
-			FD_SET(server.dns_fds.v6fd, &fds);
+			FD_SET(server.dns_fds.v6fd, &read_fds);
 			maxfd = MAX(server.dns_fds.v6fd, maxfd);
 		}
 
 		if (server.bind_fd) {
 			/* wait for replies from real DNS */
-			FD_SET(server.bind_fd, &fds);
+			FD_SET(server.bind_fd, &read_fds);
 			maxfd = MAX(server.bind_fd, maxfd);
 		}
 
 		/* Don't read from tun if all users have filled outpacket queues */
 		if(!all_users_waiting_to_send()) {
-			FD_SET(server.tun_fd, &fds);
+			FD_SET(server.tun_fd, &read_fds);
 			maxfd = MAX(server.tun_fd, maxfd);
 		}
 
-		i = select(maxfd + 1, &fds, NULL, NULL, &tv);
+		/* add connected user TCP forward FDs to read set */
+		maxfd = MAX(set_user_tcp_fds(&read_fds, 1), maxfd);
+
+		/* add connectING user TCP FDs to write set */
+		maxfd = MAX(set_user_tcp_fds(&write_fds, 2), maxfd);
+
+		i = select(maxfd + 1, &read_fds, &write_fds, NULL, &tv);
 
 		if(i < 0) {
 			if (server.running)
@@ -757,16 +829,29 @@ server_tunnel()
 				}
 			}
 		} else {
-			if (FD_ISSET(server.tun_fd, &fds)) {
+			if (FD_ISSET(server.tun_fd, &read_fds)) {
 				tunnel_tun();
 			}
-			if (FD_ISSET(server.dns_fds.v4fd, &fds)) {
+
+			for (userid = 0; userid < created_users; userid++) {
+				if (FD_ISSET(users[userid].remote_tcp_fd, &read_fds) && users[userid].remoteforward_addr_len > 0) {
+					DEBUG(4, "tunnel_tcp called for user %d", userid);
+					tunnel_tcp(userid);
+				} else if (users[userid].remote_forward_connected == 2 &&
+					FD_ISSET(users[userid].remote_tcp_fd, &write_fds)) {
+					DEBUG(2, "User %d TCP socket now writable (connection established)", userid);
+					users[userid].remote_forward_connected = 1;
+				}
+			}
+
+			if (FD_ISSET(server.dns_fds.v4fd, &read_fds)) {
 				tunnel_dns(server.dns_fds.v4fd);
 			}
-			if (FD_ISSET(server.dns_fds.v6fd, &fds)) {
+			if (FD_ISSET(server.dns_fds.v6fd, &read_fds)) {
 				tunnel_dns(server.dns_fds.v6fd);
 			}
-			if (FD_ISSET(server.bind_fd, &fds)) {
+
+			if (FD_ISSET(server.bind_fd, &read_fds)) {
 				tunnel_bind();
 			}
 		}
@@ -781,7 +866,7 @@ handle_full_packet(int userid, uint8_t *data, size_t len, int compressed)
 	size_t rawlen;
 	uint8_t out[64*1024], *rawdata;
 	struct ip *hdr;
-	int touser;
+	int touser = -1;
 	int ret;
 
 	/* Check if data needs to be uncompressed */
@@ -796,20 +881,28 @@ handle_full_packet(int userid, uint8_t *data, size_t len, int compressed)
 	}
 
 	if (ret == Z_OK) {
-		hdr = (struct ip*) (out + 4);
-		touser = find_user_by_ip(hdr->ip_dst.s_addr);
-		DEBUG(2, "FULL PKT: %" L "u bytes from user %d (touser %d)", len, userid, touser);
-		if (touser == -1) {
-			/* send the uncompressed packet to tun device */
-			write_tun(server.tun_fd, rawdata, rawlen);
-		} else {
-			/* don't re-compress if possible */
-			if (users[touser].down_compression && compressed) {
-				user_send_data(touser, data, len, 1);
+		if (users[userid].remoteforward_addr_len == 0) {
+			hdr = (struct ip*) (out + 4);
+			touser = find_user_by_ip(hdr->ip_dst.s_addr);
+			DEBUG(2, "FULL PKT: %" L "u bytes from user %d (touser %d)", len, userid, touser);
+			if (touser == -1) {
+				/* send the uncompressed packet to tun device */
+				write_tun(server.tun_fd, rawdata, rawlen);
 			} else {
-				user_send_data(touser, rawdata, rawlen, 0);
+				/* don't re-compress if possible */
+				if (users[touser].down_compression && compressed) {
+					user_send_data(touser, data, len, 1);
+				} else {
+					user_send_data(touser, rawdata, rawlen, 0);
+				}
+			}
+		} else {
+			/* Write full pkt to user's remote forward TCP stream */
+			if ((ret = write(users[userid].remote_tcp_fd, rawdata, rawlen)) != rawlen) {
+				DEBUG(2, "Write error %d on TCP socket for user %d: %s", errno, userid, strerror(errno));
 			}
 		}
+
 	} else {
 		DEBUG(2, "Discarded upstream data from user %d, uncompress() result: %d", userid, ret);
 	}
@@ -1170,6 +1263,7 @@ handle_dns_version(int dns_fd, struct query *q, uint8_t *domain, int domain_len)
 	u->hostlen = q->fromlen;
 	u->remote_forward_connected = 0;
 	u->remoteforward_addr_len = 0;
+	u->remote_tcp_fd = 0;
 	u->remoteforward_addr.ss_family = AF_UNSPEC;
 	u->fragsize = 100; /* very safe */
 	u->conn = CONN_DNS_NULL;
@@ -1250,7 +1344,7 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 {
 	uint8_t unpacked[512], flags;
 	char logindata[16], *tmp[2], out[512], *reason = NULL;
-	char *errormsg = NULL;
+	char *errormsg = NULL, fromaddr[100];
 	struct in_addr tempip;
 	char remote_tcp, remote_isnt_localhost, use_ipv6, poll_status; //, drop_packets;
 	int length = 17, read, addrlen, login_ok = 1;
@@ -1279,8 +1373,10 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 
 	CHECK_LEN(read, length);
 
+	strncpy(fromaddr, format_addr(&q->from, q->fromlen), 100);
+
 	DEBUG(2, "Received login request for user %d from %s",
-				userid, format_addr(&q->from, q->fromlen));
+				userid, fromaddr);
 
 	DEBUG(6, "Login: length=%d, flags=0x%02x, seed=0x%08x, hash=0x%016llx%016llx",
 			  length, flags, u->seed, *(unsigned long long *) (unpacked + 1),
@@ -1289,7 +1385,7 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 	if (check_user_and_ip(userid, q, server.check_ip) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		syslog(LOG_WARNING, "rejected login request from user #%d from %s; expected source %s",
-			userid, format_addr(&q->from, q->fromlen), format_addr(&u->host, u->hostlen));
+			userid, fromaddr, format_addr(&u->host, u->hostlen));
 		DEBUG(1, "Rejected login request from user %d: BADIP", userid);
 		return;
 	}
@@ -1314,12 +1410,12 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 		if (addrlen > 0) {
 			if (use_ipv6) {
 				addr6->sin6_family = AF_INET6;
-				addr6->sin6_port = port;
+				addr6->sin6_port = htons(port);
 				u->remoteforward_addr_len = sizeof(*addr6);
 				memcpy(&addr6->sin6_addr, unpacked + 19, MIN(sizeof(*addr6), addrlen));
 			} else {
 				addr->sin_family = AF_INET;
-				addr->sin_port = port;
+				addr->sin_port = htons(port);
 				u->remoteforward_addr_len = sizeof(*addr);
 				memcpy(&addr->sin_addr, unpacked + 19, MIN(sizeof(*addr), addrlen));
 			}
@@ -1329,8 +1425,8 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 				  port, login_ok ? "allowed" : "rejected");
 		} else {
 			addr->sin_family = AF_INET;
-			addr->sin_port = port;
-			addr->sin_addr.s_addr = INADDR_LOOPBACK;
+			addr->sin_port = htons(port);
+			addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 			DEBUG(1, "User %d requested TCP connection to localhost:%hu, %s.", userid,
 				  port, login_ok ? "allowed" : "rejected");
 		}
@@ -1347,12 +1443,11 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 		write_dns(dns_fd, q, "LNAK", 4, 'T');
 		if (--u->authenticated >= 0)
 			u->authenticated = -1;
-		char *src_ip = format_addr(&q->from, q->fromlen);
 		int tries = abs(u->authenticated);
 		DEBUG(1, "rejected login from user %d (%s), tries: %d, reason: %s",
-			  userid, src_ip, tries, reason);
+			  userid, fromaddr, tries, reason);
 		syslog(LOG_WARNING, "rejected login request from user #%d from %s, %s; incorrect attempts: %d",
-			userid, src_ip, reason, tries);
+			userid, fromaddr, reason, tries);
 		return;
 	}
 
@@ -1360,13 +1455,13 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 	u->authenticated++;
 	if (u->authenticated > 1 && !poll_status)
 		syslog(LOG_WARNING, "duplicate login request from user #%d from %s",
-			   userid, format_addr(&u->host, u->hostlen));
+			   userid, fromaddr);
 
 	if (remote_tcp) {
 		int tcp_fd;
 
 		DEBUG(1, "User %d connected from %s, starting TCP connection to %s.", userid,
-			  format_addr(&q->from, q->fromlen), format_addr(&u->remoteforward_addr, sizeof(struct sockaddr_storage)));
+			  fromaddr, format_addr(&u->remoteforward_addr, sizeof(struct sockaddr_storage)));
 		syslog(LOG_NOTICE, "accepted password from user #%d, connecting TCP forward", userid);
 
 		/* Open socket and connect to TCP forward host:port */
@@ -1377,28 +1472,38 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 			goto tcp_forward_error;
 		}
 
+		/* connection in progress */
 		out[0] = 'W';
 		read = 1;
 		write_dns(dns_fd, q, out, read + 1, u->downenc);
-		u->tcp_fd = tcp_fd;
+		u->remote_tcp_fd = tcp_fd;
+		u->remote_forward_connected = 2; /* connecting */
 		return;
 	} else if (poll_status) {
+		/* Check TCP forward connection status and update user data */
 		int retval;
 
-		if ((retval = check_tcp_status(u->tcp_fd, &errormsg)) == -1) {
-			goto tcp_forward_error;
+		/* Check for connection errors */
+		if ((retval = check_tcp_error(u->remote_tcp_fd, &errormsg)) != 0) {
+			/* if unacceptable error, tell user */
+			if (retval != EINPROGRESS)
+				goto tcp_forward_error;
 		}
+
+		if (retval == EINPROGRESS)
+			u->remote_forward_connected = 2;
 
 		read = 1;
 		out[1] = 0;
 
-		if (retval == 0) {
+		/* check user TCP forward status flag, which is updated in server_tunnel
+		 * when the file descriptor becomes writable (ie, connection established */
+		if (u->remote_forward_connected == 1) {
 			out[0] = 'C';
-			u->remote_forward_connected = 1;
-		} else if (retval == EINPROGRESS) {
+			DEBUG(2, "User %d TCP forward connection established: %s", userid, errormsg);
+		} else if (u->remote_forward_connected == 2) {
 			out[0] = 'W';
-		} else {
-			goto tcp_forward_error;
+			DEBUG(3, "User %d TCP connection in progress: %s", userid, errormsg);
 		}
 
 		write_dns(dns_fd, q, out, read + 1, u->downenc);
@@ -1412,11 +1517,11 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 		tempip.s_addr = u->tun_ip;
 		tmp[1] = strdup(inet_ntoa(tempip));
 
-		read = snprintf(out, sizeof(out) - 1, "-%s-%s-%d-%d",
+		read = snprintf(out + 1, sizeof(out) - 1, "-%s-%s-%d-%d",
 						tmp[0], tmp[1], server.mtu, server.netmask);
 
 		DEBUG(1, "User %d connected from %s, tun_ip %s.", userid,
-			  format_addr(&q->from, q->fromlen), tmp[1]);
+			  fromaddr, tmp[1]);
 		syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
 
 		free(tmp[1]);
@@ -1618,7 +1723,7 @@ handle_dns_ping(int dns_fd, struct query *q, int userid,
 				uint8_t *unpacked, size_t read)
 {
 	int dn_seq, up_seq, dn_winsize, up_winsize, dn_ack;
-	int respond, set_qtimeout, set_wtimeout;
+	int respond, set_qtimeout, set_wtimeout, tcp_disconnect;
 	unsigned qtimeout_ms, wtimeout_ms;
 
 	CHECK_LEN(read, UPSTREAM_PING);
@@ -1628,23 +1733,36 @@ handle_dns_ping(int dns_fd, struct query *q, int userid,
 		return;
 
 	/* Unpack flags/options from ping header */
-	dn_ack = ((unpacked[10] >> 2) & 1) ? unpacked[1] : -1;
-	up_winsize = unpacked[2];
-	dn_winsize = unpacked[3];
-	up_seq = unpacked[4];
-	dn_seq = unpacked[5];
+	dn_ack = ((unpacked[9] >> 2) & 1) ? unpacked[0] : -1;
+	up_winsize = unpacked[1];
+	dn_winsize = unpacked[2];
+	up_seq = unpacked[3];
+	dn_seq = unpacked[4];
 
 	/* Query timeout and window frag timeout */
-	qtimeout_ms = ntohs(*(uint16_t *) (unpacked + 6));
-	wtimeout_ms = ntohs(*(uint16_t *) (unpacked + 8));
-	respond = unpacked[10] & 1;
-	set_qtimeout = (unpacked[10] >> 3) & 1;
-	set_wtimeout = (unpacked[10] >> 4) & 1;
+	qtimeout_ms = ntohs(*(uint16_t *) (unpacked + 5));
+	wtimeout_ms = ntohs(*(uint16_t *) (unpacked + 7));
+	respond = unpacked[9] & 1;
+	set_qtimeout = (unpacked[9] >> 3) & 1;
+	set_wtimeout = (unpacked[9] >> 4) & 1;
+	tcp_disconnect = (unpacked[9] >> 5) & 1;
 
-	DEBUG(3, "PING pkt user %d, down %d/%d, up %d/%d, ACK %d, %sqtime %u ms, %swtime %u ms, respond %d (flags %02X)",
+	DEBUG(3, "PING pkt user %d, down %d/%d, up %d/%d, ACK %d, %sqtime %u ms, "
+		  "%swtime %u ms, respond %d, tcp_close %d (flags %02X)",
 				userid, dn_seq, dn_winsize, up_seq, up_winsize, dn_ack,
 				set_qtimeout ? "SET " : "", qtimeout_ms, set_wtimeout ? "SET " : "",
-				wtimeout_ms, respond, unpacked[10]);
+				wtimeout_ms, respond, tcp_disconnect, unpacked[9]);
+
+	if (tcp_disconnect) {
+		/* close user's TCP forward connection and mark user as inactive */
+		if (users[userid].remoteforward_addr_len == 0) {
+			DEBUG(1, "User %d attempted TCP disconnect but didn't request TCP forwarding!", userid);
+		} else {
+			DEBUG(1, "User %d closed remote TCP forward", userid);
+			close_socket(users[userid].remote_tcp_fd);
+			users[userid].active = 0;
+		}
+	}
 
 	if (set_qtimeout) {
 		/* update user's query timeout if timeout flag set */
@@ -1671,7 +1789,7 @@ handle_dns_ping(int dns_fd, struct query *q, int userid,
 			  users[userid].outgoing->windowsize, dn_winsize, users[userid].incoming->windowsize, up_winsize);
 		users[userid].outgoing->windowsize = dn_winsize;
 		users[userid].incoming->windowsize = up_winsize;
-		send_data_or_ping(userid, q, 1, 1);
+		send_data_or_ping(userid, q, 1, 1, NULL);
 		return;
 	}
 
@@ -1682,7 +1800,7 @@ handle_dns_ping(int dns_fd, struct query *q, int userid,
 void
 handle_dns_data(int dns_fd, struct query *q, uint8_t *domain, int domain_len, int userid)
 {
-	uint8_t unpacked[512];
+	uint8_t unpacked[20];
 	static fragment f;
 	size_t len;
 

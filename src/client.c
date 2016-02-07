@@ -29,6 +29,7 @@
 #include <zlib.h>
 #include <sys/time.h>
 #include <time.h>
+#include <errno.h>
 
 #ifdef WINDOWS32
 #include "windows.h"
@@ -201,7 +202,7 @@ update_server_timeout(int handshake)
 
 	if (handshake) {
 		/* Send ping handshake to set server timeout */
-		return send_ping(1, -1, 1);
+		return send_ping(1, -1, 1, 0);
 	}
 	return -1;
 }
@@ -447,7 +448,7 @@ send_packet(char cmd, const uint8_t *data, const size_t datalen)
 }
 
 int
-send_ping(int ping_response, int ack, int set_timeout)
+send_ping(int ping_response, int ack, int set_timeout, int disconnect)
 {
 	this.num_pings++;
 	if (this.conn == CONN_DNS_NULL) {
@@ -468,14 +469,16 @@ send_ping(int ping_response, int ack, int set_timeout)
 		*(uint16_t *) (data + 7) = htons(this.downstream_timeout_ms);
 
 		/* update server frag/lazy timeout, ack flag, respond with ping flag */
-		data[9] = ((set_timeout & 1) << 4) | ((set_timeout & 1) << 3) | ((ack < 0 ? 0 : 1) << 2) | (ping_response & 1);
+		data[9] = ((disconnect & 1) << 5) | ((set_timeout & 1) << 4) |
+			((set_timeout & 1) << 3) | ((ack < 0 ? 0 : 1) << 2) | (ping_response & 1);
 		data[10] = (this.rand_seed >> 8) & 0xff;
 		data[11] = (this.rand_seed >> 0) & 0xff;
 		this.rand_seed += 1;
 
-		DEBUG(3, " SEND PING: respond %d, ack %d, %s(server %ld ms, downfrag %ld ms), flags %02X",
-				ping_response, ack, set_timeout ? "SET " : "", this.server_timeout_ms,
-				this.downstream_timeout_ms, data[8]);
+		DEBUG(3, " SEND PING: %srespond %d, ack %d, %s(server %ld ms, downfrag %ld ms), flags %02X, wup %u, wdn %u",
+				disconnect ? "DISCONNECT! " : "", ping_response, ack, set_timeout ? "SET " : "",
+				this.server_timeout_ms, this.downstream_timeout_ms,
+				data[8], this.outbuf->windowsize, this.inbuf->windowsize);
 
 		id = send_packet('p', data, sizeof(data));
 
@@ -505,7 +508,7 @@ send_next_frag()
 		if (this.outbuf->numitems > 0) {
 			/* There is stuff to send but we're out of sync, so send a ping
 			 * to get things back in order and keep the packets flowing */
-			send_ping(1, this.next_downstream_ack, 1);
+			send_ping(1, this.next_downstream_ack, 1, 0);
 			this.next_downstream_ack = -1;
 			window_tick(this.outbuf);
 		}
@@ -889,11 +892,11 @@ handshake_waitdns(char *buf, size_t buflen, char cmd, int timeout)
 }
 
 int
-parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
+parse_data(uint8_t *data, size_t len, fragment *f, int *immediate, int *ping)
 {
 	size_t headerlen = DOWNSTREAM_HDR;
-	int ping;
 	memset(f, 0, sizeof(fragment));
+	int error;
 
 	f->seqID = data[0];
 
@@ -902,12 +905,13 @@ parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
 	f->start = (data[2] >> 1) & 1;
 	f->compressed = (data[2] >> 2) & 1;
 	f->ack_other = (data[2] >> 3) & 1 ? data[1] : -1;
-	ping = (data[2] >> 4) & 1;
+	if (ping) *ping = (data[2] >> 4) & 1;
+	error = (data[2] >> 6) & 1;
 
 	if (immediate)
 		*immediate = (data[2] >> 5) & 1;
 
-	if (ping) { /* Handle ping stuff */
+	if (ping && *ping) { /* Handle ping stuff */
 		static unsigned dn_start_seq, up_start_seq, dn_wsize, up_wsize;
 
 		headerlen = DOWNSTREAM_PING_HDR;
@@ -924,7 +928,52 @@ parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
 	f->len = len - headerlen;
 	if (f->len > 0)
 		memcpy(f->data, data + headerlen, MIN(f->len, sizeof(f->data)));
-	return ping; /* return ping flag (if corresponding query was a ping) */
+	return error; /* return ping flag (if corresponding query was a ping) */
+}
+
+static ssize_t
+tunnel_stdin()
+{
+	size_t datalen;
+	uint8_t out[64*1024];
+	uint8_t in[64*1024];
+	uint8_t *data;
+	ssize_t readlen;
+
+	readlen = read(STDIN_FILENO, in, sizeof(in));
+	DEBUG(4, "  IN: %" L "d bytes on stdin, to be compressed: %d", readlen, this.compression_up);
+	if (readlen == 0) {
+		DEBUG(2, "EOF on stdin!");
+		return -1;
+	} else if (readlen < 0) {
+		warnx("Error %d reading from stdin: %s", errno, strerror(errno));
+		return -1;
+	}
+
+	if (this.conn != CONN_DNS_NULL || this.compression_up) {
+		datalen = sizeof(out);
+		compress2(out, &datalen, in, readlen, 9);
+		data = out;
+	} else {
+		datalen = readlen;
+		data = in;
+	}
+
+	if (this.conn == CONN_DNS_NULL) {
+		/* Check if outgoing buffer can hold data */
+		if (window_buffer_available(this.outbuf) < (datalen / MAX_FRAGSIZE) + 1) {
+			DEBUG(1, "  Outgoing buffer full (%" L "u/%" L "u), not adding data!",
+						this.outbuf->numitems, this.outbuf->length);
+			return -1;
+		}
+
+		window_add_outgoing_data(this.outbuf, data, datalen, this.compression_up);
+		/* Don't send anything here to respect min. send interval */
+	} else {
+		send_raw_data(data, datalen);
+	}
+
+	return datalen;
 }
 
 static int
@@ -974,7 +1023,7 @@ tunnel_dns()
 	size_t datalen, buflen;
 	uint8_t buf[64*1024], cbuf[64*1024], *data;
 	fragment f;
-	int read, compressed, res, immediate;
+	int read, compressed, ping, immediate, error;
 
 	memset(&q, 0, sizeof(q));
 	memset(buf, 0, sizeof(buf));
@@ -1060,19 +1109,27 @@ tunnel_dns()
 
 	this.num_recv++;
 
-	/* Decode the downstream data header and fragment-ify ready for processing */
-	res = parse_data(cbuf, read, &f, &immediate);
-
 	/* Mark query as received */
 	got_response(q.id, immediate, 0);
 
-	if ((this.debug >= 3 && res) || (this.debug >= 2 && !res))
+	/* Decode the downstream data header and fragment-ify ready for processing */
+	error = parse_data(cbuf, read, &f, &immediate, &ping);
+
+	if ((this.debug >= 3 && ping) || (this.debug >= 2 && !ping))
 		fprintf(stderr, " RX %s; frag ID %3u, ACK %3d, compression %d, datalen %" L "u, s%d e%d\n",
-				res ? "PING" : "DATA", f.seqID, f.ack_other, f.compressed, f.len, f.start, f.end);
+				ping ? "PING" : "DATA", f.seqID, f.ack_other, f.compressed, f.len, f.start, f.end);
 
 
 	window_ack(this.outbuf, f.ack_other);
 	window_tick(this.outbuf);
+
+	/* respond to TCP forwarding errors by shutting down */
+	if (error && this.use_remote_forward) {
+		f.data[f.len] = 0;
+		warnx("server: TCP forwarding error: %s", f.data);
+		this.running = 0;
+		return -1;
+	}
 
 	/* In lazy mode, we shouldn't get immediate replies to our most-recent
 	 query, only during heavy data transfer. Since this means the server
@@ -1080,7 +1137,7 @@ tunnel_dns()
 	 too fast, to avoid runaway ping-pong loops..) */
 	/* Don't send anything too soon; no data waiting from server */
 	if (f.len == 0) {
-		if (!res)
+		if (!ping)
 			DEBUG(1, "[WARNING] Received downstream data fragment with 0 length and NOT a ping!");
 		if (!this.lazymode)
 			this.send_ping_soon = 100;
@@ -1107,8 +1164,8 @@ tunnel_dns()
 	if (datalen > 0) {
 		if (compressed) {
 			buflen = sizeof(buf);
-			if ((res = uncompress(buf, &buflen, cbuf, datalen)) != Z_OK) {
-				DEBUG(1, "Uncompress failed (%d) for data len %" L "u: reassembled data corrupted or incomplete!", res, datalen);
+			if ((ping = uncompress(buf, &buflen, cbuf, datalen)) != Z_OK) {
+				DEBUG(1, "Uncompress failed (%d) for data len %" L "u: reassembled data corrupted or incomplete!", ping, datalen);
 				datalen = 0;
 			} else {
 				datalen = buflen;
@@ -1118,8 +1175,12 @@ tunnel_dns()
 			data = cbuf;
 		}
 
-		if (datalen)
-			write_tun(this.tun_fd, data, datalen);
+		if (datalen) {
+			if (this.use_remote_forward)
+				write(STDOUT_FILENO, data, datalen);
+			else
+				write_tun(this.tun_fd, data, datalen);
+		}
 	}
 
 	/* Move window along after doing all data processing */
@@ -1135,7 +1196,7 @@ client_tunnel()
 	fd_set fds;
 	int rv;
 	int i, use_min_send;
-	int sending, total;
+	int sending, total, maxfd;
 	time_t last_stats;
 	size_t sent_since_report, recv_since_report;
 
@@ -1191,7 +1252,7 @@ client_tunnel()
 					send_next_frag();
 				} else {
 					/* Send ping if we didn't send anything yet */
-					send_ping(0, this.next_downstream_ack, (this.num_pings > 20 && this.num_pings % 50 == 0));
+					send_ping(0, this.next_downstream_ack, (this.num_pings > 20 && this.num_pings % 50 == 0), 0);
 					this.next_downstream_ack = -1;
 				}
 
@@ -1260,12 +1321,20 @@ client_tunnel()
 		}
 
 		FD_ZERO(&fds);
-		if (this.conn != CONN_DNS_NULL || window_buffer_available(this.outbuf) > 16) {
+		maxfd = 0;
+		if (this.conn != CONN_DNS_NULL || window_buffer_available(this.outbuf) > 1) {
 			/* Fill up outgoing buffer with available data if it has enough space
 			 * The windowing protocol manages data retransmits, timeouts etc. */
-			FD_SET(this.tun_fd, &fds);
+			if (this.use_remote_forward) {
+				FD_SET(STDIN_FILENO, &fds);
+				maxfd = MAX(STDIN_FILENO, maxfd);
+			} else {
+				FD_SET(this.tun_fd, &fds);
+				maxfd = MAX(this.tun_fd, maxfd);
+			}
 		}
 		FD_SET(this.dns_fd, &fds);
+		maxfd = MAX(this.dns_fd, maxfd);
 
 		DEBUG(4, "Waiting %ld ms before sending more... (min_send %d)", timeval_to_ms(&tv), use_min_send);
 
@@ -1273,7 +1342,7 @@ client_tunnel()
 			gettimeofday(&now, NULL);
 		}
 
-		i = select(MAX(this.tun_fd, this.dns_fd) + 1, &fds, NULL, NULL, &tv);
+		i = select(maxfd + 1, &fds, NULL, NULL, &tv);
 
 		if (use_min_send && i > 0) {
 			/* enforce min_send_interval if we get interrupted by new tun data */
@@ -1299,7 +1368,7 @@ client_tunnel()
 		if (i == 0) {
 			/* timed out - no new packets recv'd */
 		} else {
-			if (FD_ISSET(this.tun_fd, &fds)) {
+			if (!this.use_remote_forward && FD_ISSET(this.tun_fd, &fds)) {
 				if (tunnel_tun() <= 0)
 					continue;
 				/* Returns -1 on error OR when quickly
@@ -1307,11 +1376,22 @@ client_tunnel()
 				   we need to _not_ do tunnel_dns() then.
 				   If chunk sent, sets this.send_ping_soon=0. */
 			}
+			if (this.use_remote_forward && FD_ISSET(STDIN_FILENO, &fds)) {
+				if (tunnel_stdin() <= 0) {
+					fprintf(stderr, "server: closing remote TCP forward connection\n");
+					/* send ping to disconnect, don't care if it comes back */
+					send_ping(0, 0, 0, 1);
+					this.running = 0;
+					break;
+				}
+			}
 
 			if (FD_ISSET(this.dns_fd, &fds)) {
 				tunnel_dns();
 			}
 		}
+		if (this.running == 0)
+			break;
 	}
 
 	return rv;
@@ -1369,6 +1449,7 @@ send_version(uint32_t version)
 
 static void
 send_login(char *login, int len)
+/* Send DNS login packet. See doc/proto_xxxxxxxx.txt for details */
 {
 	uint8_t flags = 0, data[100];
 	int length = 17, addrlen = 0;
@@ -1379,7 +1460,9 @@ send_login(char *login, int len)
 
 	memcpy(data + 1, login, 16);
 
-	if (this.remote_forward_addr.ss_family != AF_UNSPEC) {
+	/* if remote forward address is specified and not currently connecting */
+	if (this.remote_forward_connected != 2 &&
+		this.remote_forward_addr.ss_family != AF_UNSPEC) {
 		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *) &this.remote_forward_addr;
 		struct sockaddr_in *s = (struct sockaddr_in *) &this.remote_forward_addr;
 
@@ -1405,6 +1488,10 @@ send_login(char *login, int len)
 		}
 		DEBUG(2, "Sending TCP forward login request: port %hu, length %d, addrlen %d",
 			  port, length, addrlen);
+	} else if (this.remote_forward_connected == 2) {
+		/* remote TCP forward connection in progress */
+		DEBUG(2, "Sending TCP forward login/poll request to check connection status.");
+		flags |= (1 << 4);
 	}
 
 	data[0] = flags;
@@ -1538,7 +1625,7 @@ static int
 handshake_login(int seed)
 {
 	char in[4096], login[16], server[65], client[65], flag;
-	int mtu, read;
+	int mtu, netmask, read, numwaiting = 0;
 
 	login_calculate(login, 16, this.password, seed);
 
@@ -1550,31 +1637,84 @@ handshake_login(int seed)
 		in[MIN(read, sizeof(in))] = 0; /* Null terminate */
 
 		if (read > 0) {
-			int netmask;
 			if (strncmp("LNAK", in, 4) == 0) {
 				fprintf(stderr, "Bad password\n");
 				return 1;
-			} else if (sscanf(in, "%c-%64[^-]-%64[^-]-%d-%d",
-				&flag, server, client, &mtu, &netmask) == 4) {
-
-				server[64] = 0;
-				client[64] = 0;
-				if (tun_setip(client, server, netmask) == 0 &&
-					tun_setmtu(mtu) == 0) {
-
-					fprintf(stderr, "Server tunnel IP is %s\n", server);
-					return 0;
-				} else {
-					errx(4, "Failed to set IP and MTU");
-				}
-			} else {
-				fprintf(stderr, "Received bad handshake: %.*s\n", read, in);
+				/* not reached */
 			}
+			flag = toupper(in[0]);
+
+			switch (flag) {
+				case 'I':
+					if (sscanf(in, "%c-%64[^-]-%64[^-]-%d-%d",
+								&flag, server, client, &mtu, &netmask) == 5) {
+
+						server[64] = 0;
+						client[64] = 0;
+						if (tun_setip(client, server, netmask) == 0 &&
+							tun_setmtu(mtu) == 0) {
+
+							fprintf(stderr, "Server tunnel IP is %s\n", server);
+							return 0;
+						} else {
+							errx(4, "Failed to set IP and MTU");
+						}
+					} else {
+						goto bad_handshake;
+					}
+					break;
+				case 'C':
+					if (!this.use_remote_forward) {
+						goto bad_handshake;
+					}
+
+					this.remote_forward_connected = 1;
+					fprintf(stderr, " done.");
+					return 0;
+				case 'W':
+					if (!this.use_remote_forward || this.remote_forward_connected == 1) {
+						goto bad_handshake;
+					}
+
+					this.remote_forward_connected = 2;
+
+					if (numwaiting == 0)
+						fprintf(stderr, "server: Opening Remote TCP forward.\n");
+					else
+						fprintf(stderr, "%.*s", numwaiting, "...............");
+
+					numwaiting ++;
+
+					/* wait a while before re-polling server, max 5 tries (14 seconds) */
+					if (numwaiting > 1)
+						sleep(numwaiting);
+
+					continue;
+				case 'E':
+					if (!this.use_remote_forward)
+						goto bad_handshake;
+
+					char errormsg[100];
+					strncpy(errormsg, in + 1, MIN(read, sizeof(errormsg)));
+					errormsg[99] = 0;
+					fprintf(stderr, "server: Remote TCP forward connection failed: %s\n", errormsg);
+					return 1;
+				default:
+					/* undefined flag */
+					bad_handshake:
+					fprintf(stderr, "Received bad handshake: %.*s\n", read, in);
+					break;
+			}
+
 		}
 
 		fprintf(stderr, "Retrying login...\n");
 	}
-	warnx("couldn't login to server");
+	if (numwaiting != 0)
+		warnx("Remote TCP forward connection timed out after 5 tries.");
+	else
+		warnx("couldn't login to server");
+
 	return 1;
 }
 
@@ -2424,7 +2564,7 @@ handshake_set_timeout()
 	for (int i = 0; this.running && i < 5; i++) {
 
 		id = this.autodetect_server_timeout ?
-			update_server_timeout(1) : send_ping(1, -1, 1);
+			update_server_timeout(1) : send_ping(1, -1, 1, 0);
 
 		read = handshake_waitdns(in, sizeof(in), 'P', i + 1);
 		got_response(id, 1, 0);
@@ -2464,13 +2604,11 @@ client_handshake()
 
 	fprintf(stderr, "Using DNS type %s queries\n", client_get_qtype());
 
-	r = handshake_version(&seed);
-	if (r) {
+	if ((r = handshake_version(&seed))) {
 		return r;
 	}
 
-	r = handshake_login(seed);
-	if (r) {
+	if ((r = handshake_login(seed))) {
 		return r;
 	}
 
@@ -2479,6 +2617,9 @@ client_handshake()
 		this.max_timeout_ms = 10000;
 		this.compression_down = 1;
 		this.compression_up = 1;
+		if (this.use_remote_forward)
+			fprintf(stderr, "Warning: Remote TCP forwards over Raw (UDP) mode may be unreliable.\n"
+				"         If forwarded connections are unstable, try using '-r' to force DNS tunnelling mode.\n");
 	} else {
 		if (this.raw_mode == 0) {
 			fprintf(stderr, "Skipping raw mode\n");
