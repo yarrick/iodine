@@ -376,7 +376,7 @@ main(int argc, char **argv)
 	char *device = NULL;
 	char *pidfile = NULL;
 
-	int remote_forward_port;
+	int remote_forward_port = 0;
 
 	char *nameserv_host = NULL;
 	struct sockaddr_storage nameservaddr;

@@ -561,7 +561,7 @@ main(int argc, char **argv)
 		goto cleanup;
 	} else if (nb_fds == 1) {
 		/* XXX: assume we get IPv4 socket */
-		dns_fds.v4fd = SD_LISTEN_FDS_START;
+		server.dns_fds.v4fd = SD_LISTEN_FDS_START;
 	} else {
 #endif
 		if ((server.addrfamily == AF_UNSPEC || server.addrfamily == AF_INET) &&
