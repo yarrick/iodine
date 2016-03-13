@@ -284,16 +284,16 @@ client_set_compression(int up, int down)
 }
 
 void
-client_set_dnstimeout(double timeout, double servertimeout, double downfrag, int autodetect)
+client_set_dnstimeout(int timeout, int servertimeout, int downfrag, int autodetect)
 {
-	max_timeout_ms = timeout * 1000;
-	server_timeout_ms = servertimeout * 1000;
-	downstream_timeout_ms = downfrag * 1000;
+	max_timeout_ms = timeout;
+	server_timeout_ms = servertimeout;
+	downstream_timeout_ms = downfrag;
 	autodetect_server_timeout = autodetect;
 }
 
 void
-client_set_interval(double interval_msec, double mininterval_msec)
+client_set_interval(int interval_msec, int mininterval_msec)
 {
 	send_interval_ms = interval_msec;
 	min_send_interval_ms = mininterval_msec;

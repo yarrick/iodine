@@ -162,9 +162,9 @@ main(int argc, char **argv)
 	int retval;
 	int raw_mode;
 	int lazymode;
-	double target_interval_sec;
-	double server_timeout_sec;
-	double downstream_timeout_sec;
+	int target_interval_ms;
+	int server_timeout_ms;
+	int downstream_timeout_ms;
 	int min_interval_ms;
 	int autodetect_server_timeout;
 	int up_compression;
@@ -211,10 +211,10 @@ main(int argc, char **argv)
 	retval = 0;
 	raw_mode = 1;
 	lazymode = 1;
-	target_interval_sec = 5;	/* DNS RFC says 5 seconds minimum */
+	target_interval_ms = 5000;	/* DNS RFC says 5 seconds minimum */
 	min_interval_ms = 0;
-	server_timeout_sec = 4;	/* Safe value for RTT <1s */
-	downstream_timeout_sec = 2;
+	server_timeout_ms = 4000;	/* Safe value for RTT <1s */
+	downstream_timeout_ms = 2000;
 	autodetect_server_timeout = 1;
 	hostname_maxlen = 0xFF;
 	nameserv_family = AF_UNSPEC;
@@ -322,17 +322,17 @@ main(int argc, char **argv)
 				lazymode = 0;
 			break;
 		case 'I':
-			target_interval_sec = strtod(optarg, NULL);
+			target_interval_ms = strtod(optarg, NULL) * 1000;
 			break;
 		case 'i':
-			server_timeout_sec = strtod(optarg, NULL);
+			server_timeout_ms = strtod(optarg, NULL) * 1000;
 			autodetect_server_timeout = 0;
 			break;
 		case 'j':
-			downstream_timeout_sec = strtod(optarg, NULL);
+			downstream_timeout_ms = strtod(optarg, NULL) * 1000;
 			if (autodetect_server_timeout) {
 				autodetect_server_timeout = 0;
-				server_timeout_sec = 4;
+				server_timeout_ms = 4000;
 			}
 			break;
 		case 's':
@@ -424,29 +424,29 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (target_interval_sec < 0.1) {
+	if (target_interval_ms < 100) {
 		warnx("Target interval must be greater than 0.1 seconds!");
 		usage();
 	}
 
-	if (server_timeout_sec < 0.1 || server_timeout_sec >= target_interval_sec) {
+	if (server_timeout_ms < 100 || server_timeout_ms >= target_interval_ms) {
 		warnx("Server timeout must be greater than 0.1 sec and less than target interval!");
 		usage();
 	}
 
-	if (downstream_timeout_sec < 0.1) {
+	if (downstream_timeout_ms < 100) {
 		warnx("Downstream fragment timeout must be more than 0.1 sec to prevent excessive retransmits.");
 		usage();
 	}
 
-	if (!lazymode && target_interval_sec > 1) {
+	if (!lazymode && target_interval_ms > 1000) {
 		warnx("Warning: Target interval of >1 second in immediate mode will cause high latency.");
 		usage();
 	}
 
 	client_set_compression(up_compression, down_compression);
-	client_set_dnstimeout(target_interval_sec, server_timeout_sec, downstream_timeout_sec, autodetect_server_timeout);
-	client_set_interval(target_interval_sec * 1000.0, min_interval_ms);
+	client_set_dnstimeout(target_interval_ms, server_timeout_ms, downstream_timeout_ms, autodetect_server_timeout);
+	client_set_interval(target_interval_ms, min_interval_ms);
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
