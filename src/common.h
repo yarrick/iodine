@@ -144,8 +144,6 @@ void read_password(char*, size_t);
 
 int check_topdomain(char *, char **);
 
-extern double difftime(time_t, time_t);
-
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID
 int inet_aton(const char *cp, struct in_addr *inp);
