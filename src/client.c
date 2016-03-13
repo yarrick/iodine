@@ -68,7 +68,7 @@ static int running;
 static const char *password;
 
 /* Nameserver/domain info */
-static struct sockaddr_storage *nameserv_addrs;
+static struct socket *nameserv_addrs;
 static int nameserv_addrs_len;
 static int current_nameserver;
 static struct sockaddr_storage raw_serv;
@@ -207,7 +207,7 @@ client_get_conn()
 }
 
 void
-client_set_nameservers(struct sockaddr_storage *addr, int addrslen)
+client_set_nameservers(struct socket *addr, int addrslen)
 {
 	nameserv_addrs = addr;
 	nameserv_addrs_len = addrslen;
@@ -552,8 +552,8 @@ send_query(int fd, uint8_t *hostname)
 
 	DEBUG(4, "  Sendquery: id %5d name[0] '%c'", q.id, hostname[0]);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*) &nameserv_addrs[current_nameserver],
-			sizeof(struct sockaddr_storage));
+	sendto(fd, packet, len, 0, (struct sockaddr*) &nameserv_addrs[current_nameserver].addr,
+			nameserv_addrs[current_nameserver].length);
 
 	client_rotate_nameserver();
 

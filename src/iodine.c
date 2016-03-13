@@ -181,7 +181,7 @@ main(int argc, char **argv)
 	char **nameserv_hosts;
 	int nameserv_hosts_len;
 	struct sockaddr_storage nameservaddr;
-	struct sockaddr_storage *nameserv_addrs;
+	struct socket *nameserv_addrs;
 	size_t nameserv_addrs_len;
 	int nameservaddr_len;
 	int nameserv_family;
@@ -374,15 +374,18 @@ main(int argc, char **argv)
 
 	// Preallocate memory with expected number of hosts
 	nameserv_hosts = malloc(sizeof(char *) * nameserv_hosts_len);
-	nameserv_addrs = malloc(sizeof(struct sockaddr_storage) * nameserv_hosts_len);
+	nameserv_addrs = malloc(sizeof(struct socket) * nameserv_hosts_len);
 
 	if (argc == 0) {
 		usage();
 		/* NOT REACHED */
 	} else if (argc == 1) {
 		nameserv_hosts[0] = get_resolvconf_addr();
-	} else if (argc > 1)
-		for (int h = 0; h < nameserv_hosts_len; h++) nameserv_hosts[h] = strdup(argv[h + 1]);
+	} else if (argc > 1) {
+		for (int h = 0; h < nameserv_hosts_len; h++) {
+			nameserv_hosts[h] = strdup(argv[h + 1]);
+		}
+	}
 	topdomain = strdup(argv[0]);
 
 	for (int n = 0; n < nameserv_hosts_len; n++) {
@@ -395,7 +398,8 @@ main(int argc, char **argv)
 			errx(1, "Cannot lookup nameserver '%s': %s ",
 					nameserv_host, gai_strerror(nameservaddr_len));
 		}
-		memcpy(&nameserv_addrs[n], &nameservaddr, sizeof(struct sockaddr_storage));
+		nameserv_addrs[n].length = nameservaddr_len;
+		memcpy(&nameserv_addrs[n].addr, &nameservaddr, sizeof(struct sockaddr_storage));
 		nameserv_addrs_len ++;
 		nameserv_host = NULL;
 	}
@@ -488,9 +492,10 @@ main(int argc, char **argv)
 	signal(SIGTERM, sighandler);
 
 	fprintf(stderr, "Sending DNS queries for %s to ", topdomain);
-	for (int a = 0; a < nameserv_addrs_len; a++)
-		fprintf(stderr, "%s%s", format_addr(&nameserv_addrs[a], nameservaddr_len),
+	for (int a = 0; a < nameserv_addrs_len; a++) {
+		fprintf(stderr, "%s%s", format_addr(&nameserv_addrs[a].addr, nameserv_addrs[a].length),
 				(a != nameserv_addrs_len-1) ?  ", " : "");
+	}
 	fprintf(stderr, "\n");
 
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {

@@ -121,6 +121,11 @@ struct query {
 	struct timeval time_recv;
 };
 
+struct socket {
+	size_t length;
+	struct sockaddr_storage addr;
+};
+
 enum connection {
 	CONN_RAW_UDP = 0,
 	CONN_DNS_NULL,
