@@ -93,6 +93,19 @@ struct ip
     struct in_addr ip_src, ip_dst;      /* source and dest address */
 };
 
+#ifdef WINDOWS32
+#define	LOG_EMERG	0
+#define	LOG_ALERT	1
+#define	LOG_CRIT	2
+#define	LOG_ERR		3
+#define	LOG_WARNING	4
+#define	LOG_NOTICE	5
+#define	LOG_INFO	6
+#define	LOG_DEBUG	7
+/* dummy syslog definition to prevent compile errors */
+#define syslog(...) /* TODO: implement (add to event log), move to common.c */
+#endif
+
 /* windows gettimeofday from https://gist.github.com/ugovaretto/5875385 */
 #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
   #define DELTA_EPOCH_IN_MICROSECS 116444736000000000Ui64
