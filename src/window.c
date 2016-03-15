@@ -31,11 +31,37 @@
 
 int window_debug = 0;
 
+
+/* Window debugging macro */
+#ifdef DEBUG_BUILD
+#define WDEBUG(...) if (window_debug) {\
+		TIMEPRINT("[WINDOW-DEBUG] (%s:%d) ", __FILE__, __LINE__);\
+		fprintf(stderr, __VA_ARGS__);\
+		fprintf(stderr, "\n");\
+	}
+#else
+#define WDEBUG(...)
+#endif
+
+/* Window-specific macros */
+/* Gets index of fragment o fragments after window start */
+#define AFTER(w, o) ((w->window_start + o) % w->length)
+
+/* Check if fragment index a is within window_buffer *w */
+#define INWINDOW_INDEX(w, a) ((w->window_start < w->window_end) ? \
+		(a >= w->window_start && a <= w->window_end) : \
+		((a >= w->window_start && a <= w->length - 1) || \
+		(a >= 0 && a <= w->window_end)))
+
+/* Wrap index x to a value within the window buffer length */
+#define WRAP(x) ((x) % w->length)
+
+
 struct frag_buffer *
 window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int dir)
 {
 	struct frag_buffer *buf;
-	buf = calloc(sizeof(struct frag_buffer), 1);
+	buf = calloc(1, sizeof(struct frag_buffer));
 	if (!buf) {
 		errx(1, "Failed to allocate window buffer memory!");
 	}
@@ -46,7 +72,7 @@ window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int di
 		errx(fragsize, "Fragsize too large! Please recompile with larger MAX_FRAGSIZE!");
 	}
 
-	buf->frags = calloc(length, sizeof(fragment));
+	buf->frags = calloc(length, sizeof(struct fragment));
 	if (!buf->frags) {
 		errx(1, "Failed to allocate fragment buffer!");
 	}
@@ -83,7 +109,7 @@ window_buffer_resize(struct frag_buffer *w, size_t length)
 		WDEBUG("Resizing window buffer with things still in it! This will cause problems!");
 	}
 	if (w->frags) free(w->frags);
-	w->frags = calloc(length, sizeof(fragment));
+	w->frags = calloc(length, sizeof(struct fragment));
 	if (!w->frags) {
 		errx(1, "Failed to resize window buffer!");
 	}
@@ -104,7 +130,7 @@ window_buffer_clear(struct frag_buffer *w)
 {
 	if (!w) return;
 
-	memset(w->frags, 0, w->length * sizeof(fragment));
+	memset(w->frags, 0, w->length * sizeof(struct fragment));
 	window_buffer_reset(w);
 }
 
@@ -117,10 +143,10 @@ window_buffer_available(struct frag_buffer *w)
 
 /* Places a fragment in the window after the last one */
 int
-window_append_fragment(struct frag_buffer *w, fragment *src)
+window_append_fragment(struct frag_buffer *w, struct fragment *src)
 {
 	if (window_buffer_available(w) < 1) return 0;
-	memcpy(&w->frags[w->last_write], src, sizeof(fragment));
+	memcpy(&w->frags[w->last_write], src, sizeof(struct fragment));
 	w->last_write = WRAP(w->last_write + 1);
 	w->numitems ++;
 	return 1;
@@ -128,14 +154,14 @@ window_append_fragment(struct frag_buffer *w, fragment *src)
 
 
 ssize_t
-window_process_incoming_fragment(struct frag_buffer *w, fragment *f)
+window_process_incoming_fragment(struct frag_buffer *w, struct fragment *f)
 /* Handles fragment received from the sending side (RECV)
  * Returns index of fragment in window or <0 if dropped
  * The next ACK MUST be for this fragment */
 {
 	/* Check if packet is in window */
 	unsigned startid, endid, offset;
-	fragment *fd;
+	struct fragment *fd;
 	startid = w->start_seq_id;
 	endid = (w->start_seq_id + w->windowsize) % MAX_SEQ_ID;
 	offset = SEQ_OFFSET(startid, f->seqID);
@@ -169,7 +195,7 @@ window_process_incoming_fragment(struct frag_buffer *w, fragment *f)
 		}
 	}
 
-	memcpy(fd, f, sizeof(fragment));
+	memcpy(fd, f, sizeof(struct fragment));
 	w->numitems ++;
 
 	fd->retries = 0;
@@ -180,6 +206,17 @@ window_process_incoming_fragment(struct frag_buffer *w, fragment *f)
 
 	return dest;
 }
+
+/* Perform wrapped iteration of statement with pos = (begin to end) wrapped at
+ * max, executing statement f for every value of pos. */
+#define ITER_FORWARD(begin, end, max, pos, f) { \
+		if (end >= begin) \
+			for (pos = begin; pos < end && pos < max; pos++) {f}\
+		else {\
+			for (pos = begin; pos < max; pos++) {f}\
+			for (pos = 0; pos < end && pos < max; pos++) {f}\
+		}\
+	}
 
 /* Reassembles first complete sequence of fragments into data. (RECV)
  * Returns length of data reassembled, or 0 if no data reassembled */
@@ -198,7 +235,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 	}
 	if (compression) *compression = 1;
 
-	fragment *f;
+	struct fragment *f;
 	size_t i;
 	unsigned curseq;
 	int end = 0;
@@ -253,7 +290,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int 
 	/* Clear all used fragments */
 	size_t p;
 	ITER_FORWARD(w->chunk_start, WRAP(w->chunk_start + i + 1), w->length, p,
-						memset(&w->frags[p], 0, sizeof(fragment));
+						memset(&w->frags[p], 0, sizeof(struct fragment));
 					);
 	w->chunk_start = WRAP(woffs + 1);
 	w->numitems -= i + 1;
@@ -267,7 +304,7 @@ window_sending(struct frag_buffer *w, struct timeval *nextresend)
    *nextresend is time before the next frag will be resent */
 {
 	struct timeval age, now, oldest;
-	fragment *f;
+	struct fragment *f;
 	size_t tosend = 0;
 
 	oldest.tv_sec = 0;
@@ -311,11 +348,11 @@ window_sending(struct frag_buffer *w, struct timeval *nextresend)
 
 /* Returns next fragment to be sent or NULL if nothing (SEND)
  * This also handles packet resends, timeouts etc. */
-fragment *
+struct fragment *
 window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack)
 {
 	struct timeval age, now;
-	fragment *f = NULL;
+	struct fragment *f = NULL;
 
 	if (*other_ack >= MAX_SEQ_ID || *other_ack < 0)
 		*other_ack = -1;
@@ -360,7 +397,7 @@ window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack)
 int
 window_get_next_ack(struct frag_buffer *w)
 {
-	fragment *f;
+	struct fragment *f;
 	for (size_t i = 0; i < w->windowsize; i++) {
 		f = &w->frags[WRAP(w->window_start + i)];
 		if (f->len > 0 && f->acks <= 0) {
@@ -375,7 +412,7 @@ window_get_next_ack(struct frag_buffer *w)
 void
 window_ack(struct frag_buffer *w, int seqid)
 {
-	fragment *f;
+	struct fragment *f;
 	if (seqid < 0 || seqid > MAX_SEQ_ID) return;
 	for (size_t i = 0; i < w->windowsize; i++) {
 		f = &w->frags[AFTER(w, i)];
@@ -406,7 +443,7 @@ window_tick(struct frag_buffer *w)
 			if (w->direction == WINDOW_SENDING) {
 				WDEBUG("Clearing old fragments in SENDING window.");
 				w->numitems --; /* Clear old fragments */
-				memset(&w->frags[w->window_start], 0, sizeof(fragment));
+				memset(&w->frags[w->window_start], 0, sizeof(struct fragment));
 			}
 			w->window_start = AFTER(w, 1);
 
@@ -428,7 +465,7 @@ window_add_outgoing_data(struct frag_buffer *w, uint8_t *data, size_t len, int c
 	}
 	compressed &= 1;
 	size_t offset = 0;
-	static fragment f;
+	struct fragment f;
 	WDEBUG("add data len %lu, %lu frags, max fragsize %u", len, n, w->maxfraglen);
 	for (size_t i = 0; i < n; i++) {
 		memset(&f, 0, sizeof(f));

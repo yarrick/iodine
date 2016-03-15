@@ -688,7 +688,7 @@ send_next_frag(int fd)
 	int code, id;
 	static int datacmc = 0;
 	static char *datacmcchars = "abcdefghijklmnopqrstuvwxyz0123456789";
-	fragment *f;
+	struct fragment *f;
 	size_t buflen;
 
 	/* Get next fragment to send */
@@ -1080,11 +1080,11 @@ handshake_waitdns(int dns_fd, char *buf, size_t buflen, char cmd, int timeout)
 }
 
 int
-parse_data(uint8_t *data, size_t len, fragment *f, int *immediate)
+parse_data(uint8_t *data, size_t len, struct fragment *f, int *immediate)
 {
 	size_t headerlen = DOWNSTREAM_HDR;
 	int ping;
-	memset(f, 0, sizeof(fragment));
+	memset(f, 0, sizeof(struct fragment));
 
 	f->seqID = data[0];
 
@@ -1164,7 +1164,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	struct query q;
 	size_t datalen, buflen;
 	uint8_t buf[64*1024], cbuf[64*1024], *data;
-	fragment f;
+	struct fragment f;
 	int read, compressed, res, immediate;
 
 	memset(&q, 0, sizeof(q));
