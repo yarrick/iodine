@@ -479,7 +479,7 @@ send_data_or_ping(struct dnsfd *dns_fds, int userid, struct query *q,
 {
 	uint8_t pkt[MAX_FRAGSIZE + DOWNSTREAM_PING_HDR];
 	size_t datalen, headerlen;
-	fragment *f;
+	struct fragment *f;
 	struct frag_buffer *out, *in;
 
 	in = users[userid].incoming;
@@ -1656,7 +1656,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		/* if respond flag not set, query waits in qmem and is used later */
 	} else if (isxdigit(in[0])) { /* Upstream data packet */
 		int code = 0;
-		static fragment f;
+		struct fragment f;
 		size_t len;
 
 		/* Need 6 char header + >=1 char data */
