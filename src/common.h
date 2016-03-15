@@ -122,7 +122,7 @@ struct query {
 };
 
 struct socket {
-	size_t length;
+	socklen_t length;
 	struct sockaddr_storage addr;
 };
 

@@ -71,8 +71,7 @@ static const char *password;
 static struct socket *nameserv_addrs;
 static int nameserv_addrs_len;
 static int current_nameserver;
-static struct sockaddr_storage raw_serv;
-static int raw_serv_len;
+static struct socket raw_serv;
 static const char *topdomain;
 
 static uint16_t rand_seed;
@@ -328,7 +327,7 @@ client_set_hostname_maxlen(size_t i)
 const char *
 client_get_raw_addr()
 {
-	return format_addr(&raw_serv, raw_serv_len);
+	return format_addr(&raw_serv.addr, raw_serv.length);
 }
 
 void
@@ -614,7 +613,7 @@ send_raw(int fd, uint8_t *buf, size_t buflen, int user, int cmd)
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = (cmd & 0xF0) | (user & 0x0F);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv, sizeof(raw_serv));
+	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv.addr, raw_serv.length);
 }
 
 static void
@@ -892,14 +891,13 @@ read_dns_withq(int dns_fd, int tun_fd, uint8_t *buf, size_t buflen, struct query
    Returns >0 on correct replies; value is #valid bytes in *buf.
 */
 {
-	struct sockaddr_storage from;
+	struct socket from;
 	uint8_t data[64*1024];
-	socklen_t addrlen;
 	int r;
 
-	addrlen = sizeof(from);
+	from.length = sizeof(from.addr);
 	if ((r = recvfrom(dns_fd, data, sizeof(data), 0,
-			  (struct sockaddr*)&from, &addrlen)) < 0) {
+			  (struct sockaddr*)&from.addr, &from.length)) < 0) {
 		warn("recvfrom");
 		return -1;
 	}
@@ -1801,21 +1799,21 @@ handshake_raw_udp(int dns_fd, int seed)
 
 		if (len == 5 && in[0] == 'I') {
 			/* Received IPv4 address */
-			struct sockaddr_in *raw4_serv = (struct sockaddr_in *) &raw_serv;
+			struct sockaddr_in *raw4_serv = (struct sockaddr_in *) &raw_serv.addr;
 			raw4_serv->sin_family = AF_INET;
 			memcpy(&raw4_serv->sin_addr, &in[1], sizeof(struct in_addr));
 			raw4_serv->sin_port = htons(53);
-			raw_serv_len = sizeof(struct sockaddr_in);
+			raw_serv.length = sizeof(struct sockaddr_in);
 			got_addr = 1;
 			break;
 		}
 		if (len == 17 && in[0] == 'I') {
 			/* Received IPv6 address */
-			struct sockaddr_in6 *raw6_serv = (struct sockaddr_in6 *) &raw_serv;
+			struct sockaddr_in6 *raw6_serv = (struct sockaddr_in6 *) &raw_serv.addr;
 			raw6_serv->sin6_family = AF_INET6;
 			memcpy(&raw6_serv->sin6_addr, &in[1], sizeof(struct in6_addr));
 			raw6_serv->sin6_port = htons(53);
-			raw_serv_len = sizeof(struct sockaddr_in6);
+			raw_serv.length = sizeof(struct sockaddr_in6);
 			got_addr = 1;
 			break;
 		}
@@ -1831,7 +1829,7 @@ handshake_raw_udp(int dns_fd, int seed)
 		fprintf(stderr, "Failed to get raw server IP, will use DNS mode.\n");
 		return 0;
 	}
-	fprintf(stderr, "Server is at %s, trying raw login: ", format_addr(&raw_serv, raw_serv_len));
+	fprintf(stderr, "Server is at %s, trying raw login: ", format_addr(&raw_serv.addr, raw_serv.length));
 	fflush(stderr);
 
 	/* do login against port 53 on remote server
