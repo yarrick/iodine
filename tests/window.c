@@ -45,7 +45,7 @@ START_TEST(test_window_everything)
 	// "send" data
 	int a = -1;
 	for (; out->numitems > 0;) {
-		fragment *f = window_get_next_sending_fragment(out, &a);
+		struct fragment *f = window_get_next_sending_fragment(out, &a);
 		if (!f) {
 //			warnx("Nothing to send.");
 			continue;
