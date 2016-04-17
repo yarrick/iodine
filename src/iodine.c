@@ -27,7 +27,6 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <time.h>
-#include <arpa/inet.h>
 
 #ifdef WINDOWS32
 #include "windows.h"
@@ -36,6 +35,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 #endif
 
 #include "common.h"
