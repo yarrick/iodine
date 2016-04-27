@@ -182,6 +182,171 @@ get_external_ip(struct in_addr *ip)
 	return (res == 0);
 }
 
+/* Ask STUN to get external ip */
+static int
+get_external_ip_by_stun(struct in_addr *ip, const char *stun_server)
+{
+	const char *magic_cookie = "\x21\x12\xa4\x42";
+	const int timeout = 5;
+	const int tries = 3;
+	int sock;
+	struct addrinfo *addr;
+	struct addrinfo addr_hint;
+	int res;
+	char request_packet[20];
+	char buf[512];
+	int len;
+	int message_length;
+	int i;
+	int t;
+
+	/* hint for getaddrinfo() to use UDP socket */
+	memset(&addr_hint,0,sizeof(addr_hint));
+	addr_hint.ai_family = AF_UNSPEC;
+	addr_hint.ai_socktype = SOCK_DGRAM;
+
+	res = getaddrinfo(stun_server, "3478", &addr_hint, &addr);
+	if (res < 0) return 1;
+
+	sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+	if (sock < 0) {
+		freeaddrinfo(addr);
+		return 2;
+	}
+
+	res = connect(sock, addr->ai_addr, addr->ai_addrlen);
+	freeaddrinfo(addr);
+	if (res < 0) return 3;
+
+	memset(request_packet, 0, sizeof(request_packet));
+
+	/* Binding request */
+	request_packet[1] = 0x01;
+	/* magic number */
+	memcpy(&(request_packet[4]), magic_cookie, 4);
+	for (i=8; i<20; i++) {
+		request_packet[i] = rand()%256;
+	}
+
+	res = write(sock, request_packet, 20);
+	if (res != 20) return 4;
+
+	for (t = 0; t < tries; t++) {
+		int check_flag;
+		struct timeval tv;
+		fd_set readfds;
+		int res2;
+
+		res = 5;
+		FD_ZERO(&readfds);
+		FD_SET(sock, &readfds);
+		memset(&tv, 0, sizeof(tv));
+		tv.tv_sec = timeout;
+
+		/* wait for data */
+		res2 = select(sock + 1, &readfds, NULL, NULL, &tv);
+		if (res2 < 0) {
+			res = 6;
+			break;
+		}
+		if (res2 == 0) {
+			/* timeout */
+			res = 7;
+			continue;
+		}
+		if (res2 != 1) {
+			res = 8;
+			continue;
+		}
+		if (!FD_ISSET(sock, &readfds)) {
+			res = 9;
+			continue;
+		}
+
+		/* Zero buf before receiving,
+		   leave at least one zero at the end */
+		memset(buf, 0, sizeof(buf));
+		res2 = read(sock, buf, sizeof(buf) - 1);
+		if (res2 < 0) {
+			res = 10;
+			break;
+		}
+		len = res2;
+
+		message_length = buf[2] * 256 + buf[3];
+		/* check message_length, should be len-20 */
+		if (message_length + 20 != len) {
+			res = 11;
+			continue;
+		}
+
+		/* check magic cookie */
+		check_flag = 0;
+		for (i = 0; i < 4; i++) {
+			if (buf[i+4] != magic_cookie[i]) {
+				check_flag = 1;
+				break;
+			}
+		}
+		if (check_flag != 0) {
+			res = 12;
+			continue;
+		}
+
+		/* check transaction ID */
+		check_flag = 0;
+		for (i = 8; i < 20; i++) {
+			if (buf[i] != request_packet[i]) {
+				check_flag = 1;
+				break;
+			}
+		}
+		if (check_flag != 0) {
+			res = 13;
+			continue;
+		}
+
+		check_flag = 0;
+		for (i = 20; i + 4 < len; ) {
+			int attribute_type = buf[i]*256 + buf[i+1];
+			int attribute_length = buf[i+2]*256 + buf[i+3];
+			if (i+4+attribute_length >= len) {
+				break;
+			}
+			if (attribute_type == 0x0001) {
+				/* MAPPED-ADDRESS */
+				if (attribute_length == 8) {
+					int attribute_family = buf[i+4+1];
+					if (attribute_family == 0x01) {
+						/* AF_INET (IPv4) */
+						memcpy(&ip->s_addr,
+						       &(buf[i+4+4]), 4);
+						check_flag = 1;
+						break;
+					}
+				}
+			}
+			if (attribute_length <= 0) {
+				break;
+			}
+			i += (4 + attribute_length);
+		}
+		if (check_flag != 0) {
+			res=0;
+			break;
+		}
+	}
+	if (res != 0) {
+		close(sock);
+		return res;
+	}
+
+	res = close(sock);
+	if (res < 0) return 14;
+
+	return (res == 0);
+}
+
 static void
 sigint(int sig)
 {
@@ -2627,6 +2792,10 @@ main(int argc, char **argv)
 		int res = get_external_ip(&extip);
 		if (res) {
 			fprintf(stderr, "Failed to get external IP via web service.\n");
+			res = get_external_ip_by_stun(&extip, "stun.sipgate.net");
+		}
+		if (res) {
+			fprintf(stderr, "Failed to get external IP via STUN server.\n");
 			exit(3);
 		}
 		ns_ip = extip.s_addr;
