@@ -252,7 +252,7 @@ get_external_ip_by_stun(struct in_addr *ip, const char *stun_server)
 		if (res2 == 0) {
 			/* timeout */
 			res = 7;
-			continue;
+			break;
 		}
 		if (res2 != 1) {
 			res = 8;
