@@ -2671,14 +2671,11 @@ main(int argc, char **argv)
 
 #ifdef HAVE_SYSTEMD
 	nb_fds = sd_listen_fds(0);
-	if (nb_fds > 1) {
+	if (nb_fds < 0) {
+		warnx("Failed to receive file descriptors from systemd: %s", strerror(-nb_fds));
 		retval = 1;
-		warnx("Too many file descriptors received!\n");
 		goto cleanup;
-	} else if (nb_fds == 1) {
-		/* XXX: assume we get IPv4 socket */
-		dns_fds.v4fd = SD_LISTEN_FDS_START;
-	} else {
+	} else if (nb_fds == 0) {
 #endif
 		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET) &&
 			(dns_fds.v4fd = open_dns(&dns4addr, dns4addr_len)) < 0) {
@@ -2694,6 +2691,25 @@ main(int argc, char **argv)
 			goto cleanup;
 		}
 #ifdef HAVE_SYSTEMD
+	} else if (nb_fds <= 2) {
+		/* systemd may pass up to two sockets, for ip4 and ip6, try to figure out
+			which is which */
+		for (int i = 0; i < nb_fds; i++) {
+			int fd = SD_LISTEN_FDS_START + i;
+			if (sd_is_socket(fd, AF_INET, SOCK_DGRAM, -1)) {
+				dns_fds.v4fd = fd;
+			} else if (sd_is_socket(fd, AF_INET6, SOCK_DGRAM, -1)) {
+				dns_fds.v6fd = fd;
+			} else {
+				retval = 1;
+				warnx("Unknown socket %d passed to iodined!\n", fd);
+				goto cleanup;
+			}
+		}
+	} else {
+		retval = 1;
+		warnx("Too many file descriptors received!\n");
+		goto cleanup;
 	}
 #endif
 
