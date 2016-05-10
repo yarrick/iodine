@@ -3,6 +3,8 @@ Description=Iodine socket
 
 [Socket]
 ListenDatagram=53
+ListenDatagram=0.0.0.0:53
+BindIPv6Only=ipv6-only
 
 [Install]
 WantedBy=sockets.target
