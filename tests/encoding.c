@@ -32,13 +32,13 @@ static struct tuple
 	char *a;
 	char *b;
 } dottests[] = {
-	{ "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	  "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaa"},
-	{ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa."},
-	{ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-	{ "abc123", "abc123" },
+	{ "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	  "aaaaaaaaaaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaa"},
+	{ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa."},
+	{ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaa"},
+	{ "abcdefghijklmnopqrtsuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrtsuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ" },
 	{ NULL, NULL }
 };
 
@@ -50,7 +50,7 @@ START_TEST(test_inline_dotify)
 	memset(temp, 0, sizeof(temp));
 	strcpy(temp, dottests[_i].a);
 	b = temp;
-	inline_dotify(b, sizeof(temp));
+	inline_dotify((uint8_t *)b, sizeof(temp));
 
 	fail_unless(strcmp(dottests[_i].b, temp) == 0,
 			"'%s' != '%s'", temp, dottests[_i].b);
@@ -65,7 +65,7 @@ START_TEST(test_inline_undotify)
 	memset(temp, 0, sizeof(temp));
 	strcpy(temp, dottests[_i].b);
 	b = temp;
-	inline_undotify(b, sizeof(temp));
+	inline_undotify((uint8_t *)b, sizeof(temp));
 
 	fail_unless(strcmp(dottests[_i].a, temp) == 0,
 			"'%s' != '%s'", temp, dottests[_i].a);
@@ -76,7 +76,7 @@ START_TEST(test_build_hostname)
 {
 	char data[256];
 	char buf[1024];
-	char *topdomain = "a.c";
+	char *topdomain = "iodine.test.example.com";
 	int buflen;
 	int i;
 
@@ -86,11 +86,16 @@ START_TEST(test_build_hostname)
 
 	buflen = sizeof(buf);
 
+	for (int j = 0; j < 10; j++) /* dummy header length */
 	for (i = 1; i < sizeof(data); i++) {
-		int len = build_hostname(buf, buflen, data, i, topdomain, get_base32_encoder(), sizeof(buf));
+		buf[j] = j + 'A';
+		int len = build_hostname((uint8_t *)buf, buflen, (uint8_t *)data, i, topdomain, get_base32_encoder(), buflen, j);
 
 		fail_if(len > i);
+		fail_if((strstr(buf, ".") - buf) > 63, "First label in encoded hostname >63 bytes!");
 		fail_if(strstr(buf, ".."), "Found double dots when encoding data len %d! buf: %s", i, buf);
+		fail_if(!strstr(buf, topdomain), "Didn't find topdomain in hostname!");
+		fail_if(buf[j] == j, "Header has been changed during encode hostname!");
 	}
 }
 END_TEST

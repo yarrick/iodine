@@ -75,7 +75,7 @@ START_TEST(test_base64_encode)
 	b64 = get_base64_encoder();
 
 	len = sizeof(buf);
-	val = b64->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
+	val = b64->encode((uint8_t *)buf, &len, (uint8_t *)testpairs[_i].a, strlen(testpairs[_i].a));
 
 	fail_unless(val == strlen(testpairs[_i].b));
 	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
@@ -93,7 +93,7 @@ START_TEST(test_base64_decode)
 	b64 = get_base64_encoder();
 
 	len = sizeof(buf);
-	val = b64->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
+	val = b64->decode((uint8_t *)buf, &len, (uint8_t *)testpairs[_i].b, strlen(testpairs[_i].b));
 
 	fail_unless(val == strlen(testpairs[_i].a));
 	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
@@ -124,7 +124,7 @@ START_TEST(test_base64_blksize)
 	}
 	rawbuf[i] = 0;
 
-	val = b64->encode(encbuf, &enclen, rawbuf, rawlen);
+	val = b64->encode((uint8_t *)encbuf, &enclen, (uint8_t *)rawbuf, rawlen);
 
 	fail_unless(rawlen == 3, "raw length was %d not 3", rawlen);
 	fail_unless(enclen == 3, "encoded %d bytes, not 3", enclen);
@@ -133,7 +133,7 @@ START_TEST(test_base64_blksize)
 	memset(rawbuf, 0, rawlen + 16);
 
 	enclen = val;
-	val = b64->decode(rawbuf, &rawlen, encbuf, enclen);
+	val = b64->decode((uint8_t *)rawbuf, &rawlen, (uint8_t *)encbuf, enclen);
 
 	fail_unless(rawlen == 3, "raw length was %d not 3", rawlen);
 	fail_unless(val == 3);

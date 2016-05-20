@@ -40,6 +40,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include <err.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 #endif
 
 #define DNS_PORT 53
@@ -67,33 +68,62 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 # define DONT_FRAG_VALUE 1
 #endif
 
+#ifndef GITREVISION
+#define GITREVISION "GIT"
+#endif
+
 #define T_PRIVATE 65399
 /* Undefined RR type; "private use" range, see http://www.bind9.net/dns-parameters */
 #define T_UNSET 65432
 /* Unused RR type, never actually sent */
 
-struct packet
-{
-	int len;		/* Total packet length */
-	int sentlen;		/* Length of chunk currently transmitted */
-	int offset;		/* Current offset */
-	char data[64*1024];	/* The data */
-	char seqno;		/* The packet sequence number */
-	char fragment;		/* Fragment index */
-};
+#define DOWNSTREAM_HDR 3
+#define DOWNSTREAM_PING_HDR 7
+#define UPSTREAM_HDR 6
+#define UPSTREAM_PING 11
+
+/* handy debug printing macro */
+#ifdef DEBUG_BUILD
+#define TIMEPRINT(...) \
+		struct timeval currenttime;\
+		gettimeofday(&currenttime, NULL);\
+		fprintf(stderr, "%03ld.%03ld ", (long) currenttime.tv_sec, (long) currenttime.tv_usec / 1000);\
+		fprintf(stderr, __VA_ARGS__);
+
+#define DEBUG(level, ...) \
+		if (debug >= level) {\
+			TIMEPRINT("[D%d %s:%d] ", level, __FILE__, __LINE__); \
+			fprintf(stderr, __VA_ARGS__);\
+			fprintf(stderr, "\n");\
+		}
+#else
+#define TIMEPRINT(...) \
+		fprintf(stderr, __VA_ARGS__);
+
+#define DEBUG(level, ...) \
+		if (debug >= level) {\
+			fprintf(stderr, "[D%d] ", level); \
+			fprintf(stderr, __VA_ARGS__);\
+			fprintf(stderr, "\n");\
+		}
+#endif
+
 
 struct query {
 	char name[QUERY_NAME_SIZE];
 	unsigned short type;
 	unsigned short rcode;
-	unsigned short id;
+	int id;	/* id < 0: unusued */
 	struct sockaddr_storage destination;
 	socklen_t dest_len;
 	struct sockaddr_storage from;
 	socklen_t fromlen;
-	unsigned short id2;
-	struct sockaddr_storage from2;
-	socklen_t fromlen2;
+	struct timeval time_recv;
+};
+
+struct socket {
+	socklen_t length;
+	struct sockaddr_storage addr;
 };
 
 enum connection {
@@ -129,8 +159,6 @@ void warn(const char *fmt, ...);
 void errx(int eval, const char *fmt, ...);
 void warnx(const char *fmt, ...);
 #endif
-
-int recent_seqno(int , int);
 
 #ifndef WINDOWS32
 void fd_set_close_on_exec(int fd);

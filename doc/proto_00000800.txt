@@ -1,0 +1,327 @@
+Detailed specification of protocol in version 00000800
+======================================================
+
+Note: work in progress!!
+
+======================================================
+1. DNS protocol
+======================================================
+
+Quick alphabetical index / register:
+	0-9	Data packet
+	A-F	Data packet
+	I	IP address
+	L	Login
+	N	Downstream fragsize	(NS.topdomain A-type reply)
+	O	Options
+	P	Ping
+	R	Downstream fragsize probe
+	S	Switch upstream codec
+	V	Version
+	W				(WWW.topdomain A-type reply)
+	Y	Downstream codec check
+	Z	Upstream codec check
+
+
+CMC = Cache Miss Counter, increased every time it is used
+
+Version:
+Client sends:
+	First byte v or V
+	Rest encoded with base32:
+	4 bytes big endian protocol version
+	CMC
+Server replies:
+	4 chars:
+		VACK (version ok), followed by login challenge
+		VNAK (version differs), followed by server protocol version
+		VFUL (server has no free slots), followed by max users
+	4 byte value: means login challenge/server protocol version/max users
+	1 byte userid of the new user, or any byte if not VACK
+
+Login:
+Client sends:
+	First byte l or L
+	Rest encoded with base32:
+	1 byte userid
+	16 bytes MD5 hash of: (first 32 bytes of password) xor (8 repetitions of login challenge)
+	CMC
+Server replies:
+	LNAK means not accepted
+	x.x.x.x-y.y.y.y-mtu-netmask means accepted (server ip, client ip, mtu, netmask bits)
+
+IP Request: (for where to try raw login or set data pipe mode)
+Client sends:
+	First byte i or I
+	5 bits coded as Base32 char, meaning userid
+	CMC as 3 Base32 chars
+Server replies
+	BADIP if bad userid
+	First byte I
+	Then comes external IP address of iodined server
+	as 4 bytes (IPv4) or 16 bytes (IPv6)
+
+Upstream codec check / bounce:
+Client sends:
+	First byte z or Z
+	Lots of data that should not be decoded
+Server replies:
+	The requested domain copied raw, in the lowest-grade downstream codec
+	available for the request type.
+
+Downstream codec check:
+Client sends:
+	First byte y or Y
+	1 char, meaning downstream codec to use
+	5 bits coded as Base32 char, meaning check variant
+	CMC as 3 Base32 chars
+	Possibly extra data, depending on check variant
+Server sends:
+	Data encoded with requested downstream codec; data content depending
+	on check variant number.
+	BADCODEC if requested downstream codec not available.
+	BADLEN if check variant is not available, or problem with extra data.
+
+	Downstream codec chars are same as in 'O' Option request, below.
+
+	Check variants:
+	1: Send encoded DOWNCODECCHECK1 string as defined in encoding.h
+
+	(Other variants reserved; possibly variant that sends a decoded-encoded
+	copy of Base32-encoded extra data in the request)
+
+Switch codec:
+Client sends:
+	First byte s or S
+	5 bits coded as Base32 char, meaning userid
+	5 bits coded as Base32 char, representing number of raw bits per
+	encoded byte:
+		5: Base32   (a-z0-5)
+		6: Base64   (a-zA-Z0-9+-)
+		26: Base64u (a-zA-Z0-9_-)
+		7: Base128  (a-zA-Z0-9\274-\375)
+	CMC as 3 Base32 chars
+Server sends:
+	Name of codec if accepted. After this all upstream data packets must
+	be encoded with the new codec.
+	BADCODEC if not accepted. Client must then revert to previous codec
+	BADLEN if length of query is too short
+
+Options:
+Client sends:
+	First byte o or O
+	5 bits coded as Base32 char, meaning userid
+	number of options (n) as decimal digit
+	n chars, each a valid option (to be processed in order)
+	CMC as 3 Base32 chars
+Server sends:
+	Option chars in the same order as request, indicating that options were
+	accepted by the server.
+	BADCODEC if not accepted. Previous situation remains.
+	BADLEN if number of options doesn't match length of query.
+	All options affect only the requesting client.
+
+	Option chars:
+	t or T: Downstream encoding Base32, for TXT/CNAME/A/MX (default)
+	s or S: Downstream encoding Base64, for TXT/CNAME/A/MX
+	u or U: Downstream encoding Base64u, for TXT/CNAME/A/MX
+	v or V: Downstream encoding Base128, for TXT/CNAME/A/MX
+	r or R: Downstream encoding Raw, for PRIVATE/TXT/NULL (assumed for
+		PRIVATE and NULL)
+	If codec unsupported for request type, server will use Base32; note
+	that server will answer any mix of request types that a client sends.
+	Server may disregard this option; client must always use the downstream
+	encoding type indicated in every downstream DNS packet.
+
+	c or C: Downstream compression enabled (compressed before encoding)
+	d or D: Downstream compression disabled
+	l or L: Lazy mode, server will keep a number of requests waiting until data
+		becomes available to send downstream or the requests time out. The
+		timeout value for requests is controlled by the client.
+		Applies only to data transfer; handshake is always answered immediately.
+	i or I: Immediate (non-lazy) mode, server will answer all requests
+		(nearly) immediately.
+
+Probe downstream fragment size:
+Client sends:
+	First byte r or R
+	Second byte userid char
+	2 bytes big-endian fragsize encoded as 4 bytes base32
+	Then follows a long random query which contents does not matter.
+Server sends:
+	Requested number of bytes as a response. The first two bytes contain
+	the requested length. The third byte is 107 (0x6B). The fourth byte
+	is a random value, and each following byte is incremented with 107.
+	This is checked by the client to determine corruption.
+	BADFRAG if requested length not accepted.
+
+Set downstream fragment size:
+Client sends:
+	First byte n or N
+	Rest encoded with base32:
+	1 byte userid
+	2 bytes new downstream fragment size (big-endian)
+	CMC
+Server sends:
+	2 bytes new downstream fragment size. After this all downstream
+	payloads will be max (fragsize + 2) bytes long.
+	BADFRAG if not accepted.
+
+
+Upstream data header:
+     76543 21076 54321076 54321076 5432
+    +!----+!----+!----!--+--!----!+----+
+    |0UUUU|UDCMC| Seq ID | Dn ACK |ACFL|
+    +-----+-----+--------+--------+----+
+
+Downstream data header:        |=> only if ping (P) flag set       |
+    0        1        2        3        4        5        6 
+    +--------+--------+76543210+--------+--------+--------+--------+
+    | Seq ID | Up ACK |00IPACFL|Dn Wsize|Up Wsize|DnWstart|UpWstart|
+    +--------+--------+--------+--------+--------+--------+--------+
+
+UUUU = Userid
+L = Last fragment flag
+A = ACK flag
+F = First fragment flag
+C = Compression enabled for downstream packet
+P = ping flag: extra header present
+I = responded to immediately (for RTT calculation) - downstream only
+UDCMC = Upstream Data CMC char (base36 [a-z0-9])
+
+Up/Dn Wsize/Wstart = upstream/downstream window size/window start Seq ID 
+
+Upstream data packet starts with 1 byte ASCII hex coded user byte; then
+1 char data-CMC; then 4 bytes Base32 encoded header; then comes the payload
+data, encoded with the chosen upstream codec.
+
+Downstream data starts with 3 byte header, followed by data, which may be
+compressed. If Ping flag is set, another 4 bytes are appended to the header,
+containing upstream and downstream window sizes and window start sequence IDs.
+The response does not need to contain data. If the server has no data to send,
+the response will always include the ping header and the ping flag will be set.
+
+In NULL and PRIVATE responses, downstream data is always raw. In all other
+response types, downstream data is encoded (see Options above).
+Encoding type is indicated by 1 prefix char (before the data header):
+TXT:
+	End result is always DNS-chopped (series of len-prefixed strings
+	<=255 bytes)
+	t or T: Base32	 encoded before chop, decoded after un-chop
+	s or S: Base64	 encoded before chop, decoded after un-chop
+	u or U: Base64u	 encoded before chop, decoded after un-chop
+	v or V: Base128	 encoded before chop, decoded after un-chop
+	r or R: Raw	 no encoding, only DNS-chop
+SRV/MX/CNAME/A:
+	h or H: Hostname encoded with Base32
+	i or I: Hostname encoded with Base64
+	j or J: Hostname encoded with Base64u
+	k or K: Hostname encoded with Base128
+SRV and MX may reply with multiple hostnames, each encoded separately. Each
+has a 10-multiple priority, and encoding/decoding is done in strictly
+increasing priority sequence 10, 20, 30, etc. without gaps. Note that some DNS
+relays will shuffle the answer records in the response.
+
+
+Ping:
+Client sends:
+	First byte p or P
+	Second byte CMC
+	Rest encoded with Base32:
+    0        1        2...8        9-10
+    +--------+--------+---+76543210+---+
+    |0000UUUU|Dn SeqID|...|000WTANR|CMC|
+    +--------+--------+---+--------+---+
+	4 bits Userid
+	1 byte Downstream seq ID ACK
+	1 byte window size (upstream)
+	1 byte window size (downstream)
+	1 byte window start (upstream)
+	1 byte window start (downstream)
+	2 bytes big-endian server timeout in ms
+	2 bytes big-endian downstream fragment ACK timeout in ms
+	
+	1 byte flags:
+		W = update window frag timeout
+		T = update server timeout
+		A = is ACKing downstream frag
+		N = is NACKing downstream frag (unused)
+		R = response must contain ping header (data optional)
+	2 bytes CMC
+
+The server responses to Ping and Data packets are compatible, and are described
+above (refer to downstream data header).
+
+If R (respond) bit is set, the server responds immediately with a ping header.
+The server must also adjust its window sizes to those provided by the ping.
+If the T but is set, the server sets the user's DNS timeout to the value spec-
+ified by the packet.
+
+In lazy mode, unless the R flag is set, the server will hold the ping until it
+times out or more data becomes available to send.
+
+
+"Lazy-mode" operation
+=====================
+
+Client-server DNS traffic sequence has been reordered to provide increased
+(interactive) performance and greatly reduced latency.
+
+Idea taken from Lucas Nussbaum's slides (24th IFIP International Security
+Conference, 2009) at http://www.loria.fr/~lnussbau/tuns.html. Current
+implementation is original to iodine, no code or documentation from any other
+project was consulted during development.
+
+Server:
+In lazy mode, except where otherwise specified, responses are sent using the
+oldest pending query held in the server's buffer (QMEM). The server responds
+to a stored pending query when the query times out, an upstream ACK is pending
+(for that user), or the server has an excess of pending queries (more than the
+user's downstream window size).
+
+Upstream data fragments are ACK'd immediately to keep data flowing.
+
+Upstream pings are answered immediately only when the Respond flag is set (see
+ping header), in which case the response is to the same DNS query as the ping.
+Immediate responses (<10ms old) to either ping or data requests are marked
+and used to calculate the round-trip-time for the connection.
+
+Client:
+The client keeps track of all queries it sends, and maintains a minimum of
+<downstream window size> pending queries to fill the server buffer.
+Downstream data is always ACK'd immediately with a new request (either a ping
+or data if available). The client sends excess requests (ie. already has enough
+pending queries) for ACKs or for new data.
+
+
+======================================================
+2. Raw UDP protocol
+======================================================
+
+This protocol does not implement data windowing and does not guarantee data
+delivery, however it is likely faster due to the fact that data is not split
+into fragments for sending. Full packets are compressed and sent when they
+arrive on the tun device, and are processed immediately on the other side.
+
+All Raw UDP protcol messages start with a 3 byte header: 0x10d19e
+This is not the start of a valid DNS message so it is easy to identify.
+The fourth byte contains the command (C) and the user id (U).
+
+	 7654 3210
+	+----+----+
+	|CCCC|UUUU|
+	+----+----+
+
+Login message (command = 1):
+The header is followed by a MD5 hash with the same password as in the DNS
+login. The client starts the raw mode by sending this message, and uses
+the login challenge +1, and the server responds using the login challenge -1.
+After the login message has been exchanged, both the server and the client
+switch to raw udp mode for the rest of the connection.
+
+Data message (command = 2):
+After the header comes the payload data, which is always compressed.
+
+Ping message (command = 3):
+Sent from client to server and back to keep session open. Has no payload.
+

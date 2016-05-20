@@ -18,7 +18,14 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
+#include <time.h>
+#include <sys/time.h>
+
 char *get_resolvconf_addr();
 void socket_setrtable(int fd, int rtable);
+
+time_t timeval_to_ms(struct timeval *tv);
+
+struct timeval ms_to_timeval(time_t ms);
 
 #endif

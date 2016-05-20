@@ -282,7 +282,9 @@ do_detach()
 {
 #ifndef WINDOWS32
 	fprintf(stderr, "Detaching from terminal...\n");
-	daemon(0, 0);
+	if (daemon(0, 0) != 0) {
+		err(1, "Failed to detach from terminal. Try running in foreground.");
+	}
 	umask(0);
 	alarm(0);
 #else
@@ -310,7 +312,8 @@ read_password(char *buf, size_t len)
 	fprintf(stderr, "Enter password: ");
 	fflush(stderr);
 #ifndef WINDOWS32
-	fscanf(stdin, "%79[^\n]", pwd);
+	if (!fscanf(stdin, "%79[^\n]", pwd))
+		err(1, "EOF while reading password!");
 #else
 	for (i = 0; i < sizeof(pwd); i++) {
 		pwd[i] = getch();
@@ -454,22 +457,6 @@ errx(int eval, const char *fmt, ...)
 	exit(eval);
 }
 #endif
-
-
-int recent_seqno(int ourseqno, int gotseqno)
-/* Return 1 if we've seen gotseqno recently (current or up to 3 back).
-   Return 0 if gotseqno is new (or very old).
-*/
-{
-	int i;
-	for (i = 0; i < 4; i++, ourseqno--) {
-		if (ourseqno < 0)
-			ourseqno = 7;
-		if (gotseqno == ourseqno)
-			return 1;
-	}
-	return 0;
-}
 
 #ifndef WINDOWS32
 /* Set FD_CLOEXEC flag on file descriptor.

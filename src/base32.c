@@ -33,11 +33,14 @@ static const char cb32_ucase[] =
 static unsigned char rev32[256];
 static int reverse_init = 0;
 
-static int base32_encode(char *, size_t *, const void *, size_t);
-static int base32_decode(void *, size_t *, const char *, size_t);
+static size_t base32_encode(uint8_t *, size_t *, const uint8_t *, size_t);
+static size_t base32_decode(uint8_t *, size_t *, const uint8_t *, size_t);
 static int base32_handles_dots();
-static int base32_blksize_raw();
-static int base32_blksize_enc();
+static size_t base32_blksize_raw();
+static size_t base32_blksize_enc();
+static size_t base32_encoded_length(size_t inputlen);
+static size_t base32_raw_length(size_t inputlen);
+
 
 static struct encoder base32_encoder =
 {
@@ -47,7 +50,9 @@ static struct encoder base32_encoder =
 	base32_handles_dots,
 	base32_handles_dots,
 	base32_blksize_raw,
-	base32_blksize_enc
+	base32_blksize_enc,
+	base32_encoded_length,
+	base32_raw_length
 };
 
 struct encoder
@@ -62,17 +67,30 @@ base32_handles_dots()
 	return 0;
 }
 
-static int
+static size_t
 base32_blksize_raw()
 {
 	return BLKSIZE_RAW;
 }
 
-static int
+static size_t
 base32_blksize_enc()
 {
 	return BLKSIZE_ENC;
 }
+
+static size_t
+base32_encoded_length(size_t inputlen)
+{
+	return (BLKSIZE_ENC * inputlen) / BLKSIZE_RAW + (((BLKSIZE_ENC * inputlen) % BLKSIZE_RAW) ? 1 : 0);
+}
+
+static size_t
+base32_raw_length(size_t inputlen)
+{
+	return (BLKSIZE_RAW * inputlen) / BLKSIZE_ENC + (((BLKSIZE_RAW * inputlen) % BLKSIZE_ENC) ? 1 : 0);
+}
+
 
 inline static void
 base32_reverse_init()
@@ -105,8 +123,8 @@ b32_8to5(int in)
 	return rev32[in];
 }
 
-static int
-base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
+static size_t
+base32_encode(uint8_t *buf, size_t *buflen, const uint8_t *udata, size_t size)
 /*
  * Fills *buf with max. *buflen characters, encoding size bytes of *data.
  *
@@ -117,9 +135,8 @@ base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
  * sets *buflen to : #bytes encoded from data
  */
 {
-	unsigned char *udata = (unsigned char *) data;
-	int iout = 0;	/* to-be-filled output char */
-	int iin = 0;	/* one more than last input byte that can be
+	size_t iout = 0;	/* to-be-filled output char */
+	size_t iin = 0;	/* one more than last input byte that can be
 			   successfully decoded */
 
 	/* Note: Don't bother to optimize manually. GCC optimizes
@@ -196,8 +213,8 @@ base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
 
 #define REV32(x) rev32[(int) (x)]
 
-static int
-base32_decode(void *buf, size_t *buflen, const char *str, size_t slen)
+static size_t
+base32_decode(uint8_t *ubuf, size_t *buflen, const uint8_t *str, size_t slen)
 /*
  * Fills *buf with max. *buflen bytes, decoded from slen chars in *str.
  * Decoding stops early when *str contains \0.
@@ -210,9 +227,8 @@ base32_decode(void *buf, size_t *buflen, const char *str, size_t slen)
  * return value    : #bytes filled in buf   (excluding \0)
  */
 {
-	unsigned char *ubuf = (unsigned char *) buf;
-	int iout = 0;	/* to-be-filled output byte */
-	int iin = 0;	/* next input char to use in decoding */
+	size_t iout = 0;	/* to-be-filled output byte */
+	size_t iin = 0;	/* next input char to use in decoding */
 
 	base32_reverse_init ();
 

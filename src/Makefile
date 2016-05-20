@@ -1,7 +1,7 @@
-COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o base64u.o base128.o md5.o common.o
-CLIENTOBJS = iodine.o client.o util.o
+COMMONOBJS = tun.o dns.o read.o encoding.o login.o base32.o base64.o base64u.o base128.o md5.o window.o common.o util.o
+CLIENTOBJS = iodine.o client.o
 CLIENT = ../bin/iodine
-SERVEROBJS = iodined.o user.o fw_query.o
+SERVEROBJS = iodined.o user.o fw_query.o server.o
 SERVER = ../bin/iodined
 
 OS = `echo $(TARGETOS) | tr "a-z" "A-Z"`
@@ -10,9 +10,18 @@ HEAD_COMMIT = `git rev-parse --short HEAD`
 
 LIBPATH = -L.
 LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
-CFLAGS += -std=c99 -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
+CFLAGS += -std=c99 -c -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
 
-all: stateos $(CLIENT) $(SERVER)
+CFLAGS_RELEASE = -O3 -fno-strict-aliasing
+CFLAGS_DEBUG = -g -O0 -DDEBUG_BUILD
+
+all: CFLAGS += $(CFLAGS_RELEASE)
+all: executables
+
+debug: CFLAGS += $(CFLAGS_DEBUG)
+debug: executables
+
+executables: stateos $(CLIENT) $(SERVER)
 
 stateos:
 	@echo OS is $(OS), arch is $(ARCH)

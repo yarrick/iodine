@@ -1,5 +1,5 @@
 .\" groff -man -Tascii iodine.8
-.TH IODINE 8 "APR 2012" "User Manuals"
+.TH IODINE 8 "OCT 2015" "User Manuals"
 .SH NAME
 iodine, iodined \- tunnel IPv4 over DNS
 .SH SYNOPSIS
@@ -7,7 +7,9 @@ iodine, iodined \- tunnel IPv4 over DNS
 
 .B iodine [-h]
 
-.B iodine [-4] [-6] [-f] [-r] [-u
+.B iodine [-4] [-6] [-f] [-D] [-r] [-V
+.I sec
+.B [-u
 .I user
 .B ] [-P
 .I password
@@ -21,8 +23,22 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I rdomain
 .B ] [-m
 .I fragsize
+.B ] [-w
+.I downfrags
+.B ] [-W
+.I upfrags
+.B ] [-i
+.I sec
+.B ] [-j
+.I sec
+.B ] [-c
+.I 0|1
+.B ] [-C
+.I 0|1
+.B ] [-s
+.I ms
 .B ] [-M
-.I namelen
+.I maxlen
 .B ] [-z
 .I context
 .B ] [-F
@@ -36,16 +52,19 @@ iodine, iodined \- tunnel IPv4 over DNS
 .B ] [-I
 .I interval
 .B ]
+.I topdomain
 .B [
 .I nameserver
-.B ]
-.I topdomain
+.B [
+.I nameserver2 ...
+.B ] ]
+
 
 .B iodined [-v]
 
 .B iodined [-h]
 
-.B iodined [-4] [-6] [-c] [-s] [-f] [-D] [-u
+.B iodined [-4] [-6] [-f] [-D] [-c] [-s] [-u
 .I user
 .B ] [-t
 .I chrootdir
@@ -81,17 +100,13 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I /netmask
 .B ]
 .I topdomain
+
 .SH DESCRIPTION
 .B iodine
 lets you tunnel IPv4 data through a DNS
 server. This can be useful in situations where Internet access is firewalled,
-but DNS queries are allowed. It needs a TUN/TAP device to operate. The
-bandwidth is asymmetrical,
-with a measured maximum of 680 kbit/s upstream and 2.3 Mbit/s
-downstream in a wired LAN test network.
-Realistic sustained throughput on a Wifi network using a carrier-grade
-DNS cache has been measured at some 50 kbit/s upstream and over 200 kbit/s
-downstream.
+but DNS queries are allowed. It needs a TUN/TAP device to operate.
+
 .B iodine
 is the client application,
 .B iodined
@@ -100,6 +115,28 @@ is the server.
 Note: server and client are required to speak the exact same protocol. In most
 cases, this means running the same iodine version. Unfortunately, implementing
 backward and forward protocol compatibility is usually not feasible.
+
+.SH PERFORMANCE
+The bandwidth is asymmetrical,
+with a measured maximum of 13.7 Mbits/sec upstream and 53.4 Mbits/sec downstream
+with all data compression disabled in a wired LAN test network.
+In the same situation with compression enabled, the measured data throughput was
+approximately 46.1 Mbits/sec upstream and 37.4 Mbits/sec downstream.
+Compression is enabled by default, and can allow faster
+data transfer in both directions depending on the type of data being
+transferred.
+Realistic sustained throughput on a Wifi network using a carrier-grade
+DNS cache has been measured at some 600 Kbit/s upstream and over 2 Mbits/sec
+downstream once more with compression disabled, however that may be increased with
+compression enabled.
+
+All of the above test scenarios used lazy mode with upstream/downstream windowsizes of
+8 fragments (default) and fixed fragment, DNS and server timeouts. These parameters
+were manually adjusted to best suit the environment, and can be specified using the
+.B iodine
+options described under 
+.IR "Fine-tuning Options" .
+
 .SH OPTIONS
 .SS Common Options:
 .TP
@@ -226,18 +263,67 @@ In these situations use \-L0 to force running in legacy mode
 (implies \-I1).
 .TP
 .B -I interval
-Maximum interval between requests (pings) so that intermediate DNS
-servers will not time out. Default is 4 in lazy mode, which will work
-fine in most cases. When too many SERVFAIL errors occur, iodine
-will automatically reduce this to 1.
-To get absolute minimum DNS traffic,
-increase well above 4, but not so high that SERVFAIL errors start to occur.
+Target timeout for queries. This should be less than the smallest timeout for
+any intermediate DNS servers to reduce SERVFAILS. If this is specified, the
+server timeout will be adjusted automatically based on the round-trip time
+so that queries remain pending for as long as possible (only in lazy mode).
+This value will be used as the polling interval in immediate mode.
+
+When too many SERVFAIL errors occur, iodine will gradually reduce this until
+it reaches 0.5 seconds or below. If SERVFAILs continue to occur, lazy mode
+will be disabled and the server will respond to all queries immediately.
+
+To reduce DNS traffic, set this interval to something large and disable lazy
+mode, or set the upstream and downstream window sizes to 1.
 There are some DNS relays with very small timeouts,
 notably dnsadvantage.com (ultradns), that will give
-SERVFAIL errors even with \-I1; data will still get trough,
+SERVFAIL errors even with \-I1; data will still get through,
 and these errors can be ignored.
 Maximum useful value is 59, since iodined will close a client's
 connection after 60 seconds of inactivity.
+
+.SS Fine-tuning Options (Client-side):
+.TP
+.B -s milliseconds
+Minimum query send interval. Increase this gradually if you notice that the
+nameserver(s) tend to fail more often with a high data load (and frequent
+queries) or drop excess DNS queries. This will affect throughput so use with
+caution.
+.B -w windowsize
+Size of downstream fragment sending window, or the number of fragments that
+can be in transit downstream at any point in time. The client will attempt to
+maintain at least this number of queries pending on the server in lazy mode,
+even when idle, so that the server can always send this number of fragments
+immediately if new data arrives on the tun device.
+The default value is 8 fragments. Increase this for high latency connections
+to improve throughput. The maximum usable value is probably around 128, however note
+that although higher values are possible there may be fragment overlaps and you may
+experience problems.
+.TP
+.B -W windowsize
+Number of fragments that can be in transit upstream at any point in time. The
+client will send a maximum of this number of queries immediately to the server
+when new data is received in addition to any already pending queries (such as
+those used to maintain the downstream windowsize). The server will respond to
+any excess queries using the oldest pending query first. The same limits apply
+as the downstream window size.
+.TP
+.B -i timeout
+The maximum amount of time in seconds the server should hold on to a pending
+query so as to not cause any intermediate DNS relays to time out. This should
+be less than the target timeout (set with
+.BR -I )
+by at least the round-trip time for the connection.
+If not set, this will be calculated automatically based on the round-trip time
+and the target timeout.
+.TP
+.B -c 0|1
+Enable or disable downstream data compression. Enabled by default. This may
+increase overall downstream throughput, or it may not depending on the type
+of data being transferred.
+.B -C 0|1
+Enable/disable upstream data compression, also enabled by default.
+
 .SS Server Options:
 .TP
 .B -c
@@ -252,7 +338,9 @@ This should only be used if you have already configured the device that will be
 used.
 .TP
 .B -D
-Increase debug level. Level 1 prints info about each RX/TX packet.
+Increase debug level. Higher levels (>2) will spam the terminal with LOTS
+of debug messages. Recompile using `make debug` to enable extra debug output
+and debug timestamping. 
 Implies the
 .B -f
 option.
@@ -303,29 +391,30 @@ Make the server stop itself after max_idle_time seconds if no traffic have been 
 This should be combined with systemd or upstart on demand activation for being effective.
 .SS Client Arguments:
 .TP
-.B nameserver
-The nameserver to use to relay the dns traffic. This can be any relaying
+.B nameservers
+The nameservers to use to relay the dns traffic. This can be any relaying
 nameserver or the server running iodined if reachable. This field can be
 given as an IPv4/IPv6 address or as a hostname. This argument is optional,
 and if not specified a nameserver will be read from the
 .I /etc/resolv.conf
 file.
+Multiple nameservers can be specified, separated by spaces.
 .TP
 .B topdomain
 The dns traffic will be sent as queries for subdomains under
 \'topdomain'. This is normally a subdomain to a domain you own. Use a short
 domain name to get better throughput. If
 .B nameserver
-is the iodined server, then the topdomain can be chosen freely. This argument
+is the iodined server address, then the topdomain can be chosen freely. This argument
 must be the same on both the client and the server.
 .SS Server Arguments:
 .TP
 .B tunnel_ip[/netmask]
 This is the server's ip address on the tun interface. The client will be
 given the next ip number in the range. It is recommended to use the
-10.0.0.0 or 172.16.0.0 ranges. The default netmask is /27, can be overridden
-by specifying it here. Using a smaller network will limit the number of
-concurrent users.
+10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16 ranges. The default netmask is /27, 
+which can be overridden by specifying it here. Using a smaller network will
+limit the number of concurrent users.
 .TP
 .B topdomain
 The dns traffic is expected to arrive as queries for
@@ -333,10 +422,12 @@ subdomains under 'topdomain'. This is normally a subdomain to a domain you
 own. Use a short domain name to get better throughput. This argument must be
 the same on both the client and the server. Queries for domains other
 than 'topdomain' will be forwarded when the \-b option is given, otherwise
-they will be dropped.
+they will be ignored.
+
 .SH EXAMPLES
 See the README file for both a quick test scenario, and a detailed description
 of real-world deployment.
+
 .SH SECURITY
 Login is a relatively secure challenge-response MD5 hash, with the
 password never passing the wire.
@@ -365,11 +456,14 @@ is set, iodined will use the value it is set to as password instead of asking
 for one. The
 .B -P
 option still has precedence.
+
 .SH SEE ALSO
-The README file in the source distribution contains some more elaborate
+The README.md file in the source distribution contains some more elaborate
 information.
+
 .SH BUGS
 File bugs at http://dev.kryo.se/iodine/
+
 .SH AUTHORS
-Erik Ekman <yarrick@kryo.se> and Bjorn Andersson <flex@kryo.se>. Major
-contributions by Anne Bezemer.
+Erik Ekman <yarrick@kryo.se>, Bjorn Andersson <flex@kryo.se> and Frekky.
+Major contributions by Anne Bezemer.
