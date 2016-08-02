@@ -1532,7 +1532,7 @@ handle_dns_login(int dns_fd, struct query *q, uint8_t *domain, int domain_len, i
 tcp_forward_error:
 	DEBUG(1, "Failed to connect TCP forward for user %d: %s", userid, errormsg);
 	out[0] = 'E';
-	strncat(out + 1, errormsg, sizeof(out) - 1);
+	strncpy(out + 1, errormsg, sizeof(out) - 1);
 	read = strlen(out);
 	write_dns(dns_fd, q, out, read + 1, u->downenc);
 }
