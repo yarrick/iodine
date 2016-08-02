@@ -1854,7 +1854,7 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 {
 	char cmd, userchar;
 	int userid = -1;
-	uint8_t in[QUERY_NAME_SIZE];
+	uint8_t in[QUERY_NAME_SIZE + 1];
 
 	/* Everything here needs at least 5 chars in the name:
 	 * cmd, userid and more data or at least 3 bytes CMC */
