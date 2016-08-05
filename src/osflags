@@ -19,7 +19,7 @@ link)
 		Linux)
 			FLAGS="";
 			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -lselinux";
-			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS $(pkg-config --libs libsystemd-daemon)";
+			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS $(pkg-config --libs libsystemd)";
 			echo $FLAGS;
 		;;
 	esac
