@@ -862,7 +862,7 @@ handshake_waitdns(char *buf, size_t buflen, char cmd, int timeout)
 		    (q.name[0] == 'Y' || q.name[0] == 'y' ||
 		     q.name[0] == 'V' || q.name[0] == 'v')) {
 			fprintf(stderr, "Got empty reply. This nameserver may not be resolving recursively, use another.\n");
-			fprintf(stderr, "Try \"iodine [options] ns.%s %s\" first, it might just work.\n",
+			fprintf(stderr, "Try \"iodine [options] %s ns.%s\" first, it might just work.\n",
 				this.topdomain, this.topdomain);
 			return -2;
 		}
@@ -1418,17 +1418,19 @@ send_upenctest(char *s)
 static void
 send_downenctest(char downenc, int variant)
 {
-	uint8_t buf[512] = "y_____.", hdr[5];
+	char buf[512] = "yTaCMC.";
+	size_t buf_space = 4;
 
-	buf[1] = downenc;
+	buf[1] = tolower(downenc);
+	buf[2] = b32_5to8(variant);
 
-	hdr[0] = variant;
-	*(uint32_t *) (hdr + 1) = rand();
+	/* add 3 bytes base32 CMC (random) */
+	uint32_t cmc = rand();
 
-	build_hostname(buf, sizeof(buf), hdr, sizeof(hdr),
-				   this.topdomain, b32, this.hostname_maxlen, 2);
-
-	send_query(buf);
+	b32->encode((uint8_t *)buf + 3, &buf_space, (uint8_t *) &cmc, 2);
+	strncat(buf, ".", 512 - strlen(buf));
+	strncat(buf, this.topdomain, 512 - strlen(buf));
+	send_query((uint8_t *)buf);
 }
 
 static void

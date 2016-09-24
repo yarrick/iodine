@@ -100,9 +100,8 @@ Downstream codec check:
 Client sends:
 	First byte y or Y
 	1 char, meaning downstream codec to use
-	rest encoded in base32:
-	1 byte check variant
-	2 bytes CMC
+	5 bits coded as Base32 char, meaning check variant
+	CMC as 3 Base32 chars
 	Possibly extra data, depending on check variant
 Server sends:
 	Data encoded with requested downstream codec; data content depending

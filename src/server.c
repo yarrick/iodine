@@ -1297,23 +1297,20 @@ handle_dns_version(int dns_fd, struct query *q, uint8_t *domain, int domain_len)
 void
 handle_dns_downstream_codec_check(int dns_fd, struct query *q, uint8_t *domain, int domain_len)
 {
-	int codec;
 	char *datap;
-	int datalen;
-	uint8_t unpacked[10];
+	int datalen, i, codec;
 
-	unpack_data(unpacked, sizeof(unpacked), (uint8_t *)domain + 2, MIN(domain_len - 2, 4), b32);
+	i = b32_8to5(domain[2]); /* check variant: second char in b32 */
 
-	switch (unpacked[0]) { /* check variant */
-	case 1:
+	if (i == 1) {
 		datap = DOWNCODECCHECK1;
 		datalen = DOWNCODECCHECK1_LEN;
-		break;
-	default:
+	} else {
 		write_dns(dns_fd, q, "BADLEN", 6, 'T');
 		return;
 	}
 
+	/* codec to test: first char raw */
 	codec = toupper(domain[1]);
 	switch (codec) {
 		case 'T':
@@ -1868,19 +1865,18 @@ handle_null_request(int dns_fd, struct query *q, int domain_len)
 	cmd = toupper(in[0]);
 	DEBUG(3, "NULL request length %d/%" L "u, command '%c'", domain_len, sizeof(in), cmd);
 
-	/* Commands that do not care about userid */
+	/* Commands that do not care about userid: also these need to be backwards
+	 * compatible with older versions of iodine (at least down to 00000502) */
 	if (cmd == 'V') { /* Version check - before userid is assigned*/
 		handle_dns_version(dns_fd, q, in, domain_len);
 		return;
 	}
 	else if (cmd == 'Z') { /* Upstream codec check - user independent */
-		/* Check for case conservation and chars not allowed according to RFC */
-
 		/* Reply with received hostname as data (encoded in base32) */
 		write_dns(dns_fd, q, (char *)in, domain_len, 'T');
 		return;
 	}
-	else if (cmd == 'Y') { /* Downstream codec check - user independent*/
+	else if (cmd == 'Y') { /* Downstream codec check - user independent */
 		handle_dns_downstream_codec_check(dns_fd, q, in, domain_len);
 		return;
 	}
