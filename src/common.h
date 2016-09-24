@@ -40,9 +40,36 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include <err.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 #endif
 
 #define DNS_PORT 53
+
+#if _WIN32 || _WIN64
+#if _WIN64
+#define BITS_64
+#else
+#define BITS_32
+#endif
+#endif
+
+#if __GNUC__
+#if __x86_64__ || __ppc64__
+#define BITS_64 1
+#else
+#define BITS_32 1
+#endif
+#endif
+
+/* Determine appropriate format specifier for long int on 32/64 bit systems */
+#if BITS_64
+#define FMT_LONG "l"
+#else
+#define FMT_LONG ""
+#endif
+
+/* For convenience and shortness */
+#define L FMT_LONG
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -67,33 +94,57 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 # define DONT_FRAG_VALUE 1
 #endif
 
+#ifndef GITREVISION
+#define GITREVISION "GIT"
+#endif
+
 #define T_PRIVATE 65399
 /* Undefined RR type; "private use" range, see http://www.bind9.net/dns-parameters */
 #define T_UNSET 65432
 /* Unused RR type, never actually sent */
 
-struct packet
-{
-	int len;		/* Total packet length */
-	int sentlen;		/* Length of chunk currently transmitted */
-	int offset;		/* Current offset */
-	char data[64*1024];	/* The data */
-	char seqno;		/* The packet sequence number */
-	char fragment;		/* Fragment index */
-};
+#define DOWNSTREAM_HDR 3
+#define DOWNSTREAM_PING_HDR 7
+#define UPSTREAM_HDR 6
+#define UPSTREAM_PING 11
+
+/* handy debug printing macro */
+#ifdef DEBUG_BUILD
+#define TIMEPRINT(...) \
+		struct timeval currenttime;\
+		gettimeofday(&currenttime, NULL);\
+		fprintf(stderr, "%03ld.%03ld ", (long) currenttime.tv_sec, (long) currenttime.tv_usec / 1000);\
+		fprintf(stderr, __VA_ARGS__);
+
+#define DEBUG(level, ...) \
+		if (INSTANCE.debug >= level) {\
+			TIMEPRINT("[D%d %s:%d] ", level, __FILE__, __LINE__); \
+			fprintf(stderr, __VA_ARGS__);\
+			fprintf(stderr, "\n");\
+		}
+#else
+#define TIMEPRINT(...) \
+		fprintf(stderr, __VA_ARGS__);
+
+#define DEBUG(level, ...) \
+		if (INSTANCE.debug >= level) {\
+			fprintf(stderr, "[D%d] ", level); \
+			fprintf(stderr, __VA_ARGS__);\
+			fprintf(stderr, "\n");\
+		}
+#endif
+
 
 struct query {
 	char name[QUERY_NAME_SIZE];
 	unsigned short type;
 	unsigned short rcode;
-	unsigned short id;
+	int id;	/* id < 0: unusued */
 	struct sockaddr_storage destination;
 	socklen_t dest_len;
 	struct sockaddr_storage from;
 	socklen_t fromlen;
-	unsigned short id2;
-	struct sockaddr_storage from2;
-	socklen_t fromlen2;
+	struct timeval time_recv;
 };
 
 enum connection {
@@ -108,7 +159,10 @@ int get_addr(char *, int, int, int, struct sockaddr_storage *);
 int open_dns(struct sockaddr_storage *, size_t);
 int open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only);
 int open_dns_from_host(char *host, int port, int addr_family, int flags);
-void close_dns(int);
+void close_socket(int);
+
+int open_tcp_nonblocking(struct sockaddr_storage *addr, char **error);
+int check_tcp_error(int fd, char **error);
 
 void do_chroot(char *);
 void do_setcon(char *);
@@ -118,6 +172,8 @@ void do_pidfile(char *);
 void read_password(char*, size_t);
 
 int check_topdomain(char *, char **);
+
+extern double difftime(time_t, time_t);
 
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID
@@ -129,8 +185,6 @@ void warn(const char *fmt, ...);
 void errx(int eval, const char *fmt, ...);
 void warnx(const char *fmt, ...);
 #endif
-
-int recent_seqno(int , int);
 
 #ifndef WINDOWS32
 void fd_set_close_on_exec(int fd);

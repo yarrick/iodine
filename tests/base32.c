@@ -49,7 +49,7 @@ START_TEST(test_base32_encode)
 	b32 = get_base32_encoder();
 
 	len = sizeof(buf);
-	val = b32->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
+	val = b32->encode((uint8_t *)buf, &len, (uint8_t *)testpairs[_i].a, strlen(testpairs[_i].a));
 
 	fail_unless(val == strlen(testpairs[_i].b));
 	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
@@ -67,7 +67,7 @@ START_TEST(test_base32_decode)
 	b32 = get_base32_encoder();
 
 	len = sizeof(buf);
-	val = b32->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
+	val = b32->decode((uint8_t *)buf, &len, (uint8_t *)testpairs[_i].b, strlen(testpairs[_i].b));
 
 	fail_unless(val == strlen(testpairs[_i].a));
 	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
@@ -110,7 +110,7 @@ START_TEST(test_base32_blksize)
 	}
 	rawbuf[i] = 0;
 
-	val = b32->encode(encbuf, &enclen, rawbuf, rawlen);
+	val = b32->encode((uint8_t *)encbuf, &enclen, (uint8_t *)rawbuf, rawlen);
 
 	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
 	fail_unless(enclen == 5, "encoded %d bytes, not 5", enclen);
@@ -119,7 +119,7 @@ START_TEST(test_base32_blksize)
 	memset(rawbuf, 0, rawlen + 16);
 
 	enclen = val;
-	val = b32->decode(rawbuf, &rawlen, encbuf, enclen);
+	val = b32->decode((uint8_t *)rawbuf, &rawlen, (uint8_t *)encbuf, enclen);
 
 	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
 	fail_unless(val == 5, "val was not 5 but %d", val);

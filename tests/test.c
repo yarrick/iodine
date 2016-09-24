@@ -23,6 +23,8 @@
 
 #include "test.h"
 
+int check_ip = 0;
+
 int
 main()
 {
@@ -58,6 +60,9 @@ main()
 	suite_add_tcase(iodine, test);
 
  	test = test_fw_query_create_tests();
+	suite_add_tcase(iodine, test);
+
+	test = test_window_create_tests();
 	suite_add_tcase(iodine, test);
 
 	runner = srunner_create(iodine);

@@ -86,7 +86,7 @@ START_TEST(test_encode_query)
 	enc = get_base32_encoder();
 
 	*d++ = 'A';
-	enc->encode(d, &enclen, innerData, strlen(innerData));
+	enc->encode((uint8_t *)d, &enclen, (uint8_t *)innerData, strlen(innerData));
 	d = resolv + strlen(resolv);
 	if (*d != '.') {
 		*d++ = '.';
@@ -123,7 +123,7 @@ START_TEST(test_decode_query)
 	dns_decode(buf, sizeof(buf), &q, QR_QUERY, query_packet, len);
 	domain = strstr(q.name, topdomain);
 	len = sizeof(buf);
-	unpack_data(buf, len, &(q.name[1]), (int) (domain - q.name) - 1, enc);
+	unpack_data((uint8_t *)buf, len, (uint8_t *)(q.name + 1), (int) (domain - q.name) - 1, enc);
 
 	fail_unless(strncmp(buf, innerData, strlen(innerData)) == 0, "Did not extract expected host: '%s'", buf);
 	fail_unless(strlen(buf) == strlen(innerData), "Bad host length: %d, expected %d: '%s'", strlen(buf), strlen(innerData), buf);

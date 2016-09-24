@@ -20,8 +20,8 @@
 
 int open_tun(const char *);
 void close_tun(int);
-int write_tun(int, char *, size_t);
-ssize_t read_tun(int, char *, size_t);
+int write_tun(int, uint8_t *, size_t);
+ssize_t read_tun(int, uint8_t *, size_t);
 int tun_setip(const char *, const char *, int);
 int tun_setmtu(const unsigned);
 

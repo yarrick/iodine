@@ -228,9 +228,15 @@ open_dns_from_host(char *host, int port, int addr_family, int flags)
 }
 
 void
-close_dns(int fd)
+close_socket(int fd)
 {
+	if (fd <= 0)
+		return;
+#ifdef WINDOWS32
+	closesocket(fd);
+#else
 	close(fd);
+#endif
 }
 
 void
@@ -282,7 +288,9 @@ do_detach()
 {
 #ifndef WINDOWS32
 	fprintf(stderr, "Detaching from terminal...\n");
-	daemon(0, 0);
+	if (daemon(0, 0) != 0) {
+		err(1, "Failed to detach from terminal. Try running in foreground.");
+	}
 	umask(0);
 	alarm(0);
 #else
@@ -310,7 +318,8 @@ read_password(char *buf, size_t len)
 	fprintf(stderr, "Enter password: ");
 	fflush(stderr);
 #ifndef WINDOWS32
-	fscanf(stdin, "%79[^\n]", pwd);
+	if (!fscanf(stdin, "%79[^\n]", pwd))
+		err(1, "EOF while reading password!");
 #else
 	for (i = 0; i < sizeof(pwd); i++) {
 		pwd[i] = getch();
@@ -394,6 +403,77 @@ check_topdomain(char *str, char **errormsg)
 	return 0;
 }
 
+int
+socket_set_blocking(int fd, int blocking)
+{
+	/* Set non-blocking socket mode */
+#ifdef WINDOWS32
+	if (ioctlsocket(fd, FIONBIO, &blocking) != 0) {
+		return WSAGetLastError();
+	}
+#else
+	int flags;
+	if ((flags = fcntl(fd, F_GETFL, 0)) < 0) {
+	    return flags;
+	}
+
+	if (fcntl(fd, F_SETFL, !blocking ? (flags | O_NONBLOCK) : (flags & (~O_NONBLOCK))) == -1)
+		return errno;
+
+#endif
+	return 0;
+}
+
+int
+open_tcp_nonblocking(struct sockaddr_storage *addr, char **errormsg)
+/* Open TCP connection to given address without blocking */
+{
+	int fd, ret;
+	if ((fd = socket(addr->ss_family, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+		if (errormsg)
+			*errormsg = strerror(errno);
+		return -1;
+	}
+
+	if ((ret = socket_set_blocking(fd, 0)) != 0) {
+		if (errormsg)
+			*errormsg = strerror(ret);
+		return -1;
+	}
+
+	if ((ret = connect(fd, (struct sockaddr *)addr, sizeof(struct sockaddr_storage)))
+		== -1 && errno != EINPROGRESS) {
+		if (errormsg)
+			*errormsg = strerror(errno);
+		return -1;
+	}
+
+	if (errormsg)
+		*errormsg = strerror(errno);
+
+	return fd;
+}
+
+int
+check_tcp_error(int fd, char **error)
+/* checks connected status of given socket.
+ * returns error code. 0 if connected or EINPROGRESS if connecting */
+{
+	int errornum = 0;
+	socklen_t len = sizeof(int);
+
+	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &errornum, &len) != 0) {
+		if (error)
+			*error = "getsockopt failed.";
+		return -1;
+	}
+
+	if (error)
+		*error = strerror(errornum);
+
+	return errornum;
+}
+
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID
 int
@@ -454,22 +534,6 @@ errx(int eval, const char *fmt, ...)
 	exit(eval);
 }
 #endif
-
-
-int recent_seqno(int ourseqno, int gotseqno)
-/* Return 1 if we've seen gotseqno recently (current or up to 3 back).
-   Return 0 if gotseqno is new (or very old).
-*/
-{
-	int i;
-	for (i = 0; i < 4; i++, ourseqno--) {
-		if (ourseqno < 0)
-			ourseqno = 7;
-		if (gotseqno == ourseqno)
-			return 1;
-	}
-	return 0;
-}
 
 #ifndef WINDOWS32
 /* Set FD_CLOEXEC flag on file descriptor.
