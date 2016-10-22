@@ -77,6 +77,7 @@ init_users(in_addr_t my_ip, int netbits)
 		users[i].disabled = 0;
 		users[i].authenticated = 0;
 		users[i].authenticated_raw = 0;
+		users[i].options_locked = 0;
 		users[i].active = 0;
  		/* Rest is reset on login ('V' packet) */
 	}
@@ -156,6 +157,7 @@ find_available_user()
 			users[i].active = 1;
 			users[i].authenticated = 0;
 			users[i].authenticated_raw = 0;
+			users[i].options_locked = 0;
 			users[i].last_pkt = time(NULL);
 			users[i].fragsize = 4096;
 			users[i].conn = CONN_DNS_NULL;
