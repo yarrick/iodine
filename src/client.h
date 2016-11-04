@@ -38,7 +38,7 @@ struct client_instance {
 	char **nameserv_hosts;
 	size_t nameserv_hosts_len;
 	struct sockaddr_storage *nameserv_addrs;
-	size_t nameserv_addrs_len;
+	size_t nameserv_addrs_count;
 	int current_nameserver;
 	struct sockaddr_storage raw_serv;
 	int raw_serv_len;

@@ -645,11 +645,11 @@ main(int argc, char **argv)
 					nameserv_host, gai_strerror(nameservaddr_len));
 		}
 		memcpy(&this.nameserv_addrs[n], &nameservaddr, sizeof(struct sockaddr_storage));
-		this.nameserv_addrs_len ++;
+		this.nameserv_addrs_count ++;
 		nameserv_host = NULL;
 	}
 
-	if (this.nameserv_addrs_len <= 0 || !this.nameserv_hosts[0]) {
+	if (this.nameserv_addrs_count <= 0 || !this.nameserv_hosts[0]) {
 		warnx("No nameservers found - not connected to any network?");
 		usage();
 	}
@@ -732,9 +732,9 @@ main(int argc, char **argv)
 	signal(SIGTERM, sighandler);
 
 	fprintf(stderr, "Sending DNS queries for %s to ", this.topdomain);
-	for (int a = 0; a < this.nameserv_addrs_len; a++)
+	for (int a = 0; a < this.nameserv_addrs_count; a++)
 		fprintf(stderr, "%s%s", format_addr(&this.nameserv_addrs[a], sizeof(struct sockaddr_storage)),
-				(a != this.nameserv_addrs_len - 1) ?  ", " : "");
+				(a != this.nameserv_addrs_count - 1) ?  ", " : "");
 	fprintf(stderr, "\n");
 
 	if (this.remote_forward_addr.ss_family != AF_UNSPEC)

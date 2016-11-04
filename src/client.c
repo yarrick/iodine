@@ -135,7 +135,7 @@ void
 client_rotate_nameserver()
 {
 	this.current_nameserver ++;
-	if (this.current_nameserver >= this.nameserv_addrs_len)
+	if (this.current_nameserver >= this.nameserv_addrs_count)
 		this.current_nameserver = 0;
 }
 
