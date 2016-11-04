@@ -26,6 +26,11 @@ extern int stats;
 #define PENDING_QUERIES_LENGTH (MAX(this.windowsize_up, this.windowsize_down) * 4)
 #define INSTANCE this
 
+struct nameserv {
+	struct sockaddr_storage addr;
+	int len;
+};
+
 struct client_instance {
 	int max_downstream_frag_size;
 	int autodetect_frag_size;
@@ -37,7 +42,7 @@ struct client_instance {
 	/* DNS nameserver info */
 	char **nameserv_hosts;
 	size_t nameserv_hosts_len;
-	struct sockaddr_storage *nameserv_addrs;
+	struct nameserv *nameserv_addrs;
 	size_t nameserv_addrs_count;
 	int current_nameserver;
 	struct sockaddr_storage raw_serv;

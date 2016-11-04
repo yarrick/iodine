@@ -622,7 +622,7 @@ main(int argc, char **argv)
 
 	// Preallocate memory with expected number of hosts
 	this.nameserv_hosts = malloc(sizeof(char *) * this.nameserv_hosts_len);
-	this.nameserv_addrs = malloc(sizeof(struct sockaddr_storage) * this.nameserv_hosts_len);
+	this.nameserv_addrs = malloc(sizeof(struct nameserv) * this.nameserv_hosts_len);
 
 	if (argc == 0) {
 		usage();
@@ -644,7 +644,8 @@ main(int argc, char **argv)
 			errx(1, "Cannot lookup nameserver '%s': %s ",
 					nameserv_host, gai_strerror(nameservaddr_len));
 		}
-		memcpy(&this.nameserv_addrs[n], &nameservaddr, sizeof(struct sockaddr_storage));
+		this.nameserv_addrs[n].len = nameservaddr_len;
+		memcpy(&this.nameserv_addrs[n].addr, &nameservaddr, sizeof(struct sockaddr_storage));
 		this.nameserv_addrs_count ++;
 		nameserv_host = NULL;
 	}
@@ -733,7 +734,7 @@ main(int argc, char **argv)
 
 	fprintf(stderr, "Sending DNS queries for %s to ", this.topdomain);
 	for (int a = 0; a < this.nameserv_addrs_count; a++)
-		fprintf(stderr, "%s%s", format_addr(&this.nameserv_addrs[a], sizeof(struct sockaddr_storage)),
+		fprintf(stderr, "%s%s", format_addr(&this.nameserv_addrs[a].addr, this.nameserv_addrs[a].len),
 				(a != this.nameserv_addrs_count - 1) ?  ", " : "");
 	fprintf(stderr, "\n");
 

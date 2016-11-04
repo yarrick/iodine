@@ -352,8 +352,8 @@ send_query(uint8_t *hostname)
 
 	DEBUG(4, "  Sendquery: id %5d name[0] '%c'", q.id, hostname[0]);
 
-	sendto(this.dns_fd, packet, len, 0, (struct sockaddr*) &this.nameserv_addrs[this.current_nameserver],
-			sizeof(struct sockaddr_storage));
+	sendto(this.dns_fd, packet, len, 0, (struct sockaddr*) &this.nameserv_addrs[this.current_nameserver].addr,
+			this.nameserv_addrs[this.current_nameserver].len);
 
 	client_rotate_nameserver();
 
