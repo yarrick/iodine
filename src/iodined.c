@@ -1844,10 +1844,10 @@ tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			if (FD_ISSET(tun_fd, &fds)) {
 				tunnel_tun(tun_fd, dns_fds);
 			}
-			if (FD_ISSET(dns_fds->v4fd, &fds)) {
+			if (dns_fds->v4fd >= 0 && FD_ISSET(dns_fds->v4fd, &fds)) {
 				tunnel_dns(tun_fd, dns_fds->v4fd, dns_fds, bind_fd);
 			}
-			if (FD_ISSET(dns_fds->v6fd, &fds)) {
+			if (dns_fds->v6fd >= 0 && FD_ISSET(dns_fds->v6fd, &fds)) {
 				tunnel_dns(tun_fd, dns_fds->v6fd, dns_fds, bind_fd);
 			}
 			if (FD_ISSET(bind_fd, &fds)) {
@@ -2592,16 +2592,19 @@ main(int argc, char **argv)
 		fprintf(stderr, "Add more -D switches to set higher debug level.\n");
 		foreground = 1;
 	}
-
-	dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
-	if (dns4addr_len < 0) {
-		warnx("Bad IPv4 address to listen on.");
-		usage();
+	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET) {
+	        dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
+		if (dns4addr_len < 0) {
+		  warnx("Bad IPv4 address to listen on.");
+		  usage();
+		}
 	}
-	dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
-	if (dns6addr_len < 0) {
-		warnx("Bad IPv6 address to listen on.");
-		usage();
+	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
+	        dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
+		if (dns6addr_len < 0) {
+		  warnx("Bad IPv6 address to listen on.");
+		  usage();
+		}
 	}
 
 	if(bind_enable) {
