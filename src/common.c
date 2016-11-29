@@ -405,12 +405,9 @@ inet_aton(const char *cp, struct in_addr *inp)
 #endif
 
 void
-warn(const char *fmt, ...)
+vwarn(const char *fmt, va_list list)
 {
-	va_list list;
-
-	va_start(list, fmt);
-	if (fmt) fprintf(stderr, fmt, list);
+	if (fmt) vfprintf(stderr, fmt, list);
 #ifndef ANDROID
 	if (errno == 0) {
 		fprintf(stderr, ": WSA error %d\n", WSAGetLastError());
@@ -418,7 +415,23 @@ warn(const char *fmt, ...)
 		fprintf(stderr, ": %s\n", strerror(errno));
 	}
 #endif
+}
+
+void
+warn(const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	vwarn(fmt, list);
 	va_end(list);
+}
+
+void
+vwarnx(const char *fmt, va_list list)
+{
+	if (fmt) vfprintf(stderr, fmt, list);
+	fprintf(stderr, "\n");
 }
 
 void
@@ -427,8 +440,7 @@ warnx(const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	if (fmt) fprintf(stderr, fmt, list);
-	fprintf(stderr, "\n");
+	vwarnx(fmt, list);
 	va_end(list);
 }
 
@@ -438,7 +450,7 @@ err(int eval, const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	warn(fmt, list);
+	vwarn(fmt, list);
 	va_end(list);
 	exit(eval);
 }
@@ -449,7 +461,7 @@ errx(int eval, const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	warnx(fmt, list);
+	vwarnx(fmt, list);
 	va_end(list);
 	exit(eval);
 }
