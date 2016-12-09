@@ -413,7 +413,7 @@ open_tun(const char *tun_device)
 	char tun_name[50];
 
 #ifdef DARWIN
-	if (!strncmp(tun_device, "utun", 4)) {
+	if (tun_device != NULL && !strncmp(tun_device, "utun", 4)) {
 		tun_fd = open_utun(tun_device);
 		if (tun_fd >= 0) {
 			return tun_fd;
