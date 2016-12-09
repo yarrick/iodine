@@ -119,6 +119,12 @@ qmem_init(int userid)
 	}
 }
 
+static size_t
+qmem_num_pending(int userid)
+{
+	return users[userid].qmem.num_pending;
+}
+
 static int
 qmem_is_cached(int dns_fd, int userid, struct query *q)
 /* Check if an answer for a particular query is cached in qmem
@@ -172,10 +178,11 @@ qmem_append(int userid, struct query *q)
 	buf = &users[userid].qmem;
 
 	if (buf->num_pending >= QMEM_LEN) {
-		/* this means we have QMEM_LEN *pending* queries; overwrite oldest one
-		 * to prevent buildup of ancient queries */
+		/* this means we have QMEM_LEN *pending* queries; respond to oldest
+		 * one to make space for new query */
 		QMEM_DEBUG(2, userid, "Full of pending queries! Replacing old query %d with new %d.",
 				   buf->queries[buf->start].q.id, q->id);
+		send_data_or_ping(userid, &buf->queries[buf->start], 0, 0, NULL);
 	}
 
 	if (buf->length < QMEM_LEN) {
@@ -187,7 +194,7 @@ qmem_append(int userid, struct query *q)
 
 	QMEM_DEBUG(5, userid, "add query ID %d, timeout %" L "u ms", q->id, timeval_to_ms(&users[userid].dns_timeout));
 
-	/* Copy query into buffer */
+	/* Copy query into end of buffer */
 	memcpy(&buf->queries[buf->end].q, q, sizeof(struct query));
 #ifdef USE_DNSCACHE
 	buf->queries[buf->end].a.len = 0;
@@ -432,7 +439,7 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tc
 /* Sends current fragment to user, or a ping if no data available.
    ping: 1=force send ping (even if data available), 0=only send if no data.
    immediate: 1=not from qmem (ie. fresh query), 0=query is from qmem
-   disconnect: whether to tell user that TCP socket is closed (NULL if OK or pointer to error message) */
+   tcperror: whether to tell user that TCP socket is closed (NULL if OK or pointer to error message) */
 {
 	uint8_t pkt[MAX_FRAGSIZE + DOWNSTREAM_PING_HDR];
 	size_t datalen, headerlen;
@@ -462,7 +469,7 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tc
 
 	/* Build downstream data/ping header (see doc/proto_xxxxxxxx.txt) for details */
 	if (!f) {
-		/* No data, may as well send data/ping header (with extra info) */
+		/* No data, send data/ping header (with extra info) */
 		ping = 1;
 		datalen = 0;
 		pkt[0] = 0; /* Pings don't need seq IDs unless they have data */
@@ -477,10 +484,12 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tc
 		headerlen = DOWNSTREAM_HDR;
 	}
 
-	/* If this is being responded to immediately (ie. not from qmem) */
+	/* If this is being responded to immediately (ie. not from qmem)
+	 * This flag is used by client to calculate stats */
 	pkt[2] |= (immediate & 1) << 5;
-	if (tcperror)
+	if (tcperror) {
 		pkt[2] |= (1 << 6);
+	}
 
 	if (ping) {
 		/* set ping flag and build extra header */
@@ -494,11 +503,12 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tc
 	if (datalen + headerlen > sizeof(pkt)) {
 		/* Should never happen, or at least user should be warned about
 		 * fragsize > MAX_FRAGLEN earlier on */
-		warnx("send_frag_or_dataless: fragment too large to send! (%" L "u)", datalen);
+		warnx("send_data_or_ping: fragment too large to send! (%" L "u)", datalen);
 		return;
 	}
-	if (f)
+	if (f) {
 		memcpy(pkt + headerlen, f->data, datalen);
+	}
 
 	write_dns(get_dns_fd(&server.dns_fds, &q->from), q, (char *)pkt,
 			  datalen + headerlen, users[userid].downenc);

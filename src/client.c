@@ -1303,9 +1303,10 @@ client_tunnel()
 				if (this.conn == CONN_DNS_NULL) {
 					fprintf(stderr, " Frags resent: %4u,   OOS: %4u          down frag: %4" L "d ms\n",
 							this.outbuf->resends, this.inbuf->oos, this.downstream_timeout_ms);
-					fprintf(stderr, " TX fragments: %8" L "u" ",   RX: %8" L "u" ",   pings: %8" L "u" "\n\n",
+					fprintf(stderr, " TX fragments: %8" L "u" ",   RX: %8" L "u" ",   pings: %8" L "u" "\n",
 							this.num_frags_sent, this.num_frags_recv, this.num_pings);
 				}
+				fprintf(stderr, " Pending frags: %4" L "u\n", this.outbuf->numitems);
 				/* update since-last-report this.stats */
 				sent_since_report = this.num_sent;
 				recv_since_report = this.num_recv;
@@ -1402,7 +1403,7 @@ send_upenctest(char *s)
 /* NOTE: String may be at most 63-4=59 chars to fit in 1 dns chunk. */
 {
 	char buf[512] = "zCMC";
-	size_t buf_space = 10;
+	size_t buf_space = 3;
 	uint32_t cmc = rand();
 
 	b32->encode((uint8_t *)buf + 1, &buf_space, (uint8_t *) &cmc, 4);
