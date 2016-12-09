@@ -281,6 +281,7 @@ query_sent_now(int id)
 
 static void
 got_response(int id, int immediate, int fail)
+/* immediate: if query was replied to immediately (see below) */
 {
 	struct timeval now, rtt;
 	time_t rtt_ms;
@@ -1122,11 +1123,11 @@ tunnel_dns()
 
 	this.num_recv++;
 
-	/* Mark query as received */
-	got_response(q.id, immediate, 0);
-
 	/* Decode the downstream data header and fragment-ify ready for processing */
 	error = parse_data(cbuf, read, &f, &immediate, &ping);
+
+	/* Mark query as received */
+	got_response(q.id, immediate, 0);
 
 	if ((this.debug >= 3 && ping) || (this.debug >= 2 && !ping))
 		fprintf(stderr, " RX %s; frag ID %3u, ACK %3d, compression %d, datalen %" L "u, s%d e%d\n",
