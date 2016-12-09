@@ -1189,10 +1189,13 @@ tunnel_dns()
 		}
 
 		if (datalen) {
-			if (this.use_remote_forward)
-				write(STDOUT_FILENO, data, datalen);
-			else
+			if (this.use_remote_forward) {
+				if (write(STDOUT_FILENO, data, datalen) != datalen) {
+					warn("write_stdout != datalen");
+				}
+			} else {
 				write_tun(this.tun_fd, data, datalen);
+			}
 		}
 	}
 
