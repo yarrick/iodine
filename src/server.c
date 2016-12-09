@@ -748,6 +748,10 @@ tunnel_dns(int dns_fd)
 		case T_MX:
 		case T_SRV:
 		case T_TXT:
+		case T_PTR:
+		case T_AAAA:
+		case T_A6:
+		case T_DNAME:
 			/* encoding is "transparent" here */
 			handle_null_request(dns_fd, &q, domain_len);
 			break;
@@ -1152,7 +1156,8 @@ write_dns(int fd, struct query *q, char *data, size_t datalen, char downenc)
 	char buf[64*1024];
 	int len = 0;
 
-	if (q->type == T_CNAME || q->type == T_A) {
+	if (q->type == T_CNAME || q->type == T_A ||
+		q->type == T_PTR || q->type == T_AAAA || q->type == T_A6 || q->type == T_DNAME) {
 		char cnamebuf[1024];		/* max 255 */
 
 		write_dns_nameenc((uint8_t *)cnamebuf, sizeof(cnamebuf), (uint8_t *)data, datalen, downenc);
@@ -1329,7 +1334,9 @@ handle_dns_downstream_codec_check(int dns_fd, struct query *q, uint8_t *domain, 
 		case 'V':
 			if (q->type == T_TXT ||
 				q->type == T_SRV || q->type == T_MX ||
-				q->type == T_CNAME || q->type == T_A) {
+				q->type == T_CNAME || q->type == T_A ||
+				q->type == T_PTR || q->type == T_AAAA ||
+				q->type == T_A6 || q->type == T_DNAME) {
 				write_dns(dns_fd, q, datap, datalen, codec);
 				return;
 			}

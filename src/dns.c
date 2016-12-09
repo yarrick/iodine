@@ -90,7 +90,9 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 
 		/* Answer section */
 
-		if (q->type == T_CNAME || q->type == T_A) {
+		if (q->type == T_CNAME || q->type == T_A ||
+			q->type == T_PTR || q->type == T_AAAA ||
+			q->type == T_A6 || q->type == T_DNAME) {
 			/* data is expected to be like "Hblabla.host.name.com\0" */
 
 			char *startp;
@@ -98,7 +100,7 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 
 			CHECKLEN(10);
 			putshort(&p, name);
-			if (q->type == T_A)
+			if (q->type == T_A || q->type == T_AAAA)
 				/* answer CNAME to A question */
 				putshort(&p, T_CNAME);
 			else
@@ -108,6 +110,10 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 
 			startp = p;
 			p += 2;			/* skip 2 bytes length */
+			if (q->type == T_A6) {
+				CHECKLEN(1);
+				putbyte(&p, 128);
+			}
 			putname(&p, buflen - (p - buf), data);
 			CHECKLEN(0);
 			namelen = p - startp;
@@ -483,7 +489,9 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 				rv = 0;
 			}
 		}
-		else if ((type == T_A || type == T_CNAME) && buf) {
+		else if ((type == T_A || type == T_CNAME ||
+			type == T_PTR || type == T_AAAA ||
+			type == T_A6 || type == T_DNAME) && buf) {
 			/* Assume that first answer is what we wanted */
 			readname(packet, packetlen, &data, name, sizeof(name));
 			CHECKLEN(10);
@@ -492,6 +500,14 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
 
+			if (type == T_A6) {
+				unsigned char prefix;
+				CHECKLEN(1);
+				readdata(packet, &data, (char *) &prefix, 1);
+				if (prefix != 128) {
+					return 0;
+				}
+			}
 			memset(name, 0, sizeof(name));
 			readname(packet, packetlen, &data, name, sizeof(name) - 1);
 			name[sizeof(name)-1] = '\0';

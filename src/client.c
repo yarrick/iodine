@@ -78,6 +78,14 @@ client_set_qtype(char *qtype)
 		this.do_qtype = T_SRV;
 	else if (!strcasecmp(qtype, "TXT"))
 		this.do_qtype = T_TXT;
+	else if (!strcasecmp(qtype, "PTR"))
+		this.do_qtype = T_PTR;
+	else if (!strcasecmp(qtype, "AAAA"))
+		this.do_qtype = T_AAAA;
+	else if (!strcasecmp(qtype, "A6"))
+		this.do_qtype = T_A6;
+	else if (!strcasecmp(qtype, "DNAME"))
+		this.do_qtype = T_DNAME;
 	return (this.do_qtype == T_UNSET);
 }
 
@@ -93,6 +101,10 @@ client_get_qtype()
 	else if (this.do_qtype == T_MX)	c = "MX";
 	else if (this.do_qtype == T_SRV)	c = "SRV";
 	else if (this.do_qtype == T_TXT)	c = "TXT";
+	else if (this.do_qtype == T_PTR)	c = "PTR";
+	else if (this.do_qtype == T_AAAA)	c = "AAAA";
+	else if (this.do_qtype == T_A6)	c = "A6";
+	else if (this.do_qtype == T_DNAME)	c = "DNAME";
 
 	return c;
 }
@@ -724,7 +736,8 @@ read_dns_withq(uint8_t *buf, size_t buflen, struct query *q)
 		if (rv <= 0)
 			return rv;
 
-		if (q->type == T_CNAME || q->type == T_TXT)
+		if (q->type == T_CNAME || q->type == T_TXT ||
+			q->type == T_PTR || q->type == T_A6 || q->type == T_DNAME)
 		/* CNAME can also be returned from an A question */
 		{
 			/*
@@ -1176,10 +1189,13 @@ tunnel_dns()
 		}
 
 		if (datalen) {
-			if (this.use_remote_forward)
-				write(STDOUT_FILENO, data, datalen);
-			else
+			if (this.use_remote_forward) {
+				if (write(STDOUT_FILENO, data, datalen) != datalen) {
+					warn("write_stdout != datalen");
+				}
+			} else {
 				write_tun(this.tun_fd, data, datalen);
+			}
 		}
 	}
 
@@ -2114,13 +2130,17 @@ static int
 handshake_qtype_numcvt(int num)
 {
 	switch (num) {
-	case 0:	return T_NULL;
-	case 1:	return T_PRIVATE;
-	case 2:	return T_TXT;
-	case 3:	return T_SRV;
-	case 4:	return T_MX;
-	case 5:	return T_CNAME;
-	case 6:	return T_A;
+	case  0:	return T_NULL;
+	case  1:	return T_PRIVATE;
+	case  2:	return T_TXT;
+	case  3:	return T_SRV;
+	case  4:	return T_MX;
+	case  5:	return T_DNAME;
+	case  6:	return T_PTR;
+	case  7:	return T_CNAME;
+	case  8:	return T_A6;
+	case  9:	return T_AAAA;
+	case 10:	return T_A;
 	}
 	return T_UNSET;
 }

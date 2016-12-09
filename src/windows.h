@@ -43,6 +43,10 @@ typedef unsigned int in_addr_t;
 #define T_MX DNS_TYPE_MX
 #define T_TXT DNS_TYPE_TXT
 #define T_SRV DNS_TYPE_SRV
+#define T_PTR DNS_TYPE_PTR
+#define T_AAAA DNS_TYPE_AAAA
+#define T_A6 DNS_TYPE_A6
+#define T_DNAME DNS_TYPE_DNAME
 
 #define C_IN 1
 

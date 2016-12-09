@@ -50,9 +50,13 @@ typedef struct {
 #define T_A			1
 #define T_CNAME		5
 #define T_NULL		10
+#define T_PTR		12
 #define T_MX		15
 #define T_TXT		16
+#define T_AAAA		28
 #define T_SRV		33
+#define T_A6		38
+#define T_DNAME		39
 
 #endif /* !C_IN */
 

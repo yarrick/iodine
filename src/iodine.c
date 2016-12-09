@@ -246,7 +246,8 @@ help()
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	print_usage();
 	fprintf(stderr, "\nOptions to try if connection doesn't work:\n");
-	fprintf(stderr, "  -T  use DNS type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
+	fprintf(stderr, "  -T  use DNS type: NULL, PRIVATE, TXT, SRV, MX,\n");
+	fprintf(stderr, "        DNAME, PTR, CNAME, A6, AAAA, A (default: autodetect)\n");
 	fprintf(stderr, "  -O  use specific downstream encoding for queries: Base32, Base64, Base64u,\n");
 	fprintf(stderr, "        Base128, or (only for TXT:) Raw  (default: autodetect)\n");
 	fprintf(stderr, "  -I  target interval between sending and receiving requests (default: 4 secs)\n");
