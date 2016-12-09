@@ -119,12 +119,6 @@ qmem_init(int userid)
 	}
 }
 
-static size_t
-qmem_num_pending(int userid)
-{
-	return users[userid].qmem.num_pending;
-}
-
 static int
 qmem_is_cached(int dns_fd, int userid, struct query *q)
 /* Check if an answer for a particular query is cached in qmem
@@ -182,7 +176,7 @@ qmem_append(int userid, struct query *q)
 		 * one to make space for new query */
 		QMEM_DEBUG(2, userid, "Full of pending queries! Replacing old query %d with new %d.",
 				   buf->queries[buf->start].q.id, q->id);
-		send_data_or_ping(userid, &buf->queries[buf->start], 0, 0, NULL);
+		send_data_or_ping(userid, &buf->queries[buf->start].q, 0, 0, NULL);
 	}
 
 	if (buf->length < QMEM_LEN) {
