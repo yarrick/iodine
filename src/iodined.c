@@ -581,9 +581,9 @@ main(int argc, char **argv)
 		for (int i = 0; i < nb_fds; i++) {
 			int fd = SD_LISTEN_FDS_START + i;
 			if (sd_is_socket(fd, AF_INET, SOCK_DGRAM, -1)) {
-				dns_fds.v4fd = fd;
+				server.dns_fds.v4fd = fd;
 			} else if (sd_is_socket(fd, AF_INET6, SOCK_DGRAM, -1)) {
-				dns_fds.v6fd = fd;
+				server.dns_fds.v6fd = fd;
 			} else {
 				retval = 1;
 				warnx("Unknown socket %d passed to iodined!\n", fd);
