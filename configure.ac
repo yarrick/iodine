@@ -28,9 +28,13 @@ AS_CASE([${host_os}],
  [mingw32],          [OS=WINDOWS32],
  [macos],            [OS=DARWIN],
  [linux-android],    [OS=ANDROID],
- [OS="$(echo ${host_os}|tr "a-z" "A-Z_")"])
+ [OS="$(echo ${host_os}|tr "a-z" "A-Z")"])
 
 uname_os="$(uname | tr "a-z" "A-Z")"
+
+# Avoid, e.g., OS=DARWIN15.6.0
+AS_CASE([${uname_os}],
+ [DARWIN],           [OS=DARWIN])
 
 AC_MSG_NOTICE([host_os: ${host_os}])
 AC_MSG_NOTICE([uname_os: ${uname_os}])
