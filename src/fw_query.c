@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2008 Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2008-2014 Erik Ekman <yarrick@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -33,9 +33,9 @@ void fw_query_init()
 void fw_query_put(struct fw_query *fw_query)
 {
 	memcpy(&(fwq[fwq_ix]), fw_query, sizeof(struct fw_query));
-	
+
 	++fwq_ix;
-	if (fwq_ix >= FW_QUERY_CACHE_SIZE) 
+	if (fwq_ix >= FW_QUERY_CACHE_SIZE)
 		fwq_ix = 0;
 }
 

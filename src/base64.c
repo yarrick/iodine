@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  * Mostly rewritten 2009 J.A.Bezemer@opensourcepartners.nl
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -31,7 +32,7 @@
 
 /* Note: the "unofficial" char is last here, which means that the \377 pattern
    in DOWNCODECCHECK1 ('Y' request) will properly test it. */
-static const char cb64[] = 
+static const char cb64[] =
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789+";
 static unsigned char rev64[256];
 static int reverse_init = 0;
@@ -59,19 +60,19 @@ struct encoder
 	return &base64_encoder;
 }
 
-static int 
+static int
 base64_handles_dots()
 {
 	return 0;
 }
 
-static int 
+static int
 base64_blksize_raw()
 {
 	return BLKSIZE_RAW;
 }
 
-static int 
+static int
 base64_blksize_enc()
 {
 	return BLKSIZE_ENC;
@@ -93,7 +94,7 @@ base64_reverse_init()
 	}
 }
 
-static int 
+static int
 base64_encode(char *buf, size_t *buflen, const void *data, size_t size)
 /*
  * Fills *buf with max. *buflen characters, encoding size bytes of *data.
@@ -181,7 +182,7 @@ base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 		if (iout >= *buflen || iin + 1 >= slen ||
 		    str[iin] == '\0' || str[iin + 1] == '\0')
 			break;
-		ubuf[iout] = ((REV64(str[iin]) & 0x3f) << 2) | 
+		ubuf[iout] = ((REV64(str[iin]) & 0x3f) << 2) |
 			     ((REV64(str[iin + 1]) & 0x30) >> 4);
 		iin++;  		/* 0 used up, iin=1 */
 		iout++;
@@ -189,7 +190,7 @@ base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 		if (iout >= *buflen || iin + 1 >= slen ||
 		    str[iin] == '\0' || str[iin + 1] == '\0')
 			break;
-		ubuf[iout] = ((REV64(str[iin]) & 0x0f) << 4) | 
+		ubuf[iout] = ((REV64(str[iin]) & 0x0f) << 4) |
 			     ((REV64(str[iin + 1]) & 0x3c) >> 2);
 		iin++;  		/* 1 used up, iin=2 */
 		iout++;

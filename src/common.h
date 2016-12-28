@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2015 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -52,14 +53,6 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 
 #define QUERY_NAME_SIZE 256
 
-#if defined IP_RECVDSTADDR 
-# define DSTADDR_SOCKOPT IP_RECVDSTADDR 
-# define dstaddr(x) ((struct in_addr *) CMSG_DATA(x)) 
-#elif defined IP_PKTINFO 
-# define DSTADDR_SOCKOPT IP_PKTINFO 
-# define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr)) 
-#endif
-
 #if defined IP_MTU_DISCOVER
   /* Linux */
 # define IP_OPT_DONT_FRAG IP_MTU_DISCOVER
@@ -74,10 +67,12 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 # define DONT_FRAG_VALUE 1
 #endif
 
+#define T_PRIVATE 65399
+/* Undefined RR type; "private use" range, see http://www.bind9.net/dns-parameters */
 #define T_UNSET 65432
-/* Unused RR type; "private use" range, see http://www.bind9.net/dns-parameters */
+/* Unused RR type, never actually sent */
 
-struct packet 
+struct packet
 {
 	int len;		/* Total packet length */
 	int sentlen;		/* Length of chunk currently transmitted */
@@ -92,16 +87,17 @@ struct query {
 	unsigned short type;
 	unsigned short rcode;
 	unsigned short id;
-	struct in_addr destination;
+	struct sockaddr_storage destination;
+	socklen_t dest_len;
 	struct sockaddr_storage from;
-	int fromlen;
+	socklen_t fromlen;
 	unsigned short id2;
-	struct sockaddr from2;
-	int fromlen2;
+	struct sockaddr_storage from2;
+	socklen_t fromlen2;
 };
 
 enum connection {
-	CONN_RAW_UDP,
+	CONN_RAW_UDP = 0,
 	CONN_DNS_NULL,
 	CONN_MAX
 };
@@ -110,6 +106,7 @@ void check_superuser(void (*usage_fn)(void));
 char *format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len);
 int get_addr(char *, int, int, int, struct sockaddr_storage *);
 int open_dns(struct sockaddr_storage *, size_t);
+int open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only);
 int open_dns_from_host(char *host, int port, int addr_family, int flags);
 void close_dns(int);
 
@@ -120,7 +117,7 @@ void do_pidfile(char *);
 
 void read_password(char*, size_t);
 
-int check_topdomain(char *);
+int check_topdomain(char *, char **);
 
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID
@@ -134,5 +131,9 @@ void warnx(const char *fmt, ...);
 #endif
 
 int recent_seqno(int , int);
+
+#ifndef WINDOWS32
+void fd_set_close_on_exec(int fd);
+#endif
 
 #endif

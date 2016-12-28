@@ -1,7 +1,9 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
+ * 2013 Peter Sagerson <psagers.github@ignorare.net>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -28,6 +30,15 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#ifdef DARWIN
+#include <ctype.h>
+#include <sys/kern_control.h>
+#include <sys/sys_domain.h>
+#include <sys/ioctl.h>
+#include <net/if_utun.h>
+#include <netinet/ip.h>
+#endif
+
 #ifndef IFCONFIGPATH
 #define IFCONFIGPATH "PATH=/sbin:/bin "
 #endif
@@ -36,8 +47,8 @@
 #include "windows.h"
 #include <winioctl.h>
 
-HANDLE dev_handle;
-struct tun_data data;
+static HANDLE dev_handle;
+static struct tun_data data;
 
 static void get_name(char *ifname, int namelen, char *dev_name);
 
@@ -63,17 +74,16 @@ static void get_name(char *ifname, int namelen, char *dev_name);
 #include "tun.h"
 #include "common.h"
 
-char if_name[250];
+static char if_name[250];
 
-#ifndef WINDOWS32
 #ifdef LINUX
 
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <linux/if_tun.h>
 
-int 
-open_tun(const char *tun_device) 
+int
+open_tun(const char *tun_device)
 {
 	int i;
 	int tun_fd;
@@ -85,13 +95,13 @@ open_tun(const char *tun_device)
 #endif
 
 	if ((tun_fd = open(tunnel, O_RDWR)) < 0) {
-		warn("open_tun: %s: %s", tunnel, strerror(errno));
+		warn("open_tun: %s", tunnel);
 		return -1;
 	}
 
 	memset(&ifreq, 0, sizeof(ifreq));
 
-	ifreq.ifr_flags = IFF_TUN; 
+	ifreq.ifr_flags = IFF_TUN;
 
 	if (tun_device != NULL) {
 		strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
@@ -101,11 +111,12 @@ open_tun(const char *tun_device)
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			fprintf(stderr, "Opened %s\n", ifreq.ifr_name);
+			fd_set_close_on_exec(tun_fd);
 			return tun_fd;
 		}
 
 		if (errno != EBUSY) {
-			warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+			warn("open_tun: ioctl[TUNSETIFF]");
 			return -1;
 		}
 	} else {
@@ -115,11 +126,12 @@ open_tun(const char *tun_device)
 			if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 				fprintf(stderr, "Opened %s\n", ifreq.ifr_name);
 				snprintf(if_name, sizeof(if_name), "dns%d", i);
+				fd_set_close_on_exec(tun_fd);
 				return tun_fd;
 			}
 
 			if (errno != EBUSY) {
-				warn("open_tun: ioctl[TUNSETIFF]: %s", strerror(errno));
+				warn("open_tun: ioctl[TUNSETIFF]");
 				return -1;
 			}
 		}
@@ -130,49 +142,8 @@ open_tun(const char *tun_device)
 	return -1;
 }
 
-#else /* BSD */
+#elif WINDOWS32
 
-int 
-open_tun(const char *tun_device) 
-{
-	int i;
-	int tun_fd;
-	char tun_name[50];
-
-	if (tun_device != NULL) {
-		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
-		strncpy(if_name, tun_device, sizeof(if_name));
-		if_name[sizeof(if_name)-1] = '\0';
-
-		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
-			warn("open_tun: %s: %s", tun_name, strerror(errno));
-			return -1;
-		}
-
-		fprintf(stderr, "Opened %s\n", tun_name);
-		return tun_fd;
-	} else {
-		for (i = 0; i < TUN_MAX_TRY; i++) {
-			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
-
-			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
-				fprintf(stderr, "Opened %s\n", tun_name);
-				snprintf(if_name, sizeof(if_name), "tun%d", i);
-				return tun_fd;
-			}
-
-			if (errno == ENOENT)
-				break;
-		}
-
-		warn("open_tun: Failed to open tunneling device");
-	}
-
-	return -1;
-}
-
-#endif /* !LINUX */
-#else /* WINDOWS32 */
 static void
 get_device(char *device, int device_len, const char *wanted_dev)
 {
@@ -187,7 +158,7 @@ get_device(char *device, int device_len, const char *wanted_dev)
 		warnx("Error opening registry key " TAP_ADAPTER_KEY );
 		return;
 	}
-	
+
 	while (TRUE) {
 		char name[256];
 		char unit[256];
@@ -225,7 +196,7 @@ get_device(char *device, int device_len, const char *wanted_dev)
 			strncmp(TAP_VERSION_ID_0901, component, strlen(TAP_VERSION_ID_0901)) == 0) {
 			/* We found a TAP32 device, get its NetCfgInstanceId */
 			char iid_string[256] = NET_CFG_INST_ID;
-			
+
 			status = RegQueryValueEx(device_key, iid_string, NULL, &datatype, (LPBYTE) device, (DWORD *) &device_len);
 			if (status != ERROR_SUCCESS || datatype != REG_SZ) {
 				warnx("Error reading registry key %s\\%s on TAP device", unit, iid_string);
@@ -291,7 +262,7 @@ DWORD WINAPI tun_reader(LPVOID arg)
 	OVERLAPPED olpd;
 	int sock;
 
-	sock = open_dns(0, INADDR_ANY);
+	sock = open_dns_from_host("127.0.0.1", 0, AF_INET, 0);
 
 	olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
@@ -302,7 +273,7 @@ DWORD WINAPI tun_reader(LPVOID arg)
 		if (!res) {
 			WaitForSingleObject(olpd.hEvent, INFINITE);
 			res = GetOverlappedResult(dev_handle, &olpd, (LPDWORD) &len, FALSE);
-			res = sendto(sock, buf, len, 0, (struct sockaddr*) &(tun->addr), 
+			res = sendto(sock, buf, len, 0, (struct sockaddr*) &(tun->addr),
 				tun->addrlen);
 		}
 	}
@@ -310,8 +281,8 @@ DWORD WINAPI tun_reader(LPVOID arg)
 	return 0;
 }
 
-int 
-open_tun(const char *tun_device) 
+int
+open_tun(const char *tun_device)
 {
 	char adapter[256];
 	char tapfile[512];
@@ -331,7 +302,7 @@ open_tun(const char *tun_device)
 		}
 		return -1;
 	}
-	
+
 	fprintf(stderr, "Opening device %s\n", if_name);
 	snprintf(tapfile, sizeof(tapfile), "%s%s.tap", TAP_DEVICE_SPACE, adapter);
 	dev_handle = CreateFile(tapfile, GENERIC_WRITE | GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM | FILE_FLAG_OVERLAPPED, NULL);
@@ -342,9 +313,9 @@ open_tun(const char *tun_device)
 
 	/* Use a UDP connection to forward packets from tun,
 	 * so we can still use select() in main code.
-	 * A thread does blocking reads on tun device and 
+	 * A thread does blocking reads on tun device and
 	 * sends data as udp to this socket */
-	
+
 	localsock_len = get_addr("127.0.0.1", 55353, AF_INET, 0, &localsock);
 	tunfd = open_dns(&localsock, localsock_len);
 
@@ -352,88 +323,259 @@ open_tun(const char *tun_device)
 	memcpy(&(data.addr), &localsock, localsock_len);
 	data.addrlen = localsock_len;
 	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)tun_reader, &data, 0, NULL);
-	
+
 	return tunfd;
 }
-#endif 
 
-void 
-close_tun(int tun_fd) 
+#else /* BSD and friends */
+
+#ifdef DARWIN
+
+/* Extract the device number from the name, if given. The value returned will
+ * be suitable for sockaddr_ctl.sc_unit, which means 0 for auto-assign, or
+ * (n + 1) for manual.
+ */
+static int
+utun_unit(const char *dev)
+{
+	const char *unit_str = dev;
+	int unit = 0;
+
+	while (*unit_str != '\0' && !isdigit(*unit_str))
+		unit_str++;
+
+	if (isdigit(*unit_str))
+		unit = strtol(unit_str, NULL, 10) + 1;
+
+	return unit;
+}
+
+static int
+open_utun(const char *dev)
+{
+	struct sockaddr_ctl addr;
+	struct ctl_info info;
+	char ifname[10];
+	socklen_t ifname_len = sizeof(ifname);
+	int fd = -1;
+	int err = 0;
+
+	fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
+	if (fd < 0) {
+		warn("open_utun: socket(PF_SYSTEM)");
+		return -1;
+	}
+
+	/* Look up the kernel controller ID for utun devices. */
+	bzero(&info, sizeof(info));
+	strncpy(info.ctl_name, UTUN_CONTROL_NAME, MAX_KCTL_NAME);
+
+	err = ioctl(fd, CTLIOCGINFO, &info);
+	if (err != 0) {
+		warn("open_utun: ioctl(CTLIOCGINFO)");
+		close(fd);
+		return -1;
+	}
+
+	/* Connecting to the socket creates the utun device. */
+	addr.sc_len = sizeof(addr);
+	addr.sc_family = AF_SYSTEM;
+	addr.ss_sysaddr = AF_SYS_CONTROL;
+	addr.sc_id = info.ctl_id;
+	addr.sc_unit = utun_unit(dev);
+
+	err = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
+	if (err != 0) {
+		warn("open_utun: connect");
+		close(fd);
+		return -1;
+	}
+
+	/* Retrieve the assigned interface name. */
+	err = getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, ifname, &ifname_len);
+	if (err != 0) {
+		warn("open_utun: getsockopt(UTUN_OPT_IFNAME)");
+		close(fd);
+		return -1;
+	}
+
+	strncpy(if_name, ifname, sizeof(if_name));
+
+	fprintf(stderr, "Opened %s\n", ifname);
+	fd_set_close_on_exec(fd);
+
+	return fd;
+}
+
+#endif
+
+int
+open_tun(const char *tun_device)
+{
+	int i;
+	int tun_fd;
+	char tun_name[50];
+
+#ifdef DARWIN
+	if (!strncmp(tun_device, "utun", 4)) {
+		tun_fd = open_utun(tun_device);
+		if (tun_fd >= 0) {
+			return tun_fd;
+		}
+	}
+#endif
+
+	if (tun_device != NULL) {
+		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
+		strncpy(if_name, tun_device, sizeof(if_name));
+		if_name[sizeof(if_name)-1] = '\0';
+
+		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
+			warn("open_tun: %s", tun_name);
+			return -1;
+		}
+
+		fprintf(stderr, "Opened %s\n", tun_name);
+		fd_set_close_on_exec(tun_fd);
+		return tun_fd;
+	} else {
+		for (i = 0; i < TUN_MAX_TRY; i++) {
+			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
+
+			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
+				fprintf(stderr, "Opened %s\n", tun_name);
+				snprintf(if_name, sizeof(if_name), "tun%d", i);
+				fd_set_close_on_exec(tun_fd);
+				return tun_fd;
+			}
+
+			if (errno == ENOENT)
+				break;
+		}
+
+		warn("open_tun: Failed to open tunneling device");
+	}
+
+	return -1;
+}
+
+#endif
+
+void
+close_tun(int tun_fd)
 {
 	if (tun_fd >= 0)
 		close(tun_fd);
 }
 
-int 
-write_tun(int tun_fd, char *data, size_t len) 
+#ifdef WINDOWS32
+int
+write_tun(int tun_fd, char *data, size_t len)
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
+	DWORD written;
+	DWORD res;
+	OVERLAPPED olpd;
+
 	data += 4;
 	len -= 4;
-#else /* !FREEBSD/DARWIN */
-#ifdef LINUX
-	data[0] = 0x00;
-	data[1] = 0x00;
-	data[2] = 0x08;
-	data[3] = 0x00;
-#else /* OPENBSD */
-	data[0] = 0x00;
-	data[1] = 0x00;
-	data[2] = 0x00;
-	data[3] = 0x02;
-#endif /* !LINUX */
-#endif /* FREEBSD */
 
-#ifndef WINDOWS32
-	if (write(tun_fd, data, len) != len) {
-		warn("write_tun");
-		return 1;
-	}
-#else /* WINDOWS32 */
-	{
-		DWORD written;
-		DWORD res;
-		OVERLAPPED olpd;
-
-		olpd.Offset = 0;
-		olpd.OffsetHigh = 0;
-		olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-		res = WriteFile(dev_handle, data, len, &written, &olpd);
-		if (!res && GetLastError() == ERROR_IO_PENDING) {
-			WaitForSingleObject(olpd.hEvent, INFINITE);
-			res = GetOverlappedResult(dev_handle, &olpd, &written, FALSE);
-			if (written != len) {
-				return -1;
-			}
+	olpd.Offset = 0;
+	olpd.OffsetHigh = 0;
+	olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	res = WriteFile(dev_handle, data, len, &written, &olpd);
+	if (!res && GetLastError() == ERROR_IO_PENDING) {
+		WaitForSingleObject(olpd.hEvent, INFINITE);
+		res = GetOverlappedResult(dev_handle, &olpd, &written, FALSE);
+		if (written != len) {
+			return -1;
 		}
 	}
-#endif
 	return 0;
 }
 
 ssize_t
-read_tun(int tun_fd, char *buf, size_t len) 
+read_tun(int tun_fd, char *buf, size_t len)
 {
-#if defined (FREEBSD) || defined (DARWIN) || defined(NETBSD) || defined(WINDOWS32)
-	/* FreeBSD/Darwin/NetBSD has no header */
 	int bytes;
 	memset(buf, 0, 4);
-#ifdef WINDOWS32
-	/* Windows needs recv() since it is local UDP socket */
+
 	bytes = recv(tun_fd, buf + 4, len - 4, 0);
-#else
-	/* The other need read() because fd is not a socket */
-	bytes = read(tun_fd, buf + 4, len - 4);
-#endif /*WINDOWS32*/
 	if (bytes < 0) {
 		return bytes;
 	} else {
 		return bytes + 4;
 	}
-#else /* !FREEBSD */
-	return read(tun_fd, buf, len);
-#endif /* !FREEBSD */
 }
+#else
+int
+write_tun(int tun_fd, char *data, size_t len)
+{
+#if defined (FREEBSD) || defined (NETBSD)
+	/* FreeBSD/NetBSD has no header */
+	int header = 0;
+#elif defined (DARWIN)
+	/* Darwin tun has no header, Darwin utun does */
+	int header = !strncmp(if_name, "utun", 4);
+#else  /* LINUX/OPENBSD */
+	int header = 1;
+#endif
+
+	if (!header) {
+		data += 4;
+		len -= 4;
+	} else {
+#ifdef LINUX
+		// Linux prefixes with 32 bits ethertype
+		// 0x0800 for IPv4, 0x86DD for IPv6
+		data[0] = 0x00;
+		data[1] = 0x00;
+		data[2] = 0x08;
+		data[3] = 0x00;
+#else /* OPENBSD and DARWIN(utun) */
+		// BSDs prefix with 32 bits address family
+		// AF_INET for IPv4, AF_INET6 for IPv6
+		data[0] = 0x00;
+		data[1] = 0x00;
+		data[2] = 0x00;
+		data[3] = 0x02;
+#endif
+	}
+
+	if (write(tun_fd, data, len) != len) {
+		warn("write_tun");
+		return 1;
+	}
+	return 0;
+}
+
+ssize_t
+read_tun(int tun_fd, char *buf, size_t len)
+{
+#if defined (FREEBSD) || defined (NETBSD)
+	/* FreeBSD/NetBSD has no header */
+	int header = 0;
+#elif defined (DARWIN)
+	/* Darwin tun has no header, Darwin utun does */
+	int header = !strncmp(if_name, "utun", 4);
+#else  /* LINUX/OPENBSD */
+	int header = 1;
+#endif
+
+	if (!header) {
+		int bytes;
+		memset(buf, 0, 4);
+
+		bytes = read(tun_fd, buf + 4, len - 4);
+		if (bytes < 0) {
+			return bytes;
+		} else {
+			return bytes + 4;
+		}
+	} else {
+		return read(tun_fd, buf, len);
+	}
+}
+#endif
 
 int
 tun_setip(const char *ip, const char *other_ip, int netbits)
@@ -450,8 +592,12 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	DWORD ipdata[3];
 	struct in_addr addr;
 	DWORD len;
-#endif
+#else
 	const char *display_ip;
+#ifndef LINUX
+	struct in_addr netip;
+#endif
+#endif
 
 	netmask = 0;
 	for (i = 0; i < netbits; i++) {
@@ -470,23 +616,22 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 # else
 	display_ip = ip;
 # endif
-	snprintf(cmdline, sizeof(cmdline), 
+	snprintf(cmdline, sizeof(cmdline),
 			IFCONFIGPATH "ifconfig %s %s %s netmask %s",
 			if_name,
 			ip,
 			display_ip,
 			inet_ntoa(net));
-	
+
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
-	struct in_addr netip;
 	netip.s_addr = inet_addr(ip);
 	netip.s_addr = netip.s_addr & net.s_addr;
 	r = system(cmdline);
 	if(r != 0) {
 		return r;
 	} else {
-		
+
 		snprintf(cmdline, sizeof(cmdline),
 				"/sbin/route add %s/%d %s",
 				inet_ntoa(netip), netbits, ip);
@@ -499,13 +644,13 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	/* Set device as connected */
 	fprintf(stderr, "Enabling interface '%s'\n", if_name);
 	status = 1;
-	r = DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status, 
+	r = DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status,
 		sizeof(status), &status, sizeof(status), &len, NULL);
 	if (!r) {
 		fprintf(stderr, "Failed to enable interface\n");
 		return -1;
 	}
-	
+
 	if (inet_aton(ip, &addr)) {
 		ipdata[0] = (DWORD) addr.s_addr;   /* local ip addr */
 		ipdata[1] = net.s_addr & ipdata[0]; /* network addr */
@@ -515,7 +660,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	}
 
 	/* Tell ip/networkaddr/netmask to device for arp use */
-	r = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata, 
+	r = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata,
 		sizeof(ipdata), &ipdata, sizeof(ipdata), &len, NULL);
 	if (!r) {
 		fprintf(stderr, "Failed to set interface in TUN mode\n");
@@ -530,18 +675,18 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 #endif
 }
 
-int 
+int
 tun_setmtu(const unsigned mtu)
 {
 #ifndef WINDOWS32
 	char cmdline[512];
 
 	if (mtu > 200 && mtu <= 1500) {
-		snprintf(cmdline, sizeof(cmdline), 
+		snprintf(cmdline, sizeof(cmdline),
 				IFCONFIGPATH "ifconfig %s mtu %u",
 				if_name,
 				mtu);
-		
+
 		fprintf(stderr, "Setting MTU of %s to %u\n", if_name, mtu);
 		return system(cmdline);
 	} else {

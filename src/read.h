@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -18,7 +19,7 @@
 #define _READ_H_
 
 int readname(char *, int, char **, char *, size_t);
-int readshort(char *, char **, short *);
+int readshort(char *, char **, unsigned short *);
 int readlong(char *, char **, uint32_t *);
 int readdata(char *, char **, char *, size_t);
 int readtxtbin(char *, char **, size_t, char *, size_t);

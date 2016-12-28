@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2006-2009 Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2009-2014 Erik Ekman <yarrick@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -32,7 +32,7 @@ START_TEST(test_fw_query_simple)
 	q.id = 0x848A;
 
 	fw_query_init();
-	
+
 	/* Test empty cache */
 	fw_query_get(0x848A, &qp);
 	fail_unless(qp == NULL);
@@ -53,7 +53,7 @@ START_TEST(test_fw_query_edge)
 	int i;
 
 	fw_query_init();
-	
+
 	q.addrlen = 33;
 	q.id = 0x848A;
 	fw_query_put(&q);
@@ -68,7 +68,7 @@ START_TEST(test_fw_query_edge)
 	fw_query_get(0x848A, &qp);
 	fail_unless(qp->addrlen == 33);
 	fail_unless(qp->id == 0x848A);
-		
+
 	q.addrlen++;
 	q.id++;
 	fw_query_put(&q);

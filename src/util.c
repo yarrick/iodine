@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -39,12 +40,12 @@ get_resolvconf_addr()
 		rv = addr;
 	pclose(fp);
 #else
-	
+
 	rv = NULL;
 
-	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL) 
+	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
 		err(1, "/etc/resolv.conf");
-	
+
 	while (feof(fp) == 0) {
 		fgets(buf, sizeof(buf), fp);
 
@@ -53,7 +54,7 @@ get_resolvconf_addr()
 			break;
 		}
 	}
-	
+
 	fclose(fp);
 #endif
 #else /* !WINDOWS32 */

@@ -6,9 +6,23 @@ iodine - http://code.kryo.se/iodine
 CHANGES:
 
 master:
-	- IPv6 support (in progress, #107)
-	   Client can connect to iodined through an IPv6 nameserver.
-	   Server only supports IPv4 for now.
+	- Mac OS X: Support native utun VPN devices. Patch by
+		Peter Sagerson, ported from OpenVPN by Catalin Patulea.
+	- Fix compilation failure on kFreeBSD and Hurd, by Gregor Herrmann
+	- Patch from Ryan Welton that fixes compilation warning.
+	- README converted to markdown by Nicolas Braud-Santoni.
+	- Linux: use pkg-config for systemd support flags.
+		Patch by Jason A. Donenfeld.
+	- Change external IP webservice to ipify.org
+	- Add support for IPv6 in the server.
+	   Raw mode will be with same protocol as used for login.
+	   Traffic inside tunnel is still IPv4.
+	- Update android build to support 5.0 (Lollipop) and newer.
+
+2014-06-16: 0.7.0 "Kryoptonite"
+	- Partial IPv6 support (#107)
+	   Client can connect to iodined through an relaying IPv6
+	   nameserver. Server only supports IPv4 for now.
 	   Traffic inside tunnel is IPv4.
 	- Add socket activation for systemd, by Michael Scherer.
 	- Add automated lookup of external ip (via -n auto).
@@ -20,6 +34,13 @@ master:
 		Patch by laurent at gouloum fr, fixes #95.
 	- Add android patches and makefile, from Marcel Bokhorst, fixes #105.
 	- Added missing break in iodine.c, by Pavel Pergamenshchik, #108.
+	- A number of minor patches from Frank Denis, Gregor Herrmann and
+		Barak A. Pearlmutter.
+	- Testcase compilation fixes for OS X and FreeBSD
+	- Do not let sockets be inherited by sub-processes, fixes #99.
+	- Add unspecified RR type (called PRIVATE; id 65399, in private use
+		range). For servers with RFC3597 support. Fixes #97.
+	- Fix authentication bypass vulnerability; found by Oscar Reparaz.
 
 2010-02-06: 0.6.0-rc1 "Hotspotify"
 	- Fixed tunnel not working on Windows.

@@ -1,7 +1,8 @@
-/* Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+/* Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  * Copyright (c) 2007 Albert Lee <trisk@acm.jhu.edu>.
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -64,7 +65,7 @@ const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
 static int daemon(int nochdir, int noclose)
 {
  	int fd, i;
- 
+
  	switch (fork()) {
  		case 0:
  			break;
@@ -73,15 +74,15 @@ static int daemon(int nochdir, int noclose)
  		default:
  			_exit(0);
  	}
- 
+
  	if (!nochdir) {
  		chdir("/");
  	}
- 
+
  	if (setsid() < 0) {
  		return -1;
  	}
- 	
+
  	if (!noclose) {
  		if ((fd = open("/dev/null", O_RDWR)) >= 0) {
  			for (i = 0; i < 3; i++) {
@@ -153,8 +154,8 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = addr_family;
-#ifdef WINDOWS32
-	/* AI_ADDRCONFIG misbehaves on windows */
+#if defined(WINDOWS32) || defined(OPENBSD)
+	/* AI_ADDRCONFIG misbehaves on windows, and does not exist in OpenBSD */
 	hints.ai_flags = flags;
 #else
 	hints.ai_flags = AI_ADDRCONFIG | flags;
@@ -173,10 +174,16 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 	return res;
 }
 
-int 
+int
 open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
 {
-	int flag = 1;
+	return open_dns_opt(sockaddr, sockaddr_len, -1);
+}
+
+int
+open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only)
+{
+	int flag;
 	int fd;
 
 	if ((fd = socket(sockaddr->ss_family, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
@@ -190,9 +197,12 @@ open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
 
 #ifndef WINDOWS32
-	/* To get destination address from each UDP datagram, see iodined.c:read_dns() */
-	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+	fd_set_close_on_exec(fd);
 #endif
+
+	if (sockaddr->ss_family == AF_INET6 && v6only >= 0) {
+		setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (const void*) &v6only, sizeof(v6only));
+	}
 
 #ifdef IP_OPT_DONT_FRAG
 	/* Set dont-fragment ip header flag */
@@ -294,7 +304,7 @@ read_password(char *buf, size_t len)
 
 	tcgetattr(0, &tp);
 	old = tp;
-	
+
 	tp.c_lflag &= (~ECHO);
 	tcsetattr(0, TCSANOW, &tp);
 #else
@@ -320,7 +330,7 @@ read_password(char *buf, size_t len)
 	fprintf(stderr, "\n");
 
 #ifndef WINDOWS32
-	tcsetattr(0, TCSANOW, &old);	
+	tcsetattr(0, TCSANOW, &old);
 #endif
 
 	strncpy(buf, pwd, len);
@@ -328,20 +338,64 @@ read_password(char *buf, size_t len)
 }
 
 int
-check_topdomain(char *str)
+check_topdomain(char *str, char **errormsg)
 {
-       int i;
+	int i;
+	int dots = 0;
+	int chunklen = 0;
 
-       if(str[0] == '.') /* special case */
-               return 1;
+	if (strlen(str) < 3) {
+		if (errormsg) *errormsg = "Too short (< 3)";
+		return 1;
+	}
+	if (strlen(str) > 128) {
+		if (errormsg) *errormsg = "Too long (> 128)";
+		return 1;
+	}
 
-       for( i = 0; i < strlen(str); i++) {
-               if( isalpha(str[i]) || isdigit(str[i]) || str[i] == '-' || str[i] == '.' )
-                       continue;
-               else 
-		       return 1;
-       }
-       return 0;
+	if (str[0] == '.') {
+		if (errormsg) *errormsg = "Starts with a dot";
+		return 1;
+	}
+
+	for( i = 0; i < strlen(str); i++) {
+		if(str[i] == '.') {
+			dots++;
+			if (chunklen == 0) {
+				if (errormsg) *errormsg = "Consecutive dots";
+				return 1;
+			}
+			if (chunklen > 63) {
+				if (errormsg) *errormsg = "Too long domain part (> 63)";
+				return 1;
+			}
+			chunklen = 0;
+		} else {
+			chunklen++;
+		}
+		if( (str[i] >= 'a' && str[i] <= 'z') || (str[i] >= 'A' && str[i] <= 'Z') ||
+				isdigit(str[i]) || str[i] == '-' || str[i] == '.' ) {
+			continue;
+		} else {
+			if (errormsg) *errormsg = "Contains illegal character (allowed: [a-zA-Z0-9-.])";
+			return 1;
+		}
+	}
+
+	if (dots == 0) {
+		if (errormsg) *errormsg = "No dots";
+		return 1;
+	}
+	if (chunklen == 0) {
+		if (errormsg) *errormsg = "Ends with a dot";
+		return 1;
+	}
+	if (chunklen > 63) {
+		if (errormsg) *errormsg = "Too long domain part (> 63)";
+		return 1;
+	}
+
+	return 0;
 }
 
 #if defined(WINDOWS32) || defined(ANDROID)
@@ -355,20 +409,33 @@ inet_aton(const char *cp, struct in_addr *inp)
 #endif
 
 void
+vwarn(const char *fmt, va_list list)
+{
+	if (fmt) vfprintf(stderr, fmt, list);
+#ifndef ANDROID
+	if (errno == 0) {
+		fprintf(stderr, ": WSA error %d\n", WSAGetLastError());
+	} else {
+		fprintf(stderr, ": %s\n", strerror(errno));
+	}
+#endif
+}
+
+void
 warn(const char *fmt, ...)
 {
 	va_list list;
 
 	va_start(list, fmt);
-	if (fmt) fprintf(stderr, fmt, list);
-#ifndef ANDROID
-	if (errno == 0) {
-		fprintf(stderr, ": WSA error %d\n", WSAGetLastError()); 
-	} else {
-		fprintf(stderr, ": %s\n", strerror(errno));
-	}
-#endif
+	vwarn(fmt, list);
 	va_end(list);
+}
+
+void
+vwarnx(const char *fmt, va_list list)
+{
+	if (fmt) vfprintf(stderr, fmt, list);
+	fprintf(stderr, "\n");
 }
 
 void
@@ -377,8 +444,7 @@ warnx(const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	if (fmt) fprintf(stderr, fmt, list);
-	fprintf(stderr, "\n");
+	vwarnx(fmt, list);
 	va_end(list);
 }
 
@@ -388,7 +454,7 @@ err(int eval, const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	warn(fmt, list);
+	vwarn(fmt, list);
 	va_end(list);
 	exit(eval);
 }
@@ -399,7 +465,7 @@ errx(int eval, const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	warnx(fmt, list);
+	vwarnx(fmt, list);
 	va_end(list);
 	exit(eval);
 }
@@ -420,3 +486,22 @@ int recent_seqno(int ourseqno, int gotseqno)
 	}
 	return 0;
 }
+
+#ifndef WINDOWS32
+/* Set FD_CLOEXEC flag on file descriptor.
+ * This stops it from being inherited by system() calls.
+ */
+void
+fd_set_close_on_exec(int fd)
+{
+	int flags;
+
+	flags = fcntl(fd, F_GETFD);
+	if (flags == -1)
+		err(4, "Failed to get fd flags");
+	flags |= FD_CLOEXEC;
+	if (fcntl(fd, F_SETFD, flags) == -1)
+		err(4, "Failed to set fd flags");
+}
+#endif
+

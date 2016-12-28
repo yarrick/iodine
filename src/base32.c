@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  * Mostly rewritten 2009 J.A.Bezemer@opensourcepartners.nl
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -29,9 +30,9 @@
 #define BLKSIZE_RAW 5
 #define BLKSIZE_ENC 8
 
-static const char cb32[] = 
+static const char cb32[] =
 	"abcdefghijklmnopqrstuvwxyz012345";
-static const char cb32_ucase[] = 
+static const char cb32_ucase[] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
 static unsigned char rev32[256];
 static int reverse_init = 0;
@@ -59,19 +60,19 @@ struct encoder
 	return &base32_encoder;
 }
 
-static int 
+static int
 base32_handles_dots()
 {
 	return 0;
 }
 
-static int 
+static int
 base32_blksize_raw()
 {
 	return BLKSIZE_RAW;
 }
 
-static int 
+static int
 base32_blksize_enc()
 {
 	return BLKSIZE_ENC;
@@ -108,7 +109,7 @@ b32_8to5(int in)
 	return rev32[in];
 }
 
-static int 
+static int
 base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
 /*
  * Fills *buf with max. *buflen characters, encoding size bytes of *data.
@@ -226,7 +227,7 @@ base32_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 		if (iout >= *buflen || iin + 1 >= slen ||
 		    str[iin] == '\0' || str[iin + 1] == '\0')
 			break;
-		ubuf[iout] = ((REV32(str[iin]) & 0x1f) << 3) | 
+		ubuf[iout] = ((REV32(str[iin]) & 0x1f) << 3) |
 			     ((REV32(str[iin + 1]) & 0x1c) >> 2);
 		iin++;  		/* 0 used up, iin=1 */
 		iout++;
@@ -235,8 +236,8 @@ base32_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 		    str[iin] == '\0' || str[iin + 1] == '\0' ||
 		    str[iin + 2] == '\0')
 			break;
-		ubuf[iout] = ((REV32(str[iin]) & 0x03) << 6) | 
-			     ((REV32(str[iin + 1]) & 0x1f) << 1) | 
+		ubuf[iout] = ((REV32(str[iin]) & 0x03) << 6) |
+			     ((REV32(str[iin + 1]) & 0x1f) << 1) |
 			     ((REV32(str[iin + 2]) & 0x10) >> 4);
 		iin += 2;  		/* 1,2 used up, iin=3 */
 		iout++;

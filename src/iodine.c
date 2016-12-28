@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -56,10 +57,16 @@ static char *__progname;
 #define PASSWORD_ENV_VAR "IODINE_PASS"
 
 static void
-sighandler(int sig) 
+sighandler(int sig)
 {
 	client_stop();
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+/* mark as no return to help some compilers to avoid warnings
+ * about use of uninitialized variables */
+static void usage() __attribute__((noreturn));
+#endif
 
 static void
 usage() {
@@ -80,7 +87,7 @@ help() {
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 	fprintf(stderr, "Options to try if connection doesn't work:\n");
-	fprintf(stderr, "  -T force dns type: NULL, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
+	fprintf(stderr, "  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
 	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
 	fprintf(stderr, "     Base128, or (only for TXT:) Raw  (default: autodetect)\n");
 	fprintf(stderr, "  -I max interval between requests (default 4 sec) to prevent DNS timeouts\n");
@@ -118,6 +125,7 @@ main(int argc, char **argv)
 {
 	char *nameserv_host;
 	char *topdomain;
+	char *errormsg;
 #ifndef WINDOWS32
 	struct passwd *pw;
 #endif
@@ -147,6 +155,7 @@ main(int argc, char **argv)
 
 	nameserv_host = NULL;
 	topdomain = NULL;
+	errormsg = NULL;
 #ifndef WINDOWS32
 	pw = NULL;
 #endif
@@ -174,7 +183,7 @@ main(int argc, char **argv)
 
 	srand((unsigned) time(NULL));
 	client_init();
-	
+
 #if !defined(BSD) && !defined(__GLIBC__)
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
@@ -222,9 +231,9 @@ main(int argc, char **argv)
 		case 'P':
 			strncpy(password, optarg, sizeof(password));
 			password[sizeof(password)-1] = 0;
-			
+
 			/* XXX: find better way of cleaning up ps(1) */
-			memset(optarg, 0, strlen(optarg)); 
+			memset(optarg, 0, strlen(optarg));
 			break;
 		case 'm':
 			autodetect_frag_size = 0;
@@ -242,12 +251,13 @@ main(int argc, char **argv)
 			break;
 		case 'F':
 			pidfile = optarg;
-			break;    
+			break;
 		case 'T':
-			set_qtype(optarg);
+			if (client_set_qtype(optarg))
+				errx(5, "Invalid query type '%s'", optarg);
 			break;
 		case 'O':       /* not -D, is Debug in server */
-			set_downenc(optarg);
+			client_set_downenc(optarg);
 			break;
 		case 'L':
 			lazymode = atoi(optarg);
@@ -268,7 +278,7 @@ main(int argc, char **argv)
 			/* NOTREACHED */
 		}
 	}
-	
+
 	check_superuser(usage);
 
 	argc -= optind;
@@ -305,16 +315,10 @@ main(int argc, char **argv)
 		warnx("No nameserver found - not connected to any network?\n");
 		usage();
 		/* NOTREACHED */
-	}	
+	}
 
-	if (strlen(topdomain) <= 128) {
-		if(check_topdomain(topdomain)) {
-			warnx("Topdomain contains invalid characters.\n");
-			usage();
-			/* NOTREACHED */
-		}
-	} else {
-		warnx("Use a topdomain max 128 chars long.\n");
+	if(check_topdomain(topdomain, &errormsg)) {
+		warnx("Invalid topdomain: %s", errormsg);
 		usage();
 		/* NOTREACHED */
 	}
@@ -323,7 +327,7 @@ main(int argc, char **argv)
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);
-	
+
 	if (username != NULL) {
 #ifndef WINDOWS32
 		if ((pw = getpwnam(username)) == NULL) {
@@ -333,21 +337,21 @@ main(int argc, char **argv)
 		}
 #endif
 	}
-	
+
 	if (strlen(password) == 0) {
 		if (NULL != getenv(PASSWORD_ENV_VAR))
 			snprintf(password, sizeof(password), "%s", getenv(PASSWORD_ENV_VAR));
 		else
 			read_password(password, sizeof(password));
 	}
-	
+
 	client_set_password(password);
 
 	if ((tun_fd = open_tun(device)) == -1) {
 		retval = 1;
 		goto cleanup1;
 	}
-	if ((dns_fd = open_dns_from_host(NULL, 53, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
+	if ((dns_fd = open_dns_from_host(NULL, 0, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
 		retval = 1;
 		goto cleanup2;
 	}
@@ -366,22 +370,22 @@ main(int argc, char **argv)
 		retval = 1;
 		goto cleanup2;
 	}
-	
+
 	if (client_get_conn() == CONN_RAW_UDP) {
 		fprintf(stderr, "Sending raw traffic directly to %s\n", client_get_raw_addr());
 	}
 
 	fprintf(stderr, "Connection setup complete, transmitting data.\n");
 
-	if (foreground == 0) 
+	if (foreground == 0)
 		do_detach();
-	
+
 	if (pidfile != NULL)
 		do_pidfile(pidfile);
 
 	if (newroot != NULL)
 		do_chroot(newroot);
-	
+
 	if (username != NULL) {
 #ifndef WINDOWS32
 		gid_t gids[1];

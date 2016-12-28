@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -51,30 +52,6 @@ START_TEST(test_init_users)
 }
 END_TEST
 
-START_TEST(test_users_waiting)
-{
-	in_addr_t ip;
-
-	ip = inet_addr("127.0.0.1");
-	init_users(ip, 27);
-
-	fail_unless(users_waiting_on_reply() == 0);
-
-	users[3].active = 1;
-
-	fail_unless(users_waiting_on_reply() == 0);
-
-	users[3].last_pkt = time(NULL);
-	
-	fail_unless(users_waiting_on_reply() == 0);
-	
-	users[3].conn = CONN_DNS_NULL;
-	users[3].q.id = 1;
-	
-	fail_unless(users_waiting_on_reply() == 1);
-}
-END_TEST
-
 START_TEST(test_find_user_by_ip)
 {
 	in_addr_t ip;
@@ -86,17 +63,22 @@ START_TEST(test_find_user_by_ip)
 
 	testip = (unsigned int) inet_addr("10.0.0.1");
 	fail_unless(find_user_by_ip(testip) == -1);
-	
+
 	testip = (unsigned int) inet_addr("127.0.0.2");
 	fail_unless(find_user_by_ip(testip) == -1);
-	
+
 	users[0].active = 1;
-	
+
 	testip = (unsigned int) inet_addr("127.0.0.2");
 	fail_unless(find_user_by_ip(testip) == -1);
-	
+
 	users[0].last_pkt = time(NULL);
-	
+
+	testip = (unsigned int) inet_addr("127.0.0.2");
+	fail_unless(find_user_by_ip(testip) == -1);
+
+	users[0].authenticated = 1;
+
 	testip = (unsigned int) inet_addr("127.0.0.2");
 	fail_unless(find_user_by_ip(testip) == 0);
 }
@@ -110,15 +92,15 @@ START_TEST(test_all_users_waiting_to_send)
 	init_users(ip, 27);
 
 	fail_unless(all_users_waiting_to_send() == 1);
-	
+
 	users[0].conn = CONN_DNS_NULL;
 	users[0].active = 1;
-	
+
 	fail_unless(all_users_waiting_to_send() == 1);
-	
+
 	users[0].last_pkt = time(NULL);
 	users[0].outpacket.len = 0;
-	
+
 	fail_unless(all_users_waiting_to_send() == 0);
 
 #ifdef OUTPACKETQ_LEN
@@ -126,7 +108,7 @@ START_TEST(test_all_users_waiting_to_send)
 #else
 	users[0].outpacket.len = 44;
 #endif
-	
+
 	fail_unless(all_users_waiting_to_send() == 1);
 }
 END_TEST
@@ -140,7 +122,11 @@ START_TEST(test_find_available_user)
 	init_users(ip, 27);
 
 	for (i = 0; i < USERS; i++) {
+		users[i].authenticated = 1;
+		users[i].authenticated_raw = 1;
 		fail_unless(find_available_user() == i);
+		fail_if(users[i].authenticated);
+		fail_if(users[i].authenticated_raw);
 	}
 
 	for (i = 0; i < USERS; i++) {
@@ -153,7 +139,7 @@ START_TEST(test_find_available_user)
 	fail_unless(find_available_user() == -1);
 
 	users[3].last_pkt = 55;
-	
+
 	fail_unless(find_available_user() == 3);
 	fail_unless(find_available_user() == -1);
 }
@@ -181,7 +167,7 @@ START_TEST(test_find_available_user_small_net)
 	fail_unless(find_available_user() == -1);
 
 	users[3].last_pkt = 55;
-	
+
 	fail_unless(find_available_user() == 3);
 	fail_unless(find_available_user() == -1);
 }
@@ -194,7 +180,6 @@ test_user_create_tests()
 
 	tc = tcase_create("User");
 	tcase_add_test(tc, test_init_users);
-	tcase_add_test(tc, test_users_waiting);
 	tcase_add_test(tc, test_find_user_by_ip);
 	tcase_add_test(tc, test_all_users_waiting_to_send);
 	tcase_add_test(tc, test_find_available_user);

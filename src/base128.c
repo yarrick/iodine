@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2009 J.A.Bezemer@opensourcepartners.nl
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -46,7 +46,7 @@
  * accent chars since they might readily be entered in normal use,
  * don't use 254-255 because of possible function overloading in DNS systems.
  */
-static const unsigned char cb128[] = 
+static const unsigned char cb128[] =
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	"\274\275\276\277"
 	"\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317"
@@ -79,19 +79,19 @@ struct encoder
 	return &base128_encoder;
 }
 
-static int 
+static int
 base128_handles_dots()
 {
 	return 0;
 }
 
-static int 
+static int
 base128_blksize_raw()
 {
 	return BLKSIZE_RAW;
 }
 
-static int 
+static int
 base128_blksize_enc()
 {
 	return BLKSIZE_ENC;
@@ -113,7 +113,7 @@ base128_reverse_init()
 	}
 }
 
-static int 
+static int
 base128_encode(char *buf, size_t *buflen, const void *data, size_t size)
 /*
  * Fills *buf with max. *buflen characters, encoding size bytes of *data.
@@ -235,7 +235,7 @@ base128_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 		if (iout >= *buflen || iin + 1 >= slen ||
 		    str[iin] == '\0' || str[iin + 1] == '\0')
 			break;
-		ubuf[iout] = ((REV128(ustr[iin]) & 0x7f) << 1) | 
+		ubuf[iout] = ((REV128(ustr[iin]) & 0x7f) << 1) |
 			     ((REV128(ustr[iin + 1]) & 0x40) >> 6);
 		iin++;  		/* 0 used up, iin=1 */
 		iout++;

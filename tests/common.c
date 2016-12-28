@@ -1,12 +1,112 @@
+/*
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
 #include <check.h>
 #include <common.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netdb.h>
+
+START_TEST(test_topdomain_ok)
+{
+	char *error;
+
+	fail_if(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", &error));
+
+	/* Not allowed to start with dot */
+	fail_unless(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", &error));
+	fail_if(strcmp("Starts with a dot", error));
+
+	/* Test missing error msg ptr */
+	fail_unless(check_topdomain(".foo", NULL));
+}
+END_TEST
+
+START_TEST(test_topdomain_length)
+{
+	char *error;
+
+	/* Test empty and too short */
+	fail_unless(check_topdomain("", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_unless(check_topdomain("a", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_unless(check_topdomain(".a", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_unless(check_topdomain("a.", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_unless(check_topdomain("ab", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+	fail_if(check_topdomain("a.b", &error));
+	fail_if(strcmp("Too short (< 3)", error));
+
+	/* Test too long (over 128, need rest of space for data) */
+	fail_unless(check_topdomain(
+		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
+		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
+		"abcd12345.abcd12345.foo129xxx", &error));
+	fail_if(strcmp("Too long (> 128)", error));
+	fail_if(check_topdomain(
+		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
+		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
+		"abcd12345.abcd12345.foo128xx", &error));
+}
+END_TEST
+
+START_TEST(test_topdomain_chunks)
+{
+	char *error;
+
+	/* Must have at least one dot */
+	fail_if(check_topdomain("abcde.gh", &error));
+	fail_unless(check_topdomain("abcdefgh", &error));
+	fail_if(strcmp("No dots", error));
+
+	/* Not two consecutive dots */
+	fail_unless(check_topdomain("abc..defgh", &error));
+	fail_if(strcmp("Consecutive dots", error));
+
+	/* Not end with a dots */
+	fail_unless(check_topdomain("abc.defgh.", &error));
+	fail_if(strcmp("Ends with a dot", error));
+
+	/* No chunk longer than 63 chars */
+	fail_if(check_topdomain("123456789012345678901234567890"
+		"123456789012345678901234567890333.com", &error));
+	fail_unless(check_topdomain("123456789012345678901234567890"
+		"1234567890123456789012345678904444.com", &error));
+	fail_if(strcmp("Too long domain part (> 63)", error));
+
+	fail_if(check_topdomain("abc.123456789012345678901234567890"
+		"123456789012345678901234567890333.com", &error));
+	fail_unless(check_topdomain("abc.123456789012345678901234567890"
+		"1234567890123456789012345678904444.com", &error));
+	fail_if(strcmp("Too long domain part (> 63)", error));
+
+	fail_if(check_topdomain("abc.123456789012345678901234567890"
+		"123456789012345678901234567890333", &error));
+	fail_unless(check_topdomain("abc.123456789012345678901234567890"
+		"1234567890123456789012345678904444", &error));
+	fail_if(strcmp("Too long domain part (> 63)", error));
+}
+END_TEST
 
 START_TEST(test_parse_format_ipv4)
 {
@@ -106,6 +206,9 @@ test_common_create_tests()
 	int sock;
 
 	tc = tcase_create("Common");
+	tcase_add_test(tc, test_topdomain_ok);
+	tcase_add_test(tc, test_topdomain_length);
+	tcase_add_test(tc, test_topdomain_chunks);
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 

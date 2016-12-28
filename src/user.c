@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -62,7 +63,7 @@ init_users(in_addr_t my_ip, int netbits)
 
 	maxusers = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
 	usercount = MIN(maxusers, USERS);
-	
+
 	users = calloc(usercount, sizeof(struct tun_user));
 	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
@@ -78,6 +79,8 @@ init_users(in_addr_t my_ip, int netbits)
 		users[i].tun_ip = ip;
 		net.s_addr = ip;
 		users[i].disabled = 0;
+		users[i].authenticated = 0;
+		users[i].authenticated_raw = 0;
 		users[i].active = 0;
  		/* Rest is reset on login ('V' packet) */
 	}
@@ -94,24 +97,6 @@ users_get_first_ip()
 }
 
 int
-users_waiting_on_reply()
-{
-	int ret;
-	int i;
-
-	ret = 0;
-	for (i = 0; i < usercount; i++) {
-		if (users[i].active && !users[i].disabled && 
-			users[i].last_pkt + 60 > time(NULL) &&
-			users[i].q.id != 0 && users[i].conn == CONN_DNS_NULL) {
-			ret++;
-		}
-	}
-	
-	return ret;
-}
-
-int
 find_user_by_ip(uint32_t ip)
 {
 	int ret;
@@ -119,7 +104,9 @@ find_user_by_ip(uint32_t ip)
 
 	ret = -1;
 	for (i = 0; i < usercount; i++) {
-		if (users[i].active && !users[i].disabled &&
+		if (users[i].active &&
+			users[i].authenticated &&
+			!users[i].disabled &&
 			users[i].last_pkt + 60 > time(NULL) &&
 			ip == users[i].tun_ip) {
 			ret = i;
@@ -146,8 +133,8 @@ all_users_waiting_to_send()
 	for (i = 0; i < usercount; i++) {
 		if (users[i].active && !users[i].disabled &&
 			users[i].last_pkt + 60 > now &&
-			((users[i].conn == CONN_RAW_UDP) || 
-			((users[i].conn == CONN_DNS_NULL) 
+			((users[i].conn == CONN_RAW_UDP) ||
+			((users[i].conn == CONN_DNS_NULL)
 #ifdef OUTPACKETQ_LEN
 				&& users[i].outpacketq_filled < 1
 #else
@@ -171,6 +158,8 @@ find_available_user()
 		/* Not used at all or not used in one minute */
 		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
 			users[i].active = 1;
+			users[i].authenticated = 0;
+			users[i].authenticated_raw = 0;
 			users[i].last_pkt = time(NULL);
 			users[i].fragsize = 4096;
 			users[i].conn = CONN_DNS_NULL;
@@ -186,7 +175,7 @@ user_switch_codec(int userid, struct encoder *enc)
 {
 	if (userid < 0 || userid >= usercount)
 		return;
-	
+
 	users[userid].encoder = enc;
 }
 
@@ -196,9 +185,9 @@ user_set_conn_type(int userid, enum connection c)
 	if (userid < 0 || userid >= usercount)
 		return;
 
-	if (c < 0 || c >= CONN_MAX)
+	if (c < CONN_RAW_UDP || c >= CONN_MAX)
 		return;
-	
+
 	users[userid].conn = c;
 }
-	
+

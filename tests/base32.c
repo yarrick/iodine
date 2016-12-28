@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -66,7 +67,7 @@ START_TEST(test_base32_decode)
 	char buf[4096];
 	struct encoder *b32;
 	int val;
-	
+
 	b32 = get_base32_encoder();
 
 	len = sizeof(buf);
@@ -84,7 +85,7 @@ START_TEST(test_base32_5to8_8to5)
 	int c;
 
 	for (i = 0; i < 32; i++) {
-		c = b32_5to8(i);	
+		c = b32_5to8(i);
 		fail_unless(b32_8to5(c) == i);
 	}
 }

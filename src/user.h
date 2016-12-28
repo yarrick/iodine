@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2006-2009 Bjorn Andersson <flex@kryo.se>, Erik Ekman <yarrick@kryo.se>
+ * Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
@@ -36,11 +37,14 @@
 struct tun_user {
 	char id;
 	int active;
+	int authenticated;
+	int authenticated_raw;
 	int disabled;
 	time_t last_pkt;
 	int seed;
 	in_addr_t tun_ip;
-	struct in_addr host;
+	struct sockaddr_storage host;
+	socklen_t hostlen;
 	struct query q;
 	struct query q_sendrealsoon;
 	int q_sendrealsoon_new;
@@ -77,7 +81,6 @@ extern struct tun_user *users;
 
 int init_users(in_addr_t, int);
 const char* users_get_first_ip();
-int users_waiting_on_reply();
 int find_user_by_ip(uint32_t);
 int all_users_waiting_to_send();
 int find_available_user();
