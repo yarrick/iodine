@@ -18,6 +18,12 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#ifdef DARWIN
+#ifndef __APPLE_USE_RFC_3542
+#define __APPLE_USE_RFC_2292
+#endif
+#endif
+
 /* Last byte of raw header is the command */
 #define RAW_HDR_LEN 4
 #define RAW_HDR_IDENT_LEN 3
