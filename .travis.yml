@@ -5,6 +5,6 @@ language: objective-c
 os: osx
 
 before_install: brew update
-install: brew install check
+install: brew install check autoconf-archive
 
 script: autoreconf --install && ./configure && make && make test
