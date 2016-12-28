@@ -3,7 +3,7 @@
 # Prologue
 
 AC_PREREQ([2.69])
-AC_INIT([iodine],[0.6.0rc1],[erik@kryo.se],[],[http://dev.kryo.se/iodine/])
+AC_INIT([iodine],[0.7.0],[erik@kryo.se],[],[http://dev.kryo.se/iodine/])
 AC_CONFIG_SRCDIR([src/iodine.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([autotools])
@@ -46,7 +46,7 @@ AS_CASE([${OS}],
 # The AC_SUBST for GITREVISION is used only in legacy stanza; remove
 # when unused in Makefile.am, leaving only the config.h #define.
 
-AC_SUBST([GITREVISION],[$(git describe --always || echo not-in-git)])
+AC_SUBST([GITREVISION],[$(git describe --tags --always --dirty || echo not-in-git)])
 AC_DEFINE_UNQUOTED([GITREVISION],["${GITREVISION}"],
   [Precise git commit checked out when building])
 
