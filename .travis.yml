@@ -7,5 +7,4 @@ os: osx
 before_install: brew update
 install: brew install check
 
-script: make && make test
-
+script: autoreconf --install && ./configure && make && make test
