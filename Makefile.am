@@ -13,7 +13,7 @@ AM_CFLAGS = -g -Wall -pedantic
 ################################################################
 
 dist_man_MANS = man/iodine.8
-dist_doc_DATA = CHANGELOG README README-android.txt README-win32.txt	\
+dist_doc_DATA = CHANGELOG README.md README-android.txt README-win32.txt	\
  TODO doc/proto_00000402.txt doc/proto_00000500.txt			\
  doc/proto_00000502.txt
 
@@ -117,7 +117,7 @@ cross-android-dist:
 	cp src/libs/armeabi/* iodine-latest-android/armeabi
 	$(MAKE) cross-android TARGET_ARCH_ABI=x86
 	cp src/libs/x86/* iodine-latest-android/x86
-	cp README README-android.txt CH* TO* iodine-latest-android/
+	cp README.md README-android.txt CH* TO* iodine-latest-android/
 	echo "Create date: " > iodine-latest-android/VERSION
 	date >> iodine-latest-android/VERSION
 	echo "Git version: " >> iodine-latest-android/VERSION
@@ -143,7 +143,7 @@ cross-mingw-dist: cross-mingw
 	mkdir -p iodine-latest-win32/bin
 	for i in `ls bin`; do cp bin/$$i iodine-latest-win32/bin/$$i.exe; done
 	cp /usr/i686-mingw32/usr/bin/zlib1.dll iodine-latest-win32/bin/
-	cp README README-win32.txt CH* TO* iodine-latest-win32/
+	cp README.md README-win32.txt CH* TO* iodine-latest-win32/
 	echo "Create date: " > iodine-latest-win32/VERSION
 	date >> iodine-latest-win32/VERSION
 	echo "Git version: " >> iodine-latest-win32/VERSION
