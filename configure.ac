@@ -56,6 +56,7 @@ AC_PROG_CC
 AC_PROG_CC_STDC
 AS_IF([test "x${ac_cv_prog_cc_stdc}" = xno],
       [AC_MSG_WARN([Unable to engage Standard C (C99) option])],)
+AX_CFLAGS_WARN_ALL
 AC_PROG_INSTALL
 
 # Process options
