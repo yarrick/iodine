@@ -157,7 +157,15 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdint.h stdlib.h str
 
 AC_CHECK_TYPES([socklen_t],,
   AC_DEFINE([socklen_t],[int],
-    [define to int if type socklen_t not found]))
+    [define to int if type socklen_t not found]),
+  [
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+])
 
 AC_TYPE_UID_T
 AC_C_INLINE
