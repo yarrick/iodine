@@ -56,6 +56,10 @@ AC_PROG_CC
 AC_PROG_CC_STDC
 AS_IF([test "x${ac_cv_prog_cc_stdc}" = xno],
       [AC_MSG_WARN([Unable to engage Standard C (C99) option])],)
+# This is to avoid
+#    error: invalid application of ‘sizeof’ to incomplete type ‘struct in6_pktinfo’
+# whose definition is guarded by _GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 AX_CFLAGS_WARN_ALL
 AC_PROG_INSTALL
 
