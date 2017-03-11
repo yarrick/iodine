@@ -2307,43 +2307,46 @@ usage() {
 
 static void
 help() {
-	fprintf(stderr, "iodine IP over DNS tunneling server\n");
+	fprintf(stderr, "iodine IP over DNS tunneling server\n\n");
 	print_usage();
-	fprintf(stderr, "  -v to print version info and exit\n");
-	fprintf(stderr, "  -h to print this help and exit\n");
-	fprintf(stderr, "  -4 to listen only on IPv4\n");
-	fprintf(stderr, "  -6 to listen only on IPv6\n");
-	fprintf(stderr, "  -c to disable check of client IP/port on each request\n");
-	fprintf(stderr, "  -s to skip creating and configuring the tun device, "
-		"which then has to be created manually\n");
-	fprintf(stderr, "  -f to keep running in foreground\n");
-	fprintf(stderr, "  -D to increase debug level\n");
-	fprintf(stderr, "     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n");
-	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
-	fprintf(stderr, "  -t dir to chroot to directory dir\n");
-	fprintf(stderr, "  -d device to set tunnel device name\n");
-	fprintf(stderr, "  -m mtu to set tunnel device mtu\n");
-	fprintf(stderr, "  -z context to apply SELinux context after initialization\n");
-	fprintf(stderr, "  -l IPv4 address to listen on for incoming dns traffic "
-		"(default 0.0.0.0)\n");
-	fprintf(stderr, "  -L IPv6 address to listen on for incoming dns traffic "
-		"(default ::)\n");
-	fprintf(stderr, "  -p port to listen on for incoming dns traffic (default 53)\n");
-	fprintf(stderr, "  -n ip to respond with to NS queries\n");
-	fprintf(stderr, "  -b port to forward normal DNS queries to (on localhost)\n");
-	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
-	fprintf(stderr, "  -F pidfile to write pid to a file\n");
-	fprintf(stderr, "  -i maximum idle time before shutting down\n");
-	fprintf(stderr, "tunnel_ip is the IP number of the local tunnel interface.\n");
-	fprintf(stderr, "   /netmask sets the size of the tunnel network.\n");
-	fprintf(stderr, "topdomain is the FQDN that is delegated to this server.\n");
+	fprintf(stderr, "\nAvailable options:\n"
+			"  -v to print version info and exit\n"
+			"  -h to print this help and exit\n"
+			"  -4 to listen only on IPv4\n"
+			"  -6 to listen only on IPv6\n"
+			"  -c to disable check of client IP/port on each request\n"
+			"  -s to skip creating and configuring the tun device,\n"
+			"     which then has to be created manually\n"
+			"  -f to keep running in foreground\n"
+			"  -D to increase debug level\n"
+			"     (using -DD in UTF-8 terminal: \"LC_ALL=C luit iodined -DD ...\")\n"
+			"  -u name to drop privileges and run as user 'name'\n"
+			"  -t dir to chroot to directory dir\n"
+			"  -d device to set tunnel device name\n"
+			"  -m mtu to set tunnel device mtu\n"
+			"  -z context to apply SELinux context after initialization\n"
+			"  -l IPv4 address to listen on for incoming dns traffic "
+			"(default 0.0.0.0)\n"
+			"  -L IPv6 address to listen on for incoming dns traffic "
+			"(default ::)\n"
+			"  -p port to listen on for incoming dns traffic (default 53)\n"
+			"  -n ip to respond with to NS queries\n"
+			"  -b port to forward normal DNS queries to (on localhost)\n"
+			"  -P password used for authentication (max 32 chars will be used)\n"
+			"  -F pidfile to write pid to a file\n"
+			"  -i maximum idle time before shutting down\n\n"
+			"tunnel_ip is the IP number of the local tunnel interface.\n"
+			"   /netmask sets the size of the tunnel network.\n"
+			"topdomain is the FQDN that is delegated to this server.\n");
+
 	exit(0);
 }
 
 static void
 version() {
-	fprintf(stderr, "iodine IP over DNS tunneling server\n");
-	fprintf(stderr, "Git version: %s\n", GITREVISION);
+	fprintf(stderr, "iodine IP over DNS tunneling server\n"
+			"Git version: %s\n", GITREVISION);
+
 	exit(0);
 }
 
