@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include "common.h"
+#include "util.h"
 
 char *
 get_resolvconf_addr()

@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 #endif
 
+#include "login.h"
 #include "md5.h"
 
 /*

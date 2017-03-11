@@ -19,6 +19,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "read.h"
+
 static int
 readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length, size_t loop)
 {
