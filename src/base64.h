@@ -18,6 +18,6 @@
 #ifndef __BASE64_H__
 #define __BASE64_H__
 
-struct encoder *get_base64_encoder(void);
+extern const struct encoder base64_ops;
 
 #endif

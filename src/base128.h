@@ -17,6 +17,6 @@
 #ifndef __BASE128_H__
 #define __BASE128_H__
 
-struct encoder *get_base128_encoder(void);
+const struct encoder base128_ops;
 
 #endif

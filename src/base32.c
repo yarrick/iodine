@@ -33,28 +33,6 @@ static const char cb32_ucase[] =
 static unsigned char rev32[256];
 static int reverse_init = 0;
 
-static int base32_encode(char *, size_t *, const void *, size_t);
-static int base32_decode(void *, size_t *, const char *, size_t);
-static int base32_handles_dots(void);
-static int base32_blksize_raw(void);
-static int base32_blksize_enc(void);
-
-static struct encoder base32_encoder =
-{
-	"Base32",
-	base32_encode,
-	base32_decode,
-	base32_handles_dots,
-	base32_handles_dots,
-	base32_blksize_raw,
-	base32_blksize_enc
-};
-
-struct encoder *get_base32_encoder(void)
-{
-	return &base32_encoder;
-}
-
 static int base32_handles_dots(void)
 {
 	return 0;
@@ -261,3 +239,16 @@ static int base32_decode(void *buf, size_t *buflen, const char *str,
 
 	return iout;
 }
+
+const struct encoder base32_ops = {
+	.name = "Base32",
+
+	.encode = base32_encode,
+	.decode = base32_decode,
+
+	.places_dots = base32_handles_dots,
+	.eats_dots = base32_handles_dots,
+
+	.blocksize_raw = base32_blksize_raw,
+	.blocksize_encoded = base32_blksize_enc,
+};

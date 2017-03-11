@@ -52,28 +52,6 @@ static const unsigned char cb128[] =
 static unsigned char rev128[256];
 static int reverse_init = 0;
 
-static int base128_encode(char *, size_t *, const void *, size_t);
-static int base128_decode(void *, size_t *, const char *, size_t);
-static int base128_handles_dots(void);
-static int base128_blksize_raw(void);
-static int base128_blksize_enc(void);
-
-static struct encoder base128_encoder =
-{
-	"Base128",
-	base128_encode,
-	base128_decode,
-	base128_handles_dots,
-	base128_handles_dots,
-	base128_blksize_raw,
-	base128_blksize_enc
-};
-
-struct encoder *get_base128_encoder(void)
-{
-	return &base128_encoder;
-}
-
 static int base128_handles_dots(void)
 {
 	return 0;
@@ -284,3 +262,16 @@ static int base128_decode(void *buf, size_t *buflen, const char *str,
 
 	return iout;
 }
+
+const struct encoder base128_ops = {
+	.name = "Base128",
+
+	.encode = base128_encode,
+	.decode = base128_decode,
+
+	.places_dots = base128_handles_dots,
+	.eats_dots = base128_handles_dots,
+
+	.blocksize_raw = base128_blksize_raw,
+	.blocksize_encoded = base128_blksize_enc
+};

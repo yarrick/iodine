@@ -33,28 +33,6 @@ static const char cb64[] =
 static unsigned char rev64[256];
 static int reverse_init = 0;
 
-static int base64_encode(char *, size_t *, const void *, size_t);
-static int base64_decode(void *, size_t *, const char *, size_t);
-static int base64_handles_dots(void);
-static int base64_blksize_raw(void);
-static int base64_blksize_enc(void);
-
-static struct encoder base64_encoder =
-{
-	"Base64",
-	base64_encode,
-	base64_decode,
-	base64_handles_dots,
-	base64_handles_dots,
-	base64_blksize_raw,
-	base64_blksize_enc
-};
-
-struct encoder *get_base64_encoder(void)
-{
-	return &base64_encoder;
-}
-
 static int base64_handles_dots(void)
 {
 	return 0;
@@ -199,3 +177,16 @@ static int base64_decode(void *buf, size_t *buflen, const char *str,
 
 	return iout;
 }
+
+const struct encoder base64_ops = {
+	.name = "Base64",
+
+	.encode = base64_encode,
+	.decode = base64_decode,
+
+	.places_dots = base64_handles_dots,
+	.eats_dots = base64_handles_dots,
+
+	.blocksize_raw = base64_blksize_raw,
+	.blocksize_encoded = base64_blksize_enc,
+};

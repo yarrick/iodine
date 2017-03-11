@@ -18,8 +18,8 @@
 #ifndef __BASE32_H__
 #define __BASE32_H__
 
-struct encoder *get_base32_encoder(void);
-
 int b32_5to8(int);
 int b32_8to5(int);
+
+extern const struct encoder base32_ops;
 #endif
