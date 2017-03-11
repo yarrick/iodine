@@ -71,7 +71,7 @@ static inline void help(bool verbose) __attribute__((noreturn));
 static void
 help(bool verbose) {
 	fprintf(stderr, "iodine IP over DNS tunneling client\n\n"
-	                "Usage: %s [-fhrv] [-u user] [-t chrootdir] [-d device] [-P password]\n"
+	                "Usage: %s [-46fhrv] [-u user] [-t chrootdir] [-d device] [-P password]\n"
 			"              [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec]\n"
 			"              [-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 
@@ -79,6 +79,8 @@ help(bool verbose) {
 		exit(2);
 
 	fprintf(stderr, "\nOptions to try if connection doesn't work:\n"
+			"  -4 to connect only to IPv4\n"
+			"  -6 to connect only to IPv6\n"
 			"  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n"
 			"  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n"
 			"     Base128, or (only for TXT:) Raw  (default: autodetect)\n"
