@@ -33,10 +33,12 @@
 
 struct encoder {
 	const char name[8];
-	int (*encode) (char *, size_t *, const void *, size_t);
-	int (*decode) (void *, size_t *, const char *, size_t);
-	int (*places_dots) (void);
-	int (*eats_dots) (void);
+	int (*encode)(char *dst, size_t *dstlen, const void *src, size_t srclen);
+	int (*decode)(void *dst, size_t *dstlen, const char *src, size_t srclen);
+
+	int (*places_dots)(void);
+	int (*eats_dots)(void);
+
 	int (*blocksize_raw)(void);
 	int (*blocksize_encoded)(void);
 };
