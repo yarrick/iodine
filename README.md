@@ -24,11 +24,11 @@ QUICKSTART
 ----------
 
 Try it out within your own LAN! Follow these simple steps:
-- On your server, run: `./iodined -f 10.0.0.1 test.com`.  
-  If you already use the `10.0.0.0` network, use another internal net like 
+- On your server, run: `./iodined -f 10.0.0.1 test.com`.
+  If you already use the `10.0.0.0` network, use another internal net like
   `172.16.0.0`.
 - Enter a password.
-- On the client, run: `./iodine -f -r 192.168.0.1 test.com`.  
+- On the client, run: `./iodine -f -r 192.168.0.1 test.com`.
   Replace `192.168.0.1` with your server's ip address.
 - Enter the same password.
 - Now the client has the tunnel ip `10.0.0.2` and the server has `10.0.0.1`.
@@ -149,12 +149,12 @@ server.
 #### Testing
 The `iodined` server replies to `NS` requests sent for subdomains of the tunnel
 domain. If your iodined subdomain is `t1.mydomain.com`, send a `NS` request for
-`foo123.t1.mydomain.com` to see if the delegation works.  
+`foo123.t1.mydomain.com` to see if the delegation works.
 `dig` is a good tool for this:
 
 	% dig -t NS foo123.t1.mydomain.com
 	ns.io.citronna.de.
-	
+
 Also, the iodined server will answer requests starting with 'z' for any of the
 supported request types, for example:
 
@@ -262,7 +262,7 @@ can also show received and sent queries.
 TIPS & TRICKS
 -------------
 
-If your port 53 is taken on a specific interface by an application that does 
+If your port 53 is taken on a specific interface by an application that does
 not use it, use `-p` on iodined to specify an alternate port (like `-p 5353`)
 and use for instance iptables (on Linux) to forward the traffic:
 
@@ -310,18 +310,18 @@ and mean deviation (indicating spread around the average), in milliseconds.
 ### Situation 1: `Laptop  ->   Wifi AP   ->  Home server  ->  DSL provider  ->  Datacenter`
 
 	 iodine    DNS "relay"        bind9           DNS cache        iodined
-	
+
 	                        downstr.  upstream downstr.  ping-up       ping-down
 	                        fragsize   kbit/s   kbit/s  avg +/-mdev   avg +/-mdev
 	-----------------------------------------------------------------------------
-	
+
 	iodine -> Wifi AP :53
 	  -Tnull (= -Oraw)           982    43.6    131.0   28.0    4.6   26.8    3.4
-	
+
 	iodine -> Home server :53
 	  -Tnull (= -Oraw)          1174    48.0    305.8   26.6    5.0   26.9    8.4
-	
-	iodine -> DSL provider :53  
+
+	iodine -> DSL provider :53
 	  -Tnull (= -Oraw)          1174    56.7    367.0   20.6    3.1   21.2    4.4
 	  -Ttxt -Obase32             730    56.7    174.7*
 	  -Ttxt -Obase64             874    56.7    174.7
@@ -330,23 +330,23 @@ and mean deviation (indicating spread around the average), in milliseconds.
 	  -Tsrv -Obase128            910    56.7    174.7
 	  -Tcname -Obase32           151    56.7     43.6
 	  -Tcname -Obase128          212    56.7     52.4
-	
-	iodine -> DSL provider :53  
+
+	iodine -> DSL provider :53
 	  wired (no Wifi) -Tnull    1174    74.2    585.4   20.2    5.6   19.6    3.4
-	
+
 	 [174.7* : these all have 2frag/packet]
 
 
 ### Situation 2: `Laptop  ->  Wifi+vpn / wired  ->  Home server`
 
 	 iodine                            iodined
-	
+
 	                        downstr.  upstream downstr.  ping-up       ping-down
 	                        fragsize   kbit/s   kbit/s  avg +/-mdev   avg +/-mdev
 	-----------------------------------------------------------------------------
-	
+
 	wifi + openvpn  -Tnull      1186   166.0   1022.3    6.3    1.3    6.6    1.6
-	
+
 	wired  -Tnull               1186   677.2   2464.1    1.3    0.2    1.3    0.1
 
 
