@@ -47,7 +47,7 @@ typedef struct {
 
 #define C_IN		1
 
-#define T_A			1
+#define T_A		1
 #define T_CNAME		5
 #define T_NULL		10
 #define T_MX		15

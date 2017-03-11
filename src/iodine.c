@@ -111,8 +111,7 @@ static inline void usage(void)
 	help(stderr, false);
 }
 
-static void
-version()
+static void version(void)
 {
 	fprintf(stderr, "iodine IP over DNS tunneling client\n"
 			"Git version: %s\n", GITREVISION);
@@ -120,8 +119,7 @@ version()
 	exit(0);
 }
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	char *nameserv_host;
 	char *topdomain;

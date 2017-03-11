@@ -33,7 +33,7 @@ struct fw_query {
 	unsigned short id;
 };
 
-void fw_query_init();
+void fw_query_init(void);
 void fw_query_put(struct fw_query *fw_query);
 void fw_query_get(unsigned short query_id, struct fw_query **fw_query);
 

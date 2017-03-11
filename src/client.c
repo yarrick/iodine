@@ -346,8 +346,7 @@ send_packet(int fd, char cmd, const char *data, const size_t datalen)
 	send_query(fd, buf);
 }
 
-static inline int
-is_sending()
+static inline int is_sending(void)
 {
 	return (outpkt.len != 0);
 }

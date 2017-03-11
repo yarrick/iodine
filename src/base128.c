@@ -54,9 +54,9 @@ static int reverse_init = 0;
 
 static int base128_encode(char *, size_t *, const void *, size_t);
 static int base128_decode(void *, size_t *, const char *, size_t);
-static int base128_handles_dots();
-static int base128_blksize_raw();
-static int base128_blksize_enc();
+static int base128_handles_dots(void);
+static int base128_blksize_raw(void);
+static int base128_blksize_enc(void);
 
 static struct encoder base128_encoder =
 {
@@ -69,32 +69,27 @@ static struct encoder base128_encoder =
 	base128_blksize_enc
 };
 
-struct encoder
-*get_base128_encoder()
+struct encoder *get_base128_encoder(void)
 {
 	return &base128_encoder;
 }
 
-static int
-base128_handles_dots()
+static int base128_handles_dots(void)
 {
 	return 0;
 }
 
-static int
-base128_blksize_raw()
+static int base128_blksize_raw(void)
 {
 	return BLKSIZE_RAW;
 }
 
-static int
-base128_blksize_enc()
+static int base128_blksize_enc(void)
 {
 	return BLKSIZE_ENC;
 }
 
-inline static void
-base128_reverse_init()
+inline static void base128_reverse_init(void)
 {
 	int i;
 	unsigned char c;
@@ -109,8 +104,6 @@ base128_reverse_init()
 	}
 }
 
-static int
-base128_encode(char *buf, size_t *buflen, const void *data, size_t size)
 /*
  * Fills *buf with max. *buflen characters, encoding size bytes of *data.
  *
@@ -120,6 +113,8 @@ base128_encode(char *buf, size_t *buflen, const void *data, size_t size)
  * return value    : #bytes filled in buf   (excluding \0)
  * sets *buflen to : #bytes encoded from data
  */
+static int base128_encode(char *buf, size_t *buflen, const void *data,
+			  size_t size)
 {
 	unsigned char *ubuf = (unsigned char *) buf;
 	unsigned char *udata = (unsigned char *) data;
@@ -203,8 +198,6 @@ base128_encode(char *buf, size_t *buflen, const void *data, size_t size)
 
 #define REV128(x) rev128[(int) (x)]
 
-static int
-base128_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 /*
  * Fills *buf with max. *buflen bytes, decoded from slen chars in *str.
  * Decoding stops early when *str contains \0.
@@ -216,6 +209,8 @@ base128_decode(void *buf, size_t *buflen, const char *str, size_t slen)
  *
  * return value    : #bytes filled in buf   (excluding \0)
  */
+static int base128_decode(void *buf, size_t *buflen, const char *str,
+			  size_t slen)
 {
 	unsigned char *ustr = (unsigned char *) str;
 	unsigned char *ubuf = (unsigned char *) buf;

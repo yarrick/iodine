@@ -11,6 +11,7 @@ HEAD_COMMIT = `git rev-parse --short HEAD`
 LIBPATH = -L.
 LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
 CFLAGS += -std=c99 -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
+CFLAGS += -Wstrict-prototypes -Wtype-limits -Wmissing-declarations -Wmissing-prototypes
 
 all: stateos $(CLIENT) $(SERVER)
 

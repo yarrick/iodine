@@ -199,17 +199,15 @@ sigint(int sig)
 #define	LOG_NOTICE	5
 #define	LOG_INFO	6
 #define	LOG_DEBUG	7
-static void
-syslog(int a, const char *str, ...)
+
+static void syslog(int a, const char *str, ...)
 {
 	/* TODO: implement (add to event log), move to common.c */
-	;
 }
 #endif
 
 /* This will not check that user has passed login challenge */
-static int
-check_user_and_ip(int userid, struct query *q)
+static int check_user_and_ip(int userid, struct query *q)
 {
 	/* Note: duplicate in handle_raw_login() except IP-address check */
 
@@ -252,8 +250,7 @@ check_user_and_ip(int userid, struct query *q)
 }
 
 /* This checks that user has passed normal (non-raw) login challenge */
-static int
-check_authenticated_user_and_ip(int userid, struct query *q)
+static int check_authenticated_user_and_ip(int userid, struct query *q)
 {
 	int res = check_user_and_ip(userid, q);
 	if (res)
@@ -265,8 +262,7 @@ check_authenticated_user_and_ip(int userid, struct query *q)
 	return 0;
 }
 
-static void
-send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
+static void send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 {
 	char packet[4096];
 	int len;
@@ -290,8 +286,7 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
 }
 
 
-static void
-start_new_outpacket(int userid, char *data, int datalen)
+static void start_new_outpacket(int userid, char *data, int datalen)
 /* Copies data to .outpacket and resets all counters.
    data is expected to be compressed already. */
 {
@@ -307,8 +302,7 @@ start_new_outpacket(int userid, char *data, int datalen)
 
 #ifdef OUTPACKETQ_LEN
 
-static int
-save_to_outpacketq(int userid, char *data, int datalen)
+static int save_to_outpacketq(int userid, char *data, int datalen)
 /* Find space in outpacket-queue and store data (expected compressed already).
    Returns: 1 = okay, 0 = no space. */
 {
@@ -336,8 +330,7 @@ save_to_outpacketq(int userid, char *data, int datalen)
 	return 1;
 }
 
-static int
-get_from_outpacketq(int userid)
+static int get_from_outpacketq(int userid)
 /* Starts new outpacket from queue, if any.
    Returns: 1 = okay, 0 = no packets were waiting. */
 {
@@ -384,8 +377,7 @@ get_from_outpacketq(int userid)
    number, and of course data.)
 */
 
-static void
-save_to_dnscache(int userid, struct query *q, char *answer, int answerlen)
+static void save_to_dnscache(int userid, struct query *q, char *answer, int answerlen)
 /* Store answer in our little DNS cache. */
 {
 	int fill;
@@ -404,8 +396,7 @@ save_to_dnscache(int userid, struct query *q, char *answer, int answerlen)
 	users[userid].dnscache_lastfilled = fill;
 }
 
-static int
-answer_from_dnscache(int dns_fd, int userid, struct query *q)
+static int answer_from_dnscache(int dns_fd, int userid, struct query *q)
 /* Checks cache and sends repeated answer if we alreay saw this query recently.
    Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
    a new query. */
@@ -446,10 +437,11 @@ answer_from_dnscache(int dns_fd, int userid, struct query *q)
 
 #endif /* DNSCACHE_LEN */
 
-static inline void
-save_to_qmem(unsigned char *qmem_cmc, unsigned short *qmem_type, int qmem_len,
-	     int *qmem_lastfilled, unsigned char *cmc_to_add,
-	     unsigned short type_to_add)
+static inline void save_to_qmem(unsigned char *qmem_cmc,
+				unsigned short *qmem_type, int qmem_len,
+				int *qmem_lastfilled,
+				unsigned char *cmc_to_add,
+				unsigned short type_to_add)
 /* Remember query to check for duplicates */
 {
 	int fill;
@@ -463,8 +455,7 @@ save_to_qmem(unsigned char *qmem_cmc, unsigned short *qmem_type, int qmem_len,
 	*qmem_lastfilled = fill;
 }
 
-static inline void
-save_to_qmem_pingordata(int userid, struct query *q)
+static inline void save_to_qmem_pingordata(int userid, struct query *q)
 {
 	/* Our CMC is a bit more than the "official" CMC; we store 4 bytes
 	   just because we can, and because it may prevent some false matches.
@@ -519,10 +510,9 @@ save_to_qmem_pingordata(int userid, struct query *q)
 	}
 }
 
-static int
-answer_from_qmem(int dns_fd, struct query *q, unsigned char *qmem_cmc,
-		 unsigned short *qmem_type, int qmem_len,
-		 unsigned char *cmc_to_check)
+static int answer_from_qmem(int dns_fd, struct query *q,
+			    unsigned char *qmem_cmc, unsigned short *qmem_type,
+			    int qmem_len, unsigned char *cmc_to_check)
 /* Checks query memory and sends an (illegal) answer if this is a duplicate.
    Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
    not a duplicate. */
@@ -552,9 +542,9 @@ answer_from_qmem(int dns_fd, struct query *q, unsigned char *qmem_cmc,
 	return 0;
 }
 
-static inline int
-answer_from_qmem_data(int dns_fd, int userid, struct query *q)
 /* Quick helper function to keep handle_null_request() clean */
+static inline int answer_from_qmem_data(int dns_fd, int userid,
+					struct query *q)
 {
 	char cmc[4];
 	int i;
@@ -570,8 +560,6 @@ answer_from_qmem_data(int dns_fd, int userid, struct query *q)
 				(void *) cmc);
 }
 
-static int
-send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 /* Sends current fragment to user, or dataless packet if there is no
    current fragment available (-> normal "quiet" ping reply).
    Does not update anything, except:
@@ -581,6 +569,7 @@ send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
    Returns: 1 = can call us again immediately, new packet from queue;
    0 = don't call us again for now.
 */
+static int send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 {
 	char pkt[4096];
 	int datalen = 0;
@@ -664,8 +653,7 @@ send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 	return 0;	/* don't call us again */
 }
 
-static int
-tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
+static int tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 {
 	unsigned long outlen;
 	struct ip *header;
@@ -722,8 +710,8 @@ typedef enum {
 	VERSION_FULL
 } version_ack_t;
 
-static void
-send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, struct query *q)
+static void send_version_response(int fd, version_ack_t ack, uint32_t payload,
+				  int userid, struct query *q)
 {
 	char out[9];
 
@@ -748,12 +736,11 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload, int userid, s
 	write_dns(fd, q, out, sizeof(out), users[userid].downenc);
 }
 
-static void
-process_downstream_ack(int userid, int down_seq, int down_frag)
 /* Process acks from downstream fragments.
    After this, .offset and .fragment are updated (if ack correct),
    or .len is set to zero when all is done.
 */
+static void process_downstream_ack(int userid, int down_seq, int down_frag)
 {
 	if (users[userid].outpacket.len <= 0)
 		/* No packet to apply acks to */
@@ -2340,16 +2327,15 @@ static void help(FILE *stream)
 	exit(0);
 }
 
-static void
-version() {
+static void version(void)
+{
 	fprintf(stderr, "iodine IP over DNS tunneling server\n"
 			"Git version: %s\n", GITREVISION);
 
 	exit(0);
 }
 
-static void
-prepare_dns_fd(int fd)
+static void prepare_dns_fd(int fd)
 {
 #ifndef WINDOWS32
 	int flag = 1;

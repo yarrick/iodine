@@ -80,10 +80,10 @@ struct tun_user {
 extern struct tun_user *users;
 
 int init_users(in_addr_t, int);
-const char* users_get_first_ip();
+const char* users_get_first_ip(void);
 int find_user_by_ip(uint32_t);
-int all_users_waiting_to_send();
-int find_available_user();
+int all_users_waiting_to_send(void);
+int find_available_user(void);
 void user_switch_codec(int userid, struct encoder *enc);
 void user_set_conn_type(int userid, enum connection c);
 
