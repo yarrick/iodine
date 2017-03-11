@@ -22,7 +22,7 @@
 int
 build_hostname(char *buf, size_t buflen,
 		const char *data, const size_t datalen,
-		const char *topdomain, struct encoder *encoder, int maxlen)
+		const char *topdomain, const struct encoder *encoder, int maxlen)
 {
 	size_t space;
 	char *b;
@@ -56,7 +56,7 @@ build_hostname(char *buf, size_t buflen,
 }
 
 int
-unpack_data(char *buf, size_t buflen, char *data, size_t datalen, struct encoder *enc)
+unpack_data(char *buf, size_t buflen, char *data, size_t datalen, const struct encoder *enc)
 {
 	if (!enc->eats_dots())
 		datalen = inline_undotify(data, datalen);

@@ -28,7 +28,7 @@ int putname(char **, size_t, const char *);
 int putbyte(char **, unsigned char);
 int putshort(char **, unsigned short);
 int putlong(char **, uint32_t);
-int putdata(char **, char *, size_t);
-int puttxtbin(char **, size_t, char *, size_t);
+int putdata(char **, const char *, size_t);
+int puttxtbin(char **, size_t, const char *, size_t);
 
 #endif

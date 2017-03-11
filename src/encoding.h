@@ -26,7 +26,7 @@
 #define DOWNCODECCHECK1_LEN  48
 
 struct encoder {
-	char name[8];
+	const char name[8];
 	int (*encode) (char *, size_t *, const void *, size_t);
 	int (*decode) (void *, size_t *, const char *, size_t);
 	int (*places_dots) (void);
@@ -35,10 +35,9 @@ struct encoder {
 	int (*blocksize_encoded)(void);
 };
 
-int build_hostname(char *, size_t, const char *, const size_t, const char *, struct encoder *, int);
-int unpack_data(char *, size_t, char *, size_t, struct encoder *);
+int build_hostname(char *, size_t, const char *, const size_t, const char *, const struct encoder *, int);
+int unpack_data(char *, size_t, char *, size_t, const struct encoder *);
 int inline_dotify(char *, size_t);
 int inline_undotify(char *, size_t);
-
 
 #endif /* _ENCODING_H_ */

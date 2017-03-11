@@ -50,7 +50,7 @@ int dnsc_use_edns0 = 1;
 #define CHECKLEN(x) if (buflen < (x) + (unsigned)(p-buf))  return 0
 
 int
-dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_t datalen)
+dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, const char *data, size_t datalen)
 {
 	HEADER *header;
 	short name;
@@ -120,7 +120,7 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, char *data, size_
 			   For SRV, see RFC2782.
 			 */
 
-			char *mxdata = data;
+			const char *mxdata = data;
 			char *startp;
 			int namelen;
 

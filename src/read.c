@@ -230,7 +230,7 @@ putlong(char **dst, uint32_t value)
 }
 
 int
-putdata(char **dst, char *data, size_t len)
+putdata(char **dst, const char *data, size_t len)
 {
 	memcpy(*dst, data, len);
 
@@ -239,7 +239,7 @@ putdata(char **dst, char *data, size_t len)
 }
 
 int
-puttxtbin(char **buf, size_t bufremain, char *from, size_t fromremain)
+puttxtbin(char **buf, size_t bufremain, const char *from, size_t fromremain)
 {
 	unsigned char uc;
 	unsigned char *ucp = &uc;

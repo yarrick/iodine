@@ -119,7 +119,7 @@ struct dnsfd {
 };
 
 static int read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q);
-static void write_dns(int fd, struct query *q, char *data, int datalen, char downenc);
+static void write_dns(int fd, struct query *q, const char *data, int datalen, char downenc);
 static void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid);
 
 static int
@@ -2118,7 +2118,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 }
 
 static size_t
-write_dns_nameenc(char *buf, size_t buflen, char *data, int datalen, char downenc)
+write_dns_nameenc(char *buf, size_t buflen, const char *data, int datalen, char downenc)
 /* Returns #bytes of data that were encoded */
 {
 	static int td1 = 0;
@@ -2188,7 +2188,7 @@ write_dns_nameenc(char *buf, size_t buflen, char *data, int datalen, char downen
 }
 
 static void
-write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
+write_dns(int fd, struct query *q, const char *data, int datalen, char downenc)
 {
 	char buf[64*1024];
 	int len = 0;

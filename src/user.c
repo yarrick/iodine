@@ -161,7 +161,7 @@ int find_available_user(void)
 	return ret;
 }
 
-void user_switch_codec(int userid, struct encoder *enc)
+void user_switch_codec(int userid, const struct encoder *enc)
 {
 	if (userid < 0 || userid >= usercount)
 		return;
