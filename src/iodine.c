@@ -275,7 +275,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	check_superuser(usage);
+	check_superuser();
 
 	argc -= optind;
 	argv += optind;

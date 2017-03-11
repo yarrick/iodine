@@ -2537,7 +2537,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	check_superuser(usage);
+	check_superuser();
 
 	if (argc != 2)
 		usage();
