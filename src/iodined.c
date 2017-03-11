@@ -105,6 +105,8 @@ static int debug;
 
 #if !defined(BSD) && !defined(__GLIBC__)
 static char *__progname;
+#else
+extern char *__progname;
 #endif
 
 /* Struct with IPv4 and IPv6 file descriptors.
@@ -2288,8 +2290,6 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 
 static void
 print_usage() {
-	extern char *__progname;
-
 	fprintf(stderr, "Usage: %s [-v] [-h] "
 		"[-4] [-6] [-c] [-s] [-f] [-D] [-u user] "
 		"[-t chrootdir] [-d device] [-m mtu] [-z context] "
@@ -2368,7 +2368,6 @@ prepare_dns_fd(int fd)
 int
 main(int argc, char **argv)
 {
-	extern char *__progname;
 	char *listen_ip4;
 	char *listen_ip6;
 	char *errormsg;

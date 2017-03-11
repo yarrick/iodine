@@ -49,6 +49,8 @@ WSADATA wsa_data;
 
 #if !defined(BSD) && !defined(__GLIBC__)
 static char *__progname;
+#else
+extern char *__progname;
 #endif
 
 #define PASSWORD_ENV_VAR "IODINE_PASS"
@@ -68,8 +70,6 @@ static inline void help(bool verbose) __attribute__((noreturn));
 
 static void
 help(bool verbose) {
-	extern char *__progname;
-
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
