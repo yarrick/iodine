@@ -15,6 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -61,27 +62,22 @@ sighandler(int sig)
 #if defined(__GNUC__) || defined(__clang__)
 /* mark as no return to help some compilers to avoid warnings
  * about use of uninitialized variables */
-static void usage() __attribute__((noreturn));
+static inline void usage(void) __attribute__((noreturn));
+static inline void help(bool verbose) __attribute__((noreturn));
 #endif
 
 static void
-usage() {
-	extern char *__progname;
-
-	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
-			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
-	exit(2);
-}
-
-static void
-help() {
+help(bool verbose) {
 	extern char *__progname;
 
 	fprintf(stderr, "iodine IP over DNS tunneling client\n");
 	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
 			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+
+	if (!verbose)
+		exit(2);
+
 	fprintf(stderr, "Options to try if connection doesn't work:\n");
 	fprintf(stderr, "  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
 	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
@@ -105,6 +101,11 @@ help() {
 	fprintf(stderr, "topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
+}
+
+static inline void usage(void)
+{
+	help(false);
 }
 
 static void
@@ -204,7 +205,7 @@ main(int argc, char **argv)
 			foreground = 1;
 			break;
 		case 'h':
-			help();
+			help(true);
 			/* NOTREACHED */
 			break;
 		case 'r':
