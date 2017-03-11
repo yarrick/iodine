@@ -19,10 +19,9 @@
 #include "common.h"
 #include "encoding.h"
 
-int
-build_hostname(char *buf, size_t buflen,
-		const char *data, const size_t datalen,
-		const char *topdomain, const struct encoder *encoder, int maxlen)
+int build_hostname(char *buf, size_t buflen, const char *data,
+		   const size_t datalen, const char *topdomain,
+		   const struct encoder *encoder, int maxlen)
 {
 	size_t space;
 	char *b;
@@ -55,16 +54,15 @@ build_hostname(char *buf, size_t buflen,
 	return space;
 }
 
-int
-unpack_data(char *buf, size_t buflen, char *data, size_t datalen, const struct encoder *enc)
+int unpack_data(char *buf, size_t buflen, char *data, size_t datalen,
+		const struct encoder *enc)
 {
 	if (!enc->eats_dots())
 		datalen = inline_undotify(data, datalen);
 	return enc->decode(buf, &buflen, data, datalen);
 }
 
-int
-inline_dotify(char *buf, size_t buflen)
+int inline_dotify(char *buf, size_t buflen)
 {
 	unsigned dots;
 	unsigned pos;
@@ -101,8 +99,7 @@ inline_dotify(char *buf, size_t buflen)
 	return total;
 }
 
-int
-inline_undotify(char *buf, size_t len)
+int inline_undotify(char *buf, size_t len)
 {
 	unsigned pos;
 	unsigned dots;
