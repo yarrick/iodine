@@ -106,7 +106,7 @@ void
 check_superuser(void)
 {
 	if (geteuid() != 0) {
-		warnx("Run as root and you'll be happy.\n");
+		warnx("Run as root and you'll be happy.");
 		exit(-1);
 	}
 }
