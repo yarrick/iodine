@@ -1297,7 +1297,7 @@ send_raw_udp_login(int dns_fd, int userid, int seed)
 }
 
 static void
-send_upenctest(int fd, char *s)
+send_upenctest(int fd, const char *s)
 /* NOTE: String may be at most 63-4=59 chars to fit in 1 dns chunk. */
 {
 	char buf[512] = "z___";
@@ -1574,7 +1574,7 @@ handshake_raw_udp(int dns_fd, int seed)
 }
 
 static int
-handshake_upenctest(int dns_fd, char *s)
+handshake_upenctest(int dns_fd, const char *s)
 /* NOTE: *s may be max 59 chars; must start with "aA" for case-swap check
    Returns:
    -1: case swap, no need for any further test: error printed; or Ctrl-C
@@ -1584,7 +1584,7 @@ handshake_upenctest(int dns_fd, char *s)
 {
 	char in[4096];
 	unsigned char *uin = (unsigned char *) in;
-	unsigned char *us = (unsigned char *) s;
+	const unsigned char *us = (const unsigned char *) s;
 	int i;
 	int read;
         int slen;
@@ -1666,17 +1666,17 @@ handshake_upenc_autodetect(int dns_fd)
 	   [A-Z] as first, and [A-Z0-9] as last char _per label_.
 	   Test by having '-' as last char.
 	 */
-        char *pat64="aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ+0129-";
-        char *pat64u="aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ_0129-";
-        char *pat128a="aA-Aaahhh-Drink-mal-ein-J\344germeister-";
-        char *pat128b="aA-La-fl\373te-na\357ve-fran\347aise-est-retir\351-\340-Cr\350te";
-        char *pat128c="aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ";
-        char *pat128d="aA0123456789\274\275\276\277"
-		      "\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317";
-        char *pat128e="aA"
-		      "\320\321\322\323\324\325\326\327\330\331\332\333\334\335\336\337"
-		      "\340\341\342\343\344\345\346\347\350\351\352\353\354\355\356\357"
-		      "\360\361\362\363\364\365\366\367\370\371\372\373\374\375";
+        const char *pat64 = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ+0129-";
+        const char *pat64u = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ_0129-";
+        const char *pat128a = "aA-Aaahhh-Drink-mal-ein-J\344germeister-";
+        const char *pat128b = "aA-La-fl\373te-na\357ve-fran\347aise-est-retir\351-\340-Cr\350te";
+        const char *pat128c = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ";
+        const char *pat128d = "aA0123456789\274\275\276\277"
+                              "\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317";
+        const char *pat128e="aA"
+		            "\320\321\322\323\324\325\326\327\330\331\332\333\334\335\336\337"
+		            "\340\341\342\343\344\345\346\347\350\351\352\353\354\355\356\357"
+		            "\360\361\362\363\364\365\366\367\370\371\372\373\374\375";
 	int res;
 
 	/* Try Base128, starting very gently to not draw attention */
