@@ -22,8 +22,8 @@
 
 #include "encoding.h"
 
-#define BLKSIZE_RAW 3
-#define BLKSIZE_ENC 4
+#define BASE64_BLKSIZE_RAW 3
+#define BASE64_BLKSIZE_ENC 4
 
 /* Note: the "unofficial" char is last here, which means that the \377 pattern
    in DOWNCODECCHECK1 ('Y' request) will properly test it. */
@@ -35,16 +35,6 @@ static int reverse_init = 0;
 static int base64_handles_dots(void)
 {
 	return 0;
-}
-
-static int base64_blksize_raw(void)
-{
-	return BLKSIZE_RAW;
-}
-
-static int base64_blksize_enc(void)
-{
-	return BLKSIZE_ENC;
 }
 
 inline static void base64_reverse_init(void)
@@ -186,6 +176,6 @@ const struct encoder base64_ops = {
 	.places_dots = base64_handles_dots,
 	.eats_dots = base64_handles_dots,
 
-	.blocksize_raw = base64_blksize_raw,
-	.blocksize_encoded = base64_blksize_enc,
+	.blocksize_raw = BASE64_BLKSIZE_RAW,
+	.blocksize_encoded = BASE64_BLKSIZE_ENC,
 };

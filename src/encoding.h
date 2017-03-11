@@ -39,8 +39,8 @@ struct encoder {
 	int (*places_dots)(void);
 	int (*eats_dots)(void);
 
-	int (*blocksize_raw)(void);
-	int (*blocksize_encoded)(void);
+	const int blocksize_raw;
+	const int blocksize_encoded;
 };
 
 int build_hostname(char *, size_t, const char *, const size_t, const char *, const struct encoder *, int);

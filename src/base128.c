@@ -34,8 +34,8 @@
 
 #include "encoding.h"
 
-#define BLKSIZE_RAW 7
-#define BLKSIZE_ENC 8
+#define BASE128_BLKSIZE_RAW 7
+#define BASE128_BLKSIZE_ENC 8
 
 /* Don't use '-' (restricted to middle of labels), prefer iso_8859-1
  * accent chars since they might readily be entered in normal use,
@@ -54,16 +54,6 @@ static int reverse_init = 0;
 static int base128_handles_dots(void)
 {
 	return 0;
-}
-
-static int base128_blksize_raw(void)
-{
-	return BLKSIZE_RAW;
-}
-
-static int base128_blksize_enc(void)
-{
-	return BLKSIZE_ENC;
 }
 
 inline static void base128_reverse_init(void)
@@ -271,6 +261,6 @@ const struct encoder base128_ops = {
 	.places_dots = base128_handles_dots,
 	.eats_dots = base128_handles_dots,
 
-	.blocksize_raw = base128_blksize_raw,
-	.blocksize_encoded = base128_blksize_enc
+	.blocksize_raw = BASE128_BLKSIZE_RAW,
+	.blocksize_encoded = BASE128_BLKSIZE_ENC,
 };

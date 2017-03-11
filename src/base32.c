@@ -22,8 +22,8 @@
 
 #include "encoding.h"
 
-#define BLKSIZE_RAW 5
-#define BLKSIZE_ENC 8
+#define BASE32_BLKSIZE_RAW 5
+#define BASE32_BLKSIZE_ENC 8
 
 static const char cb32[] =
 	"abcdefghijklmnopqrstuvwxyz012345";
@@ -35,16 +35,6 @@ static int reverse_init = 0;
 static int base32_handles_dots(void)
 {
 	return 0;
-}
-
-static int base32_blksize_raw(void)
-{
-	return BLKSIZE_RAW;
-}
-
-static int base32_blksize_enc(void)
-{
-	return BLKSIZE_ENC;
 }
 
 inline static void base32_reverse_init(void)
@@ -248,6 +238,6 @@ const struct encoder base32_ops = {
 	.places_dots = base32_handles_dots,
 	.eats_dots = base32_handles_dots,
 
-	.blocksize_raw = base32_blksize_raw,
-	.blocksize_encoded = base32_blksize_enc,
+	.blocksize_raw = BASE32_BLKSIZE_RAW,
+	.blocksize_encoded = BASE32_BLKSIZE_ENC,
 };
