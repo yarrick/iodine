@@ -49,8 +49,8 @@ int dnsc_use_edns0 = 1;
 
 #define CHECKLEN(x) if (buflen < (x) + (unsigned)(p-buf))  return 0
 
-int
-dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, const char *data, size_t datalen)
+int dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr,
+	       const char *data, size_t datalen)
 {
 	HEADER *header;
 	short name;
@@ -91,7 +91,8 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, const char *data,
 		/* Answer section */
 
 		if (q->type == T_CNAME || q->type == T_A) {
-			/* data is expected to be like "Hblabla.host.name.com\0" */
+			/* data is expected to be like
+			 * "Hblabla.host.name.com\0" */
 
 			char *startp;
 			int namelen;
@@ -130,12 +131,12 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, const char *data,
 				putshort(&p, name);
 				putshort(&p, q->type);
 				putshort(&p, C_IN);
-				putlong(&p, 0);		/* TTL */
+				putlong(&p, 0);	/* TTL */
 
 				startp = p;
-				p += 2;			/* skip 2 bytes length */
+				p += 2; /* skip 2 bytes length */
 				CHECKLEN(2);
-				putshort(&p, 10 * ancnt);	/* preference */
+				putshort(&p, 10 * ancnt); /* preference */
 
 				if (q->type == T_SRV) {
 					/* weight, port (5060 = SIP) */
@@ -165,10 +166,10 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, const char *data,
 			putshort(&p, name);
 			putshort(&p, q->type);
 			putshort(&p, C_IN);
-			putlong(&p, 0);		/* TTL */
+			putlong(&p, 0); /* TTL */
 
 			startp = p;
-			p += 2;			/* skip 2 bytes length */
+			p += 2; /* skip 2 bytes length */
 			puttxtbin(&p, buflen - (p - buf), data, datalen);
 			CHECKLEN(0);
 			txtlen = p - startp;
@@ -177,12 +178,11 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, const char *data,
 			ancnt = 1;
 		} else {
 			/* NULL has raw binary data */
-
 			CHECKLEN(10);
 			putshort(&p, name);
 			putshort(&p, q->type);
 			putshort(&p, C_IN);
-			putlong(&p, 0);		/* TTL */
+			putlong(&p, 0);	/* TTL */
 
 			datalen = MIN(datalen, buflen - (p - buf));
 			CHECKLEN(2);
@@ -227,10 +227,10 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr, const char *data,
 	return len;
 }
 
-int
-dns_encode_ns_response(char *buf, size_t buflen, struct query *q, char *topdomain)
 /* Only used when iodined gets an NS type query */
 /* Mostly same as dns_encode_a_response() below */
+int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
+			   char *topdomain)
 {
 	HEADER *header;
 	int len;
@@ -319,10 +319,9 @@ dns_encode_ns_response(char *buf, size_t buflen, struct query *q, char *topdomai
 	return len;
 }
 
-int
-dns_encode_a_response(char *buf, size_t buflen, struct query *q)
-/* Only used when iodined gets an A type query for ns.topdomain or www.topdomain */
-/* Mostly same as dns_encode_ns_response() above */
+/* Only used when iodined gets an A type query for ns.topdomain or
+ * www.topdomain . Mostly same as dns_encode_ns_response() above */
+int dns_encode_a_response(char *buf, size_t buflen, struct query *q)
 {
 	HEADER *header;
 	int len;
@@ -354,18 +353,18 @@ dns_encode_a_response(char *buf, size_t buflen, struct query *q)
 	name = 0xc000 | ((p - buf) & 0x3fff);
 
 	/* Query section */
-	putname(&p, buflen - (p - buf), q->name);	/* Name */
+	putname(&p, buflen - (p - buf), q->name); /* Name */
 	CHECKLEN(4);
-	putshort(&p, q->type);			/* Type */
-	putshort(&p, C_IN);			/* Class */
+	putshort(&p, q->type); /* Type */
+	putshort(&p, C_IN); /* Class */
 
 	/* Answer section */
 	CHECKLEN(12);
-	putshort(&p, name);			/* Name */
-	putshort(&p, q->type);			/* Type */
-	putshort(&p, C_IN);			/* Class */
-	putlong(&p, 3600);			/* TTL */
-	putshort(&p, 4);			/* Data length */
+	putshort(&p, name); /* Name */
+	putshort(&p, q->type); /* Type */
+	putshort(&p, C_IN); /* Class */
+	putlong(&p, 3600); /* TTL */
+	putshort(&p, 4); /* Data length */
 
 	/* ugly hack to output IP address */
 	ipp = (char *) &q->destination;
@@ -381,8 +380,7 @@ dns_encode_a_response(char *buf, size_t buflen, struct query *q)
 
 #undef CHECKLEN
 
-unsigned short
-dns_get_id(char *packet, size_t packetlen)
+unsigned short dns_get_id(char *packet, size_t packetlen)
 {
 	HEADER *header;
 	header = (HEADER*)packet;
@@ -395,8 +393,8 @@ dns_get_id(char *packet, size_t packetlen)
 
 #define CHECKLEN(x) if (packetlen < (x) + (unsigned)(data-packet))  return 0
 
-int
-dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, size_t packetlen)
+int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
+	       size_t packetlen)
 {
 	char name[QUERY_NAME_SIZE];
 	char rdata[4*1024];
@@ -536,7 +534,8 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 					readname(packet, packetlen, &data,
 						 names[pref / 10 - 1],
 						 QUERY_NAME_SIZE - 1);
-					names[pref / 10 - 1][QUERY_NAME_SIZE-1] = '\0';
+					names[pref / 10 - 1]
+						[QUERY_NAME_SIZE-1] = '\0';
 				}
 
 				/* always trust rlen, not name encoding */
@@ -569,7 +568,8 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet, siz
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
 
-			rv = readtxtbin(packet, &data, rlen, rdata, sizeof(rdata));
+			rv = readtxtbin(packet, &data, rlen, rdata,
+				        sizeof(rdata));
 			if (rv >= 1) {
 				rv = MIN(rv, buflen);
 				memcpy(buf, rdata, rv);
