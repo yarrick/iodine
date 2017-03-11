@@ -2288,26 +2288,26 @@ write_dns(int fd, struct query *q, char *data, int datalen, char downenc)
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }
 
-static void
-print_usage() {
-	fprintf(stderr, "Usage: %s [-46cDfsv] [-u user] [-t chrootdir] [-d device] [-m mtu]\n"
+static void print_usage(FILE *stream)
+{
+	fprintf(stream, "Usage: %s [-46cDfsv] [-u user] [-t chrootdir] [-d device] [-m mtu]\n"
 			"               [-z context] [-l ipv4 listen address] [-L ipv6 listen address]\n"
 			"               [-p port] [-n external ip] [-b dnsport] [-P password]\n"
 			"               [-F pidfile] [-i max idle time] tunnel_ip[/netmask] topdomain\n",
 			__progname);
 }
 
-static void
-usage() {
-	print_usage();
+static void usage(void)
+{
+	print_usage(stderr);
 	exit(2);
 }
 
-static void
-help() {
-	fprintf(stderr, "iodine IP over DNS tunneling server\n\n");
-	print_usage();
-	fprintf(stderr, "\nAvailable options:\n"
+static void help(FILE *stream)
+{
+	fprintf(stream, "iodine IP over DNS tunneling server\n\n");
+	print_usage(stream);
+	fprintf(stream, "\nAvailable options:\n"
 			"  -v to print version info and exit\n"
 			"  -h to print this help and exit\n"
 			"  -4 to listen only on IPv4\n"
@@ -2475,7 +2475,7 @@ main(int argc, char **argv)
 			foreground = 1;
 			break;
 		case 'h':
-			help();
+			help(stdout);
 			break;
 		case 'D':
 			debug++;

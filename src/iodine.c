@@ -65,12 +65,12 @@ sighandler(int sig)
 /* mark as no return to help some compilers to avoid warnings
  * about use of uninitialized variables */
 static inline void usage(void) __attribute__((noreturn));
-static inline void help(bool verbose) __attribute__((noreturn));
+static inline void help(FILE * stream, bool verbose) __attribute__((noreturn));
 #endif
 
-static void
-help(bool verbose) {
-	fprintf(stderr, "iodine IP over DNS tunneling client\n\n"
+static void help(FILE *stream, bool verbose)
+{
+	fprintf(stream, "iodine IP over DNS tunneling client\n\n"
 	                "Usage: %s [-46fhrv] [-u user] [-t chrootdir] [-d device] [-P password]\n"
 			"              [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec]\n"
 			"              [-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
@@ -78,7 +78,7 @@ help(bool verbose) {
 	if (!verbose)
 		exit(2);
 
-	fprintf(stderr, "\nOptions to try if connection doesn't work:\n"
+	fprintf(stream, "\nOptions to try if connection doesn't work:\n"
 			"  -4 to connect only to IPv4\n"
 			"  -6 to connect only to IPv6\n"
 			"  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n"
@@ -108,7 +108,7 @@ help(bool verbose) {
 
 static inline void usage(void)
 {
-	help(false);
+	help(stderr, false);
 }
 
 static void
@@ -208,7 +208,7 @@ main(int argc, char **argv)
 			foreground = 1;
 			break;
 		case 'h':
-			help(true);
+			help(stdout, true);
 			/* NOTREACHED */
 			break;
 		case 'r':
