@@ -47,10 +47,6 @@
 
 #include "common.h"
 #include "encoding.h"
-#include "base32.h"
-#include "base64.h"
-#include "base64u.h"
-#include "base128.h"
 #include "dns.h"
 #include "login.h"
 #include "tun.h"

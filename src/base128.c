@@ -33,7 +33,6 @@
 #include <string.h>
 
 #include "encoding.h"
-#include "base128.h"
 
 #define BLKSIZE_RAW 7
 #define BLKSIZE_ENC 8

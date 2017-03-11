@@ -51,10 +51,6 @@
 
 #include "dns.h"
 #include "encoding.h"
-#include "base32.h"
-#include "base64.h"
-#include "base64u.h"
-#include "base128.h"
 #include "user.h"
 #include "login.h"
 #include "tun.h"
