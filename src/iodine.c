@@ -70,35 +70,36 @@ static inline void help(bool verbose) __attribute__((noreturn));
 
 static void
 help(bool verbose) {
-	fprintf(stderr, "iodine IP over DNS tunneling client\n");
-	fprintf(stderr, "Usage: %s [-v] [-h] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec] "
-			"[-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
+	fprintf(stderr, "iodine IP over DNS tunneling client\n\n"
+	                "Usage: %s [-fhrv] [-u user] [-t chrootdir] [-d device] [-P password]\n"
+			"              [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec]\n"
+			"              [-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 
 	if (!verbose)
 		exit(2);
 
-	fprintf(stderr, "Options to try if connection doesn't work:\n");
-	fprintf(stderr, "  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n");
-	fprintf(stderr, "  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n");
-	fprintf(stderr, "     Base128, or (only for TXT:) Raw  (default: autodetect)\n");
-	fprintf(stderr, "  -I max interval between requests (default 4 sec) to prevent DNS timeouts\n");
-	fprintf(stderr, "  -L 1: use lazy mode for low-latency (default). 0: don't (implies -I1)\n");
-	fprintf(stderr, "  -m max size of downstream fragments (default: autodetect)\n");
-	fprintf(stderr, "  -M max size of upstream hostnames (~100-255, default: 255)\n");
-	fprintf(stderr, "  -r to skip raw UDP mode attempt\n");
-	fprintf(stderr, "  -P password used for authentication (max 32 chars will be used)\n");
-	fprintf(stderr, "Other options:\n");
-	fprintf(stderr, "  -v to print version info and exit\n");
-	fprintf(stderr, "  -h to print this help and exit\n");
-	fprintf(stderr, "  -f to keep running in foreground\n");
-	fprintf(stderr, "  -u name to drop privileges and run as user 'name'\n");
-	fprintf(stderr, "  -t dir to chroot to directory dir\n");
-	fprintf(stderr, "  -d device to set tunnel device name\n");
-	fprintf(stderr, "  -z context, to apply specified SELinux context after initialization\n");
-	fprintf(stderr, "  -F pidfile to write pid to a file\n");
-	fprintf(stderr, "nameserver is the IP number/hostname of the relaying nameserver. if absent, /etc/resolv.conf is used\n");
-	fprintf(stderr, "topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
+	fprintf(stderr, "\nOptions to try if connection doesn't work:\n"
+			"  -T force dns type: NULL, PRIVATE, TXT, SRV, MX, CNAME, A (default: autodetect)\n"
+			"  -O force downstream encoding for -T other than NULL: Base32, Base64, Base64u,\n"
+			"     Base128, or (only for TXT:) Raw  (default: autodetect)\n"
+			"  -I max interval between requests (default 4 sec) to prevent DNS timeouts\n"
+			"  -L 1: use lazy mode for low-latency (default). 0: don't (implies -I1)\n"
+			"  -m max size of downstream fragments (default: autodetect)\n"
+			"  -M max size of upstream hostnames (~100-255, default: 255)\n"
+			"  -r to skip raw UDP mode attempt\n"
+			"  -P password used for authentication (max 32 chars will be used)\n\n"
+			"Other options:\n"
+			"  -v to print version info and exit\n"
+			"  -h to print this help and exit\n"
+			"  -f to keep running in foreground\n"
+			"  -u name to drop privileges and run as user 'name'\n"
+			"  -t dir to chroot to directory dir\n"
+			"  -d device to set tunnel device name\n"
+			"  -z context, to apply specified SELinux context after initialization\n"
+			"  -F pidfile to write pid to a file\n\n"
+			"nameserver is the IP number/hostname of the relaying nameserver. If absent,\n"
+			"           /etc/resolv.conf is used\n"
+			"topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
 
 	exit(0);
 }
@@ -111,8 +112,8 @@ static inline void usage(void)
 static void
 version() {
 
-	fprintf(stderr, "iodine IP over DNS tunneling client\n");
-	fprintf(stderr, "Git version: %s\n", GITREVISION);
+	fprintf(stderr, "iodine IP over DNS tunneling client\n"
+			"Git version: %s\n", GITREVISION);
 
 	exit(0);
 }
