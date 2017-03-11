@@ -32,11 +32,6 @@ static const char cb64[] =
 static unsigned char rev64[256];
 static int reverse_init = 0;
 
-static int base64_handles_dots(void)
-{
-	return 0;
-}
-
 inline static void base64_reverse_init(void)
 {
 	int i;
@@ -173,8 +168,8 @@ const struct encoder base64_ops = {
 	.encode = base64_encode,
 	.decode = base64_decode,
 
-	.places_dots = base64_handles_dots,
-	.eats_dots = base64_handles_dots,
+	.places_dots = false,
+	.eats_dots = false,
 
 	.blocksize_raw = BASE64_BLKSIZE_RAW,
 	.blocksize_encoded = BASE64_BLKSIZE_ENC,

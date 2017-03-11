@@ -32,11 +32,6 @@ static const char cb32_ucase[] =
 static unsigned char rev32[256];
 static int reverse_init = 0;
 
-static int base32_handles_dots(void)
-{
-	return 0;
-}
-
 inline static void base32_reverse_init(void)
 {
 	int i;
@@ -235,8 +230,8 @@ const struct encoder base32_ops = {
 	.encode = base32_encode,
 	.decode = base32_decode,
 
-	.places_dots = base32_handles_dots,
-	.eats_dots = base32_handles_dots,
+	.places_dots = false,
+	.eats_dots = false,
 
 	.blocksize_raw = BASE32_BLKSIZE_RAW,
 	.blocksize_encoded = BASE32_BLKSIZE_ENC,

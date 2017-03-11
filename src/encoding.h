@@ -24,6 +24,8 @@
 #ifndef _ENCODING_H_
 #define _ENCODING_H_
 
+#include <stdbool.h>
+
 /* All-0, all-1, 01010101, 10101010: each 4 times to make sure the pattern
    spreads across multiple encoded chars -> 16 bytes total.
    Followed by 32 bytes from my /dev/random; should be enough.
@@ -36,8 +38,8 @@ struct encoder {
 	int (*encode)(char *dst, size_t *dstlen, const void *src, size_t srclen);
 	int (*decode)(void *dst, size_t *dstlen, const char *src, size_t srclen);
 
-	int (*places_dots)(void);
-	int (*eats_dots)(void);
+	const bool places_dots;
+	const bool eats_dots;
 
 	const int blocksize_raw;
 	const int blocksize_encoded;

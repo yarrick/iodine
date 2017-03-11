@@ -51,11 +51,6 @@ static const unsigned char cb128[] =
 static unsigned char rev128[256];
 static int reverse_init = 0;
 
-static int base128_handles_dots(void)
-{
-	return 0;
-}
-
 inline static void base128_reverse_init(void)
 {
 	int i;
@@ -258,8 +253,8 @@ const struct encoder base128_ops = {
 	.encode = base128_encode,
 	.decode = base128_decode,
 
-	.places_dots = base128_handles_dots,
-	.eats_dots = base128_handles_dots,
+	.places_dots = false,
+	.eats_dots = false,
 
 	.blocksize_raw = BASE128_BLKSIZE_RAW,
 	.blocksize_encoded = BASE128_BLKSIZE_ENC,
