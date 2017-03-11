@@ -112,8 +112,8 @@ static inline void usage(void)
 }
 
 static void
-version() {
-
+version()
+{
 	fprintf(stderr, "iodine IP over DNS tunneling client\n"
 			"Git version: %s\n", GITREVISION);
 
