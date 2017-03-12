@@ -2424,7 +2424,6 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	memset(password, 0, sizeof(password));
 	srand(time(NULL));
 	fw_query_init();
 
