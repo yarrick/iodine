@@ -53,43 +53,42 @@ typedef unsigned int in_addr_t;
 #define sleep(seconds) Sleep((seconds)*1000)
 
 typedef struct {
-        unsigned        id :16;         /* query identification number */
-                        /* fields in third byte */
-        unsigned        rd :1;          /* recursion desired */
-        unsigned        tc :1;          /* truncated message */
-        unsigned        aa :1;          /* authoritive answer */
-        unsigned        opcode :4;      /* purpose of message */
-        unsigned        qr :1;          /* response flag */
-                        /* fields in fourth byte */
-        unsigned        rcode :4;       /* response code */
-        unsigned        cd: 1;          /* checking disabled by resolver */
-        unsigned        ad: 1;          /* authentic data from named */
-        unsigned        unused :1;      /* unused bits (MBZ as of 4.9.3a3) */
-        unsigned        ra :1;          /* recursion available */
-                        /* remaining bytes */
-        unsigned        qdcount :16;    /* number of question entries */
-        unsigned        ancount :16;    /* number of answer entries */
-        unsigned        nscount :16;    /* number of authority entries */
-        unsigned        arcount :16;    /* number of resource entries */
+	unsigned id :16;	/* query identification number */
+				/* fields in third byte */
+	unsigned rd :1;		/* recursion desired */
+	unsigned tc :1;		/* truncated message */
+	unsigned aa :1;		/* authoritive answer */
+	unsigned opcode :4;	/* purpose of message */
+	unsigned qr :1;		/* response flag */
+				/* fields in fourth byte */
+	unsigned rcode :4;	/* response code */
+	unsigned cd: 1;		/* checking disabled by resolver */
+	unsigned ad: 1;		/* authentic data from named */
+	unsigned unused :1;	/* unused bits (MBZ as of 4.9.3a3) */
+	unsigned ra :1;		/* recursion available */
+				/* remaining bytes */
+	unsigned qdcount :16;	/* number of question entries */
+	unsigned ancount :16;	/* number of answer entries */
+	unsigned nscount :16;	/* number of authority entries */
+	unsigned arcount :16;	/* number of resource entries */
 } HEADER;
 
-struct ip
-  {
-    unsigned int ip_hl:4;               /* header length */
-    unsigned int ip_v:4;                /* version */
-    u_char ip_tos;                      /* type of service */
-    u_short ip_len;                     /* total length */
-    u_short ip_id;                      /* identification */
-    u_short ip_off;                     /* fragment offset field */
-#define IP_RF 0x8000                    /* reserved fragment flag */
-#define IP_DF 0x4000                    /* dont fragment flag */
-#define IP_MF 0x2000                    /* more fragments flag */
-#define IP_OFFMASK 0x1fff               /* mask for fragmenting bits */
-    u_char ip_ttl;                      /* time to live */
-    u_char ip_p;                        /* protocol */
-    u_short ip_sum;                     /* checksum */
-    struct in_addr ip_src, ip_dst;      /* source and dest address */
-  };
+struct ip {
+	unsigned int ip_hl:4;	/* header length */
+	unsigned int ip_v:4;	/* version */
+	u_char ip_tos;		/* type of service */
+	u_short ip_len;		/* total length */
+	u_short ip_id;		/* identification */
+	u_short ip_off;		/* fragment offset field */
+#define IP_RF 0x8000		/* reserved fragment flag */
+#define IP_DF 0x4000		/* dont fragment flag */
+#define IP_MF 0x2000		/* more fragments flag */
+#define IP_OFFMASK 0x1fff	/* mask for fragmenting bits */
+	u_char ip_ttl;		/* time to live */
+	u_char ip_p;		/* protocol */
+	u_short ip_sum;		/* checksum */
+	struct in_addr ip_src, ip_dst; /* source and dest address */
+};
 
 DWORD WINAPI tun_reader(LPVOID arg);
 struct tun_data {

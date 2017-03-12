@@ -30,7 +30,10 @@
    spreads across multiple encoded chars -> 16 bytes total.
    Followed by 32 bytes from my /dev/random; should be enough.
  */
-#define DOWNCODECCHECK1      "\000\000\000\000\377\377\377\377\125\125\125\125\252\252\252\252\201\143\310\322\307\174\262\027\137\117\316\311\111\055\122\041\141\251\161\040\045\263\006\163\346\330\104\060\171\120\127\277"
+#define DOWNCODECCHECK1 \
+	"\000\000\000\000\377\377\377\377\125\125\125\125\252\252\252\252" \
+	"\201\143\310\322\307\174\262\027\137\117\316\311\111\055\122\041" \
+	"\141\251\161\040\045\263\006\163\346\330\104\060\171\120\127\277"
 #define DOWNCODECCHECK1_LEN  48
 
 struct encoder {
@@ -45,7 +48,8 @@ struct encoder {
 	const int blocksize_encoded;
 };
 
-int build_hostname(char *, size_t, const char *, const size_t, const char *, const struct encoder *, int);
+int build_hostname(char *, size_t, const char *, const size_t, const char *,
+		   const struct encoder *, int);
 int unpack_data(char *, size_t, char *, size_t, const struct encoder *);
 int inline_dotify(char *, size_t);
 int inline_undotify(char *, size_t);

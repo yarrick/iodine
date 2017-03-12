@@ -68,7 +68,8 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #endif
 
 #define T_PRIVATE 65399
-/* Undefined RR type; "private use" range, see http://www.bind9.net/dns-parameters */
+/* Undefined RR type; "private use" range, see
+ * http://www.bind9.net/dns-parameters */
 #define T_UNSET 65432
 /* Unused RR type, never actually sent */
 
@@ -112,7 +113,8 @@ void check_superuser(void);
 char *format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len);
 int get_addr(char *, int, int, int, struct sockaddr_storage *);
 int open_dns(struct sockaddr_storage *, size_t);
-int open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only);
+int open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len,
+		 int v6only);
 int open_dns_from_host(char *host, int port, int addr_family, int flags);
 void close_dns(int);
 
