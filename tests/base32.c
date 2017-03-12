@@ -22,7 +22,6 @@
 #include <errno.h>
 
 #include "encoding.h"
-#include "base32.h"
 #include "test.h"
 
 #define TUPLES 5
@@ -43,13 +42,11 @@ START_TEST(test_base32_encode)
 {
 	size_t len;
 	char buf[4096];
-	struct encoder *b32;
 	int val;
 
-	b32 = get_base32_encoder();
 
 	len = sizeof(buf);
-	val = b32->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
+	val = base32_ops.encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
 	fail_unless(val == strlen(testpairs[_i].b));
 	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
@@ -61,13 +58,10 @@ START_TEST(test_base32_decode)
 {
 	size_t len;
 	char buf[4096];
-	struct encoder *b32;
 	int val;
 
-	b32 = get_base32_encoder();
-
 	len = sizeof(buf);
-	val = b32->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
+	val = base32_ops.decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
 	fail_unless(val == strlen(testpairs[_i].a));
 	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
@@ -93,14 +87,11 @@ START_TEST(test_base32_blksize)
 	size_t enclen;
 	char *rawbuf;
 	char *encbuf;
-	struct encoder *b32;
 	int i;
 	int val;
 
-	b32 = get_base32_encoder();
-
-	rawlen = b32->blocksize_raw();
-	enclen = b32->blocksize_encoded();
+	rawlen = base32_ops.blocksize_raw;
+	enclen = base32_ops.blocksize_encoded;
 
 	rawbuf = malloc(rawlen + 16);
 	encbuf = malloc(enclen + 16);
@@ -110,7 +101,7 @@ START_TEST(test_base32_blksize)
 	}
 	rawbuf[i] = 0;
 
-	val = b32->encode(encbuf, &enclen, rawbuf, rawlen);
+	val = base32_ops.encode(encbuf, &enclen, rawbuf, rawlen);
 
 	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
 	fail_unless(enclen == 5, "encoded %d bytes, not 5", enclen);
@@ -119,7 +110,7 @@ START_TEST(test_base32_blksize)
 	memset(rawbuf, 0, rawlen + 16);
 
 	enclen = val;
-	val = b32->decode(rawbuf, &rawlen, encbuf, enclen);
+	val = base32_ops.decode(rawbuf, &rawlen, encbuf, enclen);
 
 	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
 	fail_unless(val == 5, "val was not 5 but %d", val);

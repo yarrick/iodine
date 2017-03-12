@@ -22,7 +22,6 @@
 #include <errno.h>
 
 #include "encoding.h"
-#include "base64.h"
 #include "test.h"
 
 #define TUPLES 5
@@ -69,13 +68,10 @@ START_TEST(test_base64_encode)
 {
 	size_t len;
 	char buf[4096];
-	struct encoder *b64;
 	int val;
 
-	b64 = get_base64_encoder();
-
 	len = sizeof(buf);
-	val = b64->encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
+	val = base64_ops.encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
 	fail_unless(val == strlen(testpairs[_i].b));
 	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
@@ -87,13 +83,10 @@ START_TEST(test_base64_decode)
 {
 	size_t len;
 	char buf[4096];
-	struct encoder *b64;
 	int val;
 
-	b64 = get_base64_encoder();
-
 	len = sizeof(buf);
-	val = b64->decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
+	val = base64_ops.decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
 	fail_unless(val == strlen(testpairs[_i].a));
 	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
@@ -107,14 +100,11 @@ START_TEST(test_base64_blksize)
 	size_t enclen;
 	char *rawbuf;
 	char *encbuf;
-	struct encoder *b64;
 	int i;
 	int val;
 
-	b64 = get_base64_encoder();
-
-	rawlen = b64->blocksize_raw();
-	enclen = b64->blocksize_encoded();
+	rawlen = base64_ops.blocksize_raw;
+	enclen = base64_ops.blocksize_encoded;
 
 	rawbuf = malloc(rawlen + 16);
 	encbuf = malloc(enclen + 16);
@@ -124,7 +114,7 @@ START_TEST(test_base64_blksize)
 	}
 	rawbuf[i] = 0;
 
-	val = b64->encode(encbuf, &enclen, rawbuf, rawlen);
+	val = base64_ops.encode(encbuf, &enclen, rawbuf, rawlen);
 
 	fail_unless(rawlen == 3, "raw length was %d not 3", rawlen);
 	fail_unless(enclen == 3, "encoded %d bytes, not 3", enclen);
@@ -133,7 +123,7 @@ START_TEST(test_base64_blksize)
 	memset(rawbuf, 0, rawlen + 16);
 
 	enclen = val;
-	val = b64->decode(rawbuf, &rawlen, encbuf, enclen);
+	val = base64_ops.decode(rawbuf, &rawlen, encbuf, enclen);
 
 	fail_unless(rawlen == 3, "raw length was %d not 3", rawlen);
 	fail_unless(val == 3);

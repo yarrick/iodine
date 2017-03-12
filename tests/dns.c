@@ -33,7 +33,6 @@
 #include "common.h"
 #include "dns.h"
 #include "encoding.h"
-#include "base32.h"
 #include "test.h"
 
 static void dump_packet(char *, size_t);
@@ -70,7 +69,7 @@ START_TEST(test_encode_query)
 	char buf[512];
 	char resolv[512];
 	struct query q;
-	struct encoder *enc;
+	const struct encoder *enc;
 	char *d;
 	size_t len;
 	size_t enclen;
@@ -83,7 +82,7 @@ START_TEST(test_encode_query)
 	q.type = T_NULL;
 	q.id = 1337;
 	d = resolv;
-	enc = get_base32_encoder();
+	enc = &base32_ops;
 
 	*d++ = 'A';
 	enc->encode(d, &enclen, innerData, strlen(innerData));
@@ -111,14 +110,14 @@ START_TEST(test_decode_query)
 	char buf[512];
 	char *domain;
 	struct query q;
-	struct encoder *enc;
+	const struct encoder *enc;
 	size_t len;
 
 	memset(&q, 0, sizeof(struct query));
 	memset(&buf, 0, sizeof(buf));
 	q.id = 0;
 	len = sizeof(query_packet) - 1;
-	enc = get_base32_encoder();
+	enc = &base32_ops;
 
 	dns_decode(buf, sizeof(buf), &q, QR_QUERY, query_packet, len);
 	domain = strstr(q.name, topdomain);

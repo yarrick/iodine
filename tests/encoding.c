@@ -22,8 +22,6 @@
 
 #include "encoding.h"
 #include "test.h"
-#include "base32.h"
-#include "base64.h"
 
 #define TUPLES 4
 
@@ -87,7 +85,7 @@ START_TEST(test_build_hostname)
 	buflen = sizeof(buf);
 
 	for (i = 1; i < sizeof(data); i++) {
-		int len = build_hostname(buf, buflen, data, i, topdomain, get_base32_encoder(), sizeof(buf));
+		int len = build_hostname(buf, buflen, data, i, topdomain, &base32_ops, sizeof(buf));
 
 		fail_if(len > i);
 		fail_if(strstr(buf, ".."), "Found double dots when encoding data len %d! buf: %s", i, buf);
