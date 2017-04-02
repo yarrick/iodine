@@ -209,7 +209,7 @@ update_server_timeout(int handshake)
 	}
 
 	/* update up/down window timeouts to something reasonable */
-	this.downstream_timeout_ms = rtt_ms * 2;
+	this.downstream_timeout_ms = rtt_ms * this.downstream_delay_variance / 100;
 	this.outbuf->timeout = ms_to_timeval(this.downstream_timeout_ms);
 
 	if (handshake) {

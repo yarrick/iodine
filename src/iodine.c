@@ -82,6 +82,7 @@ struct client_instance this;
 	.next_downstream_ack = -1, \
 	.num_immediate = 1, \
 	.rtt_total_ms = 200, \
+	.downstream_delay_variance = 200, \
 	.remote_forward_addr = {.ss_family = AF_UNSPEC}
 
 static struct client_instance preset_default = {
@@ -217,7 +218,7 @@ print_usage()
 	extern char *__progname;
 
 	fprintf(stderr, "Usage: %s [-v] [-h] [-Y preset] [-V sec] [-X port] [-f] [-r] [-u user] [-t chrootdir] [-d device] "
-			"[-w downfrags] [-W upfrags] [-i sec -j sec] [-I sec] [-c 0|1] [-C 0|1] [-s ms] "
+			"[-w downfrags] [-W upfrags] [-i sec -j sec] [-I sec] [-J var] [-c 0|1] [-C 0|1] [-s ms] "
 			"[-P password] [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-R port[,host] ] "
 			"[-z context] [-F pidfile] topdomain [nameserver1 [nameserver2 [...]]]\n", __progname);
 }
@@ -264,6 +265,7 @@ help()
 	fprintf(stderr, "  -W  upstream fragment window size (default: 8 frags)\n");
 	fprintf(stderr, "  -i  server-side request timeout in lazy mode (default: auto)\n");
 	fprintf(stderr, "  -j  downstream fragment ACK timeout, implies -i4 (default: 2 sec)\n");
+	fprintf(stderr, "  -J  downstream fragment ACK delay variance factor (default: 2.0)\n");
 	//fprintf(stderr, "  --nodrop  disable TCP packet-dropping optimisations\n");
 	fprintf(stderr, "  -c 1: use downstream compression (default), 0: disable\n");
 	fprintf(stderr, "  -C 1: use upstream compression (default), 0: disable\n\n");
@@ -419,7 +421,7 @@ main(int argc, char **argv)
 	 * This is so that all options override preset values regardless of order in command line */
 	int optind_orig = optind, preset_id = -1;
 
-	static char *iodine_args_short = "46vfDhrY:s:V:c:C:i:j:u:t:d:R:P:w:W:m:M:F:T:O:L:I:";
+	static char *iodine_args_short = "46vfDhrY:s:V:c:C:i:j:J:u:t:d:R:P:w:W:m:M:F:T:O:L:I:";
 
 	while ((choice = getopt_long(argc, argv, iodine_args_short, iodine_args, NULL))) {
 		/* Check if preset has been found yet so we don't process any other options */
@@ -573,6 +575,9 @@ main(int argc, char **argv)
 				this.server_timeout_ms = 4000;
 			}
 			break;
+		case 'J':
+			this.downstream_delay_variance = strtod(optarg, NULL) * 100;
+			break;
 		case 's':
 			this.send_interval_ms = atoi(optarg);
 			if (this.send_interval_ms < 0)
@@ -688,6 +693,11 @@ main(int argc, char **argv)
 
 	if (this.downstream_timeout_ms < 100) {
 		warnx("Downstream fragment timeout must be more than 0.1 sec to prevent excessive retransmits.");
+		usage();
+	}
+
+	if (this.downstream_delay_variance < 10) {
+		warnx("Delay variance factor must be more than 0.1 to prevent excessive retransmits.");
 		usage();
 	}
 
