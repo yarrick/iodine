@@ -82,7 +82,7 @@ struct client_instance this;
 	.next_downstream_ack = -1, \
 	.num_immediate = 1, \
 	.rtt_total_ms = 200, \
-	.downstream_delay_variance = 200, \
+	.downstream_delay_variance = 2.0, \
 	.remote_forward_addr = {.ss_family = AF_UNSPEC}
 
 static struct client_instance preset_default = {
@@ -576,7 +576,7 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'J':
-			this.downstream_delay_variance = strtod(optarg, NULL) * 100;
+			this.downstream_delay_variance = strtod(optarg, NULL);
 			break;
 		case 's':
 			this.send_interval_ms = atoi(optarg);
@@ -696,7 +696,7 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (this.downstream_delay_variance < 10) {
+	if (this.downstream_delay_variance < 0.1) {
 		warnx("Delay variance factor must be more than 0.1 to prevent excessive retransmits.");
 		usage();
 	}
