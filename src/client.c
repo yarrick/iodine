@@ -322,7 +322,7 @@ got_response(int id, int immediate, int fail)
 				this.rtt_total_ms += rtt_ms;
 				this.num_immediate++;
 
-				if (this.autodetect_server_timeout && this.lazymode)
+				if (this.autodetect_server_timeout)
 					update_server_timeout(0);
 			}
 
