@@ -1,0 +1,58 @@
+#!/bin/bash
+# Fedora/GNOME3 iodine tunneler
+# By Ricky Burgin
+# http://ricky.burg.in/
+#
+# Enable and disable iodine + SSH-based SOCKS tunnel
+# on Fedora with GNOME3 (and probably other GNOME3-
+# based systems)
+#
+# Requires that you have SSH-key configured shell
+# on your remote server that runs iodine
+#
+# Run `dnf install iodine-client` to install
+# iodine on Fedora
+#
+# This will tunnel any app on your system that
+# is designed to detect system proxy settings
+# and supports proxying via SOCKS. Tested with
+# Google Chrome.
+#
+# Usage: Just run the script
+#
+####################################
+#           BEGIN CONFIG
+# !!! YOU MUST EDIT THESE VALUES !!!
+####################################
+servertunip="10.0.0.1" # The IP which you configure for iodined on your tunnel server
+remoteuser="user" # The user to log in as on your server that runs iodine
+socksport="1080" # The SOCKS port for which the SSH tunnel and your system should be configured for
+tuntopdomain="your.domain.com" # The Top domain configured for your tunnel
+tunpassword="somepassword" # The same password that was configured on iodined
+nonemanualauto="none" # Which proxy configuration to return GNOME to once finished with the tunnel. Choices are "none", "manual" and "auto".
+####################################
+#           END OF CONFIG
+####################################
+iodinepid=`pgrep -f "$tuntopdomain"`
+sshpid=`pgrep -f "ssh $remoteuser@$servertunip -D $socksport -N"`
+
+echo "tunip: $servertunip user: $remoteuser port: $socksport domain: $tuntopdomain pass: $tunpassword proxy: $nonemanualauto iodine pid: $iodinepid ssh pid: $sshpid"
+
+if [ -z "$iodinepid" ] && [ -z "$sshpid" ]; then
+	echo "Starting iodine tunnel..."
+	sudo iodine -P $tunpassword $tuntopdomain
+	echo "SSHing to iodine server and establishing SSH/SOCKS tunnel..."
+	ssh $remoteuser@$servertunip -D $socksport -N 2>&1 &
+	echo "Configuring GNOME's proxy settings..."
+	gsettings set org.gnome.system.proxy mode "manual"
+	gsettings set org.gnome.system.proxy.socks host "127.0.0.1"
+	gsettings set org.gnome.system.proxy.socks port "$socksport"
+	echo "Tunnel established!"
+else
+	echo "Existing iodine tunnel detected, killing process and removing GNOME proxy settings..."
+	sudo kill $iodinepid $sshpid
+	gsettings set org.gnome.system.proxy.socks host ""
+	gsettings set org.gnome.system.proxy.socks port 0
+	gsettings set org.gnome.system.proxy mode "$nonemanualauto"
+	echo "Done!"
+fi
