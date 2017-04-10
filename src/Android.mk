@@ -13,8 +13,10 @@ LOCAL_PATH:= $(call my-dir)
 
 HEAD_COMMIT = `git rev-parse --short HEAD`
 
+
 include $(CLEAR_VARS)
 
+APP_PLATFORM := android-16
 LOCAL_MODULE    := iodine
 LOCAL_SRC_FILES := tun.c dns.c read.c encoding.c login.c base32.c base64.c base64u.c base128.c md5.c common.c iodine.c client.c util.c
 LOCAL_CFLAGS    := -c -DANDROID -DLINUX -DIFCONFIGPATH=\"/system/bin/\" -Wall -DGITREVISION=\"$(HEAD_COMMIT)\"
