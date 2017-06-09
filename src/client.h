@@ -90,6 +90,7 @@ struct client_instance {
 	time_t downstream_timeout_ms;
 	double downstream_delay_variance;
 	int autodetect_server_timeout;
+	int autodetect_delay_variance;
 
 	/* Cumulative Round-Trip-Time in ms */
 	time_t rtt_total_ms;

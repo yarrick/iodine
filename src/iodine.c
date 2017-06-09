@@ -83,6 +83,7 @@ struct client_instance this;
 	.num_immediate = 1, \
 	.rtt_total_ms = 200, \
 	.downstream_delay_variance = 2.0, \
+	.autodetect_delay_variance = 0, \
 	.remote_forward_addr = {.ss_family = AF_UNSPEC}
 
 static struct client_instance preset_default = {
@@ -265,7 +266,7 @@ help()
 	fprintf(stderr, "  -W  upstream fragment window size (default: 8 frags)\n");
 	fprintf(stderr, "  -i  server-side request timeout in lazy mode (default: auto)\n");
 	fprintf(stderr, "  -j  downstream fragment ACK timeout, implies -i4 (default: 2 sec)\n");
-	fprintf(stderr, "  -J  downstream fragment ACK delay variance factor (default: 2.0)\n");
+	fprintf(stderr, "  -J  downstream fragment ACK delay variance factor (default: 2.0), 0: auto\n");
 	//fprintf(stderr, "  --nodrop  disable TCP packet-dropping optimisations\n");
 	fprintf(stderr, "  -c 1: use downstream compression (default), 0: disable\n");
 	fprintf(stderr, "  -C 1: use upstream compression (default), 0: disable\n\n");
@@ -577,6 +578,10 @@ main(int argc, char **argv)
 			break;
 		case 'J':
 			this.downstream_delay_variance = strtod(optarg, NULL);
+			if (0.0 == this.downstream_delay_variance) {
+				this.autodetect_delay_variance = 1;
+				this.downstream_delay_variance = 2.0;
+			}
 			break;
 		case 's':
 			this.send_interval_ms = atoi(optarg);
