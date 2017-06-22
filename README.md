@@ -10,15 +10,7 @@ firewalled, but DNS queries are allowed.
 COMPILING
 ---------
 
-Iodine has no configure script. There are two optional features for Linux
-(SELinux and systemd support) that will be enabled automatically if the
-relevant header files are found in `/usr/include`.
-(See script at `./src/osflags`)
-
-Run `make` to compile the server and client binaries.
-Run `make debug` to compile the binaries with extra debugging enabled.
-Run `make install` to copy binaries and manpage to the destination directory.
-Run `make test` to compile and run the unit tests. (Requires the `check` library)
+Standard `autotools` build scripts, so a simple `autoreconf --install && ./configure && make`, followed by an optional `make check`, and a `make install`, should do it. All the usual build options for cross-compilation etc should be available, such as `./configure --help=short` to find package-specific configuration options.
 
 
 QUICKSTART

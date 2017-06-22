@@ -114,13 +114,6 @@ struct client_instance {
 
 	uint16_t chunkid;
 
-	/* Base32 encoder used for non-data packets and replies */
-	struct encoder *b32;
-	/* Base64 etc encoders for replies */
-	struct encoder *b64;
-	struct encoder *b64u;
-	struct encoder *b128;
-
 	/* The encoder used for data packets
 	 * Defaults to Base32, can be changed after handshake */
 	struct encoder *dataenc;
