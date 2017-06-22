@@ -213,7 +213,7 @@ update_server_timeout(int handshake)
 	}
 
 	/* update up/down window timeouts to something reasonable */
-	this.downstream_timeout_ms = rtt_ms * 2;
+	this.downstream_timeout_ms = rtt_ms * this.downstream_delay_variance;
 	this.outbuf->timeout = ms_to_timeval(this.downstream_timeout_ms);
 
 	if (handshake) {
@@ -289,6 +289,7 @@ got_response(int id, int immediate, int fail)
 {
 	struct timeval now, rtt;
 	time_t rtt_ms;
+	static time_t rtt_min_ms = 1;
 	gettimeofday(&now, NULL);
 
 	QTRACK_DEBUG(4, "Got answer id %d (%s)%s", id, immediate ? "immediate" : "lazy",
@@ -326,8 +327,16 @@ got_response(int id, int immediate, int fail)
 				this.rtt_total_ms += rtt_ms;
 				this.num_immediate++;
 
-				if (this.autodetect_server_timeout && this.lazymode)
+				if (this.autodetect_server_timeout) {
+					if (this.autodetect_delay_variance) {
+						if (rtt_ms > 0 && (rtt_ms < rtt_min_ms || 1 == rtt_min_ms)) {
+							rtt_min_ms = rtt_ms;
+						}
+						this.downstream_delay_variance = (double) (this.rtt_total_ms /
+							this.num_immediate) / rtt_min_ms;
+					}
 					update_server_timeout(0);
+				}
 			}
 
 			/* Remove query info from buffer to mark it as answered */
