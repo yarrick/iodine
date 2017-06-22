@@ -88,7 +88,9 @@ struct client_instance {
 	/* Server response timeout in ms and downstream window timeout */
 	time_t server_timeout_ms;
 	time_t downstream_timeout_ms;
+	double downstream_delay_variance;
 	int autodetect_server_timeout;
+	int autodetect_delay_variance;
 
 	/* Cumulative Round-Trip-Time in ms */
 	time_t rtt_total_ms;
