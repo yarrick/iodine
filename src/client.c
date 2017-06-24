@@ -1028,7 +1028,7 @@ tunnel_tun()
 
 	if (this.conn == CONN_DNS_NULL) {
 		/* Check if outgoing buffer can hold data */
-		if (window_buffer_available(this.outbuf) < (read / MAX_FRAGSIZE) + 1) {
+		if ((0 == this.windowsize_up && 0 != this.outbuf->numitems) || window_buffer_available(this.outbuf) < (read / MAX_FRAGSIZE) + 1) {
 			DEBUG(1, "  Outgoing buffer full (%" L "u/%" L "u), not adding data!",
 						this.outbuf->numitems, this.outbuf->length);
 			return -1;
@@ -1353,7 +1353,7 @@ client_tunnel()
 
 		FD_ZERO(&fds);
 		maxfd = 0;
-		if (this.conn != CONN_DNS_NULL || window_buffer_available(this.outbuf) > 1) {
+		if (this.conn != CONN_DNS_NULL || 0 == this.windowsize_up || window_buffer_available(this.outbuf) > 1) {
 			/* Fill up outgoing buffer with available data if it has enough space
 			 * The windowing protocol manages data retransmits, timeouts etc. */
 			if (this.use_remote_forward) {
@@ -2715,7 +2715,7 @@ client_handshake()
 			return -1;
 
 		/* init windowing protocol */
-		this.outbuf = window_buffer_init(64, this.windowsize_up, this.maxfragsize_up, WINDOW_SENDING);
+		this.outbuf = window_buffer_init(64, (0 == this.windowsize_up ? 1 : this.windowsize_up), this.maxfragsize_up, WINDOW_SENDING);
 		this.outbuf->timeout = ms_to_timeval(this.downstream_timeout_ms);
 		/* Incoming buffer max fragsize doesn't matter */
 		this.inbuf = window_buffer_init(64, this.windowsize_down, MAX_FRAGSIZE, WINDOW_RECVING);

@@ -683,7 +683,7 @@ main(int argc, char **argv)
 	}
 
 	int max_ws = MAX_SEQ_ID / 2;
-	if (this.windowsize_up < 1 || this.windowsize_down < 1 ||
+	if (this.windowsize_up < 0 || this.windowsize_down < 1 ||
 		this.windowsize_up > max_ws || this.windowsize_down > max_ws) {
 		warnx("Window sizes (-w or -W) must be between 0 and %d!", max_ws);
 		usage();
