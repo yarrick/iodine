@@ -3,7 +3,7 @@
 # Prologue
 
 AC_PREREQ([2.69])
-AC_INIT([iodine],[0.7.0],[erik@kryo.se],[],[http://dev.kryo.se/iodine/])
+AC_INIT([iodine],[0.8.0],[erik@kryo.se],[],[http://dev.kryo.se/iodine/])
 AC_CONFIG_SRCDIR([src/iodine.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([autotools])
@@ -56,6 +56,15 @@ AC_DEFINE_UNQUOTED([GITREVISION],["${GITREVISION}"],
 
 # Checks for programs
 
+AC_MSG_CHECKING([whether configure should try to set CFLAGS])
+if test "x${CFLAGS+set}" = xset; then
+   enable_cflags_setting=no
+else
+   enable_cflags_setting=yes
+   CFLAGS_ORIG="$CFLAGS"
+fi
+AC_MSG_RESULT($enable_cflags_setting)
+
 AC_PROG_CC
 AC_PROG_CC_STDC
 AS_IF([test "x${ac_cv_prog_cc_stdc}" = xno],
@@ -66,6 +75,9 @@ AS_IF([test "x${ac_cv_prog_cc_stdc}" = xno],
 AC_USE_SYSTEM_EXTENSIONS
 AX_CFLAGS_WARN_ALL
 AC_PROG_INSTALL
+
+# Restore CFLAGS (preserve debug flags)
+test "x$enable_cflags_setting" = xyes && CFLAGS="$CFLAGS_ORIG"
 
 # Process options
 
@@ -78,6 +90,18 @@ AC_ARG_ENABLE([selinux],
   [AS_HELP_STRING([--enable-selinux],
     [enable selinux support @<:@default=check@:>@])],,
   [enable_selinux=check])
+  
+AC_ARG_ENABLE(debug,
+AS_HELP_STRING([--enable-debug],
+               [enable debugging, default: no]),
+[case "${enableval}" in
+             yes) debug=true ;;
+             no)  debug=false ;;
+             *)   AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+esac],
+[debug=false])
+
+AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
 
 # Checks for libraries
 

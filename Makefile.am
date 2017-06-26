@@ -5,8 +5,12 @@
 ################################################################
 
 AM_CPPFLAGS = -D$(OS)
-AM_CFLAGS = -pedantic
 
+if DEBUG
+AM_CFLAGS = -pedantic -O0 -g3 -DDEBUG_BUILD 
+else
+AM_CFLAGS = -pedantic -O3 -fno-strict-aliasing
+endif
 
 ################################################################
 ##                            docs                            ##
@@ -31,6 +35,8 @@ EXTRA_DIST = .travis.yml doc/iodine-server.service	\
 ################################################################
 
 sbin_PROGRAMS = iodine iodined
+iodine_CFLAGS = $(AM_CFLAGS)
+iodined_CFLAGS = $(AM_CFLAGS)
 
 COMMONSRC0 = src/base32.c src/base64.c src/common.c src/dns.c	\
  src/encoding.c src/login.c src/md5.c src/read.c src/window.c	\
