@@ -922,7 +922,6 @@ int
 parse_data(uint8_t *data, size_t len, fragment *f, int *immediate, int *ping)
 {
 	size_t headerlen = DOWNSTREAM_HDR;
-	memset(f, 0, sizeof(fragment));
 	int error;
 
 	f->seqID = data[0];
@@ -954,8 +953,8 @@ parse_data(uint8_t *data, size_t len, fragment *f, int *immediate, int *ping)
 	}
 	f->len = len - headerlen;
 	if (f->len > 0)
-		memcpy(f->data, data + headerlen, MIN(f->len, sizeof(f->data)));
-	return error; /* return ping flag (if corresponding query was a ping) */
+		memcpy(f->data, data + headerlen, MIN(f->len, this.inbuf->maxfraglen));
+	return error;
 }
 
 static ssize_t
@@ -1048,9 +1047,9 @@ tunnel_dns()
 {
 	struct query q;
 	size_t datalen, buflen;
-	uint8_t buf[64*1024], cbuf[64*1024], *data;
+	uint8_t buf[64*1024], cbuf[64*1024], *data, compressed;
 	fragment f;
-	int read, compressed, ping, immediate, error;
+	int read, ping, immediate, error;
 
 	memset(&q, 0, sizeof(q));
 	memset(buf, 0, sizeof(buf));
@@ -1137,6 +1136,7 @@ tunnel_dns()
 	this.num_recv++;
 
 	/* Decode the downstream data header and fragment-ify ready for processing */
+	f.data = buf;
 	error = parse_data(cbuf, read, &f, &immediate, &ping);
 
 	/* Mark query as received */

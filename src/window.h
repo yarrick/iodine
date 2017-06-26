@@ -20,41 +20,43 @@
 /* Hard-coded sequence ID and fragment size limits
  * These should match the limitations of the protocol. */
 #define MAX_SEQ_ID 256
-#define MAX_FRAGSIZE 4096
+#define MAX_FRAGSIZE 2048
 
 /* Window function definitions. */
 #define WINDOW_SENDING 1
 #define WINDOW_RECVING 0
 
 typedef struct fragment {
+	uint8_t *data;				/* pointer to fragment data */
+	struct timeval lastsent;	/* timestamp of most recent send attempt */
 	size_t len;					/* Length of fragment data (0 if fragment unused) */
 	unsigned seqID;				/* fragment sequence ID */
+	unsigned retries;			/* number of times has been sent or dupes recv'd */
+	int acks;					/* number of times packet has been ack'd */
 	int ack_other;				/* other way ACK seqID (>=0) or unset (<0) */
-	int compressed;				/* compression flag */
+	uint8_t compressed;			/* compression flag */
 	uint8_t start;				/* start of chunk flag */
 	uint8_t end;				/* end of chunk flag */
-	uint8_t data[MAX_FRAGSIZE];	/* fragment data */
-	unsigned retries;			/* number of times has been sent or dupes recv'd */
-	struct timeval lastsent;	/* timestamp of most recent send attempt */
-	int acks;					/* number of times packet has been ack'd */
 } fragment;
 
 struct frag_buffer {
-	fragment *frags;		/* pointer to array of data fragments */
-	unsigned windowsize;	/* Max number of fragments in flight */
-	unsigned maxfraglen;	/* Max outgoing fragment data size */
+	fragment *frags;		/* pointer to array of fragment metadata */
+	uint8_t *data;			/* pointer to actual fragment data */
 	size_t length;			/* Length of buffer */
 	size_t numitems;		/* number of non-empty fragments stored in buffer */
 	size_t window_start;	/* Start of window (index) */
 	size_t window_end;		/* End of window (index) */
 	size_t last_write;		/* Last fragment appended (index) */
 	size_t chunk_start;		/* Start of current chunk of fragments (index) */
+	struct timeval timeout;	/* Fragment ACK timeout before resend or drop */
+	unsigned windowsize;	/* Max number of fragments in flight */
+	unsigned maxfraglen;	/* Max outgoing fragment data size */
 	unsigned cur_seq_id;	/* Next unused sequence ID */
 	unsigned start_seq_id;	/* Start of window sequence ID */
+	unsigned max_retries;	/* max number of resends before dropping (-1 = never drop) */
 	unsigned resends;		/* number of fragments resent or number of dupes received */
 	unsigned oos;			/* Number of out-of-sequence fragments received */
 	int direction;			/* WINDOW_SENDING or WINDOW_RECVING */
-	struct timeval timeout;	/* Fragment ACK timeout before resend */
 };
 
 extern int window_debug;
@@ -69,6 +71,9 @@ extern int window_debug;
 #else
 #define WDEBUG(...)
 #endif
+
+/* Gets pointer to fragment data given fragment index */
+#define FRAG_DATA(w, fragIndex) ((w->data + (w->maxfraglen * fragIndex)))
 
 /* Gets index of fragment o fragments after window start */
 #define AFTER(w, o) ((w->window_start + o) % w->length)
@@ -109,29 +114,27 @@ extern int window_debug;
 		}\
 	}
 
-/* Window buffer creation and housekeeping */
-struct frag_buffer *window_buffer_init(size_t length, unsigned windowsize, unsigned fragsize, int dir);
-void window_buffer_resize(struct frag_buffer *w, size_t length);
+/* Window buffer creation */
+struct frag_buffer *window_buffer_init(size_t length, unsigned windowsize, unsigned maxfraglen, int dir);
+
+/* Resize buffer, clear and reset stats and data */
+void window_buffer_resize(struct frag_buffer *w, size_t length, unsigned maxfraglen);
+
+/* Destroys window buffer instance */
 void window_buffer_destroy(struct frag_buffer *w);
 
 /* Clears fragments and resets window stats */
 void window_buffer_clear(struct frag_buffer *w);
 
-/* Resets window stats without clearing fragments */
-void window_buffer_reset(struct frag_buffer *w);
-
 /* Returns number of available fragment slots (NOT BYTES) */
 size_t window_buffer_available(struct frag_buffer *w);
-
-/* Places a fragment in the window after the last one */
-int window_append_fragment(struct frag_buffer *w, fragment *src);
 
 /* Handles fragment received from the sending side (RECV) */
 ssize_t window_process_incoming_fragment(struct frag_buffer *w, fragment *f);
 
 /* Reassembles first complete sequence of fragments into data. (RECV)
  * Returns length of data reassembled, or 0 if no data reassembled */
-size_t window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, int *compression);
+size_t window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, uint8_t *compression);
 
 /* Returns number of fragments to be sent */
 size_t window_sending(struct frag_buffer *w, struct timeval *);
@@ -151,6 +154,6 @@ void window_tick(struct frag_buffer *w);
 
 /* Splits data into fragments and adds to the end of the window buffer for sending
  * All fragment meta-data is created here (SEND) */
-int window_add_outgoing_data(struct frag_buffer *w, uint8_t *data, size_t len, int compressed);
+int window_add_outgoing_data(struct frag_buffer *w, uint8_t *data, size_t len, uint8_t compressed);
 
 #endif /* __WINDOW_H__ */

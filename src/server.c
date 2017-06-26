@@ -439,13 +439,14 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tc
    immediate: 1=not from qmem (ie. fresh query), 0=query is from qmem
    tcperror: whether to tell user that TCP socket is closed (NULL if OK or pointer to error message) */
 {
-	uint8_t pkt[MAX_FRAGSIZE + DOWNSTREAM_PING_HDR];
 	size_t datalen, headerlen;
 	fragment *f = NULL;
 	struct frag_buffer *out, *in;
 
 	in = users[userid].incoming;
 	out = users[userid].outgoing;
+
+	uint8_t pkt[out->maxfraglen + DOWNSTREAM_PING_HDR];
 
 	window_tick(out);
 
@@ -499,8 +500,6 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tc
 		headerlen = DOWNSTREAM_PING_HDR;
 	}
 	if (datalen + headerlen > sizeof(pkt)) {
-		/* Should never happen, or at least user should be warned about
-		 * fragsize > MAX_FRAGLEN earlier on */
 		warnx("send_data_or_ping: fragment too large to send! (%" L "u)", datalen);
 		return;
 	}
@@ -521,7 +520,7 @@ user_process_incoming_data(int userid, int ack)
 {
 	uint8_t pkt[65536];
 	size_t datalen;
-	int compressed = 0;
+	uint8_t compressed = 0;
 
 	window_ack(users[userid].outgoing, ack);
 	window_tick(users[userid].outgoing);
@@ -1813,7 +1812,7 @@ void
 handle_dns_data(int dns_fd, struct query *q, uint8_t *domain, int domain_len, int userid)
 {
 	uint8_t unpacked[20];
-	static fragment f;
+	fragment f;
 	size_t len;
 
 	/* Need 6 char header + >=1 char data */
@@ -1838,9 +1837,13 @@ handle_dns_data(int dns_fd, struct query *q, uint8_t *domain, int domain_len, in
 	f.start = (unpacked[2] >> 1) & 1;
 	f.end = unpacked[2] & 1;
 
+	uint8_t data[users[userid].incoming->maxfraglen];
+	f.data = data;
+
 	/* Decode remainder of data with user encoding into fragment */
-	f.len = unpack_data(f.data, MAX_FRAGSIZE, (uint8_t *)domain + UPSTREAM_HDR,
-					   domain_len - UPSTREAM_HDR, users[userid].encoder);
+	f.len = unpack_data(f.data, users[userid].incoming->maxfraglen,
+				(uint8_t *)domain + UPSTREAM_HDR,
+				domain_len - UPSTREAM_HDR, users[userid].encoder);
 
 	DEBUG(3, "frag seq %3u, datalen %5lu, ACK %3d, compression %1d, s%1d e%1d",
 				f.seqID, f.len, f.ack_other, f.compressed, f.start, f.end);
@@ -1848,7 +1851,7 @@ handle_dns_data(int dns_fd, struct query *q, uint8_t *domain, int domain_len, in
 	/* if already waiting for an ACK to be sent back upstream (on incoming buffer) */
 	if (users[userid].next_upstream_ack >= 0) {
 		/* Shouldn't normally happen; will always be reset after sending a packet. */
-		DEBUG(1, "[WARNING] next_upstream_ack == %d for user %d.", users[userid].next_upstream_ack, userid);
+		DEBUG(1, "[WARNING] next_upstream_ack == %d for user %d.",users[userid].next_upstream_ack, userid);
 	}
 
 	window_process_incoming_fragment(users[userid].incoming, &f);

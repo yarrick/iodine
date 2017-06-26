@@ -67,7 +67,7 @@ START_TEST(test_window_everything)
 	uint8_t newdata[1000];
 	memset(newdata, 0, 1000);
 	unsigned i;
-	int c;
+	uint8_t c;
 	for (i = 0; i < 50; i++) {
 		memset(data, 0, 100);
 		size_t len = window_reassemble_data(in, data, 100, &c);
