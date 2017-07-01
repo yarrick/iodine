@@ -70,7 +70,9 @@ START_TEST(test_window_everything)
 	uint8_t c;
 	for (i = 0; i < 50; i++) {
 		memset(data, 0, 100);
-		size_t len = window_reassemble_data(in, data, 100, &c);
+		size_t len = 100;
+		// TODO test reassemble multiple packets
+		window_reassemble_data(in, data, &len, &c);
 		fail_if(c != 0, "Compression flag weird");
 //		printf("Reassembled %lu bytes, num frags %lu: '", len, in->numitems);
 //		for (unsigned i = 0; i < len; i++) {

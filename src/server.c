@@ -521,19 +521,23 @@ user_process_incoming_data(int userid, int ack)
 	uint8_t pkt[65536];
 	size_t datalen;
 	uint8_t compressed = 0;
+	int can_reassemble = 1;
 
 	window_ack(users[userid].outgoing, ack);
 	window_tick(users[userid].outgoing);
 
-	datalen = window_reassemble_data(users[userid].incoming, pkt, sizeof(pkt), &compressed);
-	window_tick(users[userid].incoming);
+	while (can_reassemble == 1) {
+		datalen = sizeof(pkt);
+		can_reassemble = window_reassemble_data(users[userid].incoming, pkt, &datalen, &compressed);
+		window_tick(users[userid].incoming);
 
-	/* Update time info */
-	users[userid].last_pkt = time(NULL);
+		/* Update time info */
+		users[userid].last_pkt = time(NULL);
 
-	if (datalen > 0) {
-		/* Data reassembled successfully + cleared out of buffer */
-		handle_full_packet(userid, pkt, datalen, compressed);
+		if (datalen > 0) {
+			/* Data reassembled successfully + cleared out of buffer */
+			handle_full_packet(userid, pkt, datalen, compressed);
+		}
 	}
 }
 
@@ -778,8 +782,7 @@ server_tunnel()
 	struct query *answer_now = NULL;
 	time_t last_action = time(NULL);
 
-	if (server.debug >= 5)
-		window_debug = server.debug - 4;
+	window_debug = server.debug;
 
 	while (server.running) {
 		int maxfd;
@@ -915,7 +918,8 @@ handle_full_packet(int userid, uint8_t *data, size_t len, int compressed)
 		}
 
 	} else {
-		DEBUG(2, "Discarded upstream data from user %d, uncompress() result: %d", userid, ret);
+		DEBUG(2, "Discarded pkt from user %d, uncompress()==%d, len=%" L "u, rawlen=%" L "u",
+				userid, ret, len, rawlen);
 	}
 }
 

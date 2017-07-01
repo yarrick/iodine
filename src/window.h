@@ -134,7 +134,7 @@ ssize_t window_process_incoming_fragment(struct frag_buffer *w, fragment *f);
 
 /* Reassembles first complete sequence of fragments into data. (RECV)
  * Returns length of data reassembled, or 0 if no data reassembled */
-size_t window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t maxlen, uint8_t *compression);
+int window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t *maxlen, uint8_t *compression);
 
 /* Returns number of fragments to be sent */
 size_t window_sending(struct frag_buffer *w, struct timeval *);

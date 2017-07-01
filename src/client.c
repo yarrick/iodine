@@ -1027,7 +1027,8 @@ tunnel_tun()
 
 	if (this.conn == CONN_DNS_NULL) {
 		/* Check if outgoing buffer can hold data */
-		if ((0 == this.windowsize_up && 0 != this.outbuf->numitems) || window_buffer_available(this.outbuf) < (read / MAX_FRAGSIZE) + 1) {
+		if ((this.windowsize_up == 0 && this.outbuf->numitems != 0) ||
+				window_buffer_available(this.outbuf) < (read / MAX_FRAGSIZE) + 1) {
 			DEBUG(1, "  Outgoing buffer full (%" L "u/%" L "u), not adding data!",
 						this.outbuf->numitems, this.outbuf->length);
 			return -1;
@@ -1049,7 +1050,7 @@ tunnel_dns()
 	size_t datalen, buflen;
 	uint8_t buf[64*1024], cbuf[64*1024], *data, compressed;
 	fragment f;
-	int read, ping, immediate, error;
+	int read, ping, immediate, error, pkt = 1;
 
 	memset(&q, 0, sizeof(q));
 	memset(buf, 0, sizeof(buf));
@@ -1187,34 +1188,40 @@ tunnel_dns()
 
 	this.num_frags_recv++;
 
-	datalen = window_reassemble_data(this.inbuf, cbuf, sizeof(cbuf), &compressed);
-	if (datalen > 0) {
-		if (compressed) {
-			buflen = sizeof(buf);
-			if ((ping = uncompress(buf, &buflen, cbuf, datalen)) != Z_OK) {
-				DEBUG(1, "Uncompress failed (%d) for data len %" L "u: reassembled data corrupted or incomplete!", ping, datalen);
-				datalen = 0;
-			} else {
-				datalen = buflen;
-			}
-			data = buf;
-		} else {
-			data = cbuf;
-		}
-
-		if (datalen) {
-			if (this.use_remote_forward) {
-				if (write(STDOUT_FILENO, data, datalen) != datalen) {
-					warn("write_stdout != datalen");
+	/* Continue reassembling packets until not possible to do so.
+	 * This prevents a buildup of fully available packets (with one or more fragments each)
+	 * in the incoming window buffer. */
+	while (pkt == 1) {
+		datalen = sizeof(cbuf);
+		pkt = window_reassemble_data(this.inbuf, cbuf, &datalen, &compressed);
+		if (datalen > 0) {
+			if (compressed) {
+				buflen = sizeof(buf);
+				if ((ping = uncompress(buf, &buflen, cbuf, datalen)) != Z_OK) {
+					DEBUG(1, "Uncompress failed (%d) for data len %" L "u: reassembled data corrupted or incomplete!", ping, datalen);
+					datalen = 0;
+				} else {
+					datalen = buflen;
 				}
+				data = buf;
 			} else {
-				write_tun(this.tun_fd, data, datalen);
+				data = cbuf;
+			}
+
+			if (datalen) {
+				if (this.use_remote_forward) {
+					if (write(STDOUT_FILENO, data, datalen) != datalen) {
+						warn("write_stdout != datalen");
+					}
+				} else {
+					write_tun(this.tun_fd, data, datalen);
+				}
 			}
 		}
-	}
 
-	/* Move window along after doing all data processing */
-	window_tick(this.inbuf);
+		/* Move window along after doing all data processing */
+		window_tick(this.inbuf);
+	}
 
 	return read;
 }
@@ -1254,8 +1261,7 @@ client_tunnel()
 
 	use_min_send = 0;
 
-	if (this.debug >= 5)
-		window_debug = this.debug - 3;
+	window_debug = this.debug;
 
 	while (this.running) {
 		if (!use_min_send)
