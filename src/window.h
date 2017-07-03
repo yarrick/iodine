@@ -46,14 +46,13 @@ struct frag_buffer {
 	size_t length;			/* Length of buffer */
 	size_t numitems;		/* number of non-empty fragments stored in buffer */
 	size_t window_start;	/* Start of window (index) */
-	size_t window_end;		/* End of window (index) */
 	size_t last_write;		/* Last fragment appended (index) */
-	size_t chunk_start;		/* Start of current chunk of fragments (index) */
+	size_t chunk_start;		/* index of oldest fragment slot (lowest seqID) in buffer */
 	struct timeval timeout;	/* Fragment ACK timeout before resend or drop */
 	unsigned windowsize;	/* Max number of fragments in flight */
 	unsigned maxfraglen;	/* Max outgoing fragment data size */
 	unsigned cur_seq_id;	/* Next unused sequence ID */
-	unsigned start_seq_id;	/* Start of window sequence ID */
+	unsigned start_seq_id;	/* lowest seqID that exists in buffer (at index chunk_start) */
 	unsigned max_retries;	/* max number of resends before dropping (-1 = never drop) */
 	unsigned resends;		/* number of fragments resent or number of dupes received */
 	unsigned oos;			/* Number of out-of-sequence fragments received */
@@ -148,9 +147,6 @@ size_t window_sending(struct frag_buffer *w, struct timeval *);
 
 /* Returns next fragment to be sent or NULL if nothing (SEND) */
 fragment *window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack);
-
-/* Gets the seqid of next fragment to be ACK'd (RECV) */
-int window_get_next_ack(struct frag_buffer *w);
 
 /* Sets the fragment with seqid to be ACK'd (SEND) */
 void window_ack(struct frag_buffer *w, int seqid);

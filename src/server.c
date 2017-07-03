@@ -448,8 +448,6 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tc
 
 	uint8_t pkt[out->maxfraglen + DOWNSTREAM_PING_HDR];
 
-	window_tick(out);
-
 	if (!tcperror) {
 		f = window_get_next_sending_fragment(out, &users[userid].next_upstream_ack);
 	} else {
@@ -529,7 +527,6 @@ user_process_incoming_data(int userid, int ack)
 	while (can_reassemble == 1) {
 		datalen = sizeof(pkt);
 		can_reassemble = window_reassemble_data(users[userid].incoming, pkt, &datalen, &compressed);
-		window_tick(users[userid].incoming);
 
 		/* Update time info */
 		users[userid].last_pkt = time(NULL);
@@ -1287,8 +1284,8 @@ handle_dns_version(int dns_fd, struct query *q, uint8_t *domain, int domain_len)
 	u->down_compression = 1;
 	u->lazy = 0;
 	u->next_upstream_ack = -1;
-	u->outgoing->maxfraglen = u->encoder->get_raw_length(u->fragsize) - DOWNSTREAM_PING_HDR;
-	window_buffer_clear(u->outgoing);
+	window_buffer_resize(u->outgoing, u->outgoing->length,
+			u->encoder->get_raw_length(u->fragsize) - DOWNSTREAM_PING_HDR);
 	window_buffer_clear(u->incoming);
 	qmem_init(userid);
 
@@ -1669,7 +1666,8 @@ handle_dns_set_options(int dns_fd, struct query *q, int userid,
 	}
 	if (bits) {
 		int f = users[userid].fragsize;
-		users[userid].outgoing->maxfraglen = (bits * f) / 8 - DOWNSTREAM_PING_HDR;
+		window_buffer_resize(users[userid].outgoing, users[userid].outgoing->length,
+				(bits * f) / 8 - DOWNSTREAM_PING_HDR);
 		users[userid].downenc_bits = bits;
 	}
 
@@ -1724,8 +1722,8 @@ handle_dns_set_fragsize(int dns_fd, struct query *q, int userid,
 		write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
 	} else {
 		users[userid].fragsize = max_frag_size;
-		users[userid].outgoing->maxfraglen = (users[userid].downenc_bits * max_frag_size) /
-			8 - DOWNSTREAM_PING_HDR;
+		window_buffer_resize(users[userid].outgoing, users[userid].outgoing->length,
+				(users[userid].downenc_bits * max_frag_size) / 8 - DOWNSTREAM_PING_HDR);
 		write_dns(dns_fd, q, (char *)unpacked, 2, users[userid].downenc);
 
 		DEBUG(1, "Setting max downstream data length to %u bytes for user %d; %d bits (%c)",

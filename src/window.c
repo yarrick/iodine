@@ -39,6 +39,11 @@ struct frag_buffer *
 window_buffer_init(size_t length, unsigned windowsize, unsigned maxfraglen, int dir)
 {
 	struct frag_buffer *w;
+
+	/* Note: window buffer DOES NOT WORK with length > MAX_SEQ_ID */
+	if (length > MAX_SEQ_ID)
+		errx(1, "window_buffer_init: length (%" L "u) is greater than MAX_SEQ_ID (%d)!\n");
+
 	w = calloc(1, sizeof(struct frag_buffer));
 	if (!w) {
 		errx(1, "Failed to allocate window buffer memory!");
@@ -104,12 +109,11 @@ window_buffer_clear(struct frag_buffer *w)
 
 	w->numitems = 0;
 	w->window_start = 0;
-	w->window_end = AFTER(w, w->windowsize);
 	w->last_write = 0;
 	w->chunk_start = 0;
 	w->cur_seq_id = 0;
 	w->start_seq_id = 0;
-	w->max_retries = 5;
+	w->max_retries = 0;
 	w->resends = 0;
 	w->oos = 0;
 	w->timeout.tv_sec = 5;
@@ -143,21 +147,31 @@ window_process_incoming_fragment(struct frag_buffer *w, fragment *f)
 	endid = WRAPSEQ(startid + w->length);
 	offset = SEQ_OFFSET(startid, f->seqID);
 
-	if (!INWINDOW_SEQ(startid, endid, f->seqID)) {
-		WDEBUG("Drop frag ID %u: cannot fit in window buffer (%u-%u)",
-				f->seqID, startid, endid);
-		w->oos++;
+	if (f->len == 0) {
+		WDEBUG("got incoming frag with len 0! id=%u", f->seqID);
 		return -1;
 	}
+
 	/* Place fragment into correct location in buffer, possibly overwriting
-	 * older and not-yet-reassembled fragment */
-	ssize_t dest = WRAP(w->window_start + SEQ_OFFSET(startid, f->seqID));
+	 * an older and not-yet-reassembled fragment
+	 * Note: chunk_start != window_start */
+	ssize_t dest = WRAP(w->chunk_start + offset);
+
+	if (offset > w->length - w->windowsize) {
+		w->oos++;
+		WDEBUG("incoming frag far ahead: offs %u > %u, cs %u[%" L "u], id %u[%" L "u]",
+				offset, w->length - w->windowsize, w->start_seq_id, w->chunk_start,
+				f->seqID, dest);
+		offset -= w->length - w->windowsize;
+		window_slide(w, offset, 1);
+	}
+
 	WDEBUG("   Putting frag seq %u into frags[%" L "u + %u = %" L "u]",
-		   f->seqID, w->window_start, SEQ_OFFSET(startid, f->seqID), dest);
+		   f->seqID, w->chunk_start, offset, dest);
 
 	/* Check if fragment already received */
 	fd = &w->frags[dest];
-	if (fd->len == f->len && fd->seqID == f->seqID) {
+	if (fd->len != 0 && fd->seqID == f->seqID) {
 		/* use retries as counter for dupes */
 		fd->retries ++;
 		WDEBUG("Received duplicate frag, dropping. (prev %u/new %u, dupes %u)",
@@ -206,7 +220,7 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t *len, uint8_
 	int end = 0, drop = 0; /* if packet is dropped */
 	for (size_t i = 0; found_frags < w->numitems; i++) {
 		woffs = WRAP(w->chunk_start + i);
-		curseq = WRAPSEQ(w->cur_seq_id + i);
+		curseq = WRAPSEQ(w->start_seq_id + i);
 		f = &w->frags[woffs];
 
 		/* TODO Drop packets if some fragments are missing after reaching max retries
@@ -217,7 +231,8 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t *len, uint8_
 		 *      several full packets are sometimes left in buffer unprocessed
 		 *      so we must not just taking the oldest full packet and ignore newer ones */
 		if (f->len == 0) { /* Empty fragment */
-			WDEBUG("reassemble: hole at frag id %u [%" L "u]", curseq, woffs);
+			if (holes < 2)
+				WDEBUG("reassemble: hole at frag id %u [%" L "u]", curseq, woffs);
 			/* reset reassembly things to start over */
 			consecutive_frags = 0;
 			holes++;
@@ -279,18 +294,6 @@ window_reassemble_data(struct frag_buffer *w, uint8_t *data, size_t *len, uint8_
 		w->frags[p].len = 0;
 		p = (p <= 0) ? w->length - 1 : p - 1;
 	}
-	if (holes == 0) {
-		/* slide chunk_start++ only if there are no missing fragments (holes)
-		 * or incomplete packets that we might have skipped */
-		w->chunk_start = WRAP(woffs + 1);
-		w->cur_seq_id = WRAPSEQ(curseq + 1);
-	}
-
-	unsigned csdist = DISTF(w->length, w->window_start, w->chunk_start);
-	if (csdist <= w->length / 2) {
-		/* chunk_start is most likely ahead of window_start, so slide window to catch up */
-		window_slide(w, csdist, 1);
-	}
 
 	w->numitems -= consecutive_frags;
 	return found_frags >= consecutive_frags;
@@ -331,7 +334,7 @@ window_sending(struct frag_buffer *w, struct timeval *nextresend)
 			/* Frag has been sent before so lastsent is a valid timestamp */
 			timersub(&now, &f->lastsent, &age);
 
-			if (!timercmp(&age, &w->timeout, <)) {
+			if (!timercmp(&age, &w->timeout, <) && f->retries < w->max_retries) {
 				/* ACK timeout: Frag will be resent */
 				tosend++;
 			} else if (timercmp(&age, &oldest, >)) {
@@ -369,13 +372,13 @@ window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack)
 
 		timersub(&now, &f->lastsent, &age);
 
-		if (f->retries >= 1 && !timercmp(&age, &w->timeout, <)) {
+		if (f->retries >= 1 && f->retries < w->max_retries && !timercmp(&age, &w->timeout, <)) {
 			/* Resending fragment due to ACK timeout */
 			WDEBUG("Retrying frag %u (%ld ms old/timeout %ld ms), retries: %u/max %u/total %u",
 				   f->seqID, timeval_to_ms(&age), timeval_to_ms(&w->timeout), f->retries, w->max_retries, w->resends);
 			w->resends ++;
 			goto found;
-		} else if (f->retries == 0 && f->len > 0) {
+		} else if (f->retries == 0) {
 			/* Fragment not sent */
 			goto found;
 		}
@@ -397,36 +400,21 @@ window_get_next_sending_fragment(struct frag_buffer *w, int *other_ack)
 	return f;
 }
 
-/* Gets the seqid of next fragment to be ACK'd (RECV) */
-int
-window_get_next_ack(struct frag_buffer *w)
-{
-	fragment *f;
-	for (size_t i = 0; i < w->windowsize; i++) {
-		f = &w->frags[WRAP(w->window_start + i)];
-		if (f->len > 0 && f->acks <= 0) {
-			f->acks = 1;
-			return f->seqID;
-		}
-	}
-	return -1;
-}
-
 /* Sets the fragment with seqid to be ACK'd (SEND) */
 void
 window_ack(struct frag_buffer *w, int seqid)
 {
 	fragment *f;
 	if (seqid < 0 || seqid > MAX_SEQ_ID) return;
-	for (size_t i = 0; i < w->windowsize; i++) {
-		f = &w->frags[AFTER(w, i)];
-		if (f->seqID == seqid && f->len > 0) { /* ACK first non-empty frag */
-			if (f->acks > 0)
-				WDEBUG("DUPE ACK: %d ACKs for seqId %u", f->acks, seqid);
-			f->acks ++;
-			WDEBUG("   ACK frag seq %u, ACKs %u, len %" L "u, s %u e %u", f->seqID, f->acks, f->len, f->start, f->end);
-			break;
-		}
+	unsigned offset = SEQ_OFFSET(w->start_seq_id, seqid);
+
+	ssize_t dest = WRAP(w->chunk_start + offset);
+	f = &w->frags[dest];
+	if (f->seqID == seqid && f->len > 0) { /* increment ACK counter in frag */
+		f->acks ++;
+		WDEBUG("ACK frag seq %u, ACKs %u, len %" L "u, s %u e %u", f->seqID, f->acks, f->len, f->start, f->end);
+	} else {
+		WDEBUG("Tried to ACK nonexistent frag, id %u", seqid);
 	}
 }
 
@@ -435,7 +423,7 @@ void
 window_slide(struct frag_buffer *w, unsigned slide, int delete)
 {
 	WDEBUG("moving window forwards by %u; %" L "u-%" L "u (%u) to %" L "u-%" L "u (%u) len=%" L "u",
-			slide, w->window_start, w->window_end, w->start_seq_id, AFTER(w, slide),
+			slide, w->window_start, AFTER(w, w->windowsize), w->start_seq_id, AFTER(w, slide),
 			AFTER(w, w->windowsize + slide), AFTERSEQ(w, slide), w->length);
 
 	/* Requirements for fragment being cleared (SENDING):
@@ -446,6 +434,8 @@ window_slide(struct frag_buffer *w, unsigned slide, int delete)
 	 * Fragments (or holes) cleared on RECEIVING must:
 	 *  ((be received) AND (be ACK'd)) OR (... see window_reassemble_data)
 	 */
+	/* check if chunk_start has to be moved to prevent window overlapping,
+	 * which results in deleting holes or frags */
 	if (delete) {
 		/* Clear old frags or holes */
 		unsigned nfrags = 0;
@@ -462,19 +452,18 @@ window_slide(struct frag_buffer *w, unsigned slide, int delete)
 			}
 		}
 
-		WDEBUG("    chunk_start: %" L "u -> %" L "u", w->chunk_start, w->window_start);
+		WDEBUG("    chunk_start: %" L "u -> %" L "u", w->chunk_start, AFTER(w, slide));
 		w->numitems -= nfrags;
 		w->chunk_start = AFTER(w, slide);
+		w->start_seq_id = AFTERSEQ(w, slide);
 	}
 
 	/* Update window status */
 	w->window_start = AFTER(w, slide);
-	w->window_end = AFTER(w, w->windowsize);
-	w->start_seq_id = AFTERSEQ(w, slide);
 }
 
 /* Function to be called after all other processing has been done
- * when anything happens (moves window etc) (SEND/RECV) */
+ * when anything happens (moves window etc) (SEND only) */
 void
 window_tick(struct frag_buffer *w)
 {
@@ -482,7 +471,7 @@ window_tick(struct frag_buffer *w)
 	for (size_t i = 0; i < w->windowsize; i++) {
 		// TODO are ACKs required for reduced arrival guarantee?
 		fragment *f = &w->frags[WRAP(w->window_start + i)];
-		if (f->len > 0 && f->acks >= 1) {
+		if (f->len > 0 && (f->acks >= 1 || (w->max_retries == 0 && f->lastsent.tv_sec != 0))) {
 			/* count consecutive fragments from start of window that are ACK'd */
 			slide++;
 		} else break;
@@ -509,7 +498,6 @@ window_add_outgoing_data(struct frag_buffer *w, uint8_t *data, size_t len, uint8
 	for (size_t i = 0; i < n; i++) {
 		/* copy in new data and reset frag stats */
 		f->len = MIN(len - offset, w->maxfraglen);
-		memcpy(f->data, data + offset, f->len);
 		f->seqID = w->cur_seq_id;
 		f->compressed = compressed;
 		f->start = (i == 0) ? 1 : 0;
@@ -526,6 +514,7 @@ window_add_outgoing_data(struct frag_buffer *w, uint8_t *data, size_t len, uint8
 		w->numitems ++;
 		WDEBUG("     fragment len %" L "u, seqID %u, s %u, end %u, dOffs %" L "u",
 				f->len, f->seqID, f->start, f->end, offset);
+		memcpy(f->data, data + offset, f->len);
 		offset += f->len;
 	}
 	return n;

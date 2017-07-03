@@ -137,7 +137,7 @@ client_set_hostname_maxlen(size_t i)
 		this.hostname_maxlen = i;
 		this.maxfragsize_up = get_raw_length_from_dns(this.hostname_maxlen - UPSTREAM_HDR, this.dataenc, this.topdomain);
 		if (this.outbuf)
-			this.outbuf->maxfraglen = this.maxfragsize_up;
+			window_buffer_resize(this.outbuf, this.outbuf->length, this.maxfragsize_up);
 	}
 }
 
@@ -536,7 +536,6 @@ send_next_frag()
 			 * to get things back in order and keep the packets flowing */
 			send_ping(1, this.next_downstream_ack, 1, 0);
 			this.next_downstream_ack = -1;
-			window_tick(this.outbuf);
 		}
 		return; /* nothing to send */
 	}
@@ -572,8 +571,8 @@ send_next_frag()
 	id = send_query(buf);
 	/* Log query ID as being sent now */
 	query_sent_now(id);
-
 	window_tick(this.outbuf);
+
 	this.num_frags_sent++;
 }
 
@@ -1218,9 +1217,6 @@ tunnel_dns()
 				}
 			}
 		}
-
-		/* Move window along after doing all data processing */
-		window_tick(this.inbuf);
 	}
 
 	return read;

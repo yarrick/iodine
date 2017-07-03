@@ -268,10 +268,11 @@ help()
 	fprintf(stderr, "Fine-tuning options:\n");
 	fprintf(stderr, "  -w  downstream fragment window size (default: 8 frags)\n");
 	fprintf(stderr, "  -W  upstream fragment window size (default: 8 frags)\n");
+//	fprintf(stderr, "  -k  max retries for sending packets (default: 0, retries disabled)\n");
 	fprintf(stderr, "  -i  server-side request timeout in lazy mode (default: auto)\n");
 	fprintf(stderr, "  -j  downstream fragment ACK timeout, implies -i4 (default: 2 sec)\n");
 	fprintf(stderr, "  -J  downstream fragment ACK delay variance factor (default: 2.0), 0: auto\n");
-	//fprintf(stderr, "  --nodrop  disable TCP packet-dropping optimisations\n");
+
 	fprintf(stderr, "  -c 1: use downstream compression (default), 0: disable\n");
 	fprintf(stderr, "  -C 1: use upstream compression (default), 0: disable\n\n");
 
@@ -591,6 +592,7 @@ main(int argc, char **argv)
 			this.send_interval_ms = atoi(optarg);
 			if (this.send_interval_ms < 0)
 				this.send_interval_ms = 0;
+			break;
 		case 'w':
 			this.windowsize_down = atoi(optarg);
 			break;
