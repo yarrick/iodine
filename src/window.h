@@ -21,6 +21,7 @@
  * These should match the limitations of the protocol. */
 #define MAX_SEQ_ID 256
 #define MAX_FRAGSIZE 2048
+#define MAX_SEQ_AHEAD (MAX_SEQ_ID / 2)
 
 /* Window function definitions. */
 #define WINDOW_SENDING 1
@@ -64,7 +65,7 @@ extern int window_debug;
 /* Window debugging macro */
 #ifdef DEBUG_BUILD
 #define WDEBUG(...) if (window_debug) {\
-		TIMEPRINT("[WINDOW-DEBUG] (%s:%d) ", __FILE__, __LINE__);\
+		TIMEPRINT("[WDEBUG:%s] (%s:%d) ", w->direction == WINDOW_SENDING ? "S" : "R", __FILE__, __LINE__);\
 		fprintf(stderr, __VA_ARGS__);\
 		fprintf(stderr, "\n");\
 	}
@@ -78,23 +79,25 @@ extern int window_debug;
 /* Gets index of fragment o fragments after window start */
 #define AFTER(w, o) ((w->window_start + o) % w->length)
 
+/* Gets seqID of fragment o fragments after window start seqID */
+#define AFTERSEQ(w, o) ((w->start_seq_id + o) % MAX_SEQ_ID)
+
 /* Distance (going forwards) between a and b in window of length l */
-#define DISTF(l, a, b) (((a > b) ? a-b : l-a+b-1) % l)
+#define DISTF(l, a, b) ((a <= b) ? b-a : l-a+b)
 
 /* Distance backwards between a and b in window of length l */
-#define DISTB(l, a, b) (((a < b) ? l-b+a-1 : a-b) % l)
+#define DISTB(l, a, b) (l-DISTF(l, a, b))
 
 /* Check if fragment index a is within window_buffer *w */
 #define INWINDOW_INDEX(w, a) ((w->window_start < w->window_end) ? \
-		(a >= w->window_start && a <= w->window_end) : \
-		((a >= w->window_start && a <= w->length - 1) || \
-		(a >= 0 && a <= w->window_end)))
+		(a >= w->window_start && a < w->window_end) : \
+		((a >= w->window_start && a < w->length) || \
+		(a >= 0 && a < w->window_end)))
 
 /* Check if sequence ID a is within sequence range start to end */
 #define INWINDOW_SEQ(start, end, a) ((start < end) ? \
-		(a >= start && a <= end) : \
-		((a >= start && a <= MAX_SEQ_ID - 1) || \
-		(a <= end)))
+		(a >= start && a < end) : \
+		((a >= start && a < MAX_SEQ_ID) || (a < end)))
 
 /* Find the wrapped offset between sequence IDs start and a
  * Note: the maximum possible offset is MAX_SEQ_ID - 1 */
@@ -102,6 +105,10 @@ extern int window_debug;
 
 /* Wrap index x to a value within the window buffer length */
 #define WRAP(x) ((x) % w->length)
+
+/* Wrap index x to a value within the seqID range */
+#define WRAPSEQ(x) ((x) % MAX_SEQ_ID)
+
 
 /* Perform wrapped iteration of statement with pos = (begin to end) wrapped at
  * max, executing statement f for every value of pos. */
@@ -147,6 +154,8 @@ int window_get_next_ack(struct frag_buffer *w);
 
 /* Sets the fragment with seqid to be ACK'd (SEND) */
 void window_ack(struct frag_buffer *w, int seqid);
+
+void window_slide(struct frag_buffer *w, unsigned slide, int delete);
 
 /* To be called after all other processing has been done
  * when anything happens (moves window etc) (SEND/RECV) */
