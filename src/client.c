@@ -135,7 +135,8 @@ client_set_hostname_maxlen(size_t i)
 {
 	if (i <= 0xFF && i != this.hostname_maxlen) {
 		this.hostname_maxlen = i;
-		this.maxfragsize_up = get_raw_length_from_dns(this.hostname_maxlen - UPSTREAM_HDR, this.dataenc, this.topdomain);
+		this.maxfragsize_up = get_raw_length_from_dns(this.hostname_maxlen - UPSTREAM_HDR,
+				this.dataenc, this.topdomain);
 		if (this.outbuf)
 			window_buffer_resize(this.outbuf, this.outbuf->length, this.maxfragsize_up);
 	}
@@ -1147,8 +1148,10 @@ tunnel_dns()
 				ping ? "PING" : "DATA", f.seqID, f.ack_other, f.compressed, f.len, f.start, f.end);
 
 
-	window_ack(this.outbuf, f.ack_other);
-	window_tick(this.outbuf);
+	if (f.ack_other >= 0) {
+		window_ack(this.outbuf, f.ack_other);
+		window_tick(this.outbuf);
+	}
 
 	/* respond to TCP forwarding errors by shutting down */
 	if (error && this.use_remote_forward) {
@@ -1276,6 +1279,8 @@ client_tunnel()
 			else if (this.num_pending < 1 && !this.lazymode)
 				total = MAX(total, 1);
 
+			QTRACK_DEBUG(2, "sending=%d, total=%d, next_ack=%d, outbuf.n=%" L "u",
+					sending, total, this.next_downstream_ack, this.outbuf->numitems);
 			/* Upstream traffic - this is where all ping/data queries are sent */
 			if (sending > 0 || total > 0 || this.next_downstream_ack >= 0) {
 
@@ -1284,7 +1289,8 @@ client_tunnel()
 					send_next_frag();
 				} else {
 					/* Send ping if we didn't send anything yet */
-					send_ping(0, this.next_downstream_ack, (this.num_pings > 20 && this.num_pings % 50 == 0), 0);
+					send_ping(0, this.next_downstream_ack, (this.num_pings > 20 &&
+							this.num_pings % 50 == 0), 0);
 					this.next_downstream_ack = -1;
 				}
 

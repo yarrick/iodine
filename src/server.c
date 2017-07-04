@@ -260,10 +260,9 @@ qmem_max_wait(int *touser, struct query **sendq)
 	struct timeval now, timeout, soonest, tmp, age, nextresend;
 	soonest.tv_sec = 10;
 	soonest.tv_usec = 0;
-	int userid, qnum, nextuser = -1, immediate, resend = 0;
+	int userid, nextuser = -1, resend = 0;
 	struct query *q = NULL, *nextq = NULL;
 	size_t sending, total, sent;
-	time_t age_ms;
 	struct tun_user *u;
 
 	gettimeofday(&now, NULL);
@@ -299,7 +298,7 @@ qmem_max_wait(int *touser, struct query **sendq)
 		sending = total;
 		sent = 0;
 
-		qnum = u->qmem.start_pending;
+		int qnum = u->qmem.start_pending;
 		for (; qnum != u->qmem.end; qnum = (qnum + 1) % QMEM_LEN) {
 			q = &u->qmem.queries[qnum].q;
 
@@ -311,18 +310,16 @@ qmem_max_wait(int *touser, struct query **sendq)
 				 *  - user has pending data (always data)
 				 *  - user has pending ACK (either) */
 				timersub(&now, &q->time_recv, &age);
-				age_ms = timeval_to_ms(&age);
+				time_t age_ms = timeval_to_ms(&age);
 
 				/* only consider "immediate" when age is negligible */
-				immediate = llabs(age_ms) <= 10;
+				int immediate = llabs(age_ms) <= 10;
 
-				QMEM_DEBUG(3, userid, "Auto response to cached query: ID %d, %ld ms old (%s), timeout %ld ms",
-						q->id, age_ms, immediate ? "immediate" : "lazy", timeval_to_ms(&u->dns_timeout));
+				QMEM_DEBUG(3, userid, "ANSWER: ID %d, age=%ldms (imm=%d), timeout %ldms, ACK %d,"
+						" sent %" L "u/%" L "u (+%" L "u)", q->id, age_ms, immediate,
+						timeval_to_ms(&u->dns_timeout), u->next_upstream_ack, sent, total, sending);
 
 				sent++;
-				QMEM_DEBUG(4, userid, "ANSWER q id %d, ACK %d; sent %" L "u of %" L "u + sending another %" L "u",
-						q->id, u->next_upstream_ack, sent, total, sending);
-
 				send_data_or_ping(userid, q, 0, immediate, NULL);
 
 				if (sending > 0)
@@ -345,15 +342,17 @@ qmem_max_wait(int *touser, struct query **sendq)
 	if (server.debug >= 5) {
 		time_t soonest_ms = timeval_to_ms(&soonest);
 		if (nextq && nextuser >= 0) {
-			QMEM_DEBUG(5, nextuser, "can wait for %" L "u ms, will send id %d", soonest_ms, nextq->id);
+			QMEM_DEBUG(5, nextuser, "can wait for %" L "d ms, will send id %d", soonest_ms, nextq->id);
 		} else {
 			if (nextuser < 0)
 				nextuser = 0;
 			if (soonest_ms != 10000 && resend) {
 				/* only if resending some frags */
-				QMEM_DEBUG(5, nextuser, "Resending some fragments")
+				QMEM_DEBUG(5, nextuser, "Resending some fragments, soonest = %d ms", soonest_ms);
+				if (soonest_ms == 0)
+					QMEM_DEBUG(5, nextuser, "soonest_ms == 0! tv=%ds,%dus", soonest.tv_sec, soonest.tv_usec);
 			} else {
-				QMEM_DEBUG(2, nextuser, "Don't need to send anything to any users, waiting %" L "u ms", soonest_ms);
+				QMEM_DEBUG(2, nextuser, "Don't need to send anything to any users, waiting %" L "d ms", soonest_ms);
 			}
 		}
 	}
@@ -499,6 +498,7 @@ send_data_or_ping(int userid, struct query *q, int ping, int immediate, char *tc
 	}
 	if (datalen + headerlen > sizeof(pkt)) {
 		warnx("send_data_or_ping: fragment too large to send! (%" L "u)", datalen);
+		window_tick(out);
 		return;
 	}
 	if (f) {
@@ -521,8 +521,10 @@ user_process_incoming_data(int userid, int ack)
 	uint8_t compressed = 0;
 	int can_reassemble = 1;
 
-	window_ack(users[userid].outgoing, ack);
-	window_tick(users[userid].outgoing);
+	if (ack >= 0) {
+		window_ack(users[userid].outgoing, ack);
+		window_tick(users[userid].outgoing);
+	}
 
 	while (can_reassemble == 1) {
 		datalen = sizeof(pkt);
@@ -821,7 +823,7 @@ server_tunnel()
 
 		if(i < 0) {
 			if (server.running)
-				warn("select");
+				warn("select < 0");
 			return 1;
 		}
 
