@@ -53,7 +53,7 @@ struct frag_buffer {
 	unsigned maxfraglen;	/* Max outgoing fragment data size */
 	unsigned cur_seq_id;	/* Next unused sequence ID */
 	unsigned start_seq_id;	/* lowest seqID that exists in buffer (at index chunk_start) */
-	unsigned max_retries;	/* max number of resends before dropping (-1 = never drop) */
+	unsigned max_retries;	/* max number of resends before dropping */
 	unsigned resends;		/* number of fragments resent or number of dupes received */
 	unsigned oos;			/* Number of out-of-sequence fragments received */
 	int direction;			/* WINDOW_SENDING or WINDOW_RECVING */
