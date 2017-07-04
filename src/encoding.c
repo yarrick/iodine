@@ -27,8 +27,8 @@ size_t
 get_raw_length_from_dns(size_t enc_bytes, struct encoder *enc, const char *topdomain)
 /* Returns the maximum length of raw data that can be encoded into enc_bytes */
 {
-	/* 2 byte for something - seems necessary */
-	size_t enc_datalen = enc_bytes - strlen(topdomain) - 2;
+	/* 4 byte for dots and extra - seems necessary */
+	size_t enc_datalen = enc_bytes - strlen(topdomain) - 4;
 	/* Number of dots in length of encoded data */
 	size_t dots = 1;
 	if (!enc->eats_dots()) /* Dots are not included in encoded data length */
