@@ -36,8 +36,8 @@ char origdata[1000] = "";
 
 START_TEST(test_window_everything)
 {
-	in = window_buffer_init(1000, 10, 5, WINDOW_RECVING);
-	out = window_buffer_init(1000, 10, 5, WINDOW_SENDING);
+	in = window_buffer_init(80, 10, 5, WINDOW_RECVING);
+	out = window_buffer_init(80, 10, 5, WINDOW_SENDING);
 	for (unsigned i = 0; i < 20; i++) {
 		char c[100] = "0ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()-=`';\\|][{}/?~";
 		c[0] += i;
@@ -57,10 +57,8 @@ START_TEST(test_window_everything)
 		}
 		fail_if(window_process_incoming_fragment(in, f) < 0, "Dropped fragment!");
 //		warnx("Received fragment with seqid %u, remaining space %lu.", f->seqID, window_buffer_available(in));
-		window_tick(in);
 		window_ack(out, f->seqID);
 		window_tick(out);
-		fail_if(out->start_seq_id != in->start_seq_id, "in/out windows have different start IDs!");
 	}
 //	warnx("Added %lu fragments, reassembling into data.", in->numitems);
 	uint8_t data[100];
