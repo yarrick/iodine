@@ -150,7 +150,7 @@ AS_CASE([${enable_selinux}],
 # won't even *compile* there is probably a better solution than just
 # turning them off, and build time is minimal.
 
-PKG_CHECK_MODULES(CHECK,[check],
+PKG_CHECK_MODULES([CHECK], [check],
   AC_MSG_RESULT([enabled: unit testing]),
   AC_MSG_RESULT([disabled: unit testing]))
 
@@ -207,7 +207,7 @@ AC_TYPE_UINT8_T
 
 AC_FUNC_FORK
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([alarm dup2 inet_ntoa memset select socket strcasecmp strchr strdup strerror strrchr strstr])
+AC_CHECK_FUNCS([alarm dup2 inet_ntoa memset select socket strcasecmp strchr strdup strerror strrchr strstr bzero strtol gettimeofday])
 
 # Epilogue
 

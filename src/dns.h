@@ -25,6 +25,14 @@ typedef enum {
 	QR_ANSWER = 1
 } qr_t;
 
+#ifndef T_A6
+#define T_A6 38
+#endif
+
+#ifndef T_DNAME
+#define T_DNAME 39
+#endif
+
 extern int dnsc_use_edns0;
 
 int dns_encode(char *, size_t, struct query *, qr_t, char *, size_t);
