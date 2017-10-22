@@ -39,6 +39,7 @@ struct tun_user {
 	int active;
 	int authenticated;
 	int authenticated_raw;
+	int options_locked;
 	int disabled;
 	time_t last_pkt;
 	int seed;
