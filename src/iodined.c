@@ -2068,7 +2068,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 		if (raw_decode(packet, r, q, fd, dns_fds, tun_fd)) {
 			return 0;
 		}
-		if (dns_decode(NULL, 0, q, QR_QUERY, packet, r) < 0) {
+		if (dns_decode(NULL, 0, q, QR_QUERY, packet, r) <= 0) {
 			return 0;
 		}
 
