@@ -2,6 +2,7 @@ prefix?=/usr/local
 sbindir=$(prefix)/sbin
 datadir=$(prefix)/share
 mandir=$(datadir)/man
+docdir=$(datadir)/share/doc
 
 DESTDIR=
 
@@ -28,6 +29,9 @@ install: all
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(mandir)/man8
 	$(INSTALL) $(INSTALL_FLAGS) man/iodine.8 $(DESTDIR)$(mandir)/man8/iodine.8
 	chmod 644 $(DESTDIR)$(mandir)/man8/iodine.8
+	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(docdir)/iodine
+	$(INSTALL) $(INSTALL_FLAGS) README.md $(DESTDIR)$(docdir)/iodine/README.md
+	chmod 644 $(DESTDIR)$(docdir)/iodine/README.md
 
 uninstall:
 	$(RM) $(RM_FLAGS) $(DESTDIR)$(sbindir)/iodine
