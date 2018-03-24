@@ -1,6 +1,6 @@
 
 
-iodine - http://code.kryo.se/iodine
+iodine - https://code.kryo.se/iodine
 
 ***********************************
 
@@ -12,7 +12,7 @@ Extra README file for Win32 related stuff
 0. After iodine 0.6, you need Windows XP or newer to run.
 
 1. Install the TAP driver 
-   http://openvpn.net/index.php/open-source/downloads.html
+   https://openvpn.net/index.php/open-source/downloads.html
    Download the OpenVPN TAP driver (under section Tap-windows)
    Problems has been reported with the NDIS6 version (9.2x.y), use the
    NDIS5 version for now if possible.
@@ -47,7 +47,7 @@ Note that the binaries will not get a .exe suffix
 
 == Zlib download
 You can get zlib for MinGW here (both for native and crosscompile):
-http://code.kryo.se/iodine/deps/zlib.zip
+https://code.kryo.se/iodine/deps/zlib.zip
 Unzip it in your MinGW directory on Windows or in $ROOT/usr for
 cross-compile.
 
