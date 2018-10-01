@@ -1290,8 +1290,8 @@ send_upenctest(int fd, const char *s)
 	buf[3] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, s, 512);
-	strncat(buf, ".", 512);
+	strncat(buf, s, 128);
+	strncat(buf, ".", 2);
 	strncat(buf, topdomain, 512 - strlen(buf));
 	send_query(fd, buf);
 }
