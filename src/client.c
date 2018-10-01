@@ -95,6 +95,7 @@ static unsigned short do_qtype = T_UNSET;
 static enum connection conn;
 
 static int selecttimeout;		/* RFC says timeout minimum 5sec */
+static int inactivitytimeout;
 static int lazymode;
 static long send_ping_soon;
 static time_t lastdownstreamtime;
@@ -209,6 +210,12 @@ void
 client_set_selecttimeout(int select_timeout)
 {
 	selecttimeout = select_timeout;
+}
+
+void
+client_set_inactivitytimeout(int inactivity_timeout)
+{
+	inactivitytimeout = inactivity_timeout;
 }
 
 void
@@ -847,7 +854,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	}
 
 	if (read == 5 && !strncmp("BADIP", buf, 5)) {
-		warnx("BADIP: Server rejected sender IP address (maybe iodined -c will help), or server kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.");
+		warnx("BADIP: Server rejected sender IP address (maybe iodined -c will help), or server kicked us due to timeout. Will exit if no downstream data is received in %d seconds.", inactivitytimeout);
 		return -1;	/* nothing done */
 	}
 
@@ -1117,8 +1124,8 @@ client_tunnel(int tun_fd, int dns_fd)
 
 		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
 
- 		if (lastdownstreamtime + 60 < time(NULL)) {
- 			warnx("No downstream data received in 60 seconds, shutting down.");
+ 		if (lastdownstreamtime + inactivitytimeout < time(NULL)) {
+ 			warnx("No downstream data received in %d seconds, shutting down.", inactivitytimeout);
  			running = 0;
  		}
 

@@ -98,7 +98,8 @@ static void help(FILE *stream, bool verbose)
 			"  -t dir to chroot to directory dir\n"
 			"  -d device to set tunnel device name\n"
 			"  -z context, to apply specified SELinux context after initialization\n"
-			"  -F pidfile to write pid to a file\n\n"
+			"  -F pidfile to write pid to a file\n"
+			"  -o inactivity timeout interval\n\n"
 			"nameserver is the IP number/hostname of the relaying nameserver. If absent,\n"
 			"           /etc/resolv.conf is used\n"
 			"topdomain is the FQDN that is delegated to the tunnel endpoint.\n");
@@ -143,6 +144,7 @@ int main(int argc, char **argv)
 	int raw_mode;
 	int lazymode;
 	int selecttimeout;
+	int inactivitytimeout;
 	int hostname_maxlen;
 #ifdef OPENBSD
 	int rtable = 0;
@@ -172,6 +174,7 @@ int main(int argc, char **argv)
 	raw_mode = 1;
 	lazymode = 1;
 	selecttimeout = 4;
+	inactivitytimeout = 60;
 	hostname_maxlen = 0xFF;
 	nameserv_family = AF_UNSPEC;
 
@@ -190,7 +193,7 @@ int main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:o:")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -271,6 +274,11 @@ int main(int argc, char **argv)
 			if (selecttimeout < 1)
 				selecttimeout = 1;
 			break;
+		case 'o':
+			inactivitytimeout = atoi(optarg);
+			if (inactivitytimeout < 1)
+				inactivitytimeout = 1;
+			break;
 		default:
 			usage();
 			/* NOTREACHED */
@@ -322,6 +330,7 @@ int main(int argc, char **argv)
 	}
 
 	client_set_selecttimeout(selecttimeout);
+	client_set_inactivitytimeout(inactivitytimeout);
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
 	client_set_hostname_maxlen(hostname_maxlen);

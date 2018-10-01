@@ -31,6 +31,7 @@ int client_set_qtype(char *qtype);
 char *client_get_qtype(void);
 void client_set_downenc(char *encoding);
 void client_set_selecttimeout(int select_timeout);
+void client_set_inactivitytimeout(int inactivity_timeout);
 void client_set_lazymode(int lazy_mode);
 void client_set_hostname_maxlen(int i);
 
