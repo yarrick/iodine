@@ -16,17 +16,20 @@
  */
 
 #include <string.h>
+#include <assert.h>
 #include "common.h"
 #include "encoding.h"
 
 int build_hostname(char *buf, size_t buflen, const char *data,
 		   const size_t datalen, const char *topdomain,
-		   const struct encoder *encoder, int maxlen)
+		   const struct encoder *encoder, size_t maxlen)
 {
 	size_t space;
 	char *b;
+	size_t topdomainlen = strlen(topdomain);
+	char *bufstart = buf;
 
-	space = MIN((size_t)maxlen, buflen) - strlen(topdomain) - 8;
+	space = MIN(maxlen, buflen) - topdomainlen - 8;
 	/* 8 = 5 max header length + 1 dot before topdomain + 2 safety */
 
 	if (!encoder->places_dots)
@@ -49,7 +52,8 @@ int build_hostname(char *buf, size_t buflen, const char *data,
 	b++;
 	/* move b ahead of the string so we can copy to it */
 
-	strncpy(b, topdomain, strlen(topdomain)+1);
+	assert((*b - *bufstart) >= topdomainlen+1);
+	strncpy(b, topdomain, topdomainlen+1);
 
 	return space;
 }

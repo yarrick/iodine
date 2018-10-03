@@ -1266,7 +1266,7 @@ send_ip_request(int fd, int userid)
 	buf[4] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, topdomain, 511 - strlen(buf));
 	send_query(fd, buf);
 }
 
@@ -1290,9 +1290,9 @@ send_upenctest(int fd, const char *s)
 	buf[3] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, s, 512);
-	strncat(buf, ".", 512);
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, s, 511);
+	strncat(buf, ".", 511);
+	strncat(buf, topdomain, 511 - strlen(buf));
 	send_query(fd, buf);
 }
 
@@ -1310,7 +1310,7 @@ send_downenctest(int fd, char downenc, int variant, char *s, int slen)
 	buf[5] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, topdomain, 511 - strlen(buf));
 	send_query(fd, buf);
 }
 
@@ -1326,7 +1326,7 @@ send_codec_switch(int fd, int userid, int bits)
 	buf[5] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, topdomain, 511 - strlen(buf));
 	send_query(fd, buf);
 }
 
@@ -1343,7 +1343,7 @@ send_downenc_switch(int fd, int userid)
 	buf[5] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, topdomain, 511 - strlen(buf));
 	send_query(fd, buf);
 }
 
@@ -1363,7 +1363,7 @@ send_lazy_switch(int fd, int userid)
 	buf[5] = b32_5to8((rand_seed ) & 0x1f);
 	rand_seed++;
 
-	strncat(buf, topdomain, 512 - strlen(buf));
+	strncat(buf, topdomain, 511 - strlen(buf));
 	send_query(fd, buf);
 }
 

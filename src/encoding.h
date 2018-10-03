@@ -49,7 +49,7 @@ struct encoder {
 };
 
 int build_hostname(char *, size_t, const char *, const size_t, const char *,
-		   const struct encoder *, int);
+		   const struct encoder *, size_t);
 int unpack_data(char *, size_t, char *, size_t, const struct encoder *);
 int inline_dotify(char *, size_t);
 int inline_undotify(char *, size_t);

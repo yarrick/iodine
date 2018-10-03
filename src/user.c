@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #ifdef WINDOWS32
 #include <winsock2.h>
@@ -63,11 +64,15 @@ int init_users(in_addr_t my_ip, int netbits)
 	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
 		users[i].id = i;
+		assert(0 <= (i + skip + 1));
+		assert(255 >= (i + skip + 1));
 		snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 		ip = ipstart.s_addr + inet_addr(newip);
 		if (ip == my_ip && skip == 0) {
 			/* This IP was taken by iodined */
 			skip++;
+			assert(0 <= (i + skip + 1));
+			assert(255 >= (i + skip + 1));
 			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 			ip = ipstart.s_addr + inet_addr(newip);
 		}
