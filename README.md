@@ -132,21 +132,39 @@ nameservers will translate between protocols automatically if needed. Use
 options `-4` or `-6` to force the client to use a specific IP version for its DNS
 queries.
 
-#### Routing
-It is possible to route all traffic through the DNS tunnel. To do this, first
-add a host route to the nameserver used by iodine over the wired/wireless
-interface with the default gateway as gateway. Then replace the default
-gateway with the iodined server's IP address inside the DNS tunnel, and
-configure the server to do NAT.
 
-However, note that the tunneled data traffic is not encrypted at all, and can
+#### Routing
+
+It is possible to route all traffic through the DNS tunnel. 
+
+
+**Raw Mode**
+
+Routing in raw mode means you can reach the iodine server directly for DNS queries. 
+in this case you would add a host route to the iodine server over the wired/wireless
+interface with the default gateway as gateway. Then replace the default
+gateway with the iodined server's IP address inside the DNS tunnel.  Remember, your
+iodine server must be properly natted to route the traffic it receives.
+
+**non-raw mode**
+
+Routing in -r mode means you can't reach the iodine server directly for DNS queries. 
+in this case you would add a host route to the local resolver over the wired/wireless
+interface with the default gateway as gateway. Then replace the default
+gateway with the iodined server's IP address inside the DNS tunnel.  
+
+**Security**
+
+Note that the tunneled data traffic is not encrypted at all by iodine, and can
 be read and changed by external parties relatively easily. For maximum
 security, run a VPN through the DNS tunnel (=double tunneling), or use secure
 shell (SSH) access, possibly with port forwarding. The latter can also be used
 for web browsing, when you run a web proxy (for example Privoxy) on your
 server.
 
+
 #### Testing
+
 The `iodined` server replies to `NS` requests sent for subdomains of the tunnel
 domain. If your iodined subdomain is `t1.mydomain.com`, send a `NS` request for
 `foo123.t1.mydomain.com` to see if the delegation works.
