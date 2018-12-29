@@ -1439,6 +1439,9 @@ handshake_login(int dns_fd, int seed)
 			if (strncmp("LNAK", in, 4) == 0) {
 				fprintf(stderr, "Bad password\n");
 				return 1;
+			} else if (strncmp("BADIP", in, 5) == 0) {
+				warnx("BADIP: Server rejected sender IP address (maybe iodined -c will help), or server kicked us due to timeout. Will exit if no downstream data is received in 60 seconds.");
+				return 1;
 			} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d",
 				server, client, &mtu, &netmask) == 4) {
 
