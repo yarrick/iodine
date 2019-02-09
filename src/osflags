@@ -1,5 +1,7 @@
 #!/bin/sh
 
+: "${PKG_CONFIG:=pkg-config}"
+
 case $2 in
 link)
 
@@ -19,8 +21,8 @@ link)
 		Linux)
 			FLAGS="";
 			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -lselinux";
-			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS $(pkg-config --libs libsystemd-daemon)";
-			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS $(pkg-config --libs libsystemd)";
+			"$PKG_CONFIG" --exists libsystemd-daemon && FLAGS="$FLAGS $($PKG_CONFIG --libs libsystemd-daemon)";
+			"$PKG_CONFIG" --exists libsystemd && FLAGS="$FLAGS $($PKG_CONFIG --libs libsystemd)";
 			echo $FLAGS;
 		;;
 	esac
@@ -39,7 +41,8 @@ cflags)
 		Linux)
 			FLAGS="-D_GNU_SOURCE"
 			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -DHAVE_SETCON";
-			[ -e /usr/include/systemd/sd-daemon.h ] && FLAGS="$FLAGS -DHAVE_SYSTEMD";
+			"$PKG_CONFIG" --exists libsystemd-daemon && FLAGS="$FLAGS -DHAVE_SYSTEMD";
+			"$PKG_CONFIG" --exists libsystemd && FLAGS="$FLAGS -DHAVE_SYSTEMD";
 			echo $FLAGS;
 		;;
 		GNU/kFreeBSD|GNU)
