@@ -39,6 +39,10 @@
 #define IFCONFIGPATH "PATH=/sbin:/bin "
 #endif
 
+#ifndef ROUTEPATH
+#define ROUTEPATH "PATH=/sbin:/bin "
+#endif
+
 #ifdef WINDOWS32
 #include "windows.h"
 #include <winioctl.h>
@@ -629,7 +633,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	} else {
 
 		snprintf(cmdline, sizeof(cmdline),
-				"/sbin/route add %s/%d %s",
+				ROUTEPATH "route add %s/%d %s",
 				inet_ntoa(netip), netbits, ip);
 	}
 	fprintf(stderr, "Adding route %s/%d to %s\n", inet_ntoa(netip), netbits, ip);
