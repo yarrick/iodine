@@ -51,7 +51,9 @@ and a server with a public IP address to run `iodined` on. If this server
 already runs a DNS program, change its listening port and then use `iodined`'s
 `-b` option to let `iodined` forward the DNS requests. (Note that this procedure
 is not advised in production environments, because `iodined`'s DNS forwarding
-is not completely transparent.)
+is not completely transparent, for example zone transfers will not work.)
+Alternatively you can forward the subdomain from your DNS server to `iodined`
+which must then run on a different port (`-p`).
 
 Then, delegate a subdomain (say, `t1.mydomain.com`) to the iodined server.
 If you use BIND for your domain, add two lines like these to the zone file:
