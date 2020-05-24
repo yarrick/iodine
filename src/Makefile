@@ -32,7 +32,6 @@ $(SERVER): $(COMMONOBJS) $(SERVEROBJS)
 	@echo CC $<
 	@$(CC) $(CFLAGS) $< -o $@
 
-base64u.o client.o iodined.o:
 base64u.c: base64.c
 	@echo Making $@
 	@echo '/* No use in editing, produced by Makefile! */' > $@
