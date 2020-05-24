@@ -492,12 +492,27 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
 
-			memset(name, 0, sizeof(name));
-			readname(packet, packetlen, &data, name, sizeof(name) - 1);
-			name[sizeof(name)-1] = '\0';
-			strncpy(buf, name, buflen);
-			buf[buflen - 1] = '\0';
-			rv = strlen(buf);
+			if (type == T_CNAME) {
+				/* For tunnels, query type A has CNAME type answer */
+				memset(name, 0, sizeof(name));
+				readname(packet, packetlen, &data, name, sizeof(name) - 1);
+				name[sizeof(name)-1] = '\0';
+				strncpy(buf, name, buflen);
+				buf[buflen - 1] = '\0';
+				rv = strlen(buf);
+			}
+			if (type == T_A) {
+				/* Answer type A includes only 4 bytes.
+				   Not used for tunneling. */
+				rv = MIN(rlen, sizeof(rdata));
+				rv = readdata(packet, &data, rdata, rv);
+				if (rv >= 2 && buf) {
+					rv = MIN(rv, buflen);
+					memcpy(buf, rdata, rv);
+				} else {
+					rv = 0;
+				}
+			}
 		}
 		else if ((type == T_MX || type == T_SRV) && buf) {
 			/* We support 250 records, 250*(255+header) ~= 64kB.

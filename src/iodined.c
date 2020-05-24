@@ -123,57 +123,57 @@ get_dns_fd(struct dnsfd *fds, struct sockaddr_storage *addr)
 	return fds->v4fd;
 }
 
-/* Ask ipify.org webservice to get external ip */
+/* Ask opendns.com DNS service for external ip */
 static int
 get_external_ip(struct in_addr *ip)
 {
-	int sock;
-	struct addrinfo *addr;
+	static const char target[] = "myip.opendns.com";
+	struct query query;
+	int attempt;
 	int res;
-	const char *getstr = "GET / HTTP/1.0\r\n"
-		/* HTTP 1.0 to avoid chunked transfer coding */
-		"Host: api.ipify.org\r\n\r\n";
-	char buf[512];
-	char *b;
-	int len;
+	int fd;
+	int out_len = 0;
+	memset(&query, 0, sizeof(query));
 
-	res = getaddrinfo("api.ipify.org", "80", NULL, &addr);
+	query.type = T_A;
+	res = get_addr("resolver1.opendns.com", 53, AF_INET, 0, &query.destination);
 	if (res < 0) return 1;
+	query.dest_len = res;
 
-	sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-	if (sock < 0) {
-		freeaddrinfo(addr);
-		return 2;
+	fd = open_dns_from_host(NULL, 0, AF_INET, AI_PASSIVE);
+	if (fd < 0) return 2;
+
+	for (attempt = 0; attempt < 3; attempt++) {
+		char buf[64*1024];
+		int buflen;
+		fd_set fds;
+		struct timeval tv;
+
+		if (attempt) fprintf(stderr, "Retrying external IP lookup\n");
+		query.id = rand();
+		buflen = sizeof(buf);
+		buflen = dns_encode(buf, buflen, &query, QR_QUERY, target, strlen(target));
+		if (buflen < 0) continue;
+
+		sendto(fd, buf, buflen, 0, (struct sockaddr*)&query.destination, query.dest_len);
+
+		tv.tv_sec = 1 + attempt;
+		tv.tv_usec = 0;
+		FD_ZERO(&fds);
+		FD_SET(fd, &fds);
+		res = select(fd + 1, &fds, NULL, NULL, &tv);
+		if (res > 0) {
+			buflen = sizeof(buf);
+			buflen = recv(fd, buf, buflen, 0);
+			if (buflen > 0) {
+				out_len = dns_decode((char *)ip, sizeof(struct in_addr), &query, QR_ANSWER, buf, buflen);
+				if (out_len > 0) break;
+			}
+		}
 	}
 
-	res = connect(sock, addr->ai_addr, addr->ai_addrlen);
-	freeaddrinfo(addr);
-	if (res < 0) return 3;
-
-	res = write(sock, getstr, strlen(getstr));
-	if (res != strlen(getstr)) return 4;
-
-	/* Zero buf before receiving, leave at least one zero at the end */
-	memset(buf, 0, sizeof(buf));
-	res = read(sock, buf, sizeof(buf) - 1);
-	if (res < 0) return 5;
-	len = res;
-
-	res = close(sock);
-	if (res < 0) return 6;
-
-	b = buf;
-	while (len > 9) {
-		/* Look for split between headers and data */
-		if (strncmp("\r\n\r\n", b, 4) == 0) break;
-		b++;
-		len--;
-	}
-	if (len < 10) return 7;
-	b += 4;
-
-	res = inet_aton(b, ip);
-	return (res == 0);
+	close_dns(fd);
+	return (out_len != sizeof(struct in_addr));
 }
 
 static void
@@ -2616,7 +2616,7 @@ main(int argc, char **argv)
 		struct in_addr extip;
 		int res = get_external_ip(&extip);
 		if (res) {
-			fprintf(stderr, "Failed to get external IP via web service.\n");
+			fprintf(stderr, "Failed to get external IP via DNS query.\n");
 			exit(3);
 		}
 		ns_ip = extip.s_addr;
