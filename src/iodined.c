@@ -2285,7 +2285,7 @@ static void print_usage(FILE *stream)
 {
 	fprintf(stream, "Usage: %s [-46cDfsv] [-u user] [-t chrootdir] [-d device] [-m mtu]\n"
 			"               [-z context] [-l ipv4 listen address] [-L ipv6 listen address]\n"
-			"               [-p port] [-n external ip] [-b dnsport] [-P password]\n"
+			"               [-p port] [-n auto|external_ip] [-b dnsport] [-P password]\n"
 			"               [-F pidfile] [-i max idle time] tunnel_ip[/netmask] topdomain\n",
 			__progname);
 }
@@ -2322,6 +2322,7 @@ static void help(FILE *stream)
 			"(default ::)\n"
 			"  -p port to listen on for incoming dns traffic (default 53)\n"
 			"  -n ip to respond with to NS queries\n"
+			"     (Use 'auto' to look up external IP via a service)\n"
 			"  -b port to forward normal DNS queries to (on localhost)\n"
 			"  -P password used for authentication (max 32 chars will be used)\n"
 			"  -F pidfile to write pid to a file\n"
