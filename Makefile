@@ -40,7 +40,7 @@ uninstall:
 
 test: all
 	@echo "!! The check library is required for compiling and running the tests"
-	@echo "!! Get it at http://check.sf.net"
+	@echo "!! Get it at https://libcheck.github.io/check/"
 	@(cd tests; $(MAKE) TARGETOS=$(TARGETOS) all)
 
 clean:
