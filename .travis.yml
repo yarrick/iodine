@@ -5,7 +5,7 @@ language: objective-c
 os: osx
 
 before_install: brew update
-install: brew install check && brew install make
+install: brew install check
 
-script: make && gmake test
+script: make && make test
 
