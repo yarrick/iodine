@@ -507,20 +507,24 @@ read_tun(int tun_fd, char *buf, size_t len)
 	}
 }
 #else
-int
-write_tun(int tun_fd, char *data, size_t len)
+static int
+tun_uses_header(void)
 {
 #if defined (FREEBSD) || defined (NETBSD)
 	/* FreeBSD/NetBSD has no header */
-	int header = 0;
+	return 0;
 #elif defined (DARWIN)
 	/* Darwin tun has no header, Darwin utun does */
-	int header = !strncmp(if_name, "utun", 4);
+	return !strncmp(if_name, "utun", 4);
 #else  /* LINUX/OPENBSD */
-	int header = 1;
+	return 1;
 #endif
+}
 
-	if (!header) {
+int
+write_tun(int tun_fd, char *data, size_t len)
+{
+	if (!tun_uses_header()) {
 		data += 4;
 		len -= 4;
 	} else {
@@ -551,17 +555,7 @@ write_tun(int tun_fd, char *data, size_t len)
 ssize_t
 read_tun(int tun_fd, char *buf, size_t len)
 {
-#if defined (FREEBSD) || defined (NETBSD)
-	/* FreeBSD/NetBSD has no header */
-	int header = 0;
-#elif defined (DARWIN)
-	/* Darwin tun has no header, Darwin utun does */
-	int header = !strncmp(if_name, "utun", 4);
-#else  /* LINUX/OPENBSD */
-	int header = 1;
-#endif
-
-	if (!header) {
+	if (!tun_uses_header()) {
 		int bytes;
 		memset(buf, 0, 4);
 
