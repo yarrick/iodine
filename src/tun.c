@@ -416,16 +416,16 @@ open_tun(const char *tun_device)
 	int tun_fd;
 	char tun_name[50];
 
+	if (tun_device != NULL) {
 #ifdef DARWIN
-	if (!strncmp(tun_device, "utun", 4)) {
-		tun_fd = open_utun(tun_device);
-		if (tun_fd >= 0) {
-			return tun_fd;
+		if (!strncmp(tun_device, "utun", 4)) {
+			tun_fd = open_utun(tun_device);
+			if (tun_fd >= 0) {
+				return tun_fd;
+			}
 		}
-	}
 #endif
 
-	if (tun_device != NULL) {
 		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
 		strncpy(if_name, tun_device, sizeof(if_name));
 		if_name[sizeof(if_name)-1] = '\0';
