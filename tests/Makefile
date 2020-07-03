@@ -8,6 +8,12 @@ CHECK_PATH = /usr/local
 LDFLAGS = -L$(CHECK_PATH)/lib `pkg-config check --libs` -lpthread `sh ../src/osflags $(TARGETOS) link`
 CFLAGS = -std=c99 -g -Wall -D$(OS) `pkg-config check --cflags` -I../src -I$(CHECK_PATH)/include -pedantic `sh ../src/osflags $(TARGETOS) cflags`
 
+# Hide clang warnings from check.h about "token pasting of ',' and __VA_ARGS__ is a GNU extension"
+# and "'format' attribute argument not supported: gnu_printf"
+ifeq (clang,$(findstring clang,$(CC)))
+CFLAGS += -Wno-gnu-zero-variadic-macro-arguments -Wno-ignored-attributes
+endif
+
 all: $(TEST)
 	@LD_LIBRARY_PATH=${CHECK_PATH}/lib ./$(TEST)
 
