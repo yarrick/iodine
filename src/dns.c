@@ -260,7 +260,6 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 
 	header->qdcount = htons(1);
 	header->ancount = htons(1);
-	header->arcount = htons(1);
 
 	/* pointer to start of name */
 	name = 0xc000 | ((p - buf) & 0x3fff);
@@ -302,6 +301,10 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 	/* Do we have an IPv4 address to send? */
 	if (q->destination.ss_family == AF_INET) {
 		struct sockaddr_in *dest = (struct sockaddr_in *) &q->destination;
+
+		/* One additional record coming */
+		header->arcount = htons(1);
+
 		/* Additional data (A-record of NS server) */
 		CHECKLEN(12);
 		putshort(&p, nsname);		/* Name Server */
