@@ -48,8 +48,8 @@ START_TEST(test_base32_encode)
 	len = sizeof(buf);
 	val = base32_ops.encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
-	fail_unless(val == strlen(testpairs[_i].b));
-	fail_unless(strcmp(buf, testpairs[_i].b) == 0,
+	ck_assert(val == strlen(testpairs[_i].b));
+	ck_assert_msg(strcmp(buf, testpairs[_i].b) == 0,
 			"'%s' != '%s'", buf, testpairs[_i].b);
 }
 END_TEST
@@ -63,8 +63,8 @@ START_TEST(test_base32_decode)
 	len = sizeof(buf);
 	val = base32_ops.decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
-	fail_unless(val == strlen(testpairs[_i].a));
-	fail_unless(strcmp(buf, testpairs[_i].a) == 0,
+	ck_assert(val == strlen(testpairs[_i].a));
+	ck_assert_msg(strcmp(buf, testpairs[_i].a) == 0,
 			"'%s' != '%s'", buf, testpairs[_i].a);
 }
 END_TEST
@@ -76,7 +76,7 @@ START_TEST(test_base32_5to8_8to5)
 
 	for (i = 0; i < 32; i++) {
 		c = b32_5to8(i);
-		fail_unless(b32_8to5(c) == i);
+		ck_assert(b32_8to5(c) == i);
 	}
 }
 END_TEST
@@ -103,19 +103,19 @@ START_TEST(test_base32_blksize)
 
 	val = base32_ops.encode(encbuf, &enclen, rawbuf, rawlen);
 
-	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
-	fail_unless(enclen == 5, "encoded %d bytes, not 5", enclen);
-	fail_unless(val == 8, "encoded string %s was length %d", encbuf, val);
+	ck_assert_msg(rawlen == 5, "raw length was %d not 5", rawlen);
+	ck_assert_msg(enclen == 5, "encoded %d bytes, not 5", enclen);
+	ck_assert_msg(val == 8, "encoded string %s was length %d", encbuf, val);
 
 	memset(rawbuf, 0, rawlen + 16);
 
 	enclen = val;
 	val = base32_ops.decode(rawbuf, &rawlen, encbuf, enclen);
 
-	fail_unless(rawlen == 5, "raw length was %d not 5", rawlen);
-	fail_unless(val == 5, "val was not 5 but %d", val);
+	ck_assert_msg(rawlen == 5, "raw length was %d not 5", rawlen);
+	ck_assert_msg(val == 5, "val was not 5 but %d", val);
 	for (i = 0; i < rawlen; i++) {
-		fail_unless(rawbuf[i] == 'A');
+		ck_assert(rawbuf[i] == 'A');
 	}
 }
 END_TEST

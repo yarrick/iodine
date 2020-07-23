@@ -34,7 +34,7 @@ START_TEST(test_login_hash)
 
 	memset(ans, 0, sizeof(ans));
 	login_calculate(ans, len, pass, seed);
-	fail_unless(strncmp(ans, good, len) == 0, NULL);
+	ck_assert(strncmp(ans, good, len) == 0);
 }
 END_TEST
 
@@ -54,7 +54,7 @@ START_TEST(test_login_hash_short)
 
 	/* If len < 16, it should do nothing */
 	login_calculate(ans, len, pass, seed);
-	fail_if(memcmp(ans, check, sizeof(ans)));
+	ck_assert(memcmp(ans, check, sizeof(ans)) == 0);
 }
 END_TEST
 

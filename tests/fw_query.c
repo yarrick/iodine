@@ -31,14 +31,14 @@ START_TEST(test_fw_query_simple)
 
 	/* Test empty cache */
 	fw_query_get(0x848A, &qp);
-	fail_unless(qp == NULL);
+	ck_assert(qp == NULL);
 
 	fw_query_put(&q);
 
 	/* Test cache with one entry */
 	fw_query_get(0x848A, &qp);
-	fail_unless(qp->addrlen == q.addrlen);
-	fail_unless(qp->id == q.id);
+	ck_assert(qp->addrlen == q.addrlen);
+	ck_assert(qp->id == q.id);
 }
 END_TEST
 
@@ -62,8 +62,8 @@ START_TEST(test_fw_query_edge)
 
 	/* The query should still be cached */
 	fw_query_get(0x848A, &qp);
-	fail_unless(qp->addrlen == 33);
-	fail_unless(qp->id == 0x848A);
+	ck_assert(qp->addrlen == 33);
+	ck_assert(qp->id == 0x848A);
 
 	q.addrlen++;
 	q.id++;
@@ -71,7 +71,7 @@ START_TEST(test_fw_query_edge)
 
 	/* but now it is overwritten */
 	fw_query_get(0x848A, &qp);
-	fail_unless(qp == NULL);
+	ck_assert(qp == NULL);
 }
 END_TEST
 

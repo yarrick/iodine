@@ -46,13 +46,13 @@ START_TEST(test_read_putshort)
 	for (i = 0; i < 65536; i++) {
 		p = (char*)&k;
 		putshort(&p, i);
-		fail_unless(ntohs(k) == i,
+		ck_assert_msg(ntohs(k) == i,
 				"Bad value on putshort for %d: %d != %d",
 					i, ntohs(k), i);
 
 		p = (char*)&k;
 		readshort(NULL, &p, &l);
-		fail_unless(l == i,
+		ck_assert_msg(l == i,
 				"Bad value on readshort for %d: %d != %d",
 					i, l, i);
 	}
@@ -73,13 +73,13 @@ START_TEST(test_read_putlong)
 
 		putlong(&p, j);
 
-		fail_unless(ntohl(k) == j,
+		ck_assert_msg(ntohl(k) == j,
 				"Bad value on putlong for %d: %d != %d", i, ntohl(j), j);
 
 		p = (char*)&k;
 		readlong(NULL, &p, &l);
 
-		fail_unless(l == j,
+		ck_assert_msg(l == j,
 				"Bad value on readlong for %d: %d != %d", i, l, j);
 	}
 }
@@ -98,8 +98,8 @@ START_TEST(test_read_name_empty_loop)
 	data = (char*) emptyloop + sizeof(HEADER);
 	buf[1023] = 'A';
 	rv = readname((char *) emptyloop, sizeof(emptyloop), &data, buf, 1023);
-	fail_unless(rv == 0);
-	fail_unless(buf[1023] == 'A');
+	ck_assert(rv == 0);
+	ck_assert(buf[1023] == 'A');
 }
 END_TEST
 
@@ -116,8 +116,8 @@ START_TEST(test_read_name_inf_loop)
 	data = (char*) infloop + sizeof(HEADER);
 	buf[4] = '\a';
 	rv = readname((char*) infloop, sizeof(infloop), &data, buf, 4);
-	fail_unless(rv == 3);
-	fail_unless(buf[4] == '\a');
+	ck_assert(rv == 3);
+	ck_assert(buf[4] == '\a');
 }
 END_TEST
 
@@ -140,8 +140,8 @@ START_TEST(test_read_name_longname)
 	data = (char*) longname + sizeof(HEADER);
 	buf[256] = '\a';
 	rv = readname((char*) longname, sizeof(longname), &data, buf, 256);
-	fail_unless(rv == 256);
-	fail_unless(buf[256] == '\a');
+	ck_assert(rv == 256);
+	ck_assert(buf[256] == '\a');
 }
 END_TEST
 
@@ -157,7 +157,7 @@ START_TEST(test_read_name_onejump)
 	memset(buf, 0, sizeof(buf));
 	data = (char*) onejump + sizeof(HEADER);
 	rv = readname((char*) onejump, sizeof(onejump), &data, buf, 256);
-	fail_unless(rv == 9);
+	ck_assert(rv == 9);
 }
 END_TEST
 
@@ -179,8 +179,8 @@ START_TEST(test_read_name_badjump_start)
 		data = (char*) jumper + sizeof(HEADER);
 		rv = readname((char*) jumper, sizeof(badjump), &data, buf, 256);
 
-		fail_unless(rv == 0);
-		fail_unless(buf[0] == 0);
+		ck_assert(rv == 0);
+		ck_assert(buf[0] == 0);
 	}
 	free(jumper);
 }
@@ -204,8 +204,8 @@ START_TEST(test_read_name_badjump_second)
 		data = (char*) jumper + sizeof(HEADER);
 		rv = readname((char*) jumper, sizeof(badjump2), &data, buf, 256);
 
-		fail_unless(rv == 4);
-		fail_unless(strcmp("BA.", buf) == 0,
+		ck_assert(rv == 4);
+		ck_assert_msg(strcmp("BA.", buf) == 0,
 				"buf is not BA: %s", buf);
 	}
 	free(jumper);
@@ -224,8 +224,8 @@ START_TEST(test_putname)
 	b = buf;
 	ret = putname(&b, 256, domain);
 
-	fail_unless(ret == strlen(domain) + 1);
-	fail_unless(strncmp(buf, out, ret) == 0, "Happy flow failed");
+	ck_assert(ret == strlen(domain) + 1);
+	ck_assert_msg(strncmp(buf, out, ret) == 0, "Happy flow failed");
 }
 END_TEST
 
@@ -242,8 +242,8 @@ START_TEST(test_putname_nodot)
 	b = buf;
 	ret = putname(&b, 256, nodot);
 
-	fail_unless(ret == -1);
-	fail_unless(b == buf);
+	ck_assert(ret == -1);
+	ck_assert(b == buf);
 }
 END_TEST
 
@@ -264,8 +264,8 @@ START_TEST(test_putname_toolong)
 	b = buf;
 	ret = putname(&b, 256, toolong);
 
-	fail_unless(ret == -1);
-	fail_unless(b == buf);
+	ck_assert(ret == -1);
+	ck_assert(b == buf);
 }
 END_TEST
 

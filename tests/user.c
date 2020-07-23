@@ -38,12 +38,12 @@ START_TEST(test_init_users)
 	ip = inet_addr("127.0.0.1");
 	count = init_users(ip, 27);
 	for (i = 0; i < count; i++) {
-		fail_unless(users[i].id == i);
-		fail_unless(users[i].q.id == 0);
-		fail_unless(users[i].inpacket.len == 0);
-		fail_unless(users[i].outpacket.len == 0);
+		ck_assert(users[i].id == i);
+		ck_assert(users[i].q.id == 0);
+		ck_assert(users[i].inpacket.len == 0);
+		ck_assert(users[i].outpacket.len == 0);
 		snprintf(givenip, sizeof(givenip), "127.0.0.%d", i + 2);
-		fail_unless(users[i].tun_ip == inet_addr(givenip));
+		ck_assert(users[i].tun_ip == inet_addr(givenip));
 	}
 }
 END_TEST
@@ -58,25 +58,25 @@ START_TEST(test_find_user_by_ip)
 	users[0].conn = CONN_DNS_NULL;
 
 	testip = (unsigned int) inet_addr("10.0.0.1");
-	fail_unless(find_user_by_ip(testip) == -1);
+	ck_assert(find_user_by_ip(testip) == -1);
 
 	testip = (unsigned int) inet_addr("127.0.0.2");
-	fail_unless(find_user_by_ip(testip) == -1);
+	ck_assert(find_user_by_ip(testip) == -1);
 
 	users[0].active = 1;
 
 	testip = (unsigned int) inet_addr("127.0.0.2");
-	fail_unless(find_user_by_ip(testip) == -1);
+	ck_assert(find_user_by_ip(testip) == -1);
 
 	users[0].last_pkt = time(NULL);
 
 	testip = (unsigned int) inet_addr("127.0.0.2");
-	fail_unless(find_user_by_ip(testip) == -1);
+	ck_assert(find_user_by_ip(testip) == -1);
 
 	users[0].authenticated = 1;
 
 	testip = (unsigned int) inet_addr("127.0.0.2");
-	fail_unless(find_user_by_ip(testip) == 0);
+	ck_assert(find_user_by_ip(testip) == 0);
 }
 END_TEST
 
@@ -87,17 +87,17 @@ START_TEST(test_all_users_waiting_to_send)
 	ip = inet_addr("127.0.0.1");
 	init_users(ip, 27);
 
-	fail_unless(all_users_waiting_to_send() == 1);
+	ck_assert(all_users_waiting_to_send() == 1);
 
 	users[0].conn = CONN_DNS_NULL;
 	users[0].active = 1;
 
-	fail_unless(all_users_waiting_to_send() == 1);
+	ck_assert(all_users_waiting_to_send() == 1);
 
 	users[0].last_pkt = time(NULL);
 	users[0].outpacket.len = 0;
 
-	fail_unless(all_users_waiting_to_send() == 0);
+	ck_assert(all_users_waiting_to_send() == 0);
 
 #ifdef OUTPACKETQ_LEN
 	users[0].outpacketq_filled = 1;
@@ -105,7 +105,7 @@ START_TEST(test_all_users_waiting_to_send)
 	users[0].outpacket.len = 44;
 #endif
 
-	fail_unless(all_users_waiting_to_send() == 1);
+	ck_assert(all_users_waiting_to_send() == 1);
 }
 END_TEST
 
@@ -120,24 +120,24 @@ START_TEST(test_find_available_user)
 	for (i = 0; i < USERS; i++) {
 		users[i].authenticated = 1;
 		users[i].authenticated_raw = 1;
-		fail_unless(find_available_user() == i);
-		fail_if(users[i].authenticated);
-		fail_if(users[i].authenticated_raw);
+		ck_assert(find_available_user() == i);
+		ck_assert(users[i].authenticated == 0);
+		ck_assert(users[i].authenticated_raw == 0);
 	}
 
 	for (i = 0; i < USERS; i++) {
-		fail_unless(find_available_user() == -1);
+		ck_assert(find_available_user() == -1);
 	}
 
 	users[3].active = 0;
 
-	fail_unless(find_available_user() == 3);
-	fail_unless(find_available_user() == -1);
+	ck_assert(find_available_user() == 3);
+	ck_assert(find_available_user() == -1);
 
 	users[3].last_pkt = 55;
 
-	fail_unless(find_available_user() == 3);
-	fail_unless(find_available_user() == -1);
+	ck_assert(find_available_user() == 3);
+	ck_assert(find_available_user() == -1);
 }
 END_TEST
 
@@ -150,22 +150,22 @@ START_TEST(test_find_available_user_small_net)
 	init_users(ip, 29); /* this should result in 5 enabled users */
 
 	for (i = 0; i < 5; i++) {
-		fail_unless(find_available_user() == i);
+		ck_assert(find_available_user() == i);
 	}
 
 	for (i = 0; i < USERS; i++) {
-		fail_unless(find_available_user() == -1);
+		ck_assert(find_available_user() == -1);
 	}
 
 	users[3].active = 0;
 
-	fail_unless(find_available_user() == 3);
-	fail_unless(find_available_user() == -1);
+	ck_assert(find_available_user() == 3);
+	ck_assert(find_available_user() == -1);
 
 	users[3].last_pkt = 55;
 
-	fail_unless(find_available_user() == 3);
-	fail_unless(find_available_user() == -1);
+	ck_assert(find_available_user() == 3);
+	ck_assert(find_available_user() == -1);
 }
 END_TEST
 

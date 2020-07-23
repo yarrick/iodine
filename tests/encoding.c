@@ -50,7 +50,7 @@ START_TEST(test_inline_dotify)
 	b = temp;
 	inline_dotify(b, sizeof(temp));
 
-	fail_unless(strcmp(dottests[_i].b, temp) == 0,
+	ck_assert_msg(strcmp(dottests[_i].b, temp) == 0,
 			"'%s' != '%s'", temp, dottests[_i].b);
 }
 END_TEST
@@ -65,7 +65,7 @@ START_TEST(test_inline_undotify)
 	b = temp;
 	inline_undotify(b, sizeof(temp));
 
-	fail_unless(strcmp(dottests[_i].a, temp) == 0,
+	ck_assert_msg(strcmp(dottests[_i].a, temp) == 0,
 			"'%s' != '%s'", temp, dottests[_i].a);
 }
 END_TEST
@@ -87,8 +87,9 @@ START_TEST(test_build_hostname)
 	for (i = 1; i < sizeof(data); i++) {
 		int len = build_hostname(buf, buflen, data, i, topdomain, &base32_ops, sizeof(buf));
 
-		fail_if(len > i);
-		fail_if(strstr(buf, ".."), "Found double dots when encoding data len %d! buf: %s", i, buf);
+		ck_assert(len <= i);
+		ck_assert_msg(strstr(buf, "..") == NULL,
+			"Found double dots when encoding data len %d! buf: %s", i, buf);
 	}
 }
 END_TEST

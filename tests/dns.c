@@ -100,8 +100,10 @@ START_TEST(test_encode_query)
 		dump_packet(query_packet, len);
 		dump_packet(buf, ret);
 	}
-	fail_unless(strncmp(query_packet, buf, sizeof(query_packet)) == 0, "Did not compile expected packet");
-	fail_unless(ret == len, "Bad packet length: %d, expected %d", ret, len);
+	ck_assert_msg(strncmp(query_packet, buf, sizeof(query_packet)) == 0,
+		"Did not compile expected packet");
+	ck_assert_msg(ret == len,
+		"Bad packet length: %d, expected %d", ret, len);
 }
 END_TEST
 
@@ -124,8 +126,11 @@ START_TEST(test_decode_query)
 	len = sizeof(buf);
 	unpack_data(buf, len, &(q.name[1]), (int) (domain - q.name) - 1, enc);
 
-	fail_unless(strncmp(buf, innerData, strlen(innerData)) == 0, "Did not extract expected host: '%s'", buf);
-	fail_unless(strlen(buf) == strlen(innerData), "Bad host length: %d, expected %d: '%s'", strlen(buf), strlen(innerData), buf);
+	ck_assert_msg(strncmp(buf, innerData, strlen(innerData)) == 0,
+		"Did not extract expected host: '%s'", buf);
+	ck_assert_msg(strlen(buf) == strlen(innerData),
+		"Bad host length: %d, expected %d: '%s'",
+		strlen(buf), strlen(innerData), buf);
 }
 END_TEST
 
@@ -147,8 +152,10 @@ START_TEST(test_encode_response)
 	ret = dns_encode(buf, len, &q, QR_ANSWER, msgData, strlen(msgData));
 	len = sizeof(answer_packet) - 1; /* Skip extra null character */
 
-	fail_unless(strncmp(answer_packet, buf, sizeof(answer_packet)) == 0, "Did not compile expected packet");
-	fail_unless(ret == len, "Bad packet length: %d, expected %d", ret, len);
+	ck_assert_msg(strncmp(answer_packet, buf, sizeof(answer_packet)) == 0,
+		"Did not compile expected packet");
+	ck_assert_msg(ret == len,
+		"Bad packet length: %d, expected %d", ret, len);
 }
 END_TEST
 
@@ -163,9 +170,11 @@ START_TEST(test_decode_response)
 	memset(&buf, 0, sizeof(buf));
 
 	ret = dns_decode(buf, len, &q, QR_ANSWER, answer_packet, sizeof(answer_packet)-1);
-	fail_unless(ret == strlen(msgData), "Bad data length: %d, expected %d", ret, strlen(msgData));
-	fail_unless(strncmp(msgData, buf, strlen(msgData)) == 0, "Did not extract expected data");
-	fail_unless(q.id == 0x0539);
+	ck_assert_msg(ret == strlen(msgData),
+		"Bad data length: %d, expected %d", ret, strlen(msgData));
+	ck_assert_msg(strncmp(msgData, buf, strlen(msgData)) == 0,
+		"Did not extract expected data");
+	ck_assert(q.id == 0x0539);
 }
 END_TEST
 
@@ -180,9 +189,12 @@ START_TEST(test_decode_response_with_high_trans_id)
 	memset(&buf, 0, sizeof(buf));
 
 	ret = dns_decode(buf, len, &q, QR_ANSWER, answer_packet_high_trans_id, sizeof(answer_packet_high_trans_id)-1);
-	fail_unless(ret == strlen(msgData), "Bad data length: %d, expected %d", ret, strlen(msgData));
-	fail_unless(strncmp(msgData, buf, strlen(msgData)) == 0, "Did not extract expected data");
-	fail_unless(q.id == 0x8539, "q.id was %08X instead of %08X!", q.id, 0x8539);
+	ck_assert_msg(ret == strlen(msgData),
+		"Bad data length: %d, expected %d", ret, strlen(msgData));
+	ck_assert_msg(strncmp(msgData, buf, strlen(msgData)) == 0,
+		"Did not extract expected data");
+	ck_assert_msg(q.id == 0x8539,
+		"q.id was %08X instead of %08X!", q.id, 0x8539);
 }
 END_TEST
 
@@ -196,7 +208,7 @@ START_TEST(test_get_id_short_packet)
 	memset(&buf, 5, sizeof(buf));
 
 	id = dns_get_id(buf, len);
-	fail_unless(id == 0);
+	ck_assert(id == 0);
 }
 END_TEST
 
@@ -205,7 +217,7 @@ START_TEST(test_get_id_low)
 	unsigned short id;
 
 	id = dns_get_id(answer_packet, sizeof(answer_packet));
-	fail_unless(id == 1337);
+	ck_assert(id == 1337);
 }
 END_TEST
 
@@ -214,7 +226,7 @@ START_TEST(test_get_id_high)
 	unsigned short id;
 
 	id = dns_get_id(answer_packet_high_trans_id, sizeof(answer_packet_high_trans_id));
-	fail_unless(id == 0x8539);
+	ck_assert(id == 0x8539);
 }
 END_TEST
 
