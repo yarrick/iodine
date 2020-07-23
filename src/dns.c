@@ -299,21 +299,25 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 	putbyte(&p, 's');
 	putshort(&p, topname);			/* Name Server */
 
-	/* Additional data (A-record of NS server) */
-	CHECKLEN(12);
-	putshort(&p, nsname);			/* Name Server */
-	putshort(&p, T_A);			/* Type */
-	putshort(&p, C_IN);			/* Class */
-	putlong(&p, 3600);			/* TTL */
-	putshort(&p, 4);			/* Data length */
+	/* Do we have an IPv4 address to send? */
+	if (q->destination.ss_family == AF_INET) {
+		struct sockaddr_in *dest = (struct sockaddr_in *) &q->destination;
+		/* Additional data (A-record of NS server) */
+		CHECKLEN(12);
+		putshort(&p, nsname);		/* Name Server */
+		putshort(&p, T_A);		/* Type */
+		putshort(&p, C_IN);		/* Class */
+		putlong(&p, 3600);		/* TTL */
+		putshort(&p, 4);		/* Data length */
 
-	/* ugly hack to output IP address */
-	ipp = (char *) &q->destination;
-	CHECKLEN(4);
-	putbyte(&p, *(ipp++));
-	putbyte(&p, *(ipp++));
-	putbyte(&p, *(ipp++));
-	putbyte(&p, *ipp);
+		/* ugly hack to output IP address */
+		ipp = (char *) &dest->sin_addr.s_addr;
+		CHECKLEN(4);
+		putbyte(&p, *(ipp++));
+		putbyte(&p, *(ipp++));
+		putbyte(&p, *(ipp++));
+		putbyte(&p, *ipp);
+	}
 
 	len = p - buf;
 	return len;
@@ -323,11 +327,16 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
  * www.topdomain . Mostly same as dns_encode_ns_response() above */
 int dns_encode_a_response(char *buf, size_t buflen, struct query *q)
 {
+	struct sockaddr_in *dest = (struct sockaddr_in *) &q->destination;
 	HEADER *header;
 	int len;
 	short name;
 	char *ipp;
 	char *p;
+
+	/* Check if we have an IPv4 address to send */
+	if (q->destination.ss_family != AF_INET)
+		return -1;
 
 	if (buflen < sizeof(HEADER))
 		return 0;
@@ -355,19 +364,19 @@ int dns_encode_a_response(char *buf, size_t buflen, struct query *q)
 	/* Query section */
 	putname(&p, buflen - (p - buf), q->name); /* Name */
 	CHECKLEN(4);
-	putshort(&p, q->type); /* Type */
-	putshort(&p, C_IN); /* Class */
+	putshort(&p, q->type);	/* Type */
+	putshort(&p, C_IN);	/* Class */
 
 	/* Answer section */
 	CHECKLEN(12);
-	putshort(&p, name); /* Name */
-	putshort(&p, q->type); /* Type */
-	putshort(&p, C_IN); /* Class */
-	putlong(&p, 3600); /* TTL */
-	putshort(&p, 4); /* Data length */
+	putshort(&p, name);	/* Name */
+	putshort(&p, q->type);	/* Type */
+	putshort(&p, C_IN);	/* Class */
+	putlong(&p, 3600);	/* TTL */
+	putshort(&p, 4);	/* Data length */
 
 	/* ugly hack to output IP address */
-	ipp = (char *) &q->destination;
+	ipp = (char *) &dest->sin_addr.s_addr;
 	CHECKLEN(4);
 	putbyte(&p, *(ipp++));
 	putbyte(&p, *(ipp++));

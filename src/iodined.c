@@ -1549,7 +1549,9 @@ handle_ns_request(int dns_fd, struct query *q)
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
 		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+		addr->sin_family = AF_INET;
 		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
+		q->dest_len = sizeof(*addr);
 	}
 
 	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
@@ -1577,14 +1579,22 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	if (fakeip) {
 		in_addr_t ip = inet_addr("127.0.0.1");
 		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+		addr->sin_family = AF_INET;
 		memcpy(&addr->sin_addr, &ip, sizeof(ip));
-
+		q->dest_len = sizeof(*addr);
 	} else if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
 		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+		addr->sin_family = AF_INET;
 		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
+		q->dest_len = sizeof(*addr);
 	}
+
+	/* Give up if no IPv4 address known (when A request received over IPv6
+	 * and destination was not overwritten above) */
+	if (q->destination.ss_family != AF_INET)
+		return;
 
 	len = dns_encode_a_response(buf, sizeof(buf), q);
 	if (len < 1) {
