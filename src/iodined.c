@@ -1548,8 +1548,9 @@ handle_ns_request(int dns_fd, struct query *q)
 	if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
-		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
-		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
+		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination; /* probably not needed */
+		memcpy(&q->destination, &ns_ip, sizeof(ns_ip));
+		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip)); /* probably not needed */
 	}
 
 	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
@@ -1582,8 +1583,9 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	} else if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
-		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
-		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
+		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination; /* probably not needed */
+		memcpy(&q->destination, &ns_ip, sizeof(ns_ip));
+		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip)); /* probably not needed */
 	}
 
 	len = dns_encode_a_response(buf, sizeof(buf), q);
