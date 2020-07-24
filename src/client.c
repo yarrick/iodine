@@ -1255,6 +1255,28 @@ send_version(int fd, uint32_t version)
 	send_packet(fd, 'v', data, sizeof(data));
 }
 
+/* Add lower 15 bits of rand seed as base32,
+ * followed by a dot and the tunnel domain and send */
+static void
+send_handshake_query(int fd, char *prefix)
+{
+	char buf[300];
+	char cmc_dot[5];
+
+	cmc_dot[0] = b32_5to8((rand_seed >> 10) & 0x1f);
+	cmc_dot[1] = b32_5to8((rand_seed >> 5) & 0x1f);
+	cmc_dot[2] = b32_5to8((rand_seed) & 0x1f);
+	cmc_dot[3] = '.';
+	cmc_dot[4] = 0;
+	rand_seed++;
+
+	buf[0] = 0;
+	strncat(buf, prefix, 60); /* 63 - space for 3 CMC bytes */
+	strcat(buf, cmc_dot);
+	strncat(buf, topdomain, sizeof(buf) - strlen(buf));
+	send_query(fd, buf);
+}
+
 static void
 send_ip_request(int fd, int userid)
 {
@@ -1297,21 +1319,14 @@ send_upenctest(int fd, const char *s)
 }
 
 static void
-send_downenctest(int fd, char downenc, int variant, char *s, int slen)
-/* Note: content/handling of s is not defined yet. */
+send_downenctest(int fd, char downenc, int variant)
 {
-	char buf[512] = "y_____.";
+	char prefix[4] = "y__";
+	prefix[1] = tolower(downenc);
+	prefix[2] = b32_5to8(variant);
 
-	buf[1] = tolower(downenc);
-	buf[2] = b32_5to8(variant);
-
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed) & 0x1f);
-	rand_seed++;
-
-	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
+	/* Use send_query directly if we ever send more data here. */
+	send_handshake_query(fd, prefix);
 }
 
 static void
@@ -1746,7 +1761,7 @@ handshake_downenctest(int dns_fd, char trycodec)
 
 	for (i = 0; running && i < 3; i++) {
 
-		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
+		send_downenctest(dns_fd, trycodec, 1);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', 'Y', i+1);
 
@@ -1846,7 +1861,7 @@ handshake_qtypetest(int dns_fd, int timeout)
 	   byte values can be returned, which is needed for NULL/PRIVATE
 	   to work. */
 
-	send_downenctest(dns_fd, trycodec, 1, NULL, 0);
+	send_downenctest(dns_fd, trycodec, 1);
 
 	read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', 'Y', timeout);
 
@@ -1972,7 +1987,7 @@ handshake_edns0_check(int dns_fd)
 
 	for (i = 0; running && i < 3; i++) {
 
-		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
+		send_downenctest(dns_fd, trycodec, 1);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', 'Y', i+1);
 
