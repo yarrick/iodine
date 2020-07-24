@@ -797,7 +797,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 	memcpy(in, q->name, MIN(domain_len, sizeof(in)));
 
-	if(in[0] == 'V' || in[0] == 'v') {
+	if (in[0] == 'V' || in[0] == 'v') {
 		int version = 0;
 
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
@@ -875,7 +875,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 				format_addr(&q->from, q->fromlen), version);
 		}
 		return;
-	} else if(in[0] == 'L' || in[0] == 'l') {
+	} else if (in[0] == 'L' || in[0] == 'l') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
 		if (read < 17) {
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
@@ -920,7 +920,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			}
 		}
 		return;
-	} else if(in[0] == 'I' || in[0] == 'i') {
+	} else if (in[0] == 'I' || in[0] == 'i') {
 		/* Request for IP number */
 		char reply[17];
 		int length;
@@ -949,14 +949,14 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		write_dns(dns_fd, q, reply, length, 'T');
-	} else if(in[0] == 'Z' || in[0] == 'z') {
+	} else if (in[0] == 'Z' || in[0] == 'z') {
 		/* Check for case conservation and chars not allowed according to RFC */
 
 		/* Reply with received hostname as data */
 		/* No userid here, reply with lowest-grade downenc */
 		write_dns(dns_fd, q, in, domain_len, 'T');
 		return;
-	} else if(in[0] == 'S' || in[0] == 's') {
+	} else if (in[0] == 'S' || in[0] == 's') {
 		int codec;
 		const struct encoder *enc;
 
@@ -1000,7 +1000,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			break;
 		}
 		return;
-	} else if(in[0] == 'O' || in[0] == 'o') {
+	} else if (in[0] == 'O' || in[0] == 'o') {
 		if (domain_len < 3) { /* len at least 3, example: "O1T" */
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
 			return;
@@ -1054,7 +1054,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			break;
 		}
 		return;
-	} else if(in[0] == 'Y' || in[0] == 'y') {
+	} else if (in[0] == 'Y' || in[0] == 'y') {
 		int i;
 		char *datap;
 		int datalen;
@@ -1126,7 +1126,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		write_dns(dns_fd, q, "BADCODEC", 8, 'T');
 		return;
 
-	} else if(in[0] == 'R' || in[0] == 'r') {
+	} else if (in[0] == 'R' || in[0] == 'r') {
 		int req_frag_size;
 
 		if (domain_len < 16) {  /* we'd better have some chars for data... */
@@ -1159,7 +1159,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			write_dns(dns_fd, q, buf, req_frag_size, users[userid].downenc);
 		}
 		return;
-	} else if(in[0] == 'N' || in[0] == 'n') {
+	} else if (in[0] == 'N' || in[0] == 'n') {
 		int max_frag_size;
 
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
@@ -1185,7 +1185,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			write_dns(dns_fd, q, &unpacked[1], 2, users[userid].downenc);
 		}
 		return;
-	} else if(in[0] == 'P' || in[0] == 'p') {
+	} else if (in[0] == 'P' || in[0] == 'p') {
 		int dn_seq;
 		int dn_frag;
 		int didsend = 0;
@@ -1305,7 +1305,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		    !users[userid].lazy)
 			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
 
-	} else if((in[0] >= '0' && in[0] <= '9')
+	} else if ((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
 			|| (in[0] >= 'A' && in[0] <= 'F')) {
 		int up_seq, up_frag, dn_seq, dn_frag, lastfrag;
@@ -1818,14 +1818,14 @@ tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 
 		/* Don't read from tun if no users can accept data anyway;
 		   tun queue/TCP buffers are larger than our outpacket-queues */
-		if(!all_users_waiting_to_send()) {
+		if (!all_users_waiting_to_send()) {
 			FD_SET(tun_fd, &fds);
 			maxfd = MAX(tun_fd, maxfd);
 		}
 
 		i = select(maxfd + 1, &fds, NULL, NULL, &tv);
 
-		if(i < 0) {
+		if (i < 0) {
 			if (running)
 				warn("select");
 			return 1;
@@ -2554,7 +2554,7 @@ main(int argc, char **argv)
 	}
 
 	topdomain = strdup(argv[1]);
-	if(check_topdomain(topdomain, &errormsg)) {
+	if (check_topdomain(topdomain, &errormsg)) {
 		warnx("Invalid topdomain: %s", errormsg);
 		usage();
 		/* NOTREACHED */
@@ -2574,7 +2574,7 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if(port < 1 || port > 65535) {
+	if (port < 1 || port > 65535) {
 		warnx("Bad port number given.");
 		usage();
 	}
@@ -2604,7 +2604,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if(bind_enable) {
+	if (bind_enable) {
 		in_addr_t dns_ip = ((struct sockaddr_in *) &dns4addr)->sin_addr.s_addr;
 		if (bind_port < 1 || bind_port > 65535) {
 			warnx("Bad DNS server port number given.");

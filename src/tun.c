@@ -622,7 +622,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	netip.s_addr = inet_addr(ip);
 	netip.s_addr = netip.s_addr & net.s_addr;
 	r = system(cmdline);
-	if(r != 0) {
+	if (r != 0) {
 		return r;
 	} else {
 

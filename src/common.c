@@ -204,7 +204,7 @@ open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only)
 	setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
 #endif
 
-	if(bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
+	if (bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
 		err(1, "bind");
 
 	fprintf(stderr, "Opened IPv%d UDP socket\n", sockaddr->ss_family == AF_INET6 ? 6 : 4);
@@ -353,7 +353,7 @@ check_topdomain(char *str, char **errormsg)
 	}
 
 	for( i = 0; i < strlen(str); i++) {
-		if(str[i] == '.') {
+		if (str[i] == '.') {
 			dots++;
 			if (chunklen == 0) {
 				if (errormsg) *errormsg = "Consecutive dots";
@@ -367,7 +367,7 @@ check_topdomain(char *str, char **errormsg)
 		} else {
 			chunklen++;
 		}
-		if( (str[i] >= 'a' && str[i] <= 'z') || (str[i] >= 'A' && str[i] <= 'Z') ||
+		if ((str[i] >= 'a' && str[i] <= 'z') || (str[i] >= 'A' && str[i] <= 'Z') ||
 				isdigit(str[i]) || str[i] == '-' || str[i] == '.' ) {
 			continue;
 		} else {

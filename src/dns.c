@@ -448,7 +448,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 
 	switch (qr) {
 	case QR_ANSWER:
-		if(qdcount < 1) {
+		if (qdcount < 1) {
 			/* We need a question */
 			return -1;
 		}

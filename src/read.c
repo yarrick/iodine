@@ -41,7 +41,7 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 		c = *s++;
 
 		/* is this a compressed label? */
-		if((c & 0xc0) == 0xc0) {
+		if ((c & 0xc0) == 0xc0) {
 			offset = (((s[-1] & 0x3f) << 8) | (s[0] & 0xff));
 			if (offset > packetlen) {
 				if (len == 0) {
