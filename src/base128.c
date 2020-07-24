@@ -57,7 +57,7 @@ inline static void base128_reverse_init(void)
 	unsigned char c;
 
 	if (!reverse_init) {
-		memset (rev128, 0, 256);
+		memset(rev128, 0, 256);
 		for (i = 0; i < 128; i++) {
 			c = cb128[i];
 			rev128[(int) c] = i;
@@ -179,7 +179,7 @@ static int base128_decode(void *buf, size_t *buflen, const char *str,
 	int iout = 0;	/* to-be-filled output byte */
 	int iin = 0;	/* next input char to use in decoding */
 
-	base128_reverse_init ();
+	base128_reverse_init();
 
 	/* Note: Don't bother to optimize manually. GCC optimizes
 	   better(!) when using simplistic array indexing. */
