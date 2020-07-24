@@ -1315,22 +1315,6 @@ send_downenctest(int fd, char downenc, int variant)
 }
 
 static void
-send_downenc_switch(int fd, int userid)
-{
-	char buf[512] = "o_____.";
-	buf[1] = b32_5to8(userid);
-	buf[2] = tolower(downenc);
-
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed) & 0x1f);
-	rand_seed++;
-
-	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
-}
-
-static void
 send_lazy_switch(int fd, int userid)
 {
 	char buf[512] = "o_____.";
@@ -2043,6 +2027,7 @@ codec_revert:
 static void
 handshake_switch_downenc(int dns_fd)
 {
+	char sw_downenc[] = { 'o', b32_5to8(userid), tolower(downenc), 0 };
 	char in[4096];
 	int i;
 	int read;
@@ -2061,7 +2046,7 @@ handshake_switch_downenc(int dns_fd)
 	fprintf(stderr, "Switching downstream to codec %s\n", dname);
 	for (i = 0; running && i < 5; i++) {
 
-		send_downenc_switch(dns_fd, userid);
+		send_handshake_query(dns_fd, sw_downenc);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', i+1);
 
