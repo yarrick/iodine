@@ -1439,7 +1439,8 @@ handshake_raw_udp(int dns_fd, int seed)
 	memset(&raw_serv, 0, sizeof(raw_serv));
 	got_addr = 0;
 
-	fprintf(stderr, "Testing raw UDP data to the server (skip with -r)");
+	fprintf(stderr, "Requesting server address to attempt raw UDP mode (skip with -r) ");
+	fflush(stderr);
 	for (i = 0; running && i < 3; i++) {
 
 		send_handshake_query(dns_fd, get_ip);
@@ -1478,7 +1479,8 @@ handshake_raw_udp(int dns_fd, int seed)
 		fprintf(stderr, "Failed to get raw server IP, will use DNS mode.\n");
 		return 0;
 	}
-	fprintf(stderr, "Server is at %s, trying raw login: ", format_addr(&raw_serv, raw_serv_len));
+	fprintf(stderr, "Server is at %s, trying raw login: (skip with -r) ",
+		format_addr(&raw_serv, raw_serv_len));
 	fflush(stderr);
 
 	/* do login against port 53 on remote server
