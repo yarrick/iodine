@@ -1317,21 +1317,12 @@ send_downenctest(int fd, char downenc, int variant)
 static void
 send_lazy_switch(int fd, int userid)
 {
-	char buf[512] = "o_____.";
-	buf[1] = b32_5to8(userid);
+	char sw_lazy[] = { 'o', b32_5to8(userid), 'i', 0 };
 
 	if (lazymode)
-		buf[2] = 'l';
-	else
-		buf[2] = 'i';
+		sw_lazy[2] = 'l';
 
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed) & 0x1f);
-	rand_seed++;
-
-	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
+	send_handshake_query(fd, sw_lazy);
 }
 
 static int
