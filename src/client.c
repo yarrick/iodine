@@ -292,7 +292,7 @@ send_query(int fd, char *hostname)
 }
 
 static void
-send_raw(int fd, char *buf, int buflen, int user, int cmd)
+send_raw(int fd, char *buf, int buflen, int cmd)
 {
 	char packet[4096];
 	int len;
@@ -305,7 +305,7 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd)
 	}
 
 	len += RAW_HDR_LEN;
-	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
+	packet[RAW_HDR_CMD] = cmd | (userid & 0x0F);
 
 	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv, sizeof(raw_serv));
 }
@@ -313,7 +313,7 @@ send_raw(int fd, char *buf, int buflen, int user, int cmd)
 static void
 send_raw_data(int dns_fd)
 {
-	send_raw(dns_fd, outpkt.data, outpkt.len, userid, RAW_HDR_CMD_DATA);
+	send_raw(dns_fd, outpkt.data, outpkt.len, RAW_HDR_CMD_DATA);
 	outpkt.len = 0;
 }
 
@@ -400,7 +400,7 @@ send_ping(int fd)
 
 		send_packet(fd, 'p', data, sizeof(data));
 	} else {
-		send_raw(fd, NULL, 0, userid, RAW_HDR_CMD_PING);
+		send_raw(fd, NULL, 0, RAW_HDR_CMD_PING);
 	}
 }
 
@@ -1278,12 +1278,12 @@ send_handshake_query(int fd, char *prefix)
 }
 
 static void
-send_raw_udp_login(int dns_fd, int userid, int seed)
+send_raw_udp_login(int dns_fd, int seed)
 {
 	char buf[16];
 	login_calculate(buf, 16, password, seed + 1);
 
-	send_raw(dns_fd, buf, sizeof(buf), userid, RAW_HDR_CMD_LOGIN);
+	send_raw(dns_fd, buf, sizeof(buf), RAW_HDR_CMD_LOGIN);
 }
 
 static void
@@ -1315,7 +1315,7 @@ send_downenctest(int fd, char downenc, int variant)
 }
 
 static void
-send_lazy_switch(int fd, int userid)
+send_lazy_switch(int fd)
 {
 	char sw_lazy[] = { 'o', b32_5to8(userid), 'i', 0 };
 
@@ -1490,7 +1490,7 @@ handshake_raw_udp(int dns_fd, int seed)
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
-		send_raw_udp_login(dns_fd, userid, seed);
+		send_raw_udp_login(dns_fd, seed);
 
 		FD_ZERO(&fds);
 		FD_SET(dns_fd, &fds);
@@ -2080,7 +2080,7 @@ handshake_try_lazy(int dns_fd)
 	fprintf(stderr, "Switching to lazy mode for low-latency\n");
 	for (i = 0; running && i < 5 ;i++) {
 
-		send_lazy_switch(dns_fd, userid);
+		send_lazy_switch(dns_fd);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', i+1);
 
@@ -2124,7 +2124,7 @@ handshake_lazyoff(int dns_fd)
 
 	for (i = 0; running && i < 5; i++) {
 
-		send_lazy_switch(dns_fd, userid);
+		send_lazy_switch(dns_fd);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', 1);
 
