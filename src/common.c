@@ -352,7 +352,7 @@ check_topdomain(char *str, char **errormsg)
 		return 1;
 	}
 
-	for( i = 0; i < strlen(str); i++) {
+	for (i = 0; i < strlen(str); i++) {
 		if (str[i] == '.') {
 			dots++;
 			if (chunklen == 0) {
