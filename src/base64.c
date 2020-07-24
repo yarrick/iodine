@@ -85,7 +85,7 @@ static int base64_encode(char *buf, size_t *buflen, const void *data,
 
 		if (iout >= *buflen || iin >= size)
 			break;
-		buf[iout] = cb64[((udata[iin] & 0x0f) << 2 ) |
+		buf[iout] = cb64[((udata[iin] & 0x0f) << 2) |
 				  ((iin + 1 < size) ?
 				   ((udata[iin + 1] & 0xc0) >> 6) : 0)];
 		iin++;			/* 1 complete, iin=2 */

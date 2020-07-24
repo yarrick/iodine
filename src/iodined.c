@@ -203,7 +203,7 @@ static int check_user_and_ip(int userid, struct query *q)
 {
 	/* Note: duplicate in handle_raw_login() except IP-address check */
 
-	if (userid < 0 || userid >= created_users ) {
+	if (userid < 0 || userid >= created_users) {
 		return 1;
 	}
 	if (!users[userid].active || users[userid].disabled) {
@@ -1833,11 +1833,12 @@ tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 
 		if (i==0) {
 			if (max_idle_time) {
-				/* only trigger the check if that's worth ( ie, no need to loop over if there
+				/* only trigger the check if that's worth (ie, no need to loop over if there
 				is something to send */
 				if (last_action + max_idle_time < time(NULL)) {
 					for (userid = 0; userid < created_users; userid++) {
-						last_action = ( users[userid].last_pkt > last_action ) ? users[userid].last_pkt : last_action;
+						last_action = (users[userid].last_pkt > last_action) ?
+							users[userid].last_pkt : last_action;
 					}
 					if (last_action + max_idle_time < time(NULL)) {
 						fprintf(stderr, "Idling since too long, shutting down...\n");
@@ -2744,7 +2745,7 @@ main(int argc, char **argv)
 	tzsetwall();
 #endif
 #ifndef WINDOWS32
-	openlog( __progname, LOG_NDELAY, LOG_DAEMON );
+	openlog(__progname, LOG_NDELAY, LOG_DAEMON);
 #endif
 
 	if (newroot != NULL)

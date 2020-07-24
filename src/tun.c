@@ -155,7 +155,7 @@ get_device(char *device, int device_len, const char *wanted_dev)
 	status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, TAP_ADAPTER_KEY, 0, KEY_READ, &adapter_key);
 
 	if (status != ERROR_SUCCESS) {
-		warnx("Error opening registry key " TAP_ADAPTER_KEY );
+		warnx("Error opening registry key " TAP_ADAPTER_KEY);
 		return;
 	}
 
@@ -175,7 +175,7 @@ get_device(char *device, int device_len, const char *wanted_dev)
 		if (status == ERROR_NO_MORE_ITEMS) {
 			break;
 		} else if (status != ERROR_SUCCESS) {
-			warnx("Error enumerating subkeys of registry key " TAP_ADAPTER_KEY );
+			warnx("Error enumerating subkeys of registry key " TAP_ADAPTER_KEY);
 			break;
 		}
 

@@ -368,7 +368,7 @@ check_topdomain(char *str, char **errormsg)
 			chunklen++;
 		}
 		if ((str[i] >= 'a' && str[i] <= 'z') || (str[i] >= 'A' && str[i] <= 'Z') ||
-				isdigit(str[i]) || str[i] == '-' || str[i] == '.' ) {
+				isdigit(str[i]) || str[i] == '-' || str[i] == '.') {
 			continue;
 		} else {
 			if (errormsg) *errormsg = "Contains illegal character (allowed: [a-zA-Z0-9-.])";

@@ -1263,7 +1263,7 @@ send_ip_request(int fd, int userid)
 
 	buf[2] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[3] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[4] = b32_5to8((rand_seed ) & 0x1f);
+	buf[4] = b32_5to8((rand_seed) & 0x1f);
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
@@ -1287,7 +1287,7 @@ send_upenctest(int fd, const char *s)
 
 	buf[1] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[2] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[3] = b32_5to8((rand_seed ) & 0x1f);
+	buf[3] = b32_5to8((rand_seed) & 0x1f);
 	rand_seed++;
 
 	strncat(buf, s, 128);
@@ -1307,7 +1307,7 @@ send_downenctest(int fd, char downenc, int variant, char *s, int slen)
 
 	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed ) & 0x1f);
+	buf[5] = b32_5to8((rand_seed) & 0x1f);
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
@@ -1323,7 +1323,7 @@ send_codec_switch(int fd, int userid, int bits)
 
 	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed ) & 0x1f);
+	buf[5] = b32_5to8((rand_seed) & 0x1f);
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
@@ -1340,7 +1340,7 @@ send_downenc_switch(int fd, int userid)
 
 	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed ) & 0x1f);
+	buf[5] = b32_5to8((rand_seed) & 0x1f);
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
@@ -1360,7 +1360,7 @@ send_lazy_switch(int fd, int userid)
 
 	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
 	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed ) & 0x1f);
+	buf[5] = b32_5to8((rand_seed) & 0x1f);
 	rand_seed++;
 
 	strncat(buf, topdomain, 512 - strlen(buf));
