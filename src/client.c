@@ -1330,23 +1330,6 @@ send_downenctest(int fd, char downenc, int variant)
 }
 
 static void
-send_codec_switch(int fd, int userid, int bits)
-{
-	char buf[512] = "s_____.";
-	buf[1] = b32_5to8(userid);
-	buf[2] = b32_5to8(bits);
-
-	buf[3] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[4] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[5] = b32_5to8((rand_seed) & 0x1f);
-	rand_seed++;
-
-	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
-}
-
-
-static void
 send_downenc_switch(int fd, int userid)
 {
 	char buf[512] = "o_____.";
@@ -2019,6 +2002,7 @@ handshake_edns0_check(int dns_fd)
 static void
 handshake_switch_codec(int dns_fd, int bits)
 {
+	char sw_codec[] = { 's', b32_5to8(userid), b32_5to8(bits), 0 };
 	char in[4096];
 	int i;
 	int read;
@@ -2038,7 +2022,7 @@ handshake_switch_codec(int dns_fd, int bits)
 
 	for (i = 0; running && i < 5; i++) {
 
-		send_codec_switch(dns_fd, userid, bits);
+		send_handshake_query(dns_fd, sw_codec);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 's', 'S', i+1);
 
