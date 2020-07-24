@@ -1278,21 +1278,6 @@ send_handshake_query(int fd, char *prefix)
 }
 
 static void
-send_ip_request(int fd, int userid)
-{
-	char buf[512] = "i____.";
-	buf[1] = b32_5to8(userid);
-
-	buf[2] = b32_5to8((rand_seed >> 10) & 0x1f);
-	buf[3] = b32_5to8((rand_seed >> 5) & 0x1f);
-	buf[4] = b32_5to8((rand_seed) & 0x1f);
-	rand_seed++;
-
-	strncat(buf, topdomain, 512 - strlen(buf));
-	send_query(fd, buf);
-}
-
-static void
 send_raw_udp_login(int dns_fd, int userid, int seed)
 {
 	char buf[16];
@@ -1468,6 +1453,7 @@ static int
 handshake_raw_udp(int dns_fd, int seed)
 {
 	struct timeval tv;
+	char get_ip[] = { 'i', b32_5to8(userid), 0 };
 	char in[4096];
 	fd_set fds;
 	int i;
@@ -1481,7 +1467,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	fprintf(stderr, "Testing raw UDP data to the server (skip with -r)");
 	for (i = 0; running && i < 3; i++) {
 
-		send_ip_request(dns_fd, userid);
+		send_handshake_query(dns_fd, get_ip);
 
 		len = handshake_waitdns(dns_fd, in, sizeof(in), 'i', 'I', i+1);
 
