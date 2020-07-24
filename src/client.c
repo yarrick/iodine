@@ -833,7 +833,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 			}
 		}
 
-		/* read==1 happens with "QMEM" illegal replies, caused by
+		/* read == 1 happens with "QMEM" illegal replies, caused by
 		   heavy reordering, or after short disconnections when
 		   data-CMC has looped around into the "duplicate" values.
 		   All these cases are helped by faster pinging. */
@@ -1428,7 +1428,7 @@ handshake_login(int dns_fd, int seed)
 
 	login_calculate(login, 16, password, seed);
 
-	for (i=0; running && i<5 ;i++) {
+	for (i = 0; running && i < 5; i++) {
 
 		send_login(dns_fd, login, 16);
 
@@ -1481,7 +1481,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	got_addr = 0;
 
 	fprintf(stderr, "Testing raw UDP data to the server (skip with -r)");
-	for (i=0; running && i<3 ;i++) {
+	for (i = 0; running && i < 3; i++) {
 
 		send_ip_request(dns_fd, userid);
 
@@ -1525,7 +1525,7 @@ handshake_raw_udp(int dns_fd, int seed)
 	/* do login against port 53 on remote server
 	 * based on the old seed. If reply received,
 	 * switch to raw udp mode */
-	for (i=0; running && i<4 ;i++) {
+	for (i = 0; running && i < 4; i++) {
 		tv.tv_sec = i + 1;
 		tv.tv_usec = 0;
 
@@ -1576,7 +1576,7 @@ handshake_upenctest(int dns_fd, const char *s)
         int slen;
 
 	slen = strlen(s);
-	for (i=0; running && i<3 ;i++) {
+	for (i = 0; running && i < 3; i++) {
 
 		send_upenctest(dns_fd, s);
 
@@ -1744,7 +1744,7 @@ handshake_downenctest(int dns_fd, char trycodec)
 	char *s = DOWNCODECCHECK1;
         int slen = DOWNCODECCHECK1_LEN;
 
-	for (i=0; running && i<3 ;i++) {
+	for (i = 0; running && i < 3; i++) {
 
 		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
 
@@ -1970,7 +1970,7 @@ handshake_edns0_check(int dns_fd)
 	else
 		trycodec = 'T';
 
-	for (i=0; running && i<3 ;i++) {
+	for (i = 0; running && i < 3; i++) {
 
 		send_downenctest(dns_fd, trycodec, 1, NULL, 0);
 
@@ -2021,7 +2021,7 @@ handshake_switch_codec(int dns_fd, int bits)
 
 	fprintf(stderr, "Switching upstream to codec %s\n", tempenc->name);
 
-	for (i=0; running && i<5 ;i++) {
+	for (i = 0; running && i < 5; i++) {
 
 		send_codec_switch(dns_fd, userid, bits);
 
@@ -2074,7 +2074,7 @@ handshake_switch_downenc(int dns_fd)
 		dname = "Raw";
 
 	fprintf(stderr, "Switching downstream to codec %s\n", dname);
-	for (i=0; running && i<5 ;i++) {
+	for (i = 0; running && i < 5; i++) {
 
 		send_downenc_switch(dns_fd, userid);
 
@@ -2115,7 +2115,7 @@ handshake_try_lazy(int dns_fd)
 	int read;
 
 	fprintf(stderr, "Switching to lazy mode for low-latency\n");
-	for (i=0; running && i<5; i++) {
+	for (i = 0; running && i < 5 ;i++) {
 
 		send_lazy_switch(dns_fd, userid);
 
@@ -2159,7 +2159,7 @@ handshake_lazyoff(int dns_fd)
 	int i;
 	int read;
 
-	for (i=0; running && i<5; i++) {
+	for (i = 0; running && i < 5; i++) {
 
 		send_lazy_switch(dns_fd, userid);
 
@@ -2265,7 +2265,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 	fprintf(stderr, "Autoprobing max downstream fragment size... (skip with -m fragsize)\n");
 	while (running && range > 0 && (range >= 8 || max_fragsize < 300)) {
 		/* stop the slow probing early when we have enough bytes anyway */
-		for (i=0; running && i<3 ;i++) {
+		for (i = 0; running && i < 3; i++) {
 
 			send_fragsize_probe(dns_fd, proposed_fragsize);
 
@@ -2333,7 +2333,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 	int read;
 
 	fprintf(stderr, "Setting downstream fragment size to max %d...\n", fragsize);
-	for (i=0; running && i<5 ;i++) {
+	for (i = 0; running && i < 5; i++) {
 
 		send_set_downstream_fragsize(dns_fd, fragsize);
 

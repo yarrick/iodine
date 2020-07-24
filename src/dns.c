@@ -540,7 +540,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 
 			memset(names, 0, sizeof(names));
 
-			for (i=0; i < ancount; i++) {
+			for (i = 0; i < ancount; i++) {
 				readname(packet, packetlen, &data, name, sizeof(name));
 				CHECKLEN(12);
 				readshort(packet, &data, &type);

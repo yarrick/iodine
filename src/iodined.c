@@ -1831,7 +1831,7 @@ tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			return 1;
 		}
 
-		if (i==0) {
+		if (i == 0) {
 			if (max_idle_time) {
 				/* only trigger the check if that's worth (ie, no need to loop over if there
 				is something to send */
