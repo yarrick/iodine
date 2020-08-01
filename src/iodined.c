@@ -851,17 +851,17 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 #ifdef DNSCACHE_LEN
 				{
 					for (i = 0; i < DNSCACHE_LEN; i++) {
-					        users[userid].dnscache_q[i].id = 0;
-					        users[userid].dnscache_answerlen[i] = 0;
+						users[userid].dnscache_q[i].id = 0;
+						users[userid].dnscache_answerlen[i] = 0;
 					}
 				}
 				users[userid].dnscache_lastfilled = 0;
 #endif
 				for (i = 0; i < QMEMPING_LEN; i++)
-				        users[userid].qmemping_type[i] = T_UNSET;
+					users[userid].qmemping_type[i] = T_UNSET;
 				users[userid].qmemping_lastfilled = 0;
 				for (i = 0; i < QMEMDATA_LEN; i++)
-				        users[userid].qmemdata_type[i] = T_UNSET;
+					users[userid].qmemdata_type[i] = T_UNSET;
 				users[userid].qmemdata_lastfilled = 0;
 			} else {
 				/* No space for another user */
@@ -2591,14 +2591,14 @@ main(int argc, char **argv)
 		foreground = 1;
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET) {
-	        dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
+		dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
 		if (dns4addr_len < 0) {
 		  warnx("Bad IPv4 address to listen on.");
 		  usage();
 		}
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
-	        dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
+		dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
 		if (dns6addr_len < 0) {
 		  warnx("Bad IPv6 address to listen on.");
 		  usage();

@@ -1012,7 +1012,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 			send_something_now = 1;
 		}
 
-	        break;
+		break;
 	}
 
 	/* NOTE: buf[] was overwritten when down-packet complete */
