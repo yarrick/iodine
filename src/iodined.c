@@ -2193,7 +2193,7 @@ write_dns_nameenc(char *buf, size_t buflen, const char *data, int datalen, char 
 	b += strlen(buf) - 1;
 	if (*b != '.')
 		*++b = '.';
-        b++;
+	b++;
 
 	*b = 'a' + td1;
 	b++;
