@@ -35,6 +35,8 @@ iodine, iodined \- tunnel IPv4 over DNS
 .I 0|1
 .B ] [-I
 .I interval
+.B ] [-o
+.I interval
 .B ]
 .B [
 .I nameserver
@@ -236,8 +238,10 @@ There are some DNS relays with very small timeouts,
 notably dnsadvantage.com (ultradns), that will give
 SERVFAIL errors even with \-I1; data will still get trough,
 and these errors can be ignored.
-Maximum useful value is 59, since iodined will close a client's
-connection after 60 seconds of inactivity.
+Maximum useful value is less than specified in \-o.
+.TP
+.B -o interval
+Inactivity timeout interval. Defaults to 60 seconds.
 .SS Server Options:
 .TP
 .B -c
