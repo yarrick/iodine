@@ -140,7 +140,7 @@ install_data('README.md', install_dir: get_option('datadir') / 'doc' / 'iodine')
 
 libcheck = dependency('check', required: false)
 
-if false and libcheck.found()
+if libcheck.found()
   suites = [
     ['base32', []],
     ['base64', []],
@@ -161,7 +161,7 @@ if false and libcheck.found()
         'tests/test.c',
       ] + suite[1],
       include_directories: srcdir,
-      dependencies: commondeps+libcheck,
+      dependencies: libcheck,
       c_args: '-DSUITE_NAME="@0@"'.format(name))
     test(name, s)
   endforeach

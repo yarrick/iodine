@@ -274,7 +274,7 @@ dump_packet(char *buf, size_t len)
 }
 
 TCase *
-test_dns_create_tests(void)
+test_create()
 {
 	TCase *tc;
 

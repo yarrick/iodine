@@ -347,7 +347,7 @@ END_TEST
 
 
 TCase *
-test_read_create_tests(void)
+test_create()
 {
 	TCase *tc;
 

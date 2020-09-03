@@ -406,7 +406,7 @@ START_TEST(test_secure_random)
 END_TEST
 
 TCase *
-test_common_create_tests(void)
+test_create()
 {
 	TCase *tc;
 	int sock;
