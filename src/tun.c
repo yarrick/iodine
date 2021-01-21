@@ -453,6 +453,17 @@ open_tun(const char *tun_device)
 				break;
 		}
 
+#ifdef DARWIN
+		fprintf(stderr, "No tun devices found, trying utun\n");
+		for (i = 0; i < TUN_MAX_TRY; i++) {
+			snprintf(tun_name, sizeof(tun_name), "utun%d", i);
+			tun_fd = open_utun(tun_device);
+			if (tun_fd >= 0) {
+				return tun_fd;
+			}
+		}
+#endif
+
 		warn("open_tun: Failed to open tunneling device");
 	}
 
