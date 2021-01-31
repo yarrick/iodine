@@ -98,4 +98,7 @@ struct tun_data {
 	int addrlen;
 };
 
+/* No-op for now. */
+#define syslog(...)
+
 #endif
