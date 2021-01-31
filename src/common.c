@@ -426,6 +426,17 @@ warn(const char *fmt, ...)
 }
 
 void
+err(int eval, const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	vwarn(fmt, list);
+	va_end(list);
+	exit(eval);
+}
+
+void
 vwarnx(const char *fmt, va_list list)
 {
 	if (fmt) vfprintf(stderr, fmt, list);
@@ -440,17 +451,6 @@ warnx(const char *fmt, ...)
 	va_start(list, fmt);
 	vwarnx(fmt, list);
 	va_end(list);
-}
-
-void
-err(int eval, const char *fmt, ...)
-{
-	va_list list;
-
-	va_start(list, fmt);
-	vwarn(fmt, list);
-	va_end(list);
-	exit(eval);
 }
 
 void

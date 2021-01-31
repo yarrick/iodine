@@ -132,10 +132,12 @@ int check_topdomain(char *, char **);
 int inet_aton(const char *cp, struct in_addr *inp);
 #endif
 
-void err(int eval, const char *fmt, ...);
+void vwarn(const char *fmt, va_list list);
 void warn(const char *fmt, ...);
-void errx(int eval, const char *fmt, ...);
+void err(int eval, const char *fmt, ...);
+void vwarnx(const char *fmt, va_list list);
 void warnx(const char *fmt, ...);
+void errx(int eval, const char *fmt, ...);
 #endif
 
 int recent_seqno(int , int);
