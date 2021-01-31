@@ -71,7 +71,7 @@ static inline void help(FILE * stream, bool verbose) __attribute__((noreturn));
 static void help(FILE *stream, bool verbose)
 {
 	fprintf(stream, "iodine IP over DNS tunneling client\n\n"
-	                "Usage: %s [-46fhrv] [-u user] [-t chrootdir] [-d device] [-P password]\n"
+			"Usage: %s [-46fhrv] [-u user] [-t chrootdir] [-d device] [-P password]\n"
 			"              [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec]\n"
 			"              [-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 

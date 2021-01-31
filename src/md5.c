@@ -157,18 +157,18 @@ md5_process(md5_state_t *pms, const md5_byte_t *data /*[64]*/)
 #endif
 #if BYTE_ORDER <= 0		/* little-endian */
 	{
-	    /*
-	     * On little-endian machines, we can process properly aligned
-	     * data without copying it.
-	     */
-	    if (!((data - (const md5_byte_t *)0) & 3)) {
-		/* data are properly aligned */
-		X = (const md5_word_t *)data;
-	    } else {
-		/* not aligned */
-		memcpy(xbuf, data, 64);
-		X = xbuf;
-	    }
+		/*
+		 * On little-endian machines, we can process properly aligned
+		 * data without copying it.
+		 */
+		if (!((data - (const md5_byte_t *)0) & 3)) {
+			/* data are properly aligned */
+			X = (const md5_word_t *)data;
+		} else {
+			/* not aligned */
+			memcpy(xbuf, data, 64);
+			X = xbuf;
+		}
 	}
 #endif
 #if BYTE_ORDER == 0
@@ -176,20 +176,20 @@ md5_process(md5_state_t *pms, const md5_byte_t *data /*[64]*/)
 #endif
 #if BYTE_ORDER >= 0		/* big-endian */
 	{
-	    /*
-	     * On big-endian machines, we must arrange the bytes in the
-	     * right order.
-	     */
-	    const md5_byte_t *xp = data;
-	    int i;
+		/*
+		 * On big-endian machines, we must arrange the bytes in the
+		 * right order.
+		 */
+		const md5_byte_t *xp = data;
+		int i;
 
 #  if BYTE_ORDER == 0
-	    X = xbuf;		/* (dynamic only) */
+		X = xbuf;		/* (dynamic only) */
 #  else
 #    define xbuf X		/* (static only) */
 #  endif
-	    for (i = 0; i < 16; ++i, xp += 4)
-		xbuf[i] = xp[0] + (xp[1] << 8) + (xp[2] << 16) + (xp[3] << 24);
+		for (i = 0; i < 16; ++i, xp += 4)
+			xbuf[i] = xp[0] + (xp[1] << 8) + (xp[2] << 16) + (xp[3] << 24);
 	}
 #endif
     }
@@ -342,7 +342,7 @@ md5_append(md5_state_t *pms, const md5_byte_t *data, int nbytes)
 
 	memcpy(pms->buf + offset, p, copy);
 	if (offset + copy < 64)
-	    return;
+		return;
 	p += copy;
 	left -= copy;
 	md5_process(pms, pms->buf);
