@@ -341,6 +341,9 @@ utun_unit(const char *dev)
 	const char *unit_str = dev;
 	int unit = 0;
 
+	if (!dev)
+		return -1;
+
 	while (*unit_str != '\0' && !isdigit(*unit_str))
 		unit_str++;
 
@@ -383,6 +386,10 @@ open_utun(const char *dev)
 	addr.ss_sysaddr = AF_SYS_CONTROL;
 	addr.sc_id = info.ctl_id;
 	addr.sc_unit = utun_unit(dev);
+	if (addr.sc_unit < 0) {
+		close(fd);
+		return -1;
+	}
 
 	err = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
 	if (err != 0) {
@@ -457,7 +464,7 @@ open_tun(const char *tun_device)
 		fprintf(stderr, "No tun devices found, trying utun\n");
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "utun%d", i);
-			tun_fd = open_utun(tun_device);
+			tun_fd = open_utun(tun_name);
 			if (tun_fd >= 0) {
 				return tun_fd;
 			}
