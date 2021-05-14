@@ -1,10 +1,8 @@
 #set language to objective-c to force osx build
-#linux builds are done at http://buildbot.dev.kryo.se
 
 language: objective-c
 os: osx
 
-before_install: brew update
 install: brew install check
 
 script: make && make test
