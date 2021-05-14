@@ -360,6 +360,7 @@ open_utun(const char *dev)
 	struct ctl_info info;
 	char ifname[10];
 	socklen_t ifname_len = sizeof(ifname);
+	int unit;
 	int fd = -1;
 	int err = 0;
 
@@ -385,11 +386,12 @@ open_utun(const char *dev)
 	addr.sc_family = AF_SYSTEM;
 	addr.ss_sysaddr = AF_SYS_CONTROL;
 	addr.sc_id = info.ctl_id;
-	addr.sc_unit = utun_unit(dev);
-	if (addr.sc_unit < 0) {
+	unit = utun_unit(dev);
+	if (unit < 0) {
 		close(fd);
 		return -1;
 	}
+	addr.sc_unit = unit;
 
 	err = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
 	if (err != 0) {
