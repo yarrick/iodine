@@ -205,7 +205,7 @@ open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only)
 #endif
 
 	if (bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
-		err(1, "bind");
+		err(1, "bind() to %s", format_addr(sockaddr, sockaddr_len));
 
 	fprintf(stderr, "Opened IPv%d UDP socket\n", sockaddr->ss_family == AF_INET6 ? 6 : 4);
 
