@@ -271,10 +271,12 @@ automatically fragmented when needed.
 .B -l listen_ip4
 Make the server listen only on 'listen_ip4' for incoming IPv4 requests.
 By default, incoming requests are accepted from all interfaces (0.0.0.0).
+A domain name can be used as argument - use one with only one A record.
 .TP
 .B -L listen_ip6
 Make the server listen only on 'listen_ip6' for incoming IPv6 requests.
-By default, incoming requests are accepted from all interfaces (::)
+By default, incoming requests are accepted from all interfaces (::).
+A domain name can be used as argument - use one with only one AAAA record.
 .TP
 .B -p port
 Make the server listen on 'port' instead of 53 for traffic.

@@ -2578,14 +2578,14 @@ main(int argc, char **argv)
 		foreground = 1;
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET) {
-		dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE | AI_NUMERICHOST, &dns4addr);
+		dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr);
 		if (dns4addr_len < 0) {
 			warnx("Bad IPv4 address to listen on.");
 			usage();
 		}
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
-		dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE | AI_NUMERICHOST, &dns6addr);
+		dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr);
 		if (dns6addr_len < 0) {
 			warnx("Bad IPv6 address to listen on.");
 			usage();
