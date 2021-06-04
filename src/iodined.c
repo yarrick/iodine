@@ -2315,11 +2315,12 @@ static void help(FILE *stream)
 		"  -z context to apply SELinux context after initialization\n"
 		"  -l IPv4 address to listen on for incoming dns traffic "
 		"(default 0.0.0.0)\n"
+		"     (Use 'external' to listen only on external IP, looked up via a service)\n"
 		"  -L IPv6 address to listen on for incoming dns traffic "
 		"(default ::)\n"
 		"  -p port to listen on for incoming dns traffic (default 53)\n"
 		"  -n ip to respond with to NS queries\n"
-		"     (Use 'auto' to look up external IP via a service)\n"
+		"     (Use 'auto' to use the external IP, looked up via a service)\n"
 		"  -b port to forward normal DNS queries to (on localhost)\n"
 		"  -P password used for authentication (max 32 chars will be used)\n"
 		"  -F pidfile to write pid to a file\n"
@@ -2578,18 +2579,32 @@ main(int argc, char **argv)
 		foreground = 1;
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET) {
+		if (listen_ip4 && strcmp("external", listen_ip4) == 0) {
+			struct in_addr extip;
+			int res = get_external_ip(&extip);
+			if (res) {
+				fprintf(stderr, "Failed to get external IP via DNS query.\n");
+				exit(3);
+			}
+			listen_ip4 = inet_ntoa(extip);
+			fprintf(stderr, "Will listen on external IP %s\n", listen_ip4);
+		}
 		dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr);
 		if (dns4addr_len < 0) {
-			warnx("Bad IPv4 address to listen on.");
+			warnx("Bad IPv4 address to listen on: '%s'", listen_ip4);
 			usage();
 		}
+		// Use dns4addr from here on.
+		listen_ip4 = NULL;
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
 		dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr);
 		if (dns6addr_len < 0) {
-			warnx("Bad IPv6 address to listen on.");
+			warnx("Bad IPv6 address to listen on: '%s'", listen_ip6);
 			usage();
 		}
+		// Use dns6addr from here on.
+		listen_ip6 = NULL;
 	}
 
 	if (bind_enable) {
