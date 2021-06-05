@@ -103,8 +103,8 @@ START_TEST(test_base32_blksize)
 
 	val = base32_ops.encode(encbuf, &enclen, rawbuf, rawlen);
 
-	ck_assert_msg(rawlen == 5, "raw length was %d not 5", rawlen);
-	ck_assert_msg(enclen == 5, "encoded %d bytes, not 5", enclen);
+	ck_assert_msg(rawlen == 5, "raw length was %zu not 5", rawlen);
+	ck_assert_msg(enclen == 5, "encoded %zu bytes, not 5", enclen);
 	ck_assert_msg(val == 8, "encoded string %s was length %d", encbuf, val);
 
 	memset(rawbuf, 0, rawlen + 16);
@@ -112,7 +112,7 @@ START_TEST(test_base32_blksize)
 	enclen = val;
 	val = base32_ops.decode(rawbuf, &rawlen, encbuf, enclen);
 
-	ck_assert_msg(rawlen == 5, "raw length was %d not 5", rawlen);
+	ck_assert_msg(rawlen == 5, "raw length was %zu not 5", rawlen);
 	ck_assert_msg(val == 5, "val was not 5 but %d", val);
 	for (i = 0; i < rawlen; i++) {
 		ck_assert(rawbuf[i] == 'A');
