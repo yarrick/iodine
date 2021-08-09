@@ -2598,10 +2598,24 @@ main(int argc, char **argv)
 		listen_ip4 = NULL;
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
-		dns6addr_len = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr);
-		if (dns6addr_len < 0) {
-			warnx("Bad IPv6 address to listen on: '%s'", listen_ip6);
+		int addr6_res = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr);
+		if (
+#ifdef EAI_ADDRFAMILY
+				addr6_res == EAI_ADDRFAMILY ||
+#endif
+				addr6_res == EAI_FAMILY) {
+			if (addrfamily == AF_INET6) {
+				fprintf(stderr, "IPv6 not supported");
+				exit(4);
+			} else {
+				warnx("IPv6 not supported, skipping");
+				addrfamily = AF_INET;
+			}
+		} else 	if (addr6_res < 0) {
+			warn("Failed to get IPv6 address to listen on: '%s'", listen_ip6);
 			usage();
+		} else {
+			dns6addr_len = addr6_res;
 		}
 		// Use dns6addr from here on.
 		listen_ip6 = NULL;
