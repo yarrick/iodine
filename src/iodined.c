@@ -2612,7 +2612,8 @@ main(int argc, char **argv)
 				addrfamily = AF_INET;
 			}
 		} else 	if (addr6_res < 0) {
-			warn("Failed to get IPv6 address to listen on: '%s'", listen_ip6);
+			warnx("Failed to get IPv6 address to listen on: '%s': %s",
+				listen_ip6, gai_strerror(addr6_res));
 			usage();
 		} else {
 			dns6addr_len = addr6_res;
