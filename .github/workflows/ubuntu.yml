@@ -18,4 +18,4 @@ jobs:
     - name: install check
       run: sudo apt install check
     - name: run tests
-      run: make check
+      run: make test
