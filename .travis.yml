@@ -1,9 +1,0 @@
-#set language to objective-c to force osx build
-
-language: objective-c
-os: osx
-
-install: brew install check
-
-script: make && make test
-
