@@ -2599,22 +2599,21 @@ main(int argc, char **argv)
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
 		int addr6_res = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr);
-		if (
-#ifdef EAI_ADDRFAMILY
-				addr6_res == EAI_ADDRFAMILY ||
-#endif
-				addr6_res == EAI_FAMILY) {
-			if (addrfamily == AF_INET6) {
-				fprintf(stderr, "IPv6 not supported");
-				exit(4);
+		if (addr6_res < 0) {
+			if (listen_ip6 == NULL) {
+				if (addrfamily == AF_INET6) {
+					fprintf(stderr, "IPv6 not supported");
+					exit(3);
+				} else {
+					warnx("IPv6 not supported, skipping");
+					addrfamily = AF_INET;
+				}
 			} else {
-				warnx("IPv6 not supported, skipping");
-				addrfamily = AF_INET;
+				warnx("Failed to get IPv6 address to listen on: '%s': %s",
+					listen_ip6, gai_strerror(addr6_res));
+				usage();
+				/* NOTREACHED */
 			}
-		} else 	if (addr6_res < 0) {
-			warnx("Failed to get IPv6 address to listen on: '%s': %s",
-				listen_ip6, gai_strerror(addr6_res));
-			usage();
 		} else {
 			dns6addr_len = addr6_res;
 		}
