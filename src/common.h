@@ -32,6 +32,7 @@
 #define RAW_HDR_GET_USR(x) ((x)[RAW_HDR_CMD] & RAW_HDR_USR_MASK)
 extern const unsigned char raw_header[RAW_HDR_LEN];
 
+#include <stdarg.h>
 #ifdef WINDOWS32
 #include "windows.h"
 #else
