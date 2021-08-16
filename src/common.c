@@ -305,7 +305,7 @@ read_password(char *buf, size_t len)
 	int i;
 #endif
 
-	fprintf(stderr, "Enter password: ");
+	fprintf(stderr, "Enter tunnel password: ");
 	fflush(stderr);
 #ifndef WINDOWS32
 	fscanf(stdin, "%79[^\n]", pwd);
