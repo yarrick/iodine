@@ -22,7 +22,7 @@
 char *get_resolvconf_addr(void)
 {
 	static char addr[16];
-	char *rv;
+	char *rv = NULL;
 #ifndef WINDOWS32
 	char buf[80];
 	FILE *fp;
