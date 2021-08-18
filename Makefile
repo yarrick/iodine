@@ -18,7 +18,7 @@ RM_FLAGS=-f
 TARGETOS = `uname`
 
 all:
-	@(cd src; $(MAKE) TARGETOS=$(TARGETOS) all)
+	@(cd src && $(MAKE) TARGETOS=$(TARGETOS) all)
 
 install: all
 	$(MKDIR) $(MKDIR_FLAGS) $(DESTDIR)$(sbindir)
@@ -41,12 +41,12 @@ uninstall:
 test: all
 	@echo "!! The check library is required for compiling and running the tests"
 	@echo "!! Get it at https://libcheck.github.io/check/"
-	@(cd tests; $(MAKE) TARGETOS=$(TARGETOS) all)
+	@(cd tests && $(MAKE) TARGETOS=$(TARGETOS) all)
 
 clean:
 	@echo "Cleaning..."
-	@(cd src; $(MAKE) clean)
-	@(cd tests; $(MAKE) clean)
+	@(cd src && $(MAKE) clean)
+	@(cd tests && $(MAKE) clean)
 	@rm -rf bin iodine-latest*
 
 #Helper target for windows/android zipfiles
@@ -62,13 +62,13 @@ iodine-latest:
 
 #non-PIE build for old android
 cross-android-old:
-	@(cd src; $(MAKE) base64u.c)
-	@(cd src; ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk APP_PLATFORM=android-3)
+	@(cd src && $(MAKE) base64u.c)
+	@(cd src && ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk APP_PLATFORM=android-3)
 
 #Position-indepedent build for modern android
 cross-android:
-	@(cd src; $(MAKE) base64u.c)
-	@(cd src; ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.16.mk APP_PLATFORM=android-16)
+	@(cd src && $(MAKE) base64u.c)
+	@(cd src && ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.16.mk APP_PLATFORM=android-16)
 
 iodine-latest-android.zip: iodine-latest
 	@mv iodine-latest iodine-latest-android
@@ -92,19 +92,19 @@ iodine-latest-android.zip: iodine-latest
 	@zip -r iodine-latest-android.zip iodine-latest-android
 
 cross-mingw32:
-	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-w64-mingw32-gcc all)
+	@(cd src && $(MAKE) TARGETOS=windows32 CC=i686-w64-mingw32-gcc all)
 
 cross-mingw64:
-	@(cd src; $(MAKE) TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc all)
+	@(cd src && $(MAKE) TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc all)
 
 iodine-latest-windows.zip: iodine-latest
 	@mv iodine-latest iodine-latest-windows
 	@mkdir -p iodine-latest-windows/64bit iodine-latest-windows/32bit
-	@(cd src; $(MAKE) TARGETOS=windows32 CC=i686-w64-mingw32-gcc clean all)
+	@(cd src && $(MAKE) TARGETOS=windows32 CC=i686-w64-mingw32-gcc clean all)
 	@i686-w64-mingw32-strip bin/iodine*
 	@for i in `ls bin`; do cp bin/$$i iodine-latest-windows/32bit/$$i.exe; done
 	@cp /usr/i686-w64-mingw32/bin/zlib1.dll iodine-latest-windows/32bit
-	@(cd src; $(MAKE) TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc clean all)
+	@(cd src && $(MAKE) TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc clean all)
 	@x86_64-w64-mingw32-strip bin/iodine*
 	@for i in `ls bin`; do cp bin/$$i iodine-latest-windows/64bit/$$i.exe; done
 	@cp /usr/x86_64-w64-mingw32/bin/zlib1.dll iodine-latest-windows/64bit
