@@ -1523,11 +1523,13 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 }
 
 static void
-handle_ns_request(int dns_fd, struct query *q)
+handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 /* Mostly identical to handle_a_request() below */
 {
 	char buf[64*1024];
 	int len;
+	/* Use possibly dynamic top domain in reply */
+	char *resp_domain = q->name + topdomain_offset;
 
 	if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
@@ -1538,7 +1540,7 @@ handle_ns_request(int dns_fd, struct query *q)
 		q->dest_len = sizeof(*addr);
 	}
 
-	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain);
+	len = dns_encode_ns_response(buf, sizeof(buf), q, resp_domain);
 	if (len < 1) {
 		warnx("dns_encode_ns_response doesn't fit");
 		return;
@@ -1683,7 +1685,6 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	struct query q;
 	int read;
 	int domain_len;
-	int inside_topdomain = 0;
 
 	if ((read = read_dns(dns_fd, dns_fds, tun_fd, &q)) <= 0)
 		return 0;
@@ -1693,14 +1694,8 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 			format_addr(&q.from, q.fromlen), q.type, q.name);
 	}
 
-	domain_len = strlen(q.name) - strlen(topdomain);
-	if (domain_len >= 0 && !strcasecmp(q.name + domain_len, topdomain))
-		inside_topdomain = 1;
-	/* require dot before topdomain */
-	if (domain_len >= 1 && q.name[domain_len - 1] != '.')
-		inside_topdomain = 0;
-
-	if (inside_topdomain) {
+	domain_len = query_datalen(q.name, topdomain);
+	if (domain_len >= 0) {
 		/* This is a query we can handle */
 
 		/* Handle A-type query for ns.topdomain, possibly caused
@@ -1736,7 +1731,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 			handle_null_request(tun_fd, dns_fd, dns_fds, &q, domain_len);
 			break;
 		case T_NS:
-			handle_ns_request(dns_fd, &q);
+			handle_ns_request(dns_fd, &q, domain_len);
 			break;
 		default:
 			break;
@@ -2327,7 +2322,8 @@ static void help(FILE *stream)
 		"  -i maximum idle time before shutting down\n\n"
 		"tunnel_ip is the IP number of the local tunnel interface.\n"
 		"   /netmask sets the size of the tunnel network.\n"
-		"topdomain is the FQDN that is delegated to this server.\n");
+		"topdomain is the FQDN that is delegated to this server.\n"
+		"   Initial wildcard is allowed (example: *.tun.com)\n");
 
 	exit(0);
 }
@@ -2543,7 +2539,7 @@ main(int argc, char **argv)
 	}
 
 	topdomain = strdup(argv[1]);
-	if (check_topdomain(topdomain, 0, &errormsg)) {
+	if (check_topdomain(topdomain, 1, &errormsg)) {
 		warnx("Invalid topdomain: %s", errormsg);
 		usage();
 		/* NOTREACHED */

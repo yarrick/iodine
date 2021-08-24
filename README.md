@@ -288,6 +288,11 @@ quence, assuming at most one client will be connected at any time. A small
 DNSCACHE_LEN is still advised, preferably 2 or higher, however you can also
 undefine it to save a few more kilobytes.
 
+One iodine server can handle multiple domains. Set up different NS records
+on the same domain all pointing to the same host, and use `\*.mydomain.com`
+as topdomain argument. iodine will accept tunnel traffic for all domains matching that
+pattern.
+
 
 PERFORMANCE
 -----------

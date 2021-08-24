@@ -337,7 +337,8 @@ subdomains under 'topdomain'. This is normally a subdomain to a domain you
 own. Use a short domain name to get better throughput. This argument must be
 the same on both the client and the server. Queries for domains other
 than 'topdomain' will be forwarded when the \-b option is given, otherwise
-they will be dropped.
+they will be dropped. The topdomain can start with '*' which will allow all
+domains ending with the same suffix.
 .SH EXAMPLES
 See the README file for both a quick test scenario, and a detailed description
 of real-world deployment.
