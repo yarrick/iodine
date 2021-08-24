@@ -317,7 +317,7 @@ int main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
-	if (check_topdomain(topdomain, &errormsg)) {
+	if (check_topdomain(topdomain, 0, &errormsg)) {
 		warnx("Invalid topdomain: %s", errormsg);
 		usage();
 		/* NOTREACHED */

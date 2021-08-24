@@ -126,7 +126,7 @@ void do_pidfile(char *);
 
 void read_password(char*, size_t);
 
-int check_topdomain(char *, char **);
+int check_topdomain(char *, int, char **);
 
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID

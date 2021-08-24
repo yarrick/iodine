@@ -332,7 +332,7 @@ read_password(char *buf, size_t len)
 }
 
 int
-check_topdomain(char *str, char **errormsg)
+check_topdomain(char *str, int allow_wildcard, char **errormsg)
 {
 	int i;
 	int dots = 0;
@@ -370,6 +370,18 @@ check_topdomain(char *str, char **errormsg)
 		if ((str[i] >= 'a' && str[i] <= 'z') || (str[i] >= 'A' && str[i] <= 'Z') ||
 				isdigit(str[i]) || str[i] == '-' || str[i] == '.') {
 			continue;
+		} else if (allow_wildcard && str[i] == '*') {
+			/* First char allowed to be wildcard, if followed by dot */
+			if (i == 0) {
+				if (str[i+1] == '.') {
+					continue;
+				}
+				if (errormsg) *errormsg = "Wildcard (*) must be followed by dot";
+				return 1;
+			} else {
+				if (errormsg) *errormsg = "Wildcard (*) only allowed as first char";
+				return 1;
+			}
 		} else {
 			if (errormsg) *errormsg = "Contains illegal character (allowed: [a-zA-Z0-9-.])";
 			return 1;

@@ -25,15 +25,18 @@ START_TEST(test_topdomain_ok)
 {
 	char *error = NULL;
 
-	ck_assert(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", &error) == 0);
+	ck_assert(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 0, &error) == 0);
+	ck_assert(error == NULL);
+	/* Allowing wildcard */
+	ck_assert(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 1, &error) == 0);
 	ck_assert(error == NULL);
 
 	/* Not allowed to start with dot */
-	ck_assert(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", &error));
+	ck_assert(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 0, &error));
 	ck_assert_str_eq("Starts with a dot", error);
 
 	/* Test missing error msg ptr */
-	ck_assert(check_topdomain(".foo", NULL));
+	ck_assert(check_topdomain(".foo", 0, NULL));
 }
 END_TEST
 
@@ -42,33 +45,33 @@ START_TEST(test_topdomain_length)
 	char *error;
 
 	/* Test empty and too short */
-	ck_assert(check_topdomain("", &error));
+	ck_assert(check_topdomain("", 0, &error));
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain("a", &error));
+	ck_assert(check_topdomain("a", 0, &error));
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain(".a", &error));
+	ck_assert(check_topdomain(".a", 0, &error));
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain("a.", &error));
+	ck_assert(check_topdomain("a.", 0, &error));
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain("ab", &error));
+	ck_assert(check_topdomain("ab", 0, &error));
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain("a.b", &error) == 0);
+	ck_assert(check_topdomain("a.b", 0, &error) == 0);
 
 	/* Test too long (over 128, need rest of space for data) */
 	ck_assert(check_topdomain(
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
-		"abcd12345.abcd12345.foo129xxx", &error));
+		"abcd12345.abcd12345.foo129xxx", 0, &error));
 	ck_assert_str_eq("Too long (> 128)", error);
 	ck_assert(check_topdomain(
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
-		"abcd12345.abcd12345.foo128xx", &error) == 0);
+		"abcd12345.abcd12345.foo128xx", 0, &error) == 0);
 }
 END_TEST
 
@@ -77,36 +80,66 @@ START_TEST(test_topdomain_chunks)
 	char *error;
 
 	/* Must have at least one dot */
-	ck_assert(check_topdomain("abcde.gh", &error) == 0);
-	ck_assert(check_topdomain("abcdefgh", &error));
+	ck_assert(check_topdomain("abcde.gh", 0, &error) == 0);
+	ck_assert(check_topdomain("abcdefgh", 0, &error));
 	ck_assert_str_eq("No dots", error);
 
 	/* Not two consecutive dots */
-	ck_assert(check_topdomain("abc..defgh", &error));
+	ck_assert(check_topdomain("abc..defgh", 0, &error));
 	ck_assert_str_eq("Consecutive dots", error);
 
 	/* Not end with a dots */
-	ck_assert(check_topdomain("abc.defgh.", &error));
+	ck_assert(check_topdomain("abc.defgh.", 0, &error));
 	ck_assert_str_eq("Ends with a dot", error);
 
 	/* No chunk longer than 63 chars */
 	ck_assert(check_topdomain("123456789012345678901234567890"
-		"123456789012345678901234567890333.com", &error) == 0);
+		"123456789012345678901234567890333.com", 0, &error) == 0);
 	ck_assert(check_topdomain("123456789012345678901234567890"
-		"1234567890123456789012345678904444.com", &error));
+		"1234567890123456789012345678904444.com", 0, &error));
 	ck_assert_str_eq("Too long domain part (> 63)", error);
 
 	ck_assert(check_topdomain("abc.123456789012345678901234567890"
-		"123456789012345678901234567890333.com", &error) == 0);
+		"123456789012345678901234567890333.com", 0, &error) == 0);
 	ck_assert(check_topdomain("abc.123456789012345678901234567890"
-		"1234567890123456789012345678904444.com", &error));
+		"1234567890123456789012345678904444.com", 0, &error));
 	ck_assert_str_eq("Too long domain part (> 63)", error);
 
 	ck_assert(check_topdomain("abc.123456789012345678901234567890"
-		"123456789012345678901234567890333", &error) == 0);
+		"123456789012345678901234567890333", 0, &error) == 0);
 	ck_assert(check_topdomain("abc.123456789012345678901234567890"
-		"1234567890123456789012345678904444", &error));
+		"1234567890123456789012345678904444", 0, &error));
 	ck_assert_str_eq("Too long domain part (> 63)", error);
+}
+END_TEST
+
+START_TEST(test_topdomain_wild)
+{
+	char *error = NULL;
+
+	ck_assert(check_topdomain("*.a", 0, &error) == 1);
+	ck_assert_str_eq("Contains illegal character (allowed: [a-zA-Z0-9-.])", error);
+	error = NULL;
+	ck_assert(check_topdomain("*.a", 1, &error) == 0);
+	ck_assert(error == NULL);
+
+	ck_assert(check_topdomain("b*.a", 0, &error) == 1);
+	ck_assert_str_eq("Contains illegal character (allowed: [a-zA-Z0-9-.])", error);
+	error = NULL;
+	ck_assert(check_topdomain("b*.a", 1, &error) == 1);
+	ck_assert_str_eq("Wildcard (*) only allowed as first char", error);
+
+	ck_assert(check_topdomain("*b.a", 0, &error) == 1);
+	ck_assert_str_eq("Contains illegal character (allowed: [a-zA-Z0-9-.])", error);
+	error = NULL;
+	ck_assert(check_topdomain("*b.a", 1, &error) == 1);
+	ck_assert_str_eq("Wildcard (*) must be followed by dot", error);
+
+	ck_assert(check_topdomain("*.*.a", 0, &error) == 1);
+	ck_assert_str_eq("Contains illegal character (allowed: [a-zA-Z0-9-.])", error);
+	error = NULL;
+	ck_assert(check_topdomain("*.*.a", 1, &error) == 1);
+	ck_assert_str_eq("Wildcard (*) only allowed as first char", error);
 }
 END_TEST
 
@@ -211,6 +244,7 @@ test_common_create_tests()
 	tcase_add_test(tc, test_topdomain_ok);
 	tcase_add_test(tc, test_topdomain_length);
 	tcase_add_test(tc, test_topdomain_chunks);
+	tcase_add_test(tc, test_topdomain_wild);
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 

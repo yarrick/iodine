@@ -2543,7 +2543,7 @@ main(int argc, char **argv)
 	}
 
 	topdomain = strdup(argv[1]);
-	if (check_topdomain(topdomain, &errormsg)) {
+	if (check_topdomain(topdomain, 0, &errormsg)) {
 		warnx("Invalid topdomain: %s", errormsg);
 		usage();
 		/* NOTREACHED */
