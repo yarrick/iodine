@@ -23,13 +23,14 @@
 
 START_TEST(test_topdomain_ok)
 {
-	char *error;
+	char *error = NULL;
 
 	ck_assert(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", &error) == 0);
+	ck_assert(error == NULL);
 
 	/* Not allowed to start with dot */
 	ck_assert(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", &error));
-	ck_assert(strcmp("Starts with a dot", error) == 0);
+	ck_assert_str_eq("Starts with a dot", error);
 
 	/* Test missing error msg ptr */
 	ck_assert(check_topdomain(".foo", NULL));
@@ -42,24 +43,28 @@ START_TEST(test_topdomain_length)
 
 	/* Test empty and too short */
 	ck_assert(check_topdomain("", &error));
-	ck_assert(strcmp("Too short (< 3)", error) == 0);
+	ck_assert_str_eq("Too short (< 3)", error);
+	error = NULL;
 	ck_assert(check_topdomain("a", &error));
-	ck_assert(strcmp("Too short (< 3)", error) == 0);
+	ck_assert_str_eq("Too short (< 3)", error);
+	error = NULL;
 	ck_assert(check_topdomain(".a", &error));
-	ck_assert(strcmp("Too short (< 3)", error) == 0);
+	ck_assert_str_eq("Too short (< 3)", error);
+	error = NULL;
 	ck_assert(check_topdomain("a.", &error));
-	ck_assert(strcmp("Too short (< 3)", error) == 0);
+	ck_assert_str_eq("Too short (< 3)", error);
+	error = NULL;
 	ck_assert(check_topdomain("ab", &error));
-	ck_assert(strcmp("Too short (< 3)", error) == 0);
+	ck_assert_str_eq("Too short (< 3)", error);
+	error = NULL;
 	ck_assert(check_topdomain("a.b", &error) == 0);
-	ck_assert(strcmp("Too short (< 3)", error) == 0);
 
 	/* Test too long (over 128, need rest of space for data) */
 	ck_assert(check_topdomain(
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.foo129xxx", &error));
-	ck_assert(strcmp("Too long (> 128)", error) == 0);
+	ck_assert_str_eq("Too long (> 128)", error);
 	ck_assert(check_topdomain(
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
@@ -74,34 +79,34 @@ START_TEST(test_topdomain_chunks)
 	/* Must have at least one dot */
 	ck_assert(check_topdomain("abcde.gh", &error) == 0);
 	ck_assert(check_topdomain("abcdefgh", &error));
-	ck_assert(strcmp("No dots", error) == 0);
+	ck_assert_str_eq("No dots", error);
 
 	/* Not two consecutive dots */
 	ck_assert(check_topdomain("abc..defgh", &error));
-	ck_assert(strcmp("Consecutive dots", error) == 0);
+	ck_assert_str_eq("Consecutive dots", error);
 
 	/* Not end with a dots */
 	ck_assert(check_topdomain("abc.defgh.", &error));
-	ck_assert(strcmp("Ends with a dot", error) == 0);
+	ck_assert_str_eq("Ends with a dot", error);
 
 	/* No chunk longer than 63 chars */
 	ck_assert(check_topdomain("123456789012345678901234567890"
 		"123456789012345678901234567890333.com", &error) == 0);
 	ck_assert(check_topdomain("123456789012345678901234567890"
 		"1234567890123456789012345678904444.com", &error));
-	ck_assert(strcmp("Too long domain part (> 63)", error) == 0);
+	ck_assert_str_eq("Too long domain part (> 63)", error);
 
 	ck_assert(check_topdomain("abc.123456789012345678901234567890"
 		"123456789012345678901234567890333.com", &error) == 0);
 	ck_assert(check_topdomain("abc.123456789012345678901234567890"
 		"1234567890123456789012345678904444.com", &error));
-	ck_assert(strcmp("Too long domain part (> 63)", error) == 0);
+	ck_assert_str_eq("Too long domain part (> 63)", error);
 
 	ck_assert(check_topdomain("abc.123456789012345678901234567890"
 		"123456789012345678901234567890333", &error) == 0);
 	ck_assert(check_topdomain("abc.123456789012345678901234567890"
 		"1234567890123456789012345678904444", &error));
-	ck_assert(strcmp("Too long domain part (> 63)", error) == 0);
+	ck_assert_str_eq("Too long domain part (> 63)", error);
 }
 END_TEST
 
@@ -121,7 +126,7 @@ START_TEST(test_parse_format_ipv4)
 	ck_assert(v4addr->sin_port == htons(53));
 
 	formatted = format_addr(&addr, addr_len);
-	ck_assert(strcmp(host, formatted) == 0);
+	ck_assert_str_eq(host, formatted);
 }
 END_TEST
 
@@ -141,7 +146,7 @@ START_TEST(test_parse_format_ipv4_listen_all)
 	ck_assert(v4addr->sin_port == htons(53));
 
 	formatted = format_addr(&addr, addr_len);
-	ck_assert(strcmp(host, formatted) == 0);
+	ck_assert_str_eq(host, formatted);
 }
 END_TEST
 
@@ -166,7 +171,7 @@ START_TEST(test_parse_format_ipv6)
 	ck_assert(v6addr->sin6_port == htons(53));
 
 	formatted = format_addr(&addr, addr_len);
-	ck_assert(strcmp(compact, formatted) == 0);
+	ck_assert_str_eq(compact, formatted);
 }
 END_TEST
 
@@ -192,7 +197,7 @@ START_TEST(test_parse_format_ipv4_mapped_ipv6)
 
 	/* Format as IPv4 address */
 	formatted = format_addr(&addr, addr_len);
-	ck_assert(strcmp(host, formatted) == 0);
+	ck_assert_str_eq(host, formatted);
 }
 END_TEST
 
