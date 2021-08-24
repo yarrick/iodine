@@ -143,6 +143,52 @@ START_TEST(test_topdomain_wild)
 }
 END_TEST
 
+START_TEST(test_query_datalen)
+{
+	char *topdomain = "r.foo.com";
+	/* With data */
+	ck_assert(query_datalen("foobar.r.foo.com", topdomain) == 7);
+	ck_assert(query_datalen("foobar.r.FoO.Com", topdomain) == 7);
+	ck_assert(query_datalen("foo.bar.r.FoO.Com", topdomain) == 8);
+	ck_assert(query_datalen(".r.foo.com", topdomain) == 1);
+	/* Without data */
+	ck_assert(query_datalen("r.foo.com", topdomain) == 0);
+	ck_assert(query_datalen("R.foo.com", topdomain) == 0);
+	/* Shorter query name */
+	ck_assert(query_datalen("foo.com", topdomain) == -1);
+	/* Mismatched query name */
+	ck_assert(query_datalen("b.foo.com", topdomain) == -1);
+	ck_assert(query_datalen("*.foo.com", topdomain) == -1);
+	/* Query name overlaps topdomain, but is longer */
+	ck_assert(query_datalen("bar.foo.com", topdomain) == -1);
+}
+END_TEST
+
+START_TEST(test_query_datalen_wild)
+{
+	char *topdomain = "*.foo.com";
+	/* With data */
+	ck_assert(query_datalen("foobar.a.foo.com", topdomain) == 7);
+	ck_assert(query_datalen("foobar.r.FoO.Com", topdomain) == 7);
+	ck_assert(query_datalen("foo.bar.r.FoO.Com", topdomain) == 8);
+	ck_assert(query_datalen("foo.Ab.foo.cOm", topdomain) == 4);
+	ck_assert(query_datalen("foo.Abcd.Foo.com", topdomain) == 4);
+	ck_assert(query_datalen("***.STARs.foo.com", topdomain) == 4);
+	ck_assert(query_datalen(".a.foo.com", topdomain) == 1);
+	ck_assert(query_datalen(".ab.foo.com", topdomain) == 1);
+	/* Without data */
+	ck_assert(query_datalen("rr.foo.com", topdomain) == 0);
+	ck_assert(query_datalen("b.foo.com", topdomain) == 0);
+	ck_assert(query_datalen("B.foo.com", topdomain) == 0);
+	/* Shorter query name */
+	ck_assert(query_datalen("foo.com", topdomain) == -1);
+	/* Wildcard part of query name matching topdomain */
+	ck_assert(query_datalen("aa.*.foo.com", topdomain) == -1);
+	/* Mismatched query name */
+	ck_assert(query_datalen("bar.r.boo.com", topdomain) == -1);
+}
+END_TEST
+
 START_TEST(test_parse_format_ipv4)
 {
 	char *host = "192.168.2.10";
@@ -245,6 +291,8 @@ test_common_create_tests()
 	tcase_add_test(tc, test_topdomain_length);
 	tcase_add_test(tc, test_topdomain_chunks);
 	tcase_add_test(tc, test_topdomain_wild);
+	tcase_add_test(tc, test_query_datalen);
+	tcase_add_test(tc, test_query_datalen_wild);
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 

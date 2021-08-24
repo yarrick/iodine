@@ -404,6 +404,52 @@ check_topdomain(char *str, int allow_wildcard, char **errormsg)
 	return 0;
 }
 
+int
+query_datalen(const char *qname, const char *topdomain)
+{
+	/* Return number of data bytes embedded in DNS query name,
+	 * or -1 if domains do not match.
+	 */
+	int qpos = strlen(qname);
+	int tpos = strlen(topdomain);
+	if (tpos < 3 || qpos < tpos) {
+		/* Domain or query name too short */
+		return -1;
+	}
+	/* Backward string compare */
+	qpos--;
+	tpos--;
+	while (qpos >= 0) {
+		if (topdomain[tpos] == '*') {
+			/* Wild match, is first in topdomain */
+			if (qname[qpos] == '*') {
+				/* Don't match against stars in query name */
+				return -1;
+			} else if (qpos == 0 || qname[qpos-1] == '.') {
+				/* Reached start of query name or chunk separator */
+				return qpos;
+			}
+			qpos--;
+		} else if (tolower(qname[qpos]) == tolower(topdomain[tpos])) {
+			/* Matching char, exclude wildcard in query name */
+			if (tpos == 0) {
+				/* Fully matched domain */
+				if (qpos == 0 || qname[qpos-1] == '.') {
+					/* Start of name or has dot before matching topdomain */
+					return qpos;
+				}
+				/* Query name has longer chunk than topdomain */
+				return -1;
+			}
+			tpos--;
+			qpos--;
+		} else {
+			return -1;
+		}
+	}
+	return -1;
+}
+
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID
 int

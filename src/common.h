@@ -128,6 +128,8 @@ void read_password(char*, size_t);
 
 int check_topdomain(char *, int, char **);
 
+int query_datalen(const char *qname, const char *topdomain);
+
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID
 int inet_aton(const char *cp, struct in_addr *inp);
