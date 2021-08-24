@@ -205,8 +205,7 @@ START_TEST(test_read_name_badjump_second)
 		rv = readname((char*) jumper, sizeof(badjump2), &data, buf, 256);
 
 		ck_assert(rv == 4);
-		ck_assert_msg(strcmp("BA.", buf) == 0,
-				"buf is not BA: %s", buf);
+		ck_assert_str_eq("BA.", buf);
 	}
 	free(jumper);
 }

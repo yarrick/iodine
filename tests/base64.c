@@ -74,8 +74,7 @@ START_TEST(test_base64_encode)
 	val = base64_ops.encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
 	ck_assert(val == strlen(testpairs[_i].b));
-	ck_assert_msg(strcmp(buf, testpairs[_i].b) == 0,
-			"'%s' != '%s'", buf, testpairs[_i].b);
+	ck_assert_str_eq(buf, testpairs[_i].b);
 }
 END_TEST
 
@@ -89,8 +88,7 @@ START_TEST(test_base64_decode)
 	val = base64_ops.decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
 	ck_assert(val == strlen(testpairs[_i].a));
-	ck_assert_msg(strcmp(buf, testpairs[_i].a) == 0,
-			"'%s' != '%s'", buf, testpairs[_i].a);
+	ck_assert_str_eq(buf, testpairs[_i].a);
 }
 END_TEST
 

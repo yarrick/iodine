@@ -50,8 +50,7 @@ START_TEST(test_inline_dotify)
 	b = temp;
 	inline_dotify(b, sizeof(temp));
 
-	ck_assert_msg(strcmp(dottests[_i].b, temp) == 0,
-			"'%s' != '%s'", temp, dottests[_i].b);
+	ck_assert_str_eq(dottests[_i].b, temp);
 }
 END_TEST
 
@@ -65,8 +64,7 @@ START_TEST(test_inline_undotify)
 	b = temp;
 	inline_undotify(b, sizeof(temp));
 
-	ck_assert_msg(strcmp(dottests[_i].a, temp) == 0,
-			"'%s' != '%s'", temp, dottests[_i].a);
+	ck_assert_str_eq(dottests[_i].a, temp);
 }
 END_TEST
 
