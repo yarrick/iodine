@@ -134,6 +134,13 @@ nameservers will translate between protocols automatically if needed. Use
 options `-4` or `-6` to force the client to use a specific IP version for its DNS
 queries.
 
+If your server is listening on IPv6 and is reachable, add an AAAA record for it
+to your DNS setup. Extending the example above would look like this:
+
+	t1		IN	NS	t1ns.mydomain.com.		; note the dot!
+	t1ns		IN	A	10.15.213.99
+	t1ns		IN	AAAA	2001:db8::1001:99
+
 #### Routing
 It is possible to route all traffic through the DNS tunnel. To do this, first
 add a host route to the nameserver used by iodine over the wired/wireless
