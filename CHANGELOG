@@ -18,6 +18,8 @@ master:
 	   Traffic inside tunnel is still IPv4.
 	- Update android build to support 5.0 (Lollipop) and newer.
 	- Change external IP lookup to using myip.opendns.com via DNS.
+	- Add option to choose IPv4 listen address from external IP lookup.
+	- Add server support for handling multiple domains via wildcard.
 
 2014-06-16: 0.7.0 "Kryoptonite"
 	- Partial IPv6 support (#107)
@@ -169,10 +171,10 @@ master:
 	- New encoding, 25% more peak upstream throughput
 	- New -l option to set local ip to listen to on server
 
-2006-07-11: 0.3.1 
+2006-07-11: 0.3.1
 	- Add Mac OSX support
 	- Add setting device name
-	- Use compression of domain name in reply (should allow setting MTU 
+	- Use compression of domain name in reply (should allow setting MTU
 		approx 200 bytes higher)
 
 2006-06-24: 0.3.0
