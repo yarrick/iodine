@@ -36,9 +36,6 @@ char *get_resolvconf_addr(void)
 		rv = addr;
 	pclose(fp);
 #else
-
-	rv = NULL;
-
 	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
 		err(1, "/etc/resolv.conf");
 
@@ -58,7 +55,6 @@ char *get_resolvconf_addr(void)
 	ULONG       buflen;
 	DWORD       ret;
 
-	rv = NULL;
 	fixed_info = malloc(sizeof(FIXED_INFO));
 	buflen = sizeof(FIXED_INFO);
 
