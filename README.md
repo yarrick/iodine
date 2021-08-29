@@ -296,10 +296,10 @@ DNSCACHE_LEN is still advised, preferably 2 or higher, however you can also
 undefine it to save a few more kilobytes.
 
 One iodine server can handle multiple domains. Set up different NS records
-on the same domain all pointing to the same host, and use `*.mydomain.com`
-as topdomain argument. iodine will accept tunnel traffic for all domains matching that
-pattern. All tunnels using the same server should use the same hostname for
-all NS delegations.
+on the same domain all pointing to the same host, and use a wildcard
+at the start of the topdomain argument (example `*.mydomain.com`). iodine
+will accept tunnel traffic for all domains matching that pattern. The wildcard
+has to be at the start of the topdomain argument and be followed by a dot.
 
 
 PERFORMANCE
