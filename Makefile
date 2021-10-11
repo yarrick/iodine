@@ -63,12 +63,12 @@ iodine-latest:
 #non-PIE build for old android
 cross-android-old:
 	@$(MAKE) -C src base64u.c
-	@(cd src && ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk APP_PLATFORM=android-3)
+	@(cd ./src && ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk APP_PLATFORM=android-3)
 
 #Position-indepedent build for modern android
 cross-android:
 	@$(MAKE) -C src base64u.c
-	@(cd src && ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.16.mk APP_PLATFORM=android-16)
+	@(cd ./src && ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.16.mk APP_PLATFORM=android-16)
 
 iodine-latest-android.zip: iodine-latest
 	@mv iodine-latest iodine-latest-android
