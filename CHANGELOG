@@ -5,7 +5,7 @@ iodine - https://code.kryo.se/iodine
 
 CHANGES:
 
-master:
+2021-12-26: 0.8.0 "Uncaptive portal"
 	- Mac OS X: Support native utun VPN devices. Patch by
 		Peter Sagerson, ported from OpenVPN by Catalin Patulea.
 	- Fix compilation failure on kFreeBSD and Hurd, by Gregor Herrmann
