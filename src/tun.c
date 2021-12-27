@@ -592,7 +592,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 #endif
 
 int
-tun_setip(const char *ip, const char *other_ip, int netbits)
+tun_setip(const char *ip, const char *other_ip, int netbits, int forward_v6)
 {
 	char cmdline[512];
 	int netmask;
@@ -687,6 +687,15 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		if_name, ip, inet_ntoa(net));
 	return system(cmdline);
 #endif
+
+        if (forward_v6) {
+                snprintf(cmdline, sizeof(cmdline),
+                    IFCONFIGPATH "ifconfig %s inet6 add ::%s/64",
+                    if_name,
+                    ip);
+
+        fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);        
+        }
 }
 
 int

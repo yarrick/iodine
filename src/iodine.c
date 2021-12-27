@@ -72,7 +72,7 @@ static void help(FILE *stream, bool verbose)
 {
 	fprintf(stream,
 		"iodine IP over DNS tunneling client\n\n"
-		"Usage: %s [-46fhrv] [-u user] [-t chrootdir] [-d device] [-P password]\n"
+		"Usage: %s [-46fhrvS] [-u user] [-t chrootdir] [-d device] [-P password]\n"
 		"              [-m maxfragsize] [-M maxlen] [-T type] [-O enc] [-L 0|1] [-I sec]\n"
 		"              [-z context] [-F pidfile] [nameserver] topdomain\n", __progname);
 
@@ -100,6 +100,7 @@ static void help(FILE *stream, bool verbose)
 		"  -t dir to chroot to directory dir\n"
 		"  -d device to set tunnel device name\n"
 		"  -z context, to apply specified SELinux context after initialization\n"
+                "  -S enable forwarding of IPv6 packets within the tunnel\n"
 		"  -F pidfile to write pid to a file\n\n"
 		"nameserver is the IP number/hostname of the relaying nameserver. If absent,\n"
 		"           /etc/resolv.conf is used\n"
@@ -152,6 +153,7 @@ int main(int argc, char **argv)
 	struct sockaddr_storage nameservaddr;
 	int nameservaddr_len;
 	int nameserv_family;
+        int forward_v6;
 
 	nameserv_host = NULL;
 	topdomain = NULL;
@@ -176,6 +178,7 @@ int main(int argc, char **argv)
 	selecttimeout = 4;
 	hostname_maxlen = 0xFF;
 	nameserv_family = AF_UNSPEC;
+        forward_v6 = 0;
 
 #ifdef WINDOWS32
 	WSAStartup(req_version, &wsa_data);
@@ -192,7 +195,7 @@ int main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:s")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -268,6 +271,9 @@ int main(int argc, char **argv)
 			if (!lazymode)
 				selecttimeout = 1;
 			break;
+                case 'S':
+                        forward_v6 = 1;
+                        break; 
 		case 'I':
 			selecttimeout = atoi(optarg);
 			if (selecttimeout < 1)

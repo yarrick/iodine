@@ -2274,7 +2274,7 @@ write_dns(int fd, struct query *q, const char *data, int datalen, char downenc)
 static void print_usage(FILE *stream)
 {
 	fprintf(stream,
-		"Usage: %s [-46cDfsv] [-u user] [-t chrootdir] [-d device] [-m mtu]\n"
+		"Usage: %s [-46cDfsvS] [-u user] [-t chrootdir] [-d device] [-m mtu]\n"
 		"               [-z context] [-l ipv4 listen address] [-L ipv6 listen address]\n"
 		"               [-p port] [-n auto|external_ip] [-b dnsport] [-P password]\n"
 		"               [-F pidfile] [-i max idle time] tunnel_ip[/netmask] topdomain\n",
@@ -2390,6 +2390,7 @@ main(int argc, char **argv)
 	int dns4addr_len;
 	struct sockaddr_storage dns6addr;
 	int dns6addr_len;
+        int forward_v6;
 #ifdef HAVE_SYSTEMD
 	int nb_fds;
 #endif
@@ -2418,7 +2419,7 @@ main(int argc, char **argv)
 	debug = 0;
 	netmask = 27;
 	pidfile = NULL;
-
+        forward_v6 = 0;
 	retval = 0;
 
 #ifdef WINDOWS32
@@ -2507,6 +2508,9 @@ main(int argc, char **argv)
 			/* XXX: find better way of cleaning up ps(1) */
 			memset(optarg, 0, strlen(optarg));
 			break;
+                case 'S':
+                        forward_v6 = 1;
+                        break;
 		case 'z':
 			context = optarg;
 			break;
@@ -2674,7 +2678,7 @@ main(int argc, char **argv)
 	}
 	if (!skipipconfig) {
 		const char *other_ip = users_get_first_ip();
-		if (tun_setip(argv[0], other_ip, netmask) != 0 || tun_setmtu(mtu) != 0) {
+		if (tun_setip(argv[0], other_ip, netmask, forward_v6) != 0 || tun_setmtu(mtu) != 0) {
 			retval = 1;
 			free((void*) other_ip);
 			goto cleanup;

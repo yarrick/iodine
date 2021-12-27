@@ -1374,7 +1374,7 @@ handshake_version(int dns_fd, int *seed)
 }
 
 static int
-handshake_login(int dns_fd, int seed)
+handshake_login(int dns_fd, int seed, int forward_v6)
 {
 	char in[4096];
 	char login[16];
@@ -1405,7 +1405,7 @@ handshake_login(int dns_fd, int seed)
 
 				server[64] = 0;
 				client[64] = 0;
-				if (tun_setip(client, server, netmask) == 0 &&
+				if (tun_setip(client, server, netmask, forward_v6) == 0 &&
 					tun_setmtu(mtu) == 0) {
 
 					fprintf(stderr, "Server tunnel IP is %s\n", server);
@@ -2326,7 +2326,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 }
 
 int
-client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize)
+client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize, int forward_v6)
 {
 	int seed;
 	int upcodec;
@@ -2349,7 +2349,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		return r;
 	}
 
-	r = handshake_login(dns_fd, seed);
+	r = handshake_login(dns_fd, seed, forward_v6);
 	if (r) {
 		return r;
 	}

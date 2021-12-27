@@ -35,7 +35,7 @@ void client_set_lazymode(int lazy_mode);
 void client_set_hostname_maxlen(int i);
 
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size,
-		     int fragsize);
+		     int fragsize, int forward_v6);
 int client_tunnel(int tun_fd, int dns_fd);
 
 #endif
