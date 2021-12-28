@@ -2437,7 +2437,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
-	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vcsfhDuS:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
 		switch(choice) {
 		case '4':
 			addrfamily = AF_INET;
@@ -2678,11 +2678,17 @@ main(int argc, char **argv)
 	}
 	if (!skipipconfig) {
 		const char *other_ip = users_get_first_ip();
-		if (tun_setip(argv[0], other_ip, netmask, forward_v6) != 0 || tun_setmtu(mtu) != 0) {
-			retval = 1;
+		if (tun_setip(argv[0], other_ip, netmask, forward_v6) || tun_setmtu(mtu) != 0) {
+                        retval = 1; 
 			free((void*) other_ip);
-			goto cleanup;
-		}
+                        goto cleanup;
+			
+	        }
+		if ((mtu < 1280) && (forward_v6)) {
+                                warnx("Interface mtu of %d below the 1280 threshold needed for IPv6 tunneling.\n", mtu);         
+                                warnx("Proceeding without IPv6 tunneling\n");         
+		} 
+
 		free((void*) other_ip);
 	}
 

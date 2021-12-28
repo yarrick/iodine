@@ -372,7 +372,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Sending DNS queries for %s to %s\n",
 		topdomain, format_addr(&nameservaddr, nameservaddr_len));
 
-	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
+	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size, forward_v6)) {
 		retval = 1;
 		goto cleanup2;
 	}
