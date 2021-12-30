@@ -649,13 +649,30 @@ static int tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 	char in[64*1024];
 	int userid;
 	int read;
-
+        int ip_version;
+	int c;
+	struct in6_addr v6Addr;
+        char v6AddrP[16];
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return 0;
 
 	/* find target ip in packet, in is padded with 4 bytes TUN header */
 	header = (struct ip*) (in + 4);
-	userid = find_user_by_ip(header->ip_dst.s_addr);
+	ip_version = in[4] & 0xf0;
+
+	if (ip_version == 64) { /* IPv4 */
+	     header = (struct ip*) (in + 4);
+	     userid = find_user_by_ip(header->ip_dst.s_addr);
+	} else { /* IPv6 */
+             for (c = 0; c < 16; c++) {
+	        v6Addr.s6_addr[c] = in[c + 28];
+		printf("adding byte: %i to v6 address\n", in[c+28]);
+	     }
+	     inet_ntop(AF_INET6, &v6Addr, v6AddrP, INET6_ADDRSTRLEN);
+	     printf("read v6Addr from tunnel: %s\n", v6AddrP);
+	     userid = find_user_by_ip6(&v6Addr);
+	     printf("userid: %d\n", userid);
+        }
 	if (userid < 0)
 		return 0;
 
@@ -2437,7 +2454,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
-	while ((choice = getopt(argc, argv, "46vcsfhDuS:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vcsSfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
 		switch(choice) {
 		case '4':
 			addrfamily = AF_INET;

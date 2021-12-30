@@ -549,19 +549,39 @@ write_tun(int tun_fd, char *data, size_t len)
 		len -= 4;
 	} else {
 #ifdef LINUX
+		
+                int i = data[4] & 0xf0;
+		if (i == 64) {
+			fprintf(stderr, "IPv4 packet\n");
+		// Look at the fifth bype 
 		// Linux prefixes with 32 bits ethertype
 		// 0x0800 for IPv4, 0x86DD for IPv6
-		data[0] = 0x00;
-		data[1] = 0x00;
-		data[2] = 0x08;
-		data[3] = 0x00;
+	    	    data[0] = 0x00;
+		    data[1] = 0x00;
+		    data[2] = 0x08;
+		    data[3] = 0x00;
+	        } else { /* 96 for IPV6 */
+			fprintf(stderr, "IPv6 packet\n");
+	    	    data[0] = 0x00;
+		    data[1] = 0x00;
+		    data[2] = 0x86;
+		    data[3] = 0xDD;
+	       }	
 #else /* OPENBSD and DARWIN(utun) */
 		// BSDs prefix with 32 bits address family
 		// AF_INET for IPv4, AF_INET6 for IPv6
-		data[0] = 0x00;
-		data[1] = 0x00;
-		data[2] = 0x00;
-		data[3] = 0x02;
+		if (i == 64) {
+			fprintf(stderr, "IPv4 packet\n");
+	    	    data[0] = 0x00;
+		    data[1] = 0x00;
+		    data[2] = 0x00;
+		    data[3] = 0x02;
+	        } else { /* 96 for IPV6 */
+			fprintf(stderr, "IPv6 packet\n");
+	    	    data[0] = 0x00;
+		    data[1] = 0x00;
+		    data[2] = 0x00;
+		    data[3] = 0x0A;
 #endif
 	}
 

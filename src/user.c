@@ -42,12 +42,20 @@ int init_users(in_addr_t my_ip, int netbits)
 	int i;
 	int skip = 0;
 	char newip[16];
+	char ip6Tmp[16];
+	char ip6Tmp2[18];
+        char ipv4Tmp[16];
 
 	int maxusers;
 
 	in_addr_t netmask = 0;
 	struct in_addr net;
 	struct in_addr ipstart;
+	 
+	/* For IPv6, we take the IPv4 address and simply prepend ::
+	 * and use a 64-bit mask. Reduces the need to parse
+	 * netmasks. 
+	 */
 
 	for (i = 0; i < netbits; i++) {
 		netmask = (netmask << 1) | 1;
@@ -70,6 +78,19 @@ int init_users(in_addr_t my_ip, int netbits)
 			skip++;
 			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 			ip = ipstart.s_addr + inet_addr(newip);
+
+			inet_ntop(AF_INET, &ip, ip6Tmp, INET_ADDRSTRLEN);
+
+			snprintf(ip6Tmp2, sizeof(ip6Tmp2), "::%s", ip6Tmp);
+                        
+			inet_pton(AF_INET6, ip6Tmp2, &users[i].tun_ip6);
+			memset(ip6Tmp2,0,strlen(ip6Tmp2)); 
+			inet_ntop(AF_INET6, &users[i].tun_ip6, ip6Tmp2, INET6_ADDRSTRLEN); 
+			inet_ntop(AF_INET, &ip, ipv4Tmp, INET_ADDRSTRLEN); 
+	                printf("storing IPv4 address: %s\n", ipv4Tmp);
+	                printf("storing IPv6 address: %s\n", ip6Tmp2);
+			memset(ip6Tmp2,0,strlen(ip6Tmp2)); 
+			
 		}
 		users[i].tun_ip = ip;
 		net.s_addr = ip;
@@ -90,6 +111,40 @@ const char *users_get_first_ip(void)
 	ip.s_addr = users[0].tun_ip;
 	return strdup(inet_ntoa(ip));
 }
+
+int find_user_by_ip6(struct in6_addr *v6Addr) 
+{
+	int i;
+        char v6AddrOut[32];
+
+	inet_ntop(AF_INET6, v6Addr, v6AddrOut, INET6_ADDRSTRLEN);
+
+	printf("Going to check address: %s in user list\n", v6AddrOut);
+	for (i = 0; i < usercount; i++) {
+		if (users[i].active &&
+			users[i].authenticated &&
+			!users[i].disabled &&
+			users[i].last_pkt + 60 > time(NULL) &&
+			(areV6AddressesEqual(v6Addr, &users[i].tun_ip6) == 0) ) {
+			   return i;
+		}
+	}
+	return -1;
+}
+
+int areV6AddressesEqual(struct in6_addr *v6Struct1, struct in6_addr *v6Struct2)
+{
+        int i;
+    
+	for (i = 0; i < 16; i++) {
+		printf("byte1 %d: %d byte2 %d: %d\n", i, v6Struct1->s6_addr[i], i, v6Struct2->s6_addr[i]);
+		if (v6Struct1->s6_addr[i] != v6Struct2->s6_addr[i]) {
+		    return -1;
+		}
+        }
+	return 0;
+}
+
 
 int find_user_by_ip(uint32_t ip)
 {

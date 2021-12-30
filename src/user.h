@@ -45,6 +45,7 @@ struct tun_user {
 	int seed;
 	in_addr_t tun_ip;
 	struct sockaddr_storage host;
+	struct in6_addr tun_ip6;
 	socklen_t hostlen;
 	struct query q;
 	struct query q_sendrealsoon;
@@ -83,9 +84,11 @@ extern struct tun_user *users;
 int init_users(in_addr_t, int);
 const char* users_get_first_ip(void);
 int find_user_by_ip(uint32_t);
+int find_user_by_ip6(struct in6_addr *v6Addr);
 int all_users_waiting_to_send(void);
 int find_available_user(void);
 void user_switch_codec(int userid, const struct encoder *enc);
 void user_set_conn_type(int userid, enum connection c);
+int areV6AddressesEqual(struct in6_addr *, struct in6_addr *);
 
 #endif
