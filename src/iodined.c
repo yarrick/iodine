@@ -666,12 +666,9 @@ static int tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 	} else { /* IPv6 */
              for (c = 0; c < 16; c++) {
 	        v6Addr.s6_addr[c] = in[c + 28];
-		printf("adding byte: %i to v6 address\n", in[c+28]);
 	     }
 	     inet_ntop(AF_INET6, &v6Addr, v6AddrP, INET6_ADDRSTRLEN);
-	     printf("read v6Addr from tunnel: %s\n", v6AddrP);
 	     userid = find_user_by_ip6(&v6Addr);
-	     printf("userid: %d\n", userid);
         }
 	if (userid < 0)
 		return 0;

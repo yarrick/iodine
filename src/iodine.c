@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:s")) != -1) {
+	while ((choice = getopt(argc, argv, "46vfhruS:t:d:R:P:m:M:F:T:O:L:I")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;

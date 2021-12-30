@@ -548,9 +548,9 @@ write_tun(int tun_fd, char *data, size_t len)
 		data += 4;
 		len -= 4;
 	} else {
+                int i = data[4] & 0xf0;
 #ifdef LINUX
 		
-                int i = data[4] & 0xf0;
 		if (i == 64) {
 			fprintf(stderr, "IPv4 packet\n");
 		// Look at the fifth bype 
@@ -581,7 +581,9 @@ write_tun(int tun_fd, char *data, size_t len)
 	    	    data[0] = 0x00;
 		    data[1] = 0x00;
 		    data[2] = 0x00;
-		    data[3] = 0x0A;
+		    data[3] = 0x1E;
+
+                }
 #endif
 	}
 

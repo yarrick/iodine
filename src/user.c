@@ -119,7 +119,6 @@ int find_user_by_ip6(struct in6_addr *v6Addr)
 
 	inet_ntop(AF_INET6, v6Addr, v6AddrOut, INET6_ADDRSTRLEN);
 
-	printf("Going to check address: %s in user list\n", v6AddrOut);
 	for (i = 0; i < usercount; i++) {
 		if (users[i].active &&
 			users[i].authenticated &&
@@ -137,7 +136,6 @@ int areV6AddressesEqual(struct in6_addr *v6Struct1, struct in6_addr *v6Struct2)
         int i;
     
 	for (i = 0; i < 16; i++) {
-		printf("byte1 %d: %d byte2 %d: %d\n", i, v6Struct1->s6_addr[i], i, v6Struct2->s6_addr[i]);
 		if (v6Struct1->s6_addr[i] != v6Struct2->s6_addr[i]) {
 		    return -1;
 		}
