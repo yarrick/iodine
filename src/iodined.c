@@ -2693,8 +2693,8 @@ main(int argc, char **argv)
 	}
 	if (!skipipconfig) {
 		const char *other_ip = users_get_first_ip();
-		if (tun_setip(argv[0], other_ip, netmask, forward_v6) || tun_setmtu(mtu) != 0) {
-                        retval = 1; 
+		if (tun_setip(argv[0], other_ip, netmask, forward_v6) != 0 || tun_setmtu(mtu) != 0) {
+                        retval = 1;
 			free((void*) other_ip);
                         goto cleanup;
 			
