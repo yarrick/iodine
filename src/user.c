@@ -44,7 +44,6 @@ int init_users(in_addr_t my_ip, int netbits)
 	char newip[16];
 	char ip6Tmp[16];
 	char ip6Tmp2[18];
-        char ipv4Tmp[16];
 
 	int maxusers;
 
@@ -71,7 +70,12 @@ int init_users(in_addr_t my_ip, int netbits)
 	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
 		users[i].id = i;
+
+		memset(ip6Tmp,0,strlen(ip6Tmp)); 
+		memset(ip6Tmp2,0,strlen(ip6Tmp2)); 
+
 		snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
+
 		ip = ipstart.s_addr + inet_addr(newip);
 		if (ip == my_ip && skip == 0) {
 			/* This IP was taken by iodined */
@@ -79,18 +83,14 @@ int init_users(in_addr_t my_ip, int netbits)
 			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 			ip = ipstart.s_addr + inet_addr(newip);
 
-			inet_ntop(AF_INET, &ip, ip6Tmp, INET_ADDRSTRLEN);
-
-			snprintf(ip6Tmp2, sizeof(ip6Tmp2), "::%s", ip6Tmp);
-                        
-			inet_pton(AF_INET6, ip6Tmp2, &users[i].tun_ip6);
-			memset(ip6Tmp2,0,strlen(ip6Tmp2)); 
-			inet_ntop(AF_INET6, &users[i].tun_ip6, ip6Tmp2, INET6_ADDRSTRLEN); 
-			inet_ntop(AF_INET, &ip, ipv4Tmp, INET_ADDRSTRLEN); 
-			memset(ip6Tmp2,0,strlen(ip6Tmp2)); 
 			
 		}
 		users[i].tun_ip = ip;
+
+		inet_ntop(AF_INET, &ip, ip6Tmp, INET_ADDRSTRLEN);
+		snprintf(ip6Tmp2, sizeof(ip6Tmp2), "::%s", ip6Tmp);
+		inet_pton(AF_INET6, ip6Tmp2, &users[i].tun_ip6);
+		
 		net.s_addr = ip;
 		users[i].disabled = 0;
 		users[i].authenticated = 0;
