@@ -2333,6 +2333,7 @@ static void help(FILE *stream)
 		"  -b port to forward normal DNS queries to (on localhost)\n"
 		"  -P password used for authentication (max 32 chars will be used)\n"
 		"  -F pidfile to write pid to a file\n"
+		"  -S enable forwarding of IPv6 packets within the tunnel\n"
 		"  -i maximum idle time before shutting down\n\n"
 		"tunnel_ip is the IP number of the local tunnel interface.\n"
 		"   /netmask sets the size of the tunnel network.\n"
