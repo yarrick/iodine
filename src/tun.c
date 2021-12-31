@@ -650,18 +650,20 @@ tun_setip(const char *ip, const char *other_ip, int netbits, int forward_v6)
 # else
 	display_ip = ip;
 # endif
-        fprintf(stderr, "Setting IPv6 of %s to ::%s\n", if_name, ip);
+	if (forward_v6) {
+                fprintf(stderr, "Setting IPv6 of %s to ::%s\n", if_name, ip);
 
-        snprintf(v6_cmdline, sizeof(cmdline),
+                snprintf(v6_cmdline, sizeof(cmdline),
                         IFCONFIGPATH "ifconfig %s inet6 add ::%s/64",
                         if_name,
                         display_ip);
 
-	v6_r = system(v6_cmdline);
+	        v6_r = system(v6_cmdline);
 
-        if (v6_r != 0) {
-            return v6_r;
-        } 
+                if (v6_r != 0) {
+                    return v6_r;
+                } 
+        }
 	snprintf(cmdline, sizeof(cmdline),
 			IFCONFIGPATH "ifconfig %s %s %s netmask %s",
 			if_name,
