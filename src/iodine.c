@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 		__progname++;
 #endif
 
-	while ((choice = getopt(argc, argv, "46vfhruS:t:d:R:P:m:M:F:T:O:L:I")) != -1) {
+	while ((choice = getopt(argc, argv, "t:d:R:P:m:M:z:F:T:O:L:I:46vfhruS")) != -1) {
 		switch(choice) {
 		case '4':
 			nameserv_family = AF_INET;
@@ -220,6 +220,9 @@ int main(int argc, char **argv)
 		case 'u':
 			username = optarg;
 			break;
+                case 'S':
+                        forward_v6 = 1;
+                        break;
 		case 't':
 			newroot = optarg;
 			break;
@@ -271,9 +274,6 @@ int main(int argc, char **argv)
 			if (!lazymode)
 				selecttimeout = 1;
 			break;
-                case 'S':
-                        forward_v6 = 1;
-                        break; 
 		case 'I':
 			selecttimeout = atoi(optarg);
 			if (selecttimeout < 1)

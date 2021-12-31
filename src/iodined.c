@@ -2451,7 +2451,7 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
-	while ((choice = getopt(argc, argv, "46vcsSfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
+	while ((choice = getopt(argc, argv, "t:d:m:l:L:p:n:b:P:z:F:i:46vcsSfhDu")) != -1) {
 		switch(choice) {
 		case '4':
 			addrfamily = AF_INET;
