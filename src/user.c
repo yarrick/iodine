@@ -87,8 +87,6 @@ int init_users(in_addr_t my_ip, int netbits)
 			memset(ip6Tmp2,0,strlen(ip6Tmp2)); 
 			inet_ntop(AF_INET6, &users[i].tun_ip6, ip6Tmp2, INET6_ADDRSTRLEN); 
 			inet_ntop(AF_INET, &ip, ipv4Tmp, INET_ADDRSTRLEN); 
-	                printf("storing IPv4 address: %s\n", ipv4Tmp);
-	                printf("storing IPv6 address: %s\n", ip6Tmp2);
 			memset(ip6Tmp2,0,strlen(ip6Tmp2)); 
 			
 		}
