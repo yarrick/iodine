@@ -15,7 +15,7 @@ MKDIR_FLAGS=-p
 RM=rm
 RM_FLAGS=-f
 
-TARGETOS = `uname`
+TARGETOS ?= `uname`
 
 all:
 	@$(MAKE) -C src TARGETOS=$(TARGETOS) all
