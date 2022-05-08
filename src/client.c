@@ -28,6 +28,8 @@
 #include <fcntl.h>
 #include <zlib.h>
 #include <time.h>
+#include <stdbool.h>
+
 
 #ifdef WINDOWS32
 #include "windows.h"
@@ -101,6 +103,7 @@ static time_t lastdownstreamtime;
 static long send_query_sendcnt = -1;
 static long send_query_recvcnt = 0;
 static int hostname_maxlen = 0xFF;
+static bool use_v6 = false;
 
 void
 client_init()
@@ -1374,7 +1377,7 @@ handshake_version(int dns_fd, int *seed)
 }
 
 static int
-handshake_login(int dns_fd, int seed, int forward_v6)
+handshake_login(int dns_fd, int seed)
 {
 	char in[4096];
 	char login[16];
@@ -1405,7 +1408,7 @@ handshake_login(int dns_fd, int seed, int forward_v6)
 
 				server[64] = 0;
 				client[64] = 0;
-				if (tun_setip(client, server, netmask, forward_v6) == 0 &&
+				if (tun_setip(client, server, netmask) == 0 &&
 					tun_setmtu(mtu) == 0) {
 
 					fprintf(stderr, "Server tunnel IP is %s\n", server);
@@ -2326,7 +2329,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 }
 
 int
-client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize, int forward_v6)
+client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize)
 {
 	int seed;
 	int upcodec;
@@ -2349,7 +2352,7 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		return r;
 	}
 
-	r = handshake_login(dns_fd, seed, forward_v6);
+	r = handshake_login(dns_fd, seed);
 	if (r) {
 		return r;
 	}
@@ -2414,8 +2417,72 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		handshake_set_fragsize(dns_fd, fragsize);
 		if (!running)
 			return -1;
+
+		handshake_check_v6(dns_fd);
+		if (!running)
+			return -1;
 	}
 
 	return 0;
 }
 
+static
+void send_v6_probe(int dns_fd)
+{
+  char data[4096];
+
+	data[0] = userid;
+
+	send_packet(dns_fd, 'g', data, sizeof(data));
+}
+
+int
+handshake_check_v6(int dns_fd)
+{
+	char in[4096];
+	char server6[1024];
+	char client6[1024];
+	int i;
+	int read;
+	int netmask6 = 0;
+
+	fprintf(stderr, "Autoprobing server IPV6 tunnel support\n");
+
+	for (i = 0; running && i < 5; i++) {
+
+     send_v6_probe(dns_fd);
+
+     read = handshake_waitdns(dns_fd, in, sizeof(in), 'g', 'G', i+1);
+
+		 if (read > 0) {
+
+        /*
+			   * including a terminating dash to allow for future IPv6 options, e.g.
+			   * netmask. Currently assumes /64. MTU is taken from the IPv4 handshake.
+			   * A future IPv6-only implementation would need to pass mtu
+			   * in the IPV6 handshake.
+			   */
+
+			  if (sscanf(in, "%512[^-]-%512[^-]-%d", server6, client6, &netmask6) == 3) {
+
+					 fprintf(stderr, "Server tunnel IPv6 is %s\n", server6);
+					 fprintf(stderr, "Local tunnel IPv6 is %s\n", client6);
+
+					 if (tun_setip6(client6, server6, netmask6) == 0) {
+
+              use_v6 = true;
+							return 0;
+				   } else {
+				      errx(4, "Failed to set IPv6 tunnel address");
+				   }
+			  } else {
+				   fprintf(stderr, "Received bad IPv6 tunnel handshake\n");
+			  }
+		 }
+
+		 fprintf(stderr, "Retrying IPv6 tunnel handshake...\n");
+	}
+	if (!running)
+		return -1;
+   return 0;
+}

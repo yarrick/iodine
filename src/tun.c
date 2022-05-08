@@ -35,6 +35,11 @@
 #include <netinet/ip.h>
 #endif
 
+#if defined FREEBSD || defined NETBSD 
+#include <sys/ioctl.h>
+#include <net/if_tun.h>
+#endif
+
 #ifndef IFCONFIGPATH
 #define IFCONFIGPATH "PATH=/sbin:/bin "
 #endif
@@ -81,6 +86,7 @@ static char if_name[250];
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <linux/if_tun.h>
+
 
 int
 open_tun(const char *tun_device)
@@ -452,7 +458,15 @@ open_tun(const char *tun_device)
 			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
 
 			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
-				fprintf(stderr, "Opened %s\n", tun_name);
+#if defined FREEBSD || defined NETBSD
+                                /* FreeBSD requires a packet header for
+                                 * IPv6 traffic
+                                 */
+                                if (ioctl(tun_fd, TUNSIFHEAD, &(int){1}) != 0) {
+		                   fprintf(stderr, "Not able to enable TUNSIFHEAD\n");
+                                   break; 
+                                }
+#endif /* LINUX */
 				snprintf(if_name, sizeof(if_name), "tun%d", i);
 				fd_set_close_on_exec(tun_fd);
 				return tun_fd;
@@ -530,9 +544,12 @@ read_tun(int tun_fd, char *buf, size_t len)
 static int
 tun_uses_header(void)
 {
-#if defined (FREEBSD) || defined (NETBSD)
-	/* FreeBSD/NetBSD has no header */
-	return 0;
+#if defined FREEBSD || defined NETBSD || defined OPENBSD
+        /* To enable IPv6 in FreeBSD tunnels, tunnel
+         * headers now enabled for that platform
+         */
+        return 1;
+
 #elif defined (DARWIN)
 	/* Darwin tun has no header, Darwin utun does */
 	return !strncmp(if_name, "utun", 4);
@@ -544,41 +561,82 @@ tun_uses_header(void)
 int
 write_tun(int tun_fd, char *data, size_t len)
 {
+
+        int ip_version = 0;
+ 
 	if (!tun_uses_header()) {
 		data += 4;
 		len -= 4;
 	} else {
-                int i = data[4] & 0xf0;
+
+                ip_version = get_ipversion(data[4]);
+
+                if (ip_version < 0) {
+                    return 1; /* Cannot read IP version number from packet */
+                }
+
 #ifdef LINUX
-		
-		if (i == 64) {
-		// Look at the fifth bype 
+
+		if (ip_version == 4) {
 		// Linux prefixes with 32 bits ethertype
 		// 0x0800 for IPv4, 0x86DD for IPv6
 	    	    data[0] = 0x00;
 		    data[1] = 0x00;
 		    data[2] = 0x08;
 		    data[3] = 0x00;
-	        } else { /* 96 for IPV6 */
+	        } else { /* IPV6 */
 	    	    data[0] = 0x00;
 		    data[1] = 0x00;
 		    data[2] = 0x86;
 		    data[3] = 0xDD;
-	       }	
-#else /* OPENBSD and DARWIN(utun) */
+	       }
+#elif defined (FREEBSD) || defined (OPENBSD)
+
 		// BSDs prefix with 32 bits address family
 		// AF_INET for IPv4, AF_INET6 for IPv6
-		if (i == 64) {
+		if (ip_version == 4) {
 	    	    data[0] = 0x00;
 		    data[1] = 0x00;
 		    data[2] = 0x00;
 		    data[3] = 0x02;
-	        } else { /* 96 for IPV6 */
+	        } else { /* IPV6 */
+	    	    data[0] = 0x00;
+		    data[1] = 0x00;
+		    data[2] = 0x00;
+		    data[3] = 0x1C;
+
+                }
+
+#elif defined NETBSD
+
+		// BSDs prefix with 32 bits address family
+		// AF_INET for IPv4, AF_INET6 for IPv6
+		if (ip_version == 4) {
+	    	    data[0] = 0x00;
+		    data[1] = 0x00;
+		    data[2] = 0x00;
+		    data[3] = 0x02;
+	        } else { /* IPV6 */
+	    	    data[0] = 0x00;
+		    data[1] = 0x00;
+		    data[2] = 0x00;
+		    data[3] = 0x18;
+
+                }
+#else /* DARWIN(utun) and all others */
+		
+		// BSDs prefix with 32 bits address family
+		// AF_INET for IPv4, AF_INET6 for IPv6
+		if (ip_version == 4) {
+	    	    data[0] = 0x00;
+		    data[1] = 0x00;
+		    data[2] = 0x00;
+		    data[3] = 0x02;
+	        } else { /* IPV6 */
 	    	    data[0] = 0x00;
 		    data[1] = 0x00;
 		    data[2] = 0x00;
 		    data[3] = 0x1E;
-
                 }
 #endif
 	}
@@ -610,14 +668,12 @@ read_tun(int tun_fd, char *buf, size_t len)
 #endif
 
 int
-tun_setip(const char *ip, const char *other_ip, int netbits, int forward_v6)
+tun_setip(const char *ip, const char *other_ip, int netbits)
 {
 	char cmdline[512];
-	char v6_cmdline[512];
 	int netmask;
 	struct in_addr net;
 	int i;
-	int v6_r;
 #ifndef LINUX
 	int r;
 #endif
@@ -650,20 +706,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits, int forward_v6)
 # else
 	display_ip = ip;
 # endif
-	if (forward_v6) {
-                fprintf(stderr, "Setting IPv6 of %s to ::%s\n", if_name, ip);
 
-                snprintf(v6_cmdline, sizeof(cmdline),
-                        IFCONFIGPATH "ifconfig %s inet6 add ::%s/64",
-                        if_name,
-                        display_ip);
-
-	        v6_r = system(v6_cmdline);
-
-                if (v6_r != 0) {
-                    return v6_r;
-                } 
-        }
 	snprintf(cmdline, sizeof(cmdline),
 			IFCONFIGPATH "ifconfig %s %s %s netmask %s",
 			if_name,
@@ -722,14 +765,89 @@ tun_setip(const char *ip, const char *other_ip, int netbits, int forward_v6)
 	return system(cmdline);
 #endif
 
-        if (forward_v6) {
-                snprintf(cmdline, sizeof(cmdline),
-                    IFCONFIGPATH "ifconfig %s inet6 add ::%s/64",
-                    if_name,
-                    ip);
+}
 
-        fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);        
+int
+tun_setip6(char *display_ip6, const char *display_other_ip6, int netbits6)
+{
+	int v6_r;
+        struct in6_addr ip6;
+        char v6_cmdline[512];
+        if (inet_pton(AF_INET6, display_ip6, &ip6) < 1){
+            warnx("Error in IPv6 address");
         }
+
+#ifdef WINDOWS32
+        /*
+	DWORD status;
+	DWORD ipdata[3];
+	struct in_addr addr;
+	DWORD len;
+        */
+#endif
+
+	if (netbits6 > 0) {
+
+	   fprintf(stderr, "Setting IPv6 of %s to %s\n", if_name, display_ip6);
+
+#if defined LINUX
+                snprintf(v6_cmdline, sizeof(v6_cmdline),
+                        IFCONFIGPATH "ifconfig %s inet6 add %s/%d",
+                        if_name,
+                        display_ip6, netbits6);
+#else
+                snprintf(v6_cmdline, sizeof(v6_cmdline),
+                        IFCONFIGPATH "ifconfig %s inet6 %s/%d",
+                        if_name,
+                        display_ip6, netbits6);
+#endif
+
+	        v6_r = system(v6_cmdline);
+
+                if (v6_r != 0) {
+                    return v6_r;
+                } else {
+		    return 0;
+		}
+        }
+
+#ifdef WINDOWS32 /* WINDOWS32 */
+
+	/* Set device as connected */
+	fprintf(stderr, "Enabling interface '%s'\n", if_name);
+	status = 1;
+	r = DeviceIoControl(dev_handle, TAP_IOCTL_SET_MEDIA_STATUS, &status,
+		sizeof(status), &status, sizeof(status), &len, NULL);
+	if (!r) {
+		fprintf(stderr, "Failed to enable interface\n");
+		return -1;
+	}
+
+	if (inet_aton(ip, &addr)) {
+		ipdata[0] = (DWORD) addr.s_addr;   /* local ip addr */
+		ipdata[1] = net.s_addr & ipdata[0]; /* network addr */
+		ipdata[2] = (DWORD) net.s_addr;    /* netmask */
+	} else {
+		return -1;
+	}
+
+	/* Tell ip/networkaddr/netmask to device for arp use */
+	r = DeviceIoControl(dev_handle, TAP_IOCTL_CONFIG_TUN, &ipdata,
+		sizeof(ipdata), &ipdata, sizeof(ipdata), &len, NULL);
+	if (!r) {
+		fprintf(stderr, "Failed to set interface in TUN mode\n");
+		return -1;
+	}
+
+	/* use netsh to set ip address */
+	fprintf(stderr, "Setting IP of interface '%s' to %s (can take a few seconds)...\n", if_name, ip);
+	snprintf(cmdline, sizeof(cmdline), "netsh interface ip set address \"%s\" static %s %s",
+		if_name, ip, inet_ntoa(net));
+	return system(cmdline);
+
+
+#endif
+  return 0;
 }
 
 int
@@ -757,3 +875,18 @@ tun_setmtu(const unsigned mtu)
 #endif
 }
 
+int get_ipversion(char first_byte)
+{
+
+    int v;
+
+    v = first_byte & 0xf0;
+
+    if (v == 64) {
+       return 4;
+    } else if (v == 96) {
+       return 6;
+    } else {
+       return -1;
+    }
+}

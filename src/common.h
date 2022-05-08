@@ -33,6 +33,7 @@
 extern const unsigned char raw_header[RAW_HDR_LEN];
 
 #include <stdarg.h>
+#include <stdbool.h>
 #ifdef WINDOWS32
 #include "windows.h"
 #else
@@ -129,6 +130,7 @@ void read_password(char*, size_t);
 int check_topdomain(char *, int, char **);
 
 int query_datalen(const char *qname, const char *topdomain);
+bool isV6AddrSet(struct in6_addr *);
 
 #if defined(WINDOWS32) || defined(ANDROID)
 #ifndef ANDROID

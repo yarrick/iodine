@@ -13,6 +13,8 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ *
  */
 
 #include <time.h>
@@ -556,4 +558,18 @@ fd_set_close_on_exec(int fd)
 		err(4, "Failed to set fd flags");
 }
 #endif
+
+bool
+isV6AddrSet(struct in6_addr *ip6)
+{
+       int i;
+
+       for (i = 0; i < sizeof(ip6->s6_addr); i++) {
+          if (ip6->s6_addr[i] != 0) { 
+             return true;
+          }
+       }
+       
+       return false;
+}
 

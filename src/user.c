@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <math.h>
 
 #ifdef WINDOWS32
 #include <winsock2.h>
@@ -37,25 +38,26 @@
 struct tun_user *users;
 unsigned usercount;
 
-int init_users(in_addr_t my_ip, int netbits)
+int init_users(in_addr_t my_ip, int netbits, struct in6_addr my_ip6, int netbits6)
 {
 	int i;
+	int i6;
 	int skip = 0;
+	int skip6 = 0;
 	char newip[16];
-	char ip6Tmp[16];
-	char ip6Tmp2[18];
 
 	int maxusers;
 
 	in_addr_t netmask = 0;
 	struct in_addr net;
 	struct in_addr ipstart;
-	 
-	/* For IPv6, we take the IPv4 address and simply prepend ::
-	 * and use a 64-bit mask. Reduces the need to parse
-	 * netmasks. 
-	 */
+        struct in6_addr ip6start;     
+        unsigned ip6_netmask[16]; 
 
+	bool ip6_enabled;
+
+        ip6_enabled = isV6AddrSet(&my_ip6);
+ 
 	for (i = 0; i < netbits; i++) {
 		netmask = (netmask << 1) | 1;
 	}
@@ -63,16 +65,38 @@ int init_users(in_addr_t my_ip, int netbits)
 	net.s_addr = htonl(netmask);
 	ipstart.s_addr = my_ip & net.s_addr;
 
+        /* Covert IPv6 netbits to IPv6 netmask and work
+         * out the network address from my IP address. Start
+         * assigning IPv6 address from the network address + 1
+         */
+        if (ip6_enabled == true) {
+           for (i6 = 0; i6 < netbits6 / 8; i6++) {
+              ip6_netmask[i6] |= 0xFF;
+           }
+
+           ip6_netmask[netbits6 / 8] = pow(2, (netbits6 % 8 )) - 1;
+           ip6_netmask[netbits6 / 8] <<= (8-(netbits6 % 8)); 
+           
+           for (i6 = 0; i6 < 16; i6++) { 
+	       ip6start.s6_addr[i6] = my_ip6.s6_addr[i6] & ip6_netmask[i6];
+           } 
+        }
 	maxusers = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
 	usercount = MIN(maxusers, USERS);
 
 	users = calloc(usercount, sizeof(struct tun_user));
+        /* 
+         * IPv6 note: Current behavior is to populate the users structure
+         * with the IPv4 addresses that are expected to be used. 
+         * In the future with IPv6-only tunnel transport, we should not be
+         * populating a /64 (or whatever mask) in the users structure
+         * and should shift to an on-demand scheme. For now
+         * we expect dual-stack and pre-allocate IPv6 addresses into the
+         * users struct as we do with IPv4.
+         */
 	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
 		users[i].id = i;
-
-		memset(ip6Tmp,0,strlen(ip6Tmp)); 
-		memset(ip6Tmp2,0,strlen(ip6Tmp2)); 
 
 		snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 
@@ -82,15 +106,36 @@ int init_users(in_addr_t my_ip, int netbits)
 			skip++;
 			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
 			ip = ipstart.s_addr + inet_addr(newip);
-
 			
 		}
 		users[i].tun_ip = ip;
 
-		inet_ntop(AF_INET, &ip, ip6Tmp, INET_ADDRSTRLEN);
-		snprintf(ip6Tmp2, sizeof(ip6Tmp2), "::%s", ip6Tmp);
-		inet_pton(AF_INET6, ip6Tmp2, &users[i].tun_ip6);
-		
+                if (ip6_enabled == true) {
+	           struct in6_addr temp_ip6;
+                   /*
+                    * start assigning host addresses from the network address + 1
+                    * unless that is my_ip, in which case, use the following address.
+                    */
+                   memcpy(temp_ip6.s6_addr, ip6start.s6_addr, sizeof(ip6start.s6_addr));
+                   temp_ip6.s6_addr[15] = ip6start.s6_addr[15] + skip + 1 + i;
+                  
+                   if (v6AddressesEqual(&temp_ip6, &my_ip6) == true &&
+                      skip6 == 0) {
+                         /* This IPv6 was taken by iodined */
+                         skip6++;
+
+                         /* 
+                          * We expect to start assigning addresses at the network address + 1 and
+                          * to not worry about assigning more than 254 host addresses. If we did, we have to 
+                          * iterate through lower order bytes of ip6. This plus a few other corner cases
+                          * is why we enourage/force/assume the user to specify a /64 V6 address
+                          */
+                   
+			 temp_ip6.s6_addr[15] = ip6start.s6_addr[15] + skip + 1 + i;
+
+	           }	
+                   memcpy(users[i].tun_ip6.s6_addr, temp_ip6.s6_addr, sizeof(temp_ip6.s6_addr));
+                }
 		net.s_addr = ip;
 		users[i].disabled = 0;
 		users[i].authenticated = 0;
@@ -110,6 +155,18 @@ const char *users_get_first_ip(void)
 	return strdup(inet_ntoa(ip));
 }
 
+const char *users_get_first_ip6(void)
+{
+	struct in6_addr ip6;
+        char display_ip6[INET6_ADDRSTRLEN];
+
+        memcpy(&ip6, &users[0].tun_ip6, sizeof(struct in6_addr));
+
+        inet_ntop(AF_INET6, &ip6, display_ip6, INET6_ADDRSTRLEN);
+        return strdup(display_ip6);
+}
+
+
 int find_user_by_ip6(struct in6_addr *v6Addr) 
 {
 	int i;
@@ -122,23 +179,23 @@ int find_user_by_ip6(struct in6_addr *v6Addr)
 			users[i].authenticated &&
 			!users[i].disabled &&
 			users[i].last_pkt + 60 > time(NULL) &&
-			(areV6AddressesEqual(v6Addr, &users[i].tun_ip6) == 0) ) {
+			v6AddressesEqual(v6Addr, &users[i].tun_ip6) == true) {
 			   return i;
-		}
+                }
 	}
 	return -1;
 }
 
-int areV6AddressesEqual(struct in6_addr *v6Struct1, struct in6_addr *v6Struct2)
+bool v6AddressesEqual(struct in6_addr *v6Struct1, struct in6_addr *v6Struct2)
 {
         int i;
     
 	for (i = 0; i < 16; i++) {
 		if (v6Struct1->s6_addr[i] != v6Struct2->s6_addr[i]) {
-		    return -1;
+		    return false;
 		}
         }
-	return 0;
+	return true;
 }
 
 
