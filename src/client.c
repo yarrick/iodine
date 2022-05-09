@@ -2440,44 +2440,49 @@ int
 handshake_check_v6(int dns_fd)
 {
 	char in[4096];
-	char server6[1024];
-	char client6[1024];
+	char server6[INET6_ADDRSTRLEN];
+	char client6[INET6_ADDRSTRLEN];
 	int i;
 	int read;
 	int netmask6 = 0;
+        int length_recieved;
 
 	fprintf(stderr, "Autoprobing server IPV6 tunnel support\n");
 
 	for (i = 0; running && i < 5; i++) {
 
-     send_v6_probe(dns_fd);
+            send_v6_probe(dns_fd);
 
-     read = handshake_waitdns(dns_fd, in, sizeof(in), 'g', 'G', i+1);
+            read = handshake_waitdns(dns_fd, in, sizeof(in), 'g', 'G', i+1);
 
 		 if (read > 0) {
 
-        /*
-			   * including a terminating dash to allow for future IPv6 options, e.g.
-			   * netmask. Currently assumes /64. MTU is taken from the IPv4 handshake.
-			   * A future IPv6-only implementation would need to pass mtu
-			   * in the IPV6 handshake.
-			   */
+                     /*
+		      * including a terminating dash to allow for future IPv6 options, e.g.
+		      * netmask. Currently assumes /64. MTU is taken from the IPv4 handshake.
+		      * A future IPv6-only implementation would need to pass mtu
+		      * in the IPV6 handshake.
+		     */
 
-			  if (sscanf(in, "%512[^-]-%512[^-]-%d", server6, client6, &netmask6) == 3) {
+		     if (sscanf(in, "%512[^-]-%512[^-]-%d", server6, client6, &netmask6) == 3) {
 
-					 fprintf(stderr, "Server tunnel IPv6 is %s\n", server6);
-					 fprintf(stderr, "Local tunnel IPv6 is %s\n", client6);
+		         fprintf(stderr, "Server tunnel IPv6 is %s\n", server6);
+			 fprintf(stderr, "Local tunnel IPv6 is %s\n", client6);
 
-					 if (tun_setip6(client6, server6, netmask6) == 0) {
+                         length_recieved = strlen(client6);
+                         if (length_recieved  > 2) {
+			     if (tun_setip6(client6, server6, netmask6) == 0) {
 
-              use_v6 = true;
-							return 0;
-				   } else {
-				      errx(4, "Failed to set IPv6 tunnel address");
-				   }
-			  } else {
-				   fprintf(stderr, "Received bad IPv6 tunnel handshake\n");
-			  }
+                                 use_v6 = true;
+				 return 0;
+
+		             } else {
+			         errx(4, "Failed to set IPv6 tunnel address");
+			     }
+			 } else {
+			     fprintf(stderr, "Received bad IPv6 tunnel handshake\n");
+			 }
+                     }
 		 }
 
 		 fprintf(stderr, "Retrying IPv6 tunnel handshake...\n");

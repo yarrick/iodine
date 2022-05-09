@@ -90,8 +90,8 @@ static int my_mtu;
 static in_addr_t my_ip;
 
 char display_ip6[INET6_ADDRSTRLEN];
-char *display_ip6_buffer;
-char *ip6_netmask_buffer;
+char *display_ip6_buffer = NULL;
+char *ip6_netmask_buffer = NULL;
 
 static struct in6_addr my_ip6;
 static int netmask;
@@ -2590,21 +2590,25 @@ main(int argc, char **argv)
 	}
 
 	
-	ip6_netmask_buffer = strchr(display_ip6_buffer, '/');
-	if (ip6_netmask_buffer) {
-		if (atoi(ip6_netmask_buffer+1) != ip6_netmask) {
-                     warnx("IPv6 address must be a 64-bit mask.");
-                     usage();
+	if (display_ip6_buffer != NULL) {
+
+	    ip6_netmask_buffer = strchr(display_ip6_buffer, '/');
+
+	    if (ip6_netmask_buffer != NULL) {
+		   if (atoi(ip6_netmask_buffer+1) != ip6_netmask) {
+                       warnx("IPv6 address must be a 64-bit mask.");
+                       usage();
 		}
 		/* remove masklen */
 	        memcpy(display_ip6, display_ip6_buffer, strlen(display_ip6_buffer) - strlen(ip6_netmask_buffer)); 
 		display_ip6[strlen(display_ip6)+1] = '\0';
-        }
+	    }
 
-        /* IPV6 address sanity check */
-        if (inet_pton(AF_INET6, display_ip6, &my_ip6) != 1) {
+            /* IPV6 address sanity check */
+            if (inet_pton(AF_INET6, display_ip6, &my_ip6) != 1) {
 		warnx("Bad IPv6 address to use inside tunnel.");
 		usage();
+            }
         }
 
 	topdomain = strdup(argv[1]);
@@ -2753,10 +2757,11 @@ main(int argc, char **argv)
 
 	        }
 
-		if (tun_setip6(display_ip6, display_other_ip6, ip6_netmask) != 0 ) {
-                        retval = 1;
-                        goto cleanup;
-
+		if (display_ip6_buffer != NULL) {
+		    if (tun_setip6(display_ip6, display_other_ip6, ip6_netmask) != 0 ) {
+                          retval = 1;
+                          goto cleanup;
+                    }
 	        }
 
 		if ((mtu < 1280) && (sizeof(display_ip6)) != 0) {

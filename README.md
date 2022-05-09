@@ -123,7 +123,7 @@ end of the tunnel. In this case, `ping 192.168.99.1` from the iodine client, and
 ### MISC. INFO
 
 #### IPv6
-The data inside the tunnel is IPv4 only.
+The data inside the tunnel may be IPv4 or IPv6.
 
 The server listens to both IPv4 and IPv6 for incoming requests by default.
 Use options `-4` or `-6` to only listen on one protocol. Raw mode will be
@@ -140,6 +140,14 @@ to your DNS setup. Extending the example above would look like this:
 	t1		IN	NS	t1ns.mydomain.com.		; note the dot!
 	t1ns		IN	A	10.15.213.99
 	t1ns		IN	AAAA	2001:db8::1001:99
+
+On the server, specify -S followed by an IPv6 address that will be the server end
+of the IPv6 pool to allocate to clients. The server only supports a /64 subnet 
+mask, which is assumed and can be omitted. The first 64 bits are the network from
+which IPv6 addresses are allocated from.
+
+The client will automatically check for IPv6 capability on the server and 
+assign the allocated address to its tunnel interface. No flags are needed.
 
 #### Routing
 It is possible to route all traffic through the DNS tunnel. To do this, first
