@@ -37,5 +37,5 @@ void client_set_hostname_maxlen(int i);
 int client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size,
 		     int fragsize);
 int client_tunnel(int tun_fd, int dns_fd);
-
+int handshake_check_v6(int tun_fd);
 #endif

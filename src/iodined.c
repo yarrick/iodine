@@ -88,10 +88,16 @@ static int created_users;
 static int check_ip;
 static int my_mtu;
 static in_addr_t my_ip;
+
+char display_ip6[INET6_ADDRSTRLEN];
+char *display_ip6_buffer = NULL;
+char *ip6_netmask_buffer = NULL;
+
+static struct in6_addr my_ip6;
 static int netmask;
+static int ip6_netmask = 64;
 
 static in_addr_t ns_ip;
-
 static int bind_port;
 static int debug;
 
@@ -649,17 +655,32 @@ static int tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 	char in[64*1024];
 	int userid;
 	int read;
-
+        int ip_version;
+	int c;
+	struct in6_addr v6Addr;
+        char v6AddrP[16];
 	if ((read = read_tun(tun_fd, in, sizeof(in))) <= 0)
 		return 0;
 
 	/* find target ip in packet, in is padded with 4 bytes TUN header */
 	header = (struct ip*) (in + 4);
-	userid = find_user_by_ip(header->ip_dst.s_addr);
+	ip_version = get_ipversion(in[4]);
+
+	if (ip_version == 4) { /* IPv4 */
+	     header = (struct ip*) (in + 4);
+	     userid = find_user_by_ip(header->ip_dst.s_addr);
+	} else { /* IPv6 */
+             for (c = 0; c < 16; c++) {
+	        v6Addr.s6_addr[c] = in[c + 28];
+	     }
+	     inet_ntop(AF_INET6, &v6Addr, v6AddrP, INET6_ADDRSTRLEN);
+	     userid = find_user_by_ip6(&v6Addr);
+        }
 	if (userid < 0)
 		return 0;
 
 	outlen = sizeof(out);
+
 	compress2((uint8_t*)out, &outlen, (uint8_t*)in, read, 9);
 
 	if (users[userid].conn == CONN_DNS_NULL) {
@@ -1288,6 +1309,32 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if ((!didsend && users[userid].outpacket.len > 0) ||
 		    !users[userid].lazy)
 			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
+
+  /* IPv6 tunnel address probe */
+  } else if (in[0] == 'G' || in[0] == 'g') {
+    char client_ip6[INET6_ADDRSTRLEN];
+		char display_my_ip6[INET6_ADDRSTRLEN];
+
+		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
+		if (read < 1) {
+			write_dns(dns_fd, q, "BADLEN", 6, 'T');
+			return;
+		}
+
+		/* Ping packet, store userid */
+		userid = unpacked[0];
+		if (check_authenticated_user_and_ip(userid, q) != 0) {
+			write_dns(dns_fd, q, "BADIP", 5, 'T');
+			return; /* illegal id */
+		}
+
+		inet_ntop(AF_INET6, &users[userid].tun_ip6, client_ip6, INET6_ADDRSTRLEN);
+		inet_ntop(AF_INET6, &my_ip6, display_my_ip6, INET6_ADDRSTRLEN);
+		read = snprintf(out, sizeof(out), "%s-%s-%d-",
+				display_my_ip6, client_ip6, ip6_netmask);
+
+		write_dns(dns_fd, q, out, read, users[userid].downenc);
+    return;
 
 	} else if ((in[0] >= '0' && in[0] <= '9')
 			|| (in[0] >= 'a' && in[0] <= 'f')
@@ -2277,7 +2324,7 @@ static void print_usage(FILE *stream)
 		"Usage: %s [-46cDfsv] [-u user] [-t chrootdir] [-d device] [-m mtu]\n"
 		"               [-z context] [-l ipv4 listen address] [-L ipv6 listen address]\n"
 		"               [-p port] [-n auto|external_ip] [-b dnsport] [-P password]\n"
-		"               [-F pidfile] [-i max idle time] tunnel_ip[/netmask] topdomain\n",
+		"               [-F pidfile] [-S ipv6 tunnel address] [-i max idle time] tunnel_ip[/netmask] topdomain\n",
 		__progname);
 }
 
@@ -2319,6 +2366,7 @@ static void help(FILE *stream)
 		"  -b port to forward normal DNS queries to (on localhost)\n"
 		"  -P password used for authentication (max 32 chars will be used)\n"
 		"  -F pidfile to write pid to a file\n"
+		"  -S IPv6 server address within the tunnel. Netmask fixed at /64\n"
 		"  -i maximum idle time before shutting down\n\n"
 		"tunnel_ip is the IP number of the local tunnel interface.\n"
 		"   /netmask sets the size of the tunnel network.\n"
@@ -2418,7 +2466,6 @@ main(int argc, char **argv)
 	debug = 0;
 	netmask = 27;
 	pidfile = NULL;
-
 	retval = 0;
 
 #ifdef WINDOWS32
@@ -2436,7 +2483,8 @@ main(int argc, char **argv)
 	srand(time(NULL));
 	fw_query_init();
 
-	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
+	while ((choice = getopt(argc, argv, "46vcsfhDuS:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
+
 		switch(choice) {
 		case '4':
 			addrfamily = AF_INET;
@@ -2507,6 +2555,9 @@ main(int argc, char **argv)
 			/* XXX: find better way of cleaning up ps(1) */
 			memset(optarg, 0, strlen(optarg));
 			break;
+                case 'S':
+                        display_ip6_buffer = optarg;
+                        break;
 		case 'z':
 			context = optarg;
 			break;
@@ -2534,9 +2585,31 @@ main(int argc, char **argv)
 	my_ip = inet_addr(argv[0]);
 
 	if (my_ip == INADDR_NONE) {
-		warnx("Bad IP address to use inside tunnel.");
+        	warnx("Bad IP address to use inside tunnel.");
 		usage();
 	}
+
+	
+	if (display_ip6_buffer != NULL) {
+
+	    ip6_netmask_buffer = strchr(display_ip6_buffer, '/');
+
+	    if (ip6_netmask_buffer != NULL) {
+		   if (atoi(ip6_netmask_buffer+1) != ip6_netmask) {
+                       warnx("IPv6 address must be a 64-bit mask.");
+                       usage();
+		}
+		/* remove masklen */
+	        memcpy(display_ip6, display_ip6_buffer, strlen(display_ip6_buffer) - strlen(ip6_netmask_buffer)); 
+		display_ip6[strlen(display_ip6)+1] = '\0';
+	    }
+
+            /* IPV6 address sanity check */
+            if (inet_pton(AF_INET6, display_ip6, &my_ip6) != 1) {
+		warnx("Bad IPv6 address to use inside tunnel.");
+		usage();
+            }
+        }
 
 	topdomain = strdup(argv[1]);
 	if (check_topdomain(topdomain, 1, &errormsg)) {
@@ -2666,7 +2739,7 @@ main(int argc, char **argv)
 	dns_fds.v4fd = -1;
 	dns_fds.v6fd = -1;
 
-	created_users = init_users(my_ip, netmask);
+	created_users = init_users(my_ip, netmask, my_ip6, ip6_netmask);
 
 	if ((tun_fd = open_tun(device)) == -1) {
 		/* nothing to clean up, just return */
@@ -2674,11 +2747,28 @@ main(int argc, char **argv)
 	}
 	if (!skipipconfig) {
 		const char *other_ip = users_get_first_ip();
+		const char *display_other_ip6 = users_get_first_ip6();
+
+
 		if (tun_setip(argv[0], other_ip, netmask) != 0 || tun_setmtu(mtu) != 0) {
-			retval = 1;
+                        retval = 1;
 			free((void*) other_ip);
-			goto cleanup;
+                        goto cleanup;
+
+	        }
+
+		if (display_ip6_buffer != NULL) {
+		    if (tun_setip6(display_ip6, display_other_ip6, ip6_netmask) != 0 ) {
+                          retval = 1;
+                          goto cleanup;
+                    }
+	        }
+
+		if ((mtu < 1280) && (sizeof(display_ip6)) != 0) {
+                                warnx("Interface mtu of %d below the 1280 threshold needed for IPv6 tunneling.\n", mtu);
+                                warnx("Proceeding without IPv6 tunneling\n");
 		}
+
 		free((void*) other_ip);
 	}
 

@@ -9,7 +9,7 @@ ARCH = `uname -m`
 HEAD_COMMIT = `git rev-parse --short HEAD`
 
 LIBPATH = -L.
-LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
+LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH) -lm
 CFLAGS += -std=c99 -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
 CFLAGS += -Wstrict-prototypes -Wtype-limits -Wmissing-declarations -Wmissing-prototypes
 
