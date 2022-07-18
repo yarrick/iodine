@@ -61,6 +61,7 @@ static void get_name(char *ifname, int namelen, char *dev_name);
 #define TAP_DEVICE_SPACE "\\\\.\\Global\\"
 #define TAP_VERSION_ID_0801 "tap0801"
 #define TAP_VERSION_ID_0901 "tap0901"
+#define TAP_VERSION_ID_0901_ROOT "root\\tap0901"
 #define KEY_COMPONENT_ID "ComponentId"
 #define NET_CFG_INST_ID "NetCfgInstanceId"
 #else
@@ -193,7 +194,8 @@ get_device(char *device, int device_len, const char *wanted_dev)
 			goto next;
 		}
 		if (strncmp(TAP_VERSION_ID_0801, component, strlen(TAP_VERSION_ID_0801)) == 0 ||
-			strncmp(TAP_VERSION_ID_0901, component, strlen(TAP_VERSION_ID_0901)) == 0) {
+			strncmp(TAP_VERSION_ID_0901, component, strlen(TAP_VERSION_ID_0901)) == 0 ||
+			strncmp(TAP_VERSION_ID_0901_ROOT, component, strlen(TAP_VERSION_ID_0901_ROOT)) == 0) {
 			/* We found a TAP32 device, get its NetCfgInstanceId */
 			char iid_string[256] = NET_CFG_INST_ID;
 
