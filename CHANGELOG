@@ -20,6 +20,7 @@ master:
 	- Change external IP lookup to using myip.opendns.com via DNS.
 	- Add option to choose IPv4 listen address from external IP lookup.
 	- Add server support for handling multiple domains via wildcard.
+	- Recognize tap device component id 'root' prefix on Windows.
 
 2014-06-16: 0.7.0 "Kryoptonite"
 	- Partial IPv6 support (#107)
