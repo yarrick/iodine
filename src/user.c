@@ -41,7 +41,7 @@ int init_users(in_addr_t my_ip, int netbits)
 {
 	int i;
 	int skip = 0;
-	char newip[16];
+	char newip[32];
 
 	int maxusers;
 
