@@ -103,7 +103,7 @@ int setgroups(int count, int *groups)
 
 #ifndef WINDOWS32
 void
-check_superuser(void)
+check_privileges(void)
 {
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.");
