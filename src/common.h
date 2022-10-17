@@ -107,11 +107,11 @@ enum connection {
 };
 
 #ifdef WINDOWS
-static inline void check_superuser(void)
+static inline void check_privileges(void)
 {
 }
 #else
-void check_superuser(void);
+void check_privileges(void);
 #endif
 char *format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len);
 int get_addr(char *, int, int, int, struct sockaddr_storage *);

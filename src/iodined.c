@@ -2573,7 +2573,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	check_superuser();
+	check_privileges();
 
 	if (argc != 2)
 		usage();
