@@ -2519,7 +2519,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	check_privileges();
+	check_privileges(username, port);
 
 	if (argc != 2)
 		usage();

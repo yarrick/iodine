@@ -23,6 +23,7 @@ link)
 			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -lselinux";
 			"$PKG_CONFIG" --exists libsystemd-daemon && FLAGS="$FLAGS $($PKG_CONFIG --libs libsystemd-daemon)";
 			"$PKG_CONFIG" --exists libsystemd && FLAGS="$FLAGS $($PKG_CONFIG --libs libsystemd)";
+			"$PKG_CONFIG" --exists libcap-ng && FLAGS="$FLAGS $($PKG_CONFIG --libs libcap-ng)";
 			echo $FLAGS;
 		;;
 	esac
@@ -43,6 +44,7 @@ cflags)
 			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -DHAVE_SETCON";
 			"$PKG_CONFIG" --exists libsystemd-daemon && FLAGS="$FLAGS -DHAVE_SYSTEMD";
 			"$PKG_CONFIG" --exists libsystemd && FLAGS="$FLAGS -DHAVE_SYSTEMD";
+			"$PKG_CONFIG" --exists libcap-ng && FLAGS="$FLAGS -DHAVE_LIBCAPNG";
 			echo $FLAGS;
 		;;
 		GNU/kFreeBSD|GNU)

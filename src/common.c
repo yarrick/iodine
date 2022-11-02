@@ -51,6 +51,11 @@
 # include <selinux/selinux.h>
 #endif
 
+#ifdef HAVE_LIBCAPNG
+#include <stdbool.h>
+#include <cap-ng.h>
+#endif
+
 #include "common.h"
 
 /* The raw header used when not using DNS protocol */
@@ -103,12 +108,60 @@ int setgroups(int count, int *groups)
 
 #ifndef WINDOWS32
 void
-check_privileges(void)
+check_privileges(char *username, int port)
 {
+#if defined HAVE_LIBCAPNG
+	bool capable = true;
+
+	if (capng_get_caps_process() == -1) {
+		warnx("Unable to get capabilities");
+		exit(-1);
+	}
+
+	if (!capng_have_capability(CAPNG_EFFECTIVE, CAP_NET_ADMIN)) {
+		warnx("capabilities: CAP_NET_ADMIN required");
+		capable = false;
+	}
+
+	if (port) {
+		unsigned short int ip_unprivileged_port_start = 1024;
+
+		FILE *file = fopen("/proc/sys/net/ipv4/ip_unprivileged_port_start", "r");
+		if (!file) {
+			warnx("sysctl: unable to get ip_unprivileged_port_start value");
+			// do not bail out here in case systemd.service has ProcSubset=pid set
+		} else {
+			fscanf(file, "%hu", &ip_unprivileged_port_start);
+			fclose(file);
+		}
+
+		if (port < ip_unprivileged_port_start &&
+			!capng_have_capability(CAPNG_EFFECTIVE, CAP_NET_BIND_SERVICE)) {
+			warnx("capabilities: CAP_NET_BIND_SERVICE required");
+			capable = false;
+		}
+	}
+
+	if (username) {
+		if (!capng_have_capability(CAPNG_EFFECTIVE, CAP_SETUID)) {
+			warnx("capabilities: CAP_SETUID required");
+			capable = false;
+		}
+		if (!capng_have_capability(CAPNG_EFFECTIVE, CAP_SETGID)) {
+			warnx("capabilities: CAP_SETGID required");
+			capable = false;
+		}
+	}
+
+	if (!capable) {
+		exit(-1);
+	}
+#else
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.");
 		exit(-1);
 	}
+#endif
 }
 #endif
 

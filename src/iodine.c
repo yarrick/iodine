@@ -279,7 +279,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	check_privileges();
+	check_privileges(username, 0);
 
 	argc -= optind;
 	argv += optind;
