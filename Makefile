@@ -103,11 +103,11 @@ iodine-latest-windows.zip: iodine-latest
 	@$(MAKE) -C src TARGETOS=windows32 CC=i686-w64-mingw32-gcc clean all
 	@i686-w64-mingw32-strip bin/iodine*
 	@for i in `ls bin`; do cp bin/$$i iodine-latest-windows/32bit/$$i.exe; done
-	@cp /usr/i686-w64-mingw32/bin/zlib1.dll iodine-latest-windows/32bit
+	@cp /usr/i686-w64-mingw32/sys-root/mingw/bin/zlib1.dll iodine-latest-windows/32bit
 	@$(MAKE) -C src TARGETOS=windows32 CC=x86_64-w64-mingw32-gcc clean all
 	@x86_64-w64-mingw32-strip bin/iodine*
 	@for i in `ls bin`; do cp bin/$$i iodine-latest-windows/64bit/$$i.exe; done
-	@cp /usr/x86_64-w64-mingw32/bin/zlib1.dll iodine-latest-windows/64bit
+	@cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/zlib1.dll iodine-latest-windows/64bit
 	@cp README-win32.txt iodine-latest-windows
 	@zip -r iodine-latest-windows.zip iodine-latest-windows
 
