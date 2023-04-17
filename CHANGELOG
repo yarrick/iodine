@@ -5,7 +5,7 @@ iodine - https://code.kryo.se/iodine
 
 CHANGES:
 
-master:
+2023-04-17: 0.8.0 "Burning Snowman"
 	- Mac OS X: Support native utun VPN devices. Patch by
 		Peter Sagerson, ported from OpenVPN by Catalin Patulea.
 	- Fix compilation failure on kFreeBSD and Hurd, by Gregor Herrmann
@@ -16,7 +16,7 @@ master:
 	- Add support for IPv6 in the server.
 	   Raw mode will be with same protocol as used for login.
 	   Traffic inside tunnel is still IPv4.
-	- Update android build to support 5.0 (Lollipop) and newer.
+	- Update android build to try to support 5.0 (Lollipop) and newer.
 	- Change external IP lookup to using myip.opendns.com via DNS.
 	- Add option to choose IPv4 listen address from external IP lookup.
 	- Add server support for handling multiple domains via wildcard.
