@@ -15,7 +15,7 @@ jobs:
     - name: make
       uses: vmactions/freebsd-vm@v0
       with:
-        prepare: pkg install -y libcheck
+        prepare: pkg install -y devel/check
         run: |
           make
           make test
