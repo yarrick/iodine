@@ -16,7 +16,7 @@ jobs:
       uses: vmactions/openbsd-vm@v0
       with:
         prepare: |
-          pkg_add install -y \
+          pkg_add \
             check \
             git \
             pkgconf
