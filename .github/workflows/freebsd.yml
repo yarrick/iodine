@@ -15,7 +15,11 @@ jobs:
     - name: make
       uses: vmactions/freebsd-vm@v0
       with:
-        prepare: pkg install -y devel/check
+        prepare: |
+          pkg install -y \
+            devel/check \
+            devel/git \
+            devel/pkgconf
         run: |
           make
           make test
