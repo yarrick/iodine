@@ -2754,7 +2754,7 @@ main(int argc, char **argv)
 		do_pidfile(pidfile);
 
 #ifdef FREEBSD
-	tzsetwall();
+	tzset();
 #endif
 #ifndef WINDOWS32
 	openlog(__progname, LOG_NDELAY, LOG_DAEMON);
