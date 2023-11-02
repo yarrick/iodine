@@ -20,7 +20,7 @@ link)
 		;;
 		Linux)
 			FLAGS="";
-			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -lselinux";
+			"$PKG_CONFIG" --exists libselinux && FLAGS="$FLAGS $($PKG_CONFIG --libs libselinux)";
 			"$PKG_CONFIG" --exists libsystemd-daemon && FLAGS="$FLAGS $($PKG_CONFIG --libs libsystemd-daemon)";
 			"$PKG_CONFIG" --exists libsystemd && FLAGS="$FLAGS $($PKG_CONFIG --libs libsystemd)";
 			echo $FLAGS;
@@ -40,7 +40,7 @@ cflags)
 		;;
 		Linux)
 			FLAGS="-D_GNU_SOURCE"
-			[ -e /usr/include/selinux/selinux.h ] && FLAGS="$FLAGS -DHAVE_SETCON";
+			"$PKG_CONFIG" --exists libselinux && FLAGS="$FLAGS -DHAVE_SETCON";
 			"$PKG_CONFIG" --exists libsystemd-daemon && FLAGS="$FLAGS -DHAVE_SYSTEMD";
 			"$PKG_CONFIG" --exists libsystemd && FLAGS="$FLAGS -DHAVE_SYSTEMD";
 			echo $FLAGS;
