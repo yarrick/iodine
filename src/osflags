@@ -13,7 +13,7 @@ link)
 			echo '-lsocket -lbind -lbsd';
 		;;
 		Haiku)
-			echo '-lnetwork';
+			echo '-lnetwork -lbsd';
 		;;
 		windows32)
 			echo '-lws2_32 -liphlpapi';
@@ -34,6 +34,9 @@ cflags)
 		;;
 		BeOS)
 			echo '-Dsocklen_t=int';
+		;;
+		Haiku)
+			echo '-D_DEFAULT_SOURCE';
 		;;
 		Darwin)
 			echo '-D__APPLE_USE_RFC_3542';
