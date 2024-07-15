@@ -31,7 +31,9 @@
 #include <sys/kern_control.h>
 #include <sys/sys_domain.h>
 #include <sys/ioctl.h>
-#include <net/if_utun.h>
+/* Inline used parts of if_utun.h to compile without it. */
+#define UTUN_CONTROL_NAME "com.apple.net.utun_control"
+#define UTUN_OPT_IFNAME 2
 #include <netinet/ip.h>
 #endif
 
