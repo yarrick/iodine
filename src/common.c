@@ -276,7 +276,7 @@ do_pidfile(char *pidfile)
 }
 
 void
-do_detach()
+do_detach(void)
 {
 #ifndef WINDOWS32
 	fprintf(stderr, "Detaching from terminal...\n");

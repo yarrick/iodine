@@ -20,7 +20,7 @@
 static struct fw_query fwq[FW_QUERY_CACHE_SIZE];
 static int fwq_ix;
 
-void fw_query_init()
+void fw_query_init(void)
 {
 	memset(fwq, 0, sizeof(struct fw_query) * FW_QUERY_CACHE_SIZE);
 	fwq_ix = 0;

@@ -170,7 +170,7 @@ START_TEST(test_find_available_user_small_net)
 END_TEST
 
 TCase *
-test_user_create_tests()
+test_user_create_tests(void)
 {
 	TCase *tc;
 

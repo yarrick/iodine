@@ -103,7 +103,7 @@ static long send_query_recvcnt = 0;
 static int hostname_maxlen = 0xFF;
 
 void
-client_init()
+client_init(void)
 {
 	running = 1;
 	rand_seed = ((unsigned int) rand()) & 0xFFFF;
@@ -124,13 +124,13 @@ client_init()
 }
 
 void
-client_stop()
+client_stop(void)
 {
 	running = 0;
 }
 
 enum connection
-client_get_conn()
+client_get_conn(void)
 {
 	return conn;
 }
@@ -175,7 +175,7 @@ client_set_qtype(char *qtype)
 }
 
 char *
-client_get_qtype()
+client_get_qtype(void)
 {
 	char *c = "UNDEFINED";
 
@@ -225,7 +225,7 @@ client_set_hostname_maxlen(int i)
 }
 
 const char *
-client_get_raw_addr()
+client_get_raw_addr(void)
 {
 	return format_addr(&raw_serv, raw_serv_len);
 }

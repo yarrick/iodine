@@ -18,15 +18,15 @@
 #ifndef __TEST_H__
 #define __TEST_H__
 
-TCase *test_base32_create_tests();
-TCase *test_base64_create_tests();
-TCase *test_common_create_tests();
-TCase *test_dns_create_tests();
-TCase *test_encoding_create_tests();
-TCase *test_read_create_tests();
-TCase *test_login_create_tests();
-TCase *test_user_create_tests();
-TCase *test_fw_query_create_tests();
+TCase *test_base32_create_tests(void);
+TCase *test_base64_create_tests(void);
+TCase *test_common_create_tests(void);
+TCase *test_dns_create_tests(void);
+TCase *test_encoding_create_tests(void);
+TCase *test_read_create_tests(void);
+TCase *test_login_create_tests(void);
+TCase *test_user_create_tests(void);
+TCase *test_fw_query_create_tests(void);
 
 char *va_str(const char *, ...);
 

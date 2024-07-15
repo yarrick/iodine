@@ -24,7 +24,7 @@
 #include "test.h"
 
 int
-main()
+main(void)
 {
 	SRunner *runner;
 	Suite *iodine;

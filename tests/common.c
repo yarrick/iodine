@@ -281,7 +281,7 @@ START_TEST(test_parse_format_ipv4_mapped_ipv6)
 END_TEST
 
 TCase *
-test_common_create_tests()
+test_common_create_tests(void)
 {
 	TCase *tc;
 	int sock;

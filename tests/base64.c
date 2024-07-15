@@ -132,7 +132,7 @@ START_TEST(test_base64_blksize)
 END_TEST
 
 TCase *
-test_base64_create_tests()
+test_base64_create_tests(void)
 {
 	TCase *tc;
 

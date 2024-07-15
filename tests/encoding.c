@@ -93,7 +93,7 @@ START_TEST(test_build_hostname)
 END_TEST
 
 TCase *
-test_encoding_create_tests()
+test_encoding_create_tests(void)
 {
 	TCase *tc;
 
