@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make
-      uses: vmactions/openbsd-vm@v0
+      uses: vmactions/openbsd-vm@v1.0.8
       with:
         prepare: |
           pkg_add \

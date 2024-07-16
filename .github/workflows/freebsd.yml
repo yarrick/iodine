@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make
-      uses: vmactions/freebsd-vm@v0
+      uses: vmactions/freebsd-vm@v1.0.8
       with:
         prepare: |
           pkg install -y \
