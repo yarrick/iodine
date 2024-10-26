@@ -142,6 +142,7 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 	struct addrinfo hints, *addr;
 	int res;
 	char portnum[8];
+	int addrlen;
 
 	memset(portnum, 0, sizeof(portnum));
 	snprintf(portnum, sizeof(portnum) - 1, "%d", port);
@@ -158,14 +159,15 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 	hints.ai_protocol = IPPROTO_UDP;
 
 	res = getaddrinfo(host, portnum, &hints, &addr);
-	if (res == 0) {
-		int addrlen = addr->ai_addrlen;
-		/* Grab first result */
-		memcpy(out, addr->ai_addr, addr->ai_addrlen);
-		freeaddrinfo(addr);
-		return addrlen;
+	if (res != 0) {
+		return -1;
 	}
-	return res;
+	
+	addrlen = addr->ai_addrlen;
+	/* Grab first result */
+	memcpy(out, addr->ai_addr, addr->ai_addrlen);
+	freeaddrinfo(addr);
+	return addrlen;
 }
 
 int
