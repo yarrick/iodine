@@ -280,6 +280,28 @@ START_TEST(test_parse_format_ipv4_mapped_ipv6)
 }
 END_TEST
 
+START_TEST(test_get_addr_err)
+{
+	char *host = "192.168.2.10";
+	struct sockaddr_storage addr;
+	int addr_len;
+	int flags = AI_PASSIVE;
+
+	/* Invalid host */
+	addr_len = get_addr(NULL, -1, flags, 0, &addr);
+	ck_assert(addr_len == -1);
+	/* Invalid port */
+	addr_len = get_addr(host, -1, flags, 0, &addr);
+	ck_assert(addr_len == -1);
+	/* Invalid flag */
+	addr_len = get_addr(host, 53, flags | 0xFFF, 0, &addr);
+	ck_assert(addr_len == -1);
+	/* Invalid addr */
+	addr_len = get_addr(host, 53, flags, 0, (struct sockaddr_storage *)NULL);
+	ck_assert(addr_len == -1);
+}
+END_TEST
+
 TCase *
 test_common_create_tests(void)
 {
@@ -295,6 +317,7 @@ test_common_create_tests(void)
 	tcase_add_test(tc, test_query_datalen_wild);
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
+	tcase_add_test(tc, test_get_addr_err);
 
 	/* Tests require IPv6 support */
 	sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
