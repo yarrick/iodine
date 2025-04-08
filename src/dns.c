@@ -47,7 +47,7 @@
 
 int dnsc_use_edns0 = 1;
 
-#define CHECKLEN(x) if (buflen < (x) + (unsigned)(p-buf))  return 0
+#define CHECKLEN(x) if (buflen < (x) + (size_t)(p-buf))  return 0
 
 int dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr,
 	       const char *data, size_t datalen)
@@ -403,7 +403,7 @@ unsigned short dns_get_id(char *packet, size_t packetlen)
 	return ntohs(header->id);
 }
 
-#define CHECKLEN(x) if (packetlen < (x) + (unsigned)(data-packet))  return 0
+#define CHECKLEN(x) if (packetlen < (x) + (size_t)(data-packet))  return 0
 
 int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 	       size_t packetlen)
