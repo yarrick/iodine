@@ -279,7 +279,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	check_superuser();
+	check_privileges(username, 0);
 
 	argc -= optind;
 	argv += optind;
