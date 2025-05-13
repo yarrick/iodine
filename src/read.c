@@ -168,15 +168,16 @@ putname(char **buf, size_t buflen, const char *host)
 
 	word = strtok(h, ".");
 	while(word) {
-		if (strlen(word) > 63 || strlen(word) > left) {
+		size_t word_len = strlen(word);
+		if (word_len > 63 || word_len > left) {
 			free(h);
 			return -1;
 		}
 
-		left -= (strlen(word) + 1);
-		*p++ = (char)strlen(word);
-		memcpy(p, word, strlen(word));
-		p += strlen(word);
+		left -= (word_len + 1);
+		*p++ = (char)word_len;
+		memcpy(p, word, word_len);
+		p += word_len;
 
 		word = strtok(NULL, ".");
 	}
