@@ -25,7 +25,10 @@ RUN make
 # iodine require /dev/net/tun from the host.
 # run the container with --device /dev/net/tun --cap-add=NET_ADMIN to allow it
 
-# usage: [sudo] docker run -it --rm iodined -f 10.0.0.1 -P "password" test.com
+# usage: [sudo] docker run -it --rm     \
+#     --device /dev/net/tun             \
+#     --cap-add=NET_ADMIN               \
+#     iodined -f 10.0.0.1 -P "password" test.com
 
 ENTRYPOINT [ "/app/bin/iodined" ]
 CMD [ "-h" ]
