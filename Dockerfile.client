@@ -6,19 +6,34 @@
 #
 ##############
 
-FROM alpine:3.22.0
+# FROM alpine:3.22.0
+#
+# RUN apk update
+# RUN apk add --no-cache  \
+#     gcc                 \
+#     git                 \
+#     linux-headers       \
+#     make                \
+#     musl-dev            \
+#     pkgconfig           \
+#     zlib-dev
 
-RUN apk update
-RUN apk add --no-cache  \
+FROM ubuntu:24.04
+
+RUN apt-get update
+
+RUN apt-get install -y  \
     gcc                 \
     git                 \
+    libz-dev            \
     make                \
-    pkgconfig           \
-    zlib-dev
+    pkg-config
+
+RUN apt-get clean
 
 WORKDIR /app/
 
-RUN git clone https://github.com/yarrick/iodine /app/
+COPY . /app/
 
 RUN make
 
