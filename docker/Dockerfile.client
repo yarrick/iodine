@@ -6,7 +6,7 @@
 #
 ##############
 
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:24.04
 
 RUN apt-get update
 
