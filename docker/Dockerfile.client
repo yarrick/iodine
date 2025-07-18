@@ -6,17 +6,7 @@
 #
 ##############
 
-# FROM alpine:3.22.0
-#
-# RUN apk update
-# RUN apk add --no-cache  \
-#     gcc                 \
-#     make                \
-#     musl-dev            \
-#     pkgconfig           \
-#     zlib-dev
-
-FROM ubuntu:24.04
+FROM ubuntu:24.04 AS builder
 
 RUN apt-get update
 
@@ -35,13 +25,19 @@ COPY . /app/
 
 RUN make
 
+# build command (at repo root): [sudo] docker build -t iodine -f docker/Dockerfile.client .
+
 # iodine require /dev/net/tun from the host.
 # run the container with --device /dev/net/tun --cap-add=NET_ADMIN to allow it
 
 # usage: [sudo] docker run -it --rm     \
 #     --device /dev/net/tun             \
 #     --cap-add=NET_ADMIN               \
-#     iodined -f 10.0.0.1 -P "password" test.com
+#     iodine -f -r 192.168.0.1 -P "password" test.com
 
-ENTRYPOINT [ "/app/bin/iodined" ]
+FROM ubuntu:24.04
+
+COPY --from=0 /app/bin/iodine /iodine
+
+ENTRYPOINT [ "/iodine" ]
 CMD [ "-h" ]
