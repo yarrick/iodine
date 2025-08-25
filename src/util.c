@@ -21,10 +21,10 @@
 
 char *get_resolvconf_addr(void)
 {
-	static char addr[16];
+	static char addr[257];
 	char *rv = NULL;
 #ifndef WINDOWS32
-	char buf[80];
+	char buf[257];
 	FILE *fp;
 #ifdef ANDROID
 	fp = popen("getprop net.dns1", "r");
@@ -32,7 +32,7 @@ char *get_resolvconf_addr(void)
 		err(1, "getprop net.dns1 failed");
 	if (fgets(buf, sizeof(buf), fp) == NULL)
 		err(1, "read getprop net.dns1 failed");
-	if (sscanf(buf, "%15s", addr) == 1)
+	if (sscanf(buf, "%256s", addr) == 1)
 		rv = addr;
 	pclose(fp);
 #else
@@ -42,7 +42,7 @@ char *get_resolvconf_addr(void)
 	while (feof(fp) == 0) {
 		fgets(buf, sizeof(buf), fp);
 
-		if (sscanf(buf, "nameserver %15s", addr) == 1) {
+		if (sscanf(buf, "nameserver %256s", addr) == 1) {
 			rv = addr;
 			break;
 		}
