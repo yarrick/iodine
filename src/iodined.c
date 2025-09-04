@@ -1598,6 +1598,27 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 }
 
 static void
+handle_underscore_request(int dns_fd, struct query *q, const char *topdomain)
+{
+	char buf[64*1024];
+	int len;
+
+	len = dns_encode_nxdomain(buf, sizeof(buf), q, topdomain);
+	if (len < 1) {
+		warnx("dns_encode_nxdomain doesn't fit");
+		return;
+	}
+
+	if (debug >= 2) {
+		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes NXDOMAIN reply\n",
+			format_addr(&q->from, q->fromlen), q->type, q->name, len);
+	}
+	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
+		warn("nxdomain reply send error");
+	}
+}
+
+static void
 forward_query(int bind_fd, struct query *q)
 {
 	char buf[64*1024];
@@ -1716,6 +1737,18 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		    (q.name[2] == 'w' || q.name[2] == 'W') &&
 		     q.name[3] == '.') {
 			handle_a_request(dns_fd, &q, 1);
+			return 0;
+		}
+
+		/* Handle A-type query for _.***.topdomain. It happens when
+		 *
+		 * https://datatracker.ietf.org/doc/html/rfc7816 (qname minimisation)
+		 * https://github.com/isc-projects/bind9/commit/ae52c2117eba9fa0778125f4e10834d673ab811b
+		 * */
+		if (q.type == T_A &&
+		    (q.name[0] == '_') &&
+		     q.name[1] == '.') {
+			handle_underscore_request(dns_fd, &q, topdomain);
 			return 0;
 		}
 
