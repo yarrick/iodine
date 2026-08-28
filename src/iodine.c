@@ -323,6 +323,19 @@ int main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
+	/* The topdomain plus a small fixed overhead (header + dot +
+	   safety, see build_hostname) must fit into the maximum hostname
+	   length, otherwise no tunnel payload can ever be carried - and
+	   the old code underflowed (size_t) in build_hostname with such a
+	   configuration. */
+	if (strlen(topdomain) + 8 > (size_t) hostname_maxlen) {
+		warnx("Topdomain too long for -M %d: needs at least %zu characters. "
+			"Use a shorter topdomain or a larger -M.",
+			hostname_maxlen, strlen(topdomain) + 8);
+		usage();
+		/* NOTREACHED */
+	}
+
 	client_set_selecttimeout(selecttimeout);
 	client_set_lazymode(lazymode);
 	client_set_topdomain(topdomain);
