@@ -27,6 +27,7 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 	char *dummy;
 	char *s;
 	char *d;
+	char *pktend;
 	int len;
 	int offset;
 	char c;
@@ -36,14 +37,27 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 
 	len = 0;
 	s = *src;
+	pktend = packet + packetlen;
 	d = dst;
-	while(*s && len < length - 2) {
+	while(s < pktend && *s && len < length - 2) {
 		c = *s++;
+		if (s >= pktend) {
+			break; /* label length byte is the last byte of the packet */
+		}
 
 		/* is this a compressed label? */
 		if ((c & 0xc0) == 0xc0) {
+			if (s + 1 >= pktend) {
+				/* pointer high byte present, low byte missing */
+				s = pktend - 1;
+				if (len == 0) {
+					/* Bad jump first in packet */
+					return 0;
+				}
+				break; /* Bad jump after some data */
+			}
 			offset = (((s[-1] & 0x3f) << 8) | (s[0] & 0xff));
-			if (offset > packetlen) {
+			if (offset >= packetlen) {
 				if (len == 0) {
 					/* Bad jump first in packet */
 					return 0;
@@ -57,15 +71,15 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 			goto end;
 		}
 
-		while(c && len < length - 1) {
+		while(c && s < pktend && len < length - 1) {
 			*d++ = *s++;
 			len++;
 
 			c--;
 		}
 
-		if (len >= length - 1) {
-			break; /* We used up all space */
+		if (len >= length - 1 || s >= pktend) {
+			break; /* We used up all space or the packet */
 		}
 
 		if (*s != 0) {
