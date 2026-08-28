@@ -370,12 +370,12 @@ static void save_to_dnscache(int userid, struct query *q, char *answer, int answ
 {
 	int fill;
 
-	if (answerlen > sizeof(users[userid].dnscache_answer[fill]))
-		return;  /* can't store this */
-
 	fill = users[userid].dnscache_lastfilled + 1;
 	if (fill >= DNSCACHE_LEN)
 		fill = 0;
+
+	if (answerlen > sizeof(users[userid].dnscache_answer[fill]))
+		return;  /* can't store this */
 
 	memcpy(&(users[userid].dnscache_q[fill]), q, sizeof(struct query));
 	memcpy(users[userid].dnscache_answer[fill], answer, answerlen);
