@@ -613,14 +613,9 @@ secure_random(void *buf, size_t len)
 
 #if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__DragonFly__) || \
     defined(__APPLE__)
-	{
-		ssize_t r;
-		do {
-			r = arc4random_buf(p, len);
-		} while (r < 0 && errno == EINTR);
-		if (r >= 0)
-			return;
-	}
+	/* arc4random_buf() returns void on all BSDs and macOS. */
+	arc4random_buf(p, len);
+	return;
 #endif
 
 	{
