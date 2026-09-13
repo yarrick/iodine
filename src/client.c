@@ -1405,8 +1405,19 @@ handshake_login(int dns_fd, int seed)
 
 				server[64] = 0;
 				client[64] = 0;
-				if (tun_setip(client, server, netmask) == 0 &&
-					tun_setmtu(mtu) == 0) {
+				/* The netmask prefix length comes from the server's reply.
+				   Validate it: tun_setip() computes the mask with
+				   "netmask <<= (32 - netbits)", which is undefined
+				   behavior for netbits < 1 or > 32 (an on-path
+				   attacker can supply the reply - see the lack of
+				   channel authentication). Reject like a malformed
+				   handshake and retry login. */
+				if (netmask < 1 || netmask > 32) {
+					fprintf(stderr,
+						"Received bad handshake (netmask %d)\n",
+						netmask);
+				} else if (tun_setip(client, server, netmask) == 0 &&
+					   tun_setmtu(mtu) == 0) {
 
 					fprintf(stderr, "Server tunnel IP is %s\n", server);
 					return 0;
