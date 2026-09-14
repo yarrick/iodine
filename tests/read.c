@@ -214,10 +214,7 @@ END_TEST
 START_TEST(test_read_name_truncated_label)
 {
 	/* Label length byte claims 18 bytes but the packet ends after the
-	   first data byte. Before the bounds fix, readname_loop() kept reading
-	   past the end of the packet until it happened to find a NUL byte
-	   (heap/stack-buffer-overflow, reachable from network input). Now the
-	   read must stop at the packet boundary and return the partial name. */
+	   first data byte. */
 	unsigned char p[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x12, 'a' };
@@ -244,10 +241,7 @@ END_TEST
 START_TEST(test_read_name_ptr_at_packet_end)
 {
 	/* Compression pointer as the very last byte of the packet (no low
-	   byte present). Before the bounds fix the offset read (s[0]) landed
-	   one byte past the packet (heap-buffer-overflow). Now the read stops
-	   at the packet boundary: the name is empty (just the NUL terminator,
-	   rv == 1) and nothing past the packet is touched. */
+	   byte present). */
 	unsigned char p[] = {
 		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0xc0 };
