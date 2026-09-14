@@ -40,6 +40,7 @@
 #include "common.h"
 #include "tun.h"
 #include "client.h"
+#include "encoding.h"
 #include "util.h"
 
 #ifdef WINDOWS32
@@ -324,14 +325,14 @@ int main(int argc, char **argv)
 	}
 
 	/* The topdomain plus a small fixed overhead (header + dot +
-	   safety, see build_hostname) must fit into the maximum hostname
-	   length, otherwise no tunnel payload can ever be carried - and
-	   the old code underflowed (size_t) in build_hostname with such a
-	   configuration. */
-	if (strlen(topdomain) + 8 > (size_t) hostname_maxlen) {
+	   safety, see hostname_need in encoding.c) must fit into the
+	   maximum hostname length, otherwise no tunnel payload can ever
+	   be carried - and the old code underflowed (size_t) in
+	   build_hostname with such a configuration. */
+	if (hostname_need(topdomain) > (size_t) hostname_maxlen) {
 		warnx("Topdomain too long for -M %d: needs at least %zu characters. "
 			"Use a shorter topdomain or a larger -M.",
-			hostname_maxlen, strlen(topdomain) + 8);
+			hostname_maxlen, hostname_need(topdomain));
 		usage();
 		/* NOTREACHED */
 	}

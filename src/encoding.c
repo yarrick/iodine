@@ -19,6 +19,12 @@
 #include "common.h"
 #include "encoding.h"
 
+size_t hostname_need(const char *topdomain)
+{
+	/* 8 = 5 max header length + 1 dot before topdomain + 2 safety */
+	return strlen(topdomain) + 8;
+}
+
 int build_hostname(char *buf, size_t buflen, const char *data,
 		   const size_t datalen, const char *topdomain,
 		   const struct encoder *encoder, int maxlen)
@@ -28,8 +34,7 @@ int build_hostname(char *buf, size_t buflen, const char *data,
 	size_t need;
 	size_t cap;
 
-	/* 8 = 5 max header length + 1 dot before topdomain + 2 safety */
-	need = strlen(topdomain) + 8;
+	need = hostname_need(topdomain);
 	cap = MIN((size_t)maxlen, buflen);
 	if (cap < need) {
 		/* The topdomain plus the fixed overhead do not fit into

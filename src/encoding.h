@@ -48,6 +48,7 @@ struct encoder {
 	const int blocksize_encoded;
 };
 
+size_t hostname_need(const char *);
 int build_hostname(char *, size_t, const char *, const size_t, const char *,
 		   const struct encoder *, int);
 int unpack_data(char *, size_t, char *, size_t, const struct encoder *);
