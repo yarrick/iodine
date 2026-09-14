@@ -161,7 +161,6 @@ int main(int argc, char **argv)
 #endif
 	username = NULL;
 	memset(password, 0, 33);
-	srand(time(NULL));
 	foreground = 0;
 	newroot = NULL;
 	context = NULL;
@@ -181,7 +180,6 @@ int main(int argc, char **argv)
 	WSAStartup(req_version, &wsa_data);
 #endif
 
-	srand((unsigned) time(NULL));
 	client_init();
 
 #if !defined(BSD) && !defined(__GLIBC__)
