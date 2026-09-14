@@ -198,6 +198,30 @@ START_TEST(test_decode_response_with_high_trans_id)
 }
 END_TEST
 
+START_TEST(test_decode_response_overflow_rlen)
+{
+	/* A well-formed T_NULL answer (same header/question as
+	   answer_packet) whose answer advertises rlen=0xFFFF while only a
+	   few rdata bytes are actually present in the packet. */
+	char packet[] =
+		"\x05\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00\x05\x73\x69\x6C\x6C"
+		"\x79\x04\x68\x6F\x73\x74\x02\x6F\x66\x06\x69\x6F\x64\x69\x6E\x65\x04"
+		"\x63\x6F\x64\x65\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00\x0A\x00\x01"
+		"\x01\x62\x00\x00\x0A\x00\x01\x00\x00\x00\x00\xFF\xFF\x78\x78\x78";
+	char buf[512];
+	struct query q;
+	int ret;
+
+	memset(&q, 0, sizeof(q));
+	memset(&buf, 0, sizeof(buf));
+	ret = dns_decode(buf, sizeof(buf), &q, QR_ANSWER,
+			   packet, sizeof(packet) - 1);
+	ck_assert_msg(ret == 0,
+			"Overlong advertised rlen (0xFFFF) was not rejected: rv=%d",
+			ret);
+}
+END_TEST
+
 START_TEST(test_get_id_short_packet)
 {
 	char buf[5];
@@ -260,6 +284,7 @@ test_dns_create_tests(void)
 	tcase_add_test(tc, test_encode_response);
 	tcase_add_test(tc, test_decode_response);
 	tcase_add_test(tc, test_decode_response_with_high_trans_id);
+	tcase_add_test(tc, test_decode_response_overflow_rlen);
 	tcase_add_test(tc, test_get_id_short_packet);
 	tcase_add_test(tc, test_get_id_low);
 	tcase_add_test(tc, test_get_id_high);
