@@ -202,11 +202,7 @@ START_TEST(test_decode_response_overflow_rlen)
 {
 	/* A well-formed T_NULL answer (same header/question as
 	   answer_packet) whose answer advertises rlen=0xFFFF while only a
-	   few rdata bytes are actually present in the packet. Before the
-	   bounds fix, dns_decode() would memcpy up to MIN(0xFFFF, 4096)
-	   bytes out of bounds of the (small) packet (stack-buffer-overflow,
-	   reachable from the network: a forged DNS reply carries rlen).
-	   Now the packet must be rejected cleanly (rv == 0), not crash. */
+	   few rdata bytes are actually present in the packet. */
 	char packet[] =
 		"\x05\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00\x05\x73\x69\x6C\x6C"
 		"\x79\x04\x68\x6F\x73\x74\x02\x6F\x66\x06\x69\x6F\x64\x69\x6E\x65\x04"

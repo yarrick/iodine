@@ -482,6 +482,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 	unsigned short class;
 	unsigned short type;
 	char *data;
+	char *pktend;
 	unsigned short rlen;
 	int id;
 	int rv;
@@ -500,6 +501,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 	}
 
 	data = packet + sizeof(HEADER);
+	pktend = packet + packetlen;
 	qdcount = ntohs(header->qdcount);
 	ancount = ntohs(header->ancount);
 
@@ -551,9 +553,9 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
 
-			/* The advertised rdata length must not exceed what
-			   is actually present in the packet. */
-			if (rlen > (unsigned int)((packet + packetlen) - data))
+			/* The advertised rdata length must not exceed
+			   the bytes actually remaining in the packet. */
+			if (data + rlen > pktend)
 				return 0;
 
 			rv = MIN(rlen, sizeof(rdata));
@@ -574,9 +576,9 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
 
-			/* The advertised rdata length must not exceed what
-			   is actually present in the packet. */
-			if (rlen > (unsigned int)((packet + packetlen) - data))
+			/* The advertised rdata length must not exceed
+			   the bytes actually remaining in the packet. */
+			if (data + rlen > pktend)
 				return 0;
 
 			if (type == T_CNAME) {
@@ -624,10 +626,9 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 				readshort(packet, &data, &rlen);
 				rdatastart = data;
 
-				/* The advertised rdata length must not
-				   exceed what is actually present in
-				   the packet. */
-				if (rlen > (unsigned int)((packet + packetlen) - data))
+				/* The advertised rdata length must not exceed
+				   the bytes actually remaining in the packet. */
+				if (data + rlen > pktend)
 					return 0;
 
 				readshort(packet, &data, &pref);
@@ -677,9 +678,9 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
 
-			/* The advertised rdata length must not exceed what
-			   is actually present in the packet. */
-			if (rlen > (unsigned int)((packet + packetlen) - data))
+			/* The advertised rdata length must not exceed
+			   the bytes actually remaining in the packet. */
+			if (data + rlen > pktend)
 				return 0;
 
 			rv = readtxtbin(packet, &data, rlen, rdata,
