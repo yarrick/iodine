@@ -302,6 +302,28 @@ START_TEST(test_get_addr_err)
 }
 END_TEST
 
+START_TEST(test_secure_random)
+{
+	unsigned char a[64], b[64];
+	int i, nonzero;
+
+	/* A zero-initialized buffer must come back non-zero from the
+	   CSPRNG. */
+	memset(a, 0, sizeof(a));
+	secure_random(a, sizeof(a));
+	nonzero = 0;
+	for (i = 0; i < (int)sizeof(a); i++)
+		nonzero += (a[i] != 0);
+	ck_assert(nonzero > 0);
+
+	/* Two independent draws of 64 random bytes must differ; a
+	   no-op (or all-zero) implementation would make them equal. */
+	memset(b, 0, sizeof(b));
+	secure_random(b, sizeof(b));
+	ck_assert_mem_ne(a, b, sizeof(b));
+}
+END_TEST
+
 TCase *
 test_common_create_tests(void)
 {
@@ -318,6 +340,7 @@ test_common_create_tests(void)
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 	tcase_add_test(tc, test_get_addr_err);
+tcase_add_test(tc, test_secure_random);
 
 	/* Tests require IPv6 support */
 	sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
