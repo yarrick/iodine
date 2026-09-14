@@ -263,9 +263,33 @@ void
 do_pidfile(char *pidfile)
 {
 #ifndef WINDOWS32
+	int fd;
+	struct stat st;
 	FILE *file;
 
-	if ((file = fopen(pidfile, "w")) == NULL) {
+	/* Open without following symlinks so a local user cannot
+	 * redirect the write (done as root) to an arbitrary file.
+	 * O_NONBLOCK so a fifo at the path cannot make us block; the
+	 * fstat check below rejects everything that is not a regular
+	 * file anyway. Explicit 0644 mode so the file is not
+	 * world-writable even after do_detach() sets umask(0). */
+	fd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_NONBLOCK, 0644);
+	if (fd == -1) {
+		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
+		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
+	}
+
+	/* O_NOFOLLOW rejects symlinks, but fifos, sockets and devices
+	 * are not; refuse to write the pid to anything but a regular
+	 * file. */
+	if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+		close(fd);
+		syslog(LOG_ERR, "Refusing to write pidfile: %s is not a regular file", pidfile);
+		err(1, "do_pidfile: %s is not a regular file", pidfile);
+	}
+
+	if ((file = fdopen(fd, "w")) == NULL) {
+		close(fd);
 		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
 		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
 	} else {
