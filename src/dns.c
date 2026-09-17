@@ -482,6 +482,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 	unsigned short class;
 	unsigned short type;
 	char *data;
+	char *pktend;
 	unsigned short rlen;
 	int id;
 	int rv;
@@ -500,6 +501,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 	}
 
 	data = packet + sizeof(HEADER);
+	pktend = packet + packetlen;
 	qdcount = ntohs(header->qdcount);
 	ancount = ntohs(header->ancount);
 
@@ -551,6 +553,11 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
 
+			/* The advertised rdata length must not exceed
+			   the bytes actually remaining in the packet. */
+			if (data + rlen > pktend)
+				return 0;
+
 			rv = MIN(rlen, sizeof(rdata));
 			rv = readdata(packet, &data, rdata, rv);
 			if (rv >= 2 && buf) {
@@ -568,6 +575,11 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			readshort(packet, &data, &class);
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
+
+			/* The advertised rdata length must not exceed
+			   the bytes actually remaining in the packet. */
+			if (data + rlen > pktend)
+				return 0;
 
 			if (type == T_CNAME) {
 				/* For tunnels, query type A has CNAME type answer */
@@ -613,6 +625,12 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 				readlong(packet, &data, &ttl);
 				readshort(packet, &data, &rlen);
 				rdatastart = data;
+
+				/* The advertised rdata length must not exceed
+				   the bytes actually remaining in the packet. */
+				if (data + rlen > pktend)
+					return 0;
+
 				readshort(packet, &data, &pref);
 
 				if (type == T_SRV) {
@@ -660,8 +678,13 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
 
+			/* The advertised rdata length must not exceed
+			   the bytes actually remaining in the packet. */
+			if (data + rlen > pktend)
+				return 0;
+
 			rv = readtxtbin(packet, &data, rlen, rdata,
-				        sizeof(rdata));
+					        sizeof(rdata));
 			if (rv >= 1) {
 				rv = MIN(rv, buflen);
 				memcpy(buf, rdata, rv);
