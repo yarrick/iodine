@@ -1104,7 +1104,7 @@ client_tunnel(int tun_fd, int dns_fd)
 		}
 
 		FD_ZERO(&fds);
-		if (!is_sending() || outchunkresent >= 2) {
+		if (!is_sending() || outchunkresent >= 2 || !lazymode) {
 			/* If re-sending upstream data, chances are that
 			   we're several seconds behind already and TCP
 			   will start filling tun buffer with (useless)
