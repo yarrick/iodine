@@ -29,9 +29,15 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#if defined(__linux__) && !defined(__ANDROID__)
+#include <sys/random.h>
+#endif
+
 #ifdef WINDOWS32
 #include <winsock2.h>
 #include <conio.h>
+#include <windows.h>
+#include <wincrypt.h>
 #else
 #include <arpa/nameser.h>
 #ifdef DARWIN
@@ -558,4 +564,94 @@ fd_set_close_on_exec(int fd)
 		err(4, "Failed to set fd flags");
 }
 #endif
+
+/* Fill a buffer with random bytes.
+ *
+ * Prefer a CSPRNG: getrandom() (Linux >= 3.17 / glibc 2.25), arc4random()
+ * (BSDs, and glibc 2.36+), /dev/urandom, and on Windows the CryptoAPI.
+ * Fall back to rand() only if none of those are available at all.
+ */
+void
+secure_random(void *buf, size_t len)
+{
+	unsigned char *p = (unsigned char *) buf;
+
+#ifdef WINDOWS32
+	{
+		HCRYPTPROV prov = 0;
+		if (CryptAcquireContext(&prov, NULL, NULL,
+			    PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+			if (CryptGenRandom(prov, len, (BYTE *) p)) {
+				CryptReleaseContext(prov, 0);
+				return;
+			}
+			CryptReleaseContext(prov, 0);
+		}
+	}
+	while (len > 0) {
+		unsigned int v = rand();
+		size_t n = len < sizeof(v) ? len : sizeof(v);
+		memcpy(p, &v, n);
+		p += n;
+		len -= n;
+	}
+	return;
+#else
+#if defined(__linux__) || defined(GNU_GETRANDOM)
+	/* Android is excluded: older NDK Bionics lack getrandom()
+	   (kernel 3.17+, declared only in newer Bionic headers).
+	   The /dev/urandom fallback below is backed by the kernel
+	   CSPRNG (ChaCha20) on all Android versions. */
+#if !defined(__ANDROID__)
+	{
+		ssize_t r;
+		do {
+			r = getrandom(p, len, 0);
+		} while (r < 0 && errno == EINTR);
+		if (r > 0) {
+			p += r;
+			len -= r;
+		}
+	}
+	if (len == 0)
+		return;
+#endif
+#endif
+
+#if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__DragonFly__) || \
+    defined(__APPLE__)
+	arc4random_buf(p, len);
+	return;
+#endif
+
+	{
+		int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+		if (fd >= 0) {
+			while (len > 0) {
+				ssize_t r = read(fd, p, len);
+				if (r < 0) {
+					if (errno == EINTR)
+						continue;
+					break;
+				}
+				if (r == 0)
+					break;
+				p += r;
+				len -= r;
+			}
+			close(fd);
+			if (len == 0)
+				return;
+		}
+	}
+
+	while (len > 0) {
+		unsigned int v = rand();
+		size_t n = len < sizeof(v) ? len : sizeof(v);
+		memcpy(p, &v, n);
+		p += n;
+		len -= n;
+	}
+#endif
+}
 
