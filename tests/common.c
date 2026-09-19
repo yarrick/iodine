@@ -340,7 +340,7 @@ test_common_create_tests(void)
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 	tcase_add_test(tc, test_get_addr_err);
-tcase_add_test(tc, test_secure_random);
+	tcase_add_test(tc, test_secure_random);
 
 	/* Tests require IPv6 support */
 	sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
