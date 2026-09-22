@@ -8,10 +8,15 @@ OS = `echo $(TARGETOS) | tr "a-z" "A-Z"`
 ARCH = `uname -m`
 HEAD_COMMIT = `git rev-parse --short HEAD`
 
+ALL_OBJS = $(COMMONOBJS) $(CLIENTOBJS) $(SERVEROBJS)
+DEPS = $(ALL_OBJS:.o=.d)
+
 LIBPATH = -L.
 LDFLAGS +=  -lz `sh osflags $(TARGETOS) link` $(LIBPATH)
-CFLAGS += -std=c99 -c -g -Wall -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\"
+CFLAGS += -std=c99 -c -g -Wall -Isrc -D$(OS) -pedantic `sh osflags $(TARGETOS) cflags` -DGITREVISION=\"$(HEAD_COMMIT)\" -MMD
 CFLAGS += -Wstrict-prototypes -Wtype-limits -Wmissing-declarations -Wmissing-prototypes
+
+-include $(DEPS)
 
 all: stateos $(CLIENT) $(SERVER)
 
@@ -39,6 +44,5 @@ base64u.c: base64.c
 
 clean:
 	@echo "Cleaning src/"
-	@rm -f $(CLIENT){,.exe} $(SERVER){,.exe} *~ *.o *.core base64u.*
+	@rm -f $(CLIENT){,.exe} $(SERVER){,.exe} *~ *.o *.core base64u.* $(DEPS)
 	@rm -rf obj libs #android stuff
-
