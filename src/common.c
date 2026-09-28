@@ -50,56 +50,14 @@
 #include <err.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <syslog.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#endif
-
-#ifdef HAVE_SETCON
-# include <selinux/selinux.h>
 #endif
 
 #include "common.h"
 
 /* The raw header used when not using DNS protocol */
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
-
-/* Provide daemon(3) if required and not available */
-#if !ANDROID && !WINDOWS && !HAVE_DAEMON
-static int daemon(int nochdir, int noclose)
-{
- 	int fd, i;
-
- 	switch (fork()) {
- 		case 0:
- 			break;
- 		case -1:
- 			return -1;
- 		default:
- 			_exit(0);
- 	}
-
- 	if (!nochdir) {
- 		chdir("/");
- 	}
-
- 	if (setsid() < 0) {
- 		return -1;
- 	}
-
- 	if (!noclose) {
- 		if ((fd = open("/dev/null", O_RDWR)) >= 0) {
- 			for (i = 0; i < 3; i++) {
- 				dup2(fd, i);
- 			}
- 			if (fd > 2) {
- 				close(fd);
- 			}
- 		}
- 	}
-	return 0;
-}
-#endif
 
 #if !HAVE_SETGROUPS
 int setgroups(int count, int *groups)
@@ -239,87 +197,6 @@ void
 close_dns(int fd)
 {
 	close(fd);
-}
-
-void
-do_chroot(char *newroot)
-{
-#if HAVE_CHROOT
-	if (chroot(newroot) != 0 || chdir("/") != 0)
-		err(1, "%s", newroot);
-
-	if (seteuid(geteuid()) != 0 || setuid(getuid()) != 0) {
-		err(1, "set[e]uid()");
-	}
-#else
-	warnx("chroot not available");
-#endif
-}
-
-void
-do_setcon(char *context)
-{
-#ifdef HAVE_SETCON
-	if (-1 == setcon(context))
-		err(1, "%s", context);
-#else
-	warnx("No SELinux support built in");
-#endif
-}
-
-void
-do_pidfile(char *pidfile)
-{
-#ifndef WINDOWS
-	int fd;
-	struct stat st;
-	FILE *file;
-
-	/* Open without following symlinks so a local user cannot
-	 * redirect the write (done as root) to an arbitrary file.
-	 * O_NONBLOCK so a fifo at the path cannot make us block; the
-	 * fstat check below rejects everything that is not a regular
-	 * file anyway. Explicit 0644 mode so the file is not
-	 * world-writable even after do_detach() sets umask(0). */
-	fd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_NONBLOCK, 0644);
-	if (fd == -1) {
-		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
-		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
-	}
-
-	/* O_NOFOLLOW rejects symlinks, but fifos, sockets and devices
-	 * are not; refuse to write the pid to anything but a regular
-	 * file. */
-	if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
-		close(fd);
-		syslog(LOG_ERR, "Refusing to write pidfile: %s is not a regular file", pidfile);
-		err(1, "do_pidfile: %s is not a regular file", pidfile);
-	}
-
-	if ((file = fdopen(fd, "w")) == NULL) {
-		close(fd);
-		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
-		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
-	} else {
-		fprintf(file, "%d\n", (int)getpid());
-		fclose(file);
-	}
-#else
-	fprintf(stderr, "Windows version does not support pid file\n");
-#endif
-}
-
-void
-do_detach(void)
-{
-#ifndef WINDOWS
-	fprintf(stderr, "Detaching from terminal...\n");
-	daemon(0, 0);
-	umask(0);
-	alarm(0);
-#else
-	fprintf(stderr, "Windows version does not support detaching\n");
-#endif
 }
 
 void

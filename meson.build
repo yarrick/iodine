@@ -105,6 +105,7 @@ common = files([
   'src/encoding.c',
   'src/login.c',
   'src/md5.c',
+  'src/process.c',
   'src/read.c',
   'src/tun.c',
   'src/util.c',
@@ -144,7 +145,7 @@ if libcheck.found()
   suites = [
     ['base32', []],
     ['base64', []],
-    ['common', []],
+    ['common', ['src/process.c']],
     ['dns', ['src/base32.c', 'src/encoding.c', 'src/read.c']],
     ['encoding', ['src/base32.c']],
     ['fw_query', []],
@@ -161,7 +162,7 @@ if libcheck.found()
         'tests/test.c',
       ] + suite[1],
       include_directories: srcdir,
-      dependencies: libcheck,
+      dependencies: [libcheck, commondeps],
       c_args: '-DSUITE_NAME="@0@"'.format(name))
     test(name, s)
   endforeach

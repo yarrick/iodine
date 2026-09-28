@@ -15,6 +15,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "config.h"
+#include "process.h"
+
 #include <check.h>
 #include <common.h>
 #include <unistd.h>

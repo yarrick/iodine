@@ -31,6 +31,7 @@
 #include "config.h"
 
 #include "common.h"
+#include "process.h"
 
 #ifdef WINDOWS
 #include "windows_dns.h"
