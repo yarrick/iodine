@@ -143,21 +143,21 @@ libcheck = dependency('check', required: false)
 
 if libcheck.found()
   suites = [
-    ['base32', []],
-    ['base64', []],
-    ['common', ['src/process.c']],
-    ['dns', ['src/base32.c', 'src/encoding.c', 'src/read.c']],
-    ['encoding', ['src/base32.c']],
-    ['fw_query', []],
-    ['login', ['src/md5.c']],
-    ['read', []],
-    ['user', []],
+    ['base32', ['src/base32.c']],
+    ['base64', ['src/base64.c']],
+    ['base64u', [base64u_c]],
+    ['common', ['src/common.c', 'src/process.c']],
+    ['dns', ['src/base32.c', 'src/dns.c', 'src/encoding.c', 'src/read.c']],
+    ['encoding', ['src/encoding.c', 'src/base32.c']],
+    ['fw_query', ['src/fw_query.c']],
+    ['login', ['src/login.c', 'src/md5.c']],
+    ['read', ['src/read.c']],
+    ['user', ['src/user.c']],
   ]
 
   foreach suite : suites
     name = suite[0]
     s = executable('test_@0@'.format(name), [
-        'src/@0@.c'.format(name),
         'tests/@0@.c'.format(name),
         'tests/test.c',
       ] + suite[1],
