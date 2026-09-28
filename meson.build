@@ -1,13 +1,15 @@
 project('iodine', 'c',
   default_options: [
     'c_std=c99',
-    'pie=true'
   ],
-  license: 'ISC')
+  license: 'ISC',
+  meson_version: '>=0.60.3',
+  version : '0.8.0-git' + run_command('git', 'rev-parse',  '--short', 'HEAD', check: true).stdout().strip(),
+)
 
 # config.h contents
 cdata = configuration_data()
-cdata.set('GITREVISION', '"XXYYZZ"')
+cdata.set('GITREVISION', '"@0@"'.format(meson.project_version()))
 
 srcdir = include_directories('src')
 
@@ -15,12 +17,12 @@ zlib = dependency('zlib')
 commondeps = [zlib]
 serverdeps = []
 
-cdata.set('@0@'.format(host_machine.system().to_upper()), true)
+cdata.set10('@0@'.format(host_machine.system().to_upper()), true)
 if host_machine.system() == 'linux'
   add_project_arguments('-D_GNU_SOURCE', language: 'c')
   selinux = dependency('libselinux', required: false)
   if selinux.found()
-    cdata.set('HAVE_SETCON', true)
+    cdata.set10('HAVE_SETCON', true)
     commondeps += selinux
   endif
   systemd = dependency('libsystemd', required: false)
@@ -28,7 +30,7 @@ if host_machine.system() == 'linux'
     systemd = dependency('libsystemd-daemon', required: false)
   endif
   if systemd.found()
-    cdata.set('HAVE_SYSTEMD', true)
+    cdata.set10('HAVE_SYSTEMD', true)
     serverdeps += systemd
   endif
 endif
@@ -50,7 +52,7 @@ optional_functions = [
 ]
 foreach func : optional_functions
   if cc.has_function(func)
-    cdata.set('HAVE_@0@'.format(func).to_upper(), true)
+    cdata.set10('HAVE_@0@'.format(func).to_upper(), true)
   endif
 endforeach
 
@@ -62,7 +64,7 @@ if cc.links('''
     return 0;
   }
 ''')
-  cdata.set('HAVE_PROGNAME', true)
+  cdata.set10('HAVE_PROGNAME', true)
 endif
 
 # For md5
