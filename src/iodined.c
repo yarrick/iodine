@@ -28,6 +28,8 @@
 #include <time.h>
 #include <zlib.h>
 
+#include "config.h"
+
 #include "common.h"
 
 #ifdef WINDOWS32

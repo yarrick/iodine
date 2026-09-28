@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "encoding.h"
 
 #define BASE32_BLKSIZE_RAW 5

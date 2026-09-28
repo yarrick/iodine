@@ -29,6 +29,8 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include "config.h"
+
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <sys/random.h>
 #endif

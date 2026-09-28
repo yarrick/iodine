@@ -18,6 +18,7 @@
 #ifndef __DNS_H__
 #define __DNS_H__
 
+#include "config.h"
 #include "common.h"
 
 typedef enum {

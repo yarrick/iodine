@@ -16,6 +16,7 @@
  */
 
 #include <string.h>
+#include "config.h"
 #include "common.h"
 #include "encoding.h"
 

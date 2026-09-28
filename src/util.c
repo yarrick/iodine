@@ -16,6 +16,7 @@
  */
 
 #include <stdio.h>
+#include "config.h"
 #include "common.h"
 #include "util.h"
 

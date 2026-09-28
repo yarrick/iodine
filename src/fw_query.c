@@ -15,6 +15,7 @@
  */
 
 #include <string.h>
+#include "config.h"
 #include "fw_query.h"
 
 static struct fw_query fwq[FW_QUERY_CACHE_SIZE];

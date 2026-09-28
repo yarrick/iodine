@@ -24,6 +24,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "config.h"
+
 #ifdef WINDOWS32
 #include <winsock2.h>
 #else

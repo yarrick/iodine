@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "encoding.h"
 
 #define BASE64_BLKSIZE_RAW 3

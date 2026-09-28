@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "encoding.h"
 
 #define BASE128_BLKSIZE_RAW 7

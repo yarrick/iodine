@@ -26,6 +26,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "config.h"
+
 #ifdef DARWIN
 #include <ctype.h>
 #include <sys/kern_control.h>

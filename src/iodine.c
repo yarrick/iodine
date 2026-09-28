@@ -28,6 +28,8 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include "config.h"
+
 #ifdef WINDOWS32
 #include "windows.h"
 #include <winsock2.h>

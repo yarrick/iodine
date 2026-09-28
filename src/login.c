@@ -18,6 +18,8 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "config.h"
+
 #ifdef WINDOWS32
 #include "windows.h"
 #else

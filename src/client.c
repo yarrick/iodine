@@ -29,6 +29,8 @@
 #include <zlib.h>
 #include <time.h>
 
+#include "config.h"
+
 #ifdef WINDOWS32
 #include "windows.h"
 #else
