@@ -30,7 +30,7 @@
 
 #include "config.h"
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include "windows.h"
 #include <winsock2.h>
 #else
@@ -45,7 +45,7 @@
 #include "encoding.h"
 #include "util.h"
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
 #endif
@@ -129,7 +129,7 @@ int main(int argc, char **argv)
 	char *nameserv_host;
 	char *topdomain;
 	char *errormsg;
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	struct passwd *pw;
 #endif
 	char *username;
@@ -159,7 +159,7 @@ int main(int argc, char **argv)
 	nameserv_host = NULL;
 	topdomain = NULL;
 	errormsg = NULL;
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	pw = NULL;
 #endif
 	username = NULL;
@@ -179,7 +179,7 @@ int main(int argc, char **argv)
 	hostname_maxlen = 0xFF;
 	nameserv_family = AF_UNSPEC;
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 	WSAStartup(req_version, &wsa_data);
 #endif
 
@@ -343,7 +343,7 @@ int main(int argc, char **argv)
 	client_set_hostname_maxlen(hostname_maxlen);
 
 	if (username != NULL) {
-#ifndef WINDOWS32
+#ifndef WINDOWS
 		if ((pw = getpwnam(username)) == NULL) {
 			warnx("User %s does not exist!\n", username);
 			usage();
@@ -401,7 +401,7 @@ int main(int argc, char **argv)
 		do_chroot(newroot);
 
 	if (username != NULL) {
-#ifndef WINDOWS32
+#ifndef WINDOWS
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
 		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {

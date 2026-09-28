@@ -35,7 +35,7 @@
 #include <sys/random.h>
 #endif
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include <winsock2.h>
 #include <conio.h>
 #include <windows.h>
@@ -65,7 +65,7 @@
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
 
 /* daemon(3) exists only in 4.4BSD or later, and in GNU libc */
-#if !defined(ANDROID) && !defined(WINDOWS32) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__) && !defined(__HAIKU__)
+#if !defined(ANDROID) && !defined(WINDOWS) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__) && !defined(__HAIKU__)
 static int daemon(int nochdir, int noclose)
 {
  	int fd, i;
@@ -109,7 +109,7 @@ int setgroups(int count, int *groups)
 }
 #endif
 
-#ifndef WINDOWS32
+#ifndef WINDOWS
 void
 check_superuser(void)
 {
@@ -157,7 +157,7 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = addr_family;
-#if defined(WINDOWS32) || defined(OPENBSD)
+#if defined(WINDOWS) || defined(OPENBSD)
 	/* AI_ADDRCONFIG misbehaves on windows, and does not exist in OpenBSD */
 	hints.ai_flags = flags;
 #else
@@ -200,7 +200,7 @@ open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only)
 #endif
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
 
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	fd_set_close_on_exec(fd);
 #endif
 
@@ -244,7 +244,7 @@ close_dns(int fd)
 void
 do_chroot(char *newroot)
 {
-#if !(defined(WINDOWS32) || defined(__BEOS__) || defined(__HAIKU__))
+#if !(defined(WINDOWS) || defined(__BEOS__) || defined(__HAIKU__))
 	if (chroot(newroot) != 0 || chdir("/") != 0)
 		err(1, "%s", newroot);
 
@@ -270,7 +270,7 @@ do_setcon(char *context)
 void
 do_pidfile(char *pidfile)
 {
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	int fd;
 	struct stat st;
 	FILE *file;
@@ -312,7 +312,7 @@ do_pidfile(char *pidfile)
 void
 do_detach(void)
 {
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	fprintf(stderr, "Detaching from terminal...\n");
 	daemon(0, 0);
 	umask(0);
@@ -326,7 +326,7 @@ void
 read_password(char *buf, size_t len)
 {
 	char pwd[80] = {0};
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	struct termios old;
 	struct termios tp;
 
@@ -341,7 +341,7 @@ read_password(char *buf, size_t len)
 
 	fprintf(stderr, "Enter tunnel password: ");
 	fflush(stderr);
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	fscanf(stdin, "%79[^\n]", pwd);
 #else
 	for (i = 0; i < sizeof(pwd); i++) {
@@ -357,7 +357,7 @@ read_password(char *buf, size_t len)
 #endif
 	fprintf(stderr, "\n");
 
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	tcsetattr(0, TCSANOW, &old);
 #endif
 
@@ -484,7 +484,7 @@ query_datalen(const char *qname, const char *topdomain)
 	return -1;
 }
 
-#if defined(WINDOWS32) || defined(ANDROID)
+#if defined(WINDOWS) || defined(ANDROID)
 #ifndef ANDROID
 int
 inet_aton(const char *cp, struct in_addr *inp)
@@ -573,7 +573,7 @@ int recent_seqno(int ourseqno, int gotseqno)
 	return 0;
 }
 
-#ifndef WINDOWS32
+#ifndef WINDOWS
 /* Set FD_CLOEXEC flag on file descriptor.
  * This stops it from being inherited by system() calls.
  */
@@ -602,7 +602,7 @@ secure_random(void *buf, size_t len)
 {
 	unsigned char *p = (unsigned char *) buf;
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 	{
 		HCRYPTPROV prov = 0;
 		if (CryptAcquireContext(&prov, NULL, NULL,

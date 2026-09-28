@@ -24,7 +24,7 @@ char *get_resolvconf_addr(void)
 {
 	static char addr[257];
 	char *rv = NULL;
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	char buf[257];
 	FILE *fp;
 #ifdef ANDROID
@@ -51,7 +51,7 @@ char *get_resolvconf_addr(void)
 
 	fclose(fp);
 #endif
-#else /* !WINDOWS32 */
+#else /* !WINDOWS */
 	FIXED_INFO  *fixed_info;
 	ULONG       buflen;
 	DWORD       ret;

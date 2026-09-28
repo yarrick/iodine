@@ -20,7 +20,7 @@
 #include "config.h"
 
 #include <sys/types.h>
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include "windows.h"
 #include <winsock2.h>
 #else

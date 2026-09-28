@@ -47,7 +47,7 @@
 #define ROUTEPATH "PATH=/sbin:/bin "
 #endif
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include "windows.h"
 #include <winioctl.h>
 
@@ -147,7 +147,7 @@ open_tun(const char *tun_device)
 	return -1;
 }
 
-#elif WINDOWS32
+#elif WINDOWS
 
 static void
 get_device(char *device, int device_len, const char *wanted_dev)
@@ -494,7 +494,7 @@ close_tun(int tun_fd)
 		close(tun_fd);
 }
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 int
 write_tun(int tun_fd, char *data, size_t len)
 {
@@ -607,7 +607,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 #ifndef LINUX
 	int r;
 #endif
-#ifdef WINDOWS32
+#ifdef WINDOWS
 	DWORD status;
 	DWORD ipdata[3];
 	struct in_addr addr;
@@ -640,7 +640,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		fprintf(stderr, "Invalid IP: %s!\n", ip);
 		return 1;
 	}
-#ifndef WINDOWS32
+#ifndef WINDOWS
 # ifdef FREEBSD
 	display_ip = other_ip; /* FreeBSD wants other IP as second IP */
 # else
@@ -669,7 +669,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	fprintf(stderr, "Adding route %s/%d to %s\n", inet_ntoa(netip), netbits, ip);
 #endif
 	return system(cmdline);
-#else /* WINDOWS32 */
+#else /* WINDOWS */
 
 	/* Set device as connected */
 	fprintf(stderr, "Enabling interface '%s'\n", if_name);
@@ -708,7 +708,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 int
 tun_setmtu(const unsigned mtu)
 {
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	char cmdline[512];
 
 	if (mtu > 200 && mtu <= 1500) {
@@ -724,7 +724,7 @@ tun_setmtu(const unsigned mtu)
 	}
 
 	return 1;
-#else /* WINDOWS32 */
+#else /* WINDOWS */
 
 	return 0;
 #endif

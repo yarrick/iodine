@@ -20,7 +20,7 @@
 
 #include "config.h"
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include "windows.h"
 #else
 #include <netinet/in.h>

@@ -32,7 +32,7 @@
 
 #include "common.h"
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include "windows.h"
 #include <winsock2.h>
 #else
@@ -63,7 +63,7 @@
 # include <systemd/sd-daemon.h>
 #endif
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
 #endif
@@ -2089,7 +2089,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 	socklen_t addrlen;
 	char packet[64*1024];
 	int r;
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	char control[CMSG_SPACE(sizeof (struct in6_pktinfo))];
 	struct msghdr msg;
 	struct iovec iov;
@@ -2114,7 +2114,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 #else
 	addrlen = sizeof(struct sockaddr_storage);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
-#endif /* !WINDOWS32 */
+#endif /* !WINDOWS */
 
 	if (r > 0) {
 		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
@@ -2128,7 +2128,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 			return 0;
 		}
 
-#ifndef WINDOWS32
+#ifndef WINDOWS
 		memset(&q->destination, 0, sizeof(struct sockaddr_storage));
 		/* Read destination IP address */
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
@@ -2392,7 +2392,7 @@ static void version(void)
 
 static void prepare_dns_fd(int fd)
 {
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	int flag = 1;
 
 	/* To get destination address from each UDP datagram, see read_dns() */
@@ -2413,7 +2413,7 @@ main(int argc, char **argv)
 	char *listen_ip4;
 	char *listen_ip6;
 	char *errormsg;
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	struct passwd *pw;
 #endif
 	int foreground;
@@ -2447,7 +2447,7 @@ main(int argc, char **argv)
 	int nb_fds;
 #endif
 
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	pw = NULL;
 #endif
 	errormsg = NULL;
@@ -2474,7 +2474,7 @@ main(int argc, char **argv)
 
 	retval = 0;
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 	WSAStartup(req_version, &wsa_data);
 #endif
 
@@ -2598,7 +2598,7 @@ main(int argc, char **argv)
 	}
 
 	if (username != NULL) {
-#ifndef WINDOWS32
+#ifndef WINDOWS
 		if ((pw = getpwnam(username)) == NULL) {
 			warnx("User %s does not exist!", username);
 			usage();
@@ -2808,7 +2808,7 @@ main(int argc, char **argv)
 #ifdef FREEBSD
 	tzset();
 #endif
-#ifndef WINDOWS32
+#ifndef WINDOWS
 	openlog(__progname, LOG_NDELAY, LOG_DAEMON);
 #endif
 
@@ -2817,7 +2817,7 @@ main(int argc, char **argv)
 
 	signal(SIGINT, sigint);
 	if (username != NULL) {
-#ifndef WINDOWS32
+#ifndef WINDOWS
 		gid_t gids[1];
 		gids[0] = pw->pw_gid;
 		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {

@@ -26,7 +26,7 @@
 
 #include "config.h"
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include <winsock2.h>
 #else
 #include <netdb.h>

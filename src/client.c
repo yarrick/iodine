@@ -31,7 +31,7 @@
 
 #include "config.h"
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include "windows.h"
 #else
 #include <arpa/nameser.h>

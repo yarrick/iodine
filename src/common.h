@@ -35,7 +35,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include "config.h"
 
 #include <stdarg.h>
-#ifdef WINDOWS32
+#ifdef WINDOWS
 #include "windows.h"
 #else
 #include <sys/types.h>
@@ -106,7 +106,7 @@ enum connection {
 	CONN_MAX
 };
 
-#ifdef WINDOWS32
+#ifdef WINDOWS
 static inline void check_superuser(void)
 {
 }
@@ -132,7 +132,7 @@ int check_topdomain(char *, int, char **);
 
 int query_datalen(const char *qname, const char *topdomain);
 
-#if defined(WINDOWS32) || defined(ANDROID)
+#if defined(WINDOWS) || defined(ANDROID)
 #ifndef ANDROID
 int inet_aton(const char *cp, struct in_addr *inp);
 #endif
@@ -152,7 +152,7 @@ int recent_seqno(int , int);
  * Used for protocol-seed and nonce generation instead of rand(). */
 void secure_random(void *buf, size_t len);
 
-#ifndef WINDOWS32
+#ifndef WINDOWS
 void fd_set_close_on_exec(int fd);
 #endif
 
