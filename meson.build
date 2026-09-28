@@ -49,6 +49,7 @@ endif
 
 cc = meson.get_compiler('c')
 optional_functions = [
+  'arc4random_buf',
   'chroot',
   'daemon',
   'getpwnam',

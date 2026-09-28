@@ -31,7 +31,7 @@
 
 #include "config.h"
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#if HAVE_GETRANDOM
 #include <sys/random.h>
 #endif
 
@@ -500,12 +500,7 @@ secure_random(void *buf, size_t len)
 	}
 	return;
 #else
-#if defined(__linux__) || defined(GNU_GETRANDOM)
-	/* Android is excluded: older NDK Bionics lack getrandom()
-	   (kernel 3.17+, declared only in newer Bionic headers).
-	   The /dev/urandom fallback below is backed by the kernel
-	   CSPRNG (ChaCha20) on all Android versions. */
-#if !defined(__ANDROID__)
+#if HAVE_GETRANDOM
 	{
 		ssize_t r;
 		do {
@@ -519,10 +514,8 @@ secure_random(void *buf, size_t len)
 	if (len == 0)
 		return;
 #endif
-#endif
 
-#if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__DragonFly__) || \
-    defined(__APPLE__)
+#if HAVE_ARC4RANDOM_BUF
 	arc4random_buf(p, len);
 	return;
 #endif
