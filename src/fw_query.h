@@ -21,7 +21,7 @@
 
 #include <sys/types.h>
 #ifdef WINDOWS
-#include "windows.h"
+#include "windows_dns.h"
 #include <winsock2.h>
 #else
 #include <sys/socket.h>

@@ -32,7 +32,7 @@
 #include "config.h"
 
 #ifdef WINDOWS
-#include "windows.h"
+#include "windows_dns.h"
 #else
 #include <arpa/nameser.h>
 #ifdef ANDROID

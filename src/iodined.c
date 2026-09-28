@@ -33,7 +33,7 @@
 #include "common.h"
 
 #ifdef WINDOWS
-#include "windows.h"
+#include "windows_dns.h"
 #include <winsock2.h>
 #else
 #include <arpa/nameser.h>

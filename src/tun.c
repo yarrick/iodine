@@ -48,8 +48,17 @@
 #endif
 
 #ifdef WINDOWS
-#include "windows.h"
+#include <winsock2.h>
+#include <windows.h>
 #include <winioctl.h>
+
+DWORD WINAPI tun_reader(LPVOID arg);
+struct tun_data {
+	HANDLE tun;
+	int sock;
+	struct sockaddr_storage addr;
+	int addrlen;
+};
 
 static HANDLE dev_handle;
 static struct tun_data data;

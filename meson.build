@@ -34,12 +34,17 @@ if host_machine.system() == 'linux'
     serverdeps += systemd
   endif
 endif
+if host_machine.system() == 'gnu'
+  add_project_arguments('-D_GNU_SOURCE', language: 'c')
+endif
 if host_machine.system() == 'darwin'
   add_project_arguments('-D__APPLE_USE_RFC_3542', language: 'c')
 endif
 if host_machine.system() == 'windows'
   add_project_arguments('-DWINVER=0x0501', language: 'c')
   commondeps += declare_dependency(link_args: ['-lws2_32', '-liphlpapi'])
+  cdata.set('syslog(...)', true)
+  cdata.set('sleep(seconds)', 'Sleep((seconds)*1000)')
 endif
 
 cc = meson.get_compiler('c')
@@ -73,10 +78,27 @@ cdata.set10('ARCH_IS_BIG_ENDIAN', host_machine.endian() == 'big')
 configure_file(output: 'config.h',
   configuration: cdata)
 
+py = import('python').find_installation('python3')
+
+base64u_c = custom_target('gen_base64u',
+  input : 'src/base64.c',
+  output : 'base64u.c',
+  command : [
+    py, '-c',
+    '''
+import sys, re;
+text = open(sys.argv[1]).read();
+text = re.sub(r"([Bb][Aa][Ss][Ee]64)", lambda m: m.group(1) + "u", text);
+text = text.replace("0123456789+", "0123456789_");
+open(sys.argv[2], "w").write(text)
+    ''',
+    '@INPUT@', '@OUTPUT@'
+  ]
+)
+
 common = files([
   'src/base32.c',
   'src/base64.c',
-  'src/base64u.c',
   'src/base128.c',
   'src/common.c',
   'src/dns.c',
@@ -86,7 +108,7 @@ common = files([
   'src/read.c',
   'src/tun.c',
   'src/util.c',
-])
+]) + base64u_c
 
 client = files([
   'src/client.c',
@@ -96,6 +118,7 @@ client = files([
 executable('iodine',
   sources: client + common,
   dependencies: commondeps,
+  include_directories: srcdir,
   install: true,
   install_dir: get_option('sbindir'))
 
@@ -108,6 +131,7 @@ server = files([
 executable('iodined',
   sources: common + server,
   dependencies: commondeps + serverdeps,
+  include_directories: srcdir,
   install: true,
   install_dir: get_option('sbindir'))
 

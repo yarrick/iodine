@@ -21,7 +21,7 @@
 #include "config.h"
 
 #ifdef WINDOWS
-#include "windows.h"
+#include "windows_dns.h"
 #else
 #include <netinet/in.h>
 #include <arpa/inet.h>

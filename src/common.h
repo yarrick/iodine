@@ -36,7 +36,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 
 #include <stdarg.h>
 #ifdef WINDOWS
-#include "windows.h"
+#include "windows_dns.h"
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
