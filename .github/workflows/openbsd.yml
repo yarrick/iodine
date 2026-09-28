@@ -16,13 +16,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make
-      uses: vmactions/openbsd-vm@v1.1.8
+      uses: vmactions/openbsd-vm@v1.4.8
       with:
         prepare: |
           pkg_add \
             check \
             git \
-            pkgconf
+            pkgconf \
+            meson
         run: |
-          make
-          make test
+          meson setup build
+          cd build
+          ninja
+          ninja test

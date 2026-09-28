@@ -16,12 +16,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: make
-      run: make
-    - name: install check
-      run: sudo apt install check
+    - name: install deps
+      run: sudo apt install meson ninja-build check
+    - name: meson setup
+      run: meson setup build
+    - name: build
+      working-directory: build
+      run: ninja
     - name: run tests
-      run: make test
+      working-directory: build
+      run: ninja test
 
   build-android:
 
@@ -29,8 +33,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: nttld/setup-ndk@v1
-      with:
-        ndk-version: r21e
-    - name: make
-      run: make cross-android
+    - name: install deps
+      run: sudo apt install meson ninja-build check
+    - name: meson setup
+      run: meson setup build-android --cross-file .github/ubuntu-android-aarch64.ini
+    - name: build
+      working-directory: build-android
+      run: ninja

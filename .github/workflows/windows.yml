@@ -23,6 +23,9 @@ jobs:
       with:
         msystem: MINGW64
         update: false
-        install: git make mingw-w64-x86_64-toolchain mingw-w64-x86_64-zlib
-    - name: make
-      run: make TARGETOS=windows32
+        install: git mingw-w64-x86_64-toolchain mingw-w64-x86_64-zlib mingw-w64-x86_64-meson
+    - name: setup
+      run: meson setup build
+    - name: build
+      working-directory: build
+      run: ninja

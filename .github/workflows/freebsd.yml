@@ -16,13 +16,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make
-      uses: vmactions/freebsd-vm@v1.2.0
+      uses: vmactions/freebsd-vm@v1.5.8
       with:
         prepare: |
           pkg install -y \
             devel/check \
             devel/git \
-            devel/pkgconf
+            devel/pkgconf \
+            devel/meson \
+            lang/python3
         run: |
-          make
-          make test
+          meson setup build
+          cd build
+          ninja
+          ninja test
