@@ -42,7 +42,7 @@
 #endif
 #endif
 
-
+#include "compat.h"
 #include "dns.h"
 #include "encoding.h"
 #include "read.h"

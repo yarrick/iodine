@@ -54,7 +54,9 @@ optional_functions = [
   'daemon',
   'getpwnam',
   'getrandom',
+  'inet_aton',
   'setgroups',
+  'warnx',
 ]
 foreach func : optional_functions
   if cc.has_function(func)
@@ -102,6 +104,7 @@ common = files([
   'src/base64.c',
   'src/base128.c',
   'src/common.c',
+  'src/compat.c',
   'src/dns.c',
   'src/encoding.c',
   'src/login.c',

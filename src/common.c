@@ -55,6 +55,7 @@
 #endif
 
 #include "common.h"
+#include "compat.h"
 
 /* The raw header used when not using DNS protocol */
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
@@ -360,80 +361,6 @@ query_datalen(const char *qname, const char *topdomain)
 	}
 	return -1;
 }
-
-#if defined(WINDOWS) || defined(ANDROID)
-#ifndef ANDROID
-int
-inet_aton(const char *cp, struct in_addr *inp)
-{
- inp->s_addr = inet_addr(cp);
- return inp->s_addr != INADDR_ANY;
-}
-#endif
-
-void
-vwarn(const char *fmt, va_list list)
-{
-	if (fmt) vfprintf(stderr, fmt, list);
-#ifndef ANDROID
-	if (errno == 0) {
-		fprintf(stderr, ": WSA error %d\n", WSAGetLastError());
-	} else {
-		fprintf(stderr, ": %s\n", strerror(errno));
-	}
-#endif
-}
-
-void
-warn(const char *fmt, ...)
-{
-	va_list list;
-
-	va_start(list, fmt);
-	vwarn(fmt, list);
-	va_end(list);
-}
-
-void
-err(int eval, const char *fmt, ...)
-{
-	va_list list;
-
-	va_start(list, fmt);
-	vwarn(fmt, list);
-	va_end(list);
-	exit(eval);
-}
-
-void
-vwarnx(const char *fmt, va_list list)
-{
-	if (fmt) vfprintf(stderr, fmt, list);
-	fprintf(stderr, "\n");
-}
-
-void
-warnx(const char *fmt, ...)
-{
-	va_list list;
-
-	va_start(list, fmt);
-	vwarnx(fmt, list);
-	va_end(list);
-}
-
-void
-errx(int eval, const char *fmt, ...)
-{
-	va_list list;
-
-	va_start(list, fmt);
-	vwarnx(fmt, list);
-	va_end(list);
-	exit(eval);
-}
-#endif
-
 
 int recent_seqno(int ourseqno, int gotseqno)
 /* Return 1 if we've seen gotseqno recently (current or up to 3 back).

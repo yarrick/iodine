@@ -27,6 +27,7 @@
 #include <fcntl.h>
 
 #include "config.h"
+#include "compat.h"
 
 #ifdef DARWIN
 #include <ctype.h>

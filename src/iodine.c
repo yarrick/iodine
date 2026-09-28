@@ -40,6 +40,7 @@
 #endif
 
 #include "common.h"
+#include "compat.h"
 #include "process.h"
 #include "tun.h"
 #include "client.h"

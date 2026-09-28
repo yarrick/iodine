@@ -48,6 +48,7 @@
 #endif
 
 #include "common.h"
+#include "compat.h"
 #include "encoding.h"
 #include "dns.h"
 #include "login.h"
