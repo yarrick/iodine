@@ -64,8 +64,8 @@
 /* The raw header used when not using DNS protocol */
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
 
-/* daemon(3) exists only in 4.4BSD or later, and in GNU libc */
-#if !defined(ANDROID) && !defined(WINDOWS) && !(defined(BSD) && (BSD >= 199306)) && !defined(__GLIBC__) && !defined(__HAIKU__)
+/* Provide daemon(3) if required and not available */
+#if !ANDROID && !WINDOWS && !HAVE_DAEMON
 static int daemon(int nochdir, int noclose)
 {
  	int fd, i;
@@ -101,7 +101,7 @@ static int daemon(int nochdir, int noclose)
 }
 #endif
 
-#if defined(__BEOS__) && !defined(__HAIKU__)
+#if !HAVE_SETGROUPS
 int setgroups(int count, int *groups)
 {
 	/* errno = ENOSYS; */
@@ -244,7 +244,7 @@ close_dns(int fd)
 void
 do_chroot(char *newroot)
 {
-#if !(defined(WINDOWS) || defined(__BEOS__) || defined(__HAIKU__))
+#if HAVE_CHROOT
 	if (chroot(newroot) != 0 || chdir("/") != 0)
 		err(1, "%s", newroot);
 
