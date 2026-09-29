@@ -10,14 +10,17 @@ firewalled, but DNS queries are allowed.
 COMPILING
 ---------
 
-Iodine has no configure script. There are two optional features for Linux
-(SELinux and systemd support) that will be enabled automatically if the
-relevant header files are found in `/usr/include`.
-(See script at `./src/osflags`)
+To compile iodine you need meson.
+Run the following commands to compile inside the `build` directory:
 
-Run `make` to compile the server and client binaries.
-Run `make install` to copy binaries and manpage to the destination directory.
-Run `make test` to compile and run the unit tests. (Requires the `check` library)
+```
+meson setup build
+cd build
+ninja
+```
+
+To build and run the tests you need the `check` library. Start them by
+running `ninja test` inside the build directory.
 
 
 QUICKSTART

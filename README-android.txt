@@ -30,21 +30,18 @@ Extra README file for Android
 For more information: http://blog.bokhorst.biz/5123
 
 == Building iodine for Android:
-1. Download and install the Android SDK and NDK
+1. Note the path where you unpacked the Android NDK
 
 2. Download and unpack the iodine sources
 
-3. Build:
-	cd src
-	make base64u.h base64u.c
-	ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.16.mk APP_PLATFORM=android-16
+3. Copy the ubuntu-android-aarch64.ini or macos-android-aarch64.ini from
+   the .github subdirectory into the iodine directory, calling it android.ini
 
-   or run "make cross-android" in the iodine root directory.
-   To build for other archs, specify TARGET_ARCH_ABI:
-		"make cross-android TARGET_ARCH_ABI=x86"
+4. Open android.ini and edit the ndk_path to point to your NDK location
 
-   For older android versions (pre-kitkat), build with "make cross-android-old" in the
-   root directory, or manually like above but with APP_PLATFORM=android-3 and with
-   APP_BUILD_SCRIPT=Android.mk
-
-   The iodine binary ends up in src/libs/<arch>/iodine
+5. Build with meson using the cross file:
+   ```
+   meson setup build-android --cross-file android.ini
+   cd build-android
+   ninja
+   ```

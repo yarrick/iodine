@@ -9,9 +9,9 @@ Extra README file for Win32 related stuff
 
 == Running iodine on Windows:
 
-0. After iodine 0.6, you need Windows XP or newer to run.
+0. You need Windows XP or newer to run.
 
-1. Install the TAP driver 
+1. Install the TAP driver
    https://openvpn.net/index.php/open-source/downloads.html
    Download the OpenVPN TAP driver (under section Tap-windows)
    Problems has been reported with the NDIS6 version (9.2x.y), use the
@@ -31,25 +31,25 @@ Extra README file for Win32 related stuff
 
 
 == Building on Windows:
-You need:
-	MinGW, MSYS, GCC, zlib
+You need MSYS2 installed.
+Using MSYS2, install the following packages:
+* mingw-w64-x86_64-toolchain
+* mingw-w64-x86_64-zlib
+* mingw-w64-x86_64-meson
+* mingw-w64-x86_64-check (if you want to build and run the tests)
 
-Then just run make
-
+Open a MinGW console, and switch to the iodine directory. Then run:
+meson setup build
+cd build
+ninja
+(For the tests, run: ninja test)
 
 == Cross-compiling for MinGW:
 You need:
-	MinGW crosscompiler, crosscompiled zlib
+	MinGW crosscompiler, zlib and meson for MinGW (same packages as above)
 
-Then run "make cross-mingw"
-Note that the binaries will not get a .exe suffix
-
-
-== Zlib download
-You can get zlib for MinGW here (both for native and crosscompile):
-https://code.kryo.se/iodine/deps/zlib.zip
-Unzip it in your MinGW directory on Windows or in $ROOT/usr for
-cross-compile.
+Run the same commands, as on Windows but use mingw64-meson instead in the first
+case.
 
 
 == Results of crappy Win32 API:
