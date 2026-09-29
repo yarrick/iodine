@@ -66,7 +66,7 @@ sighandler(int sig)
 	client_stop();
 }
 
-#if defined(__GNUC__) || defined(__clang__)
+#ifdef HAVE_NORETURN_ATTR
 /* mark as no return to help some compilers to avoid warnings
  * about use of uninitialized variables */
 static inline void usage(void) __attribute__((noreturn));

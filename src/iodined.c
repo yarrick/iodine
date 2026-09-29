@@ -105,6 +105,13 @@ static char *__progname;
 extern char *__progname;
 #endif
 
+#ifdef HAVE_NORETURN_ATTR
+/* mark as no return to help some compilers to avoid warnings
+ * about use of uninitialized variables */
+static inline void usage(void) __attribute__((noreturn));
+static inline void help(FILE * stream) __attribute__((noreturn));
+#endif
+
 /* Struct with IPv4 and IPv6 file descriptors.
  * Need to be passed on down to tunneling code since we can get a
  * packet on one fd meant for a user on the other.

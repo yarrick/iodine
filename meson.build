@@ -64,6 +64,10 @@ foreach func : optional_functions
   endif
 endforeach
 
+if cc.has_function_attribute('noreturn')
+  cdata.set10('HAVE_NORETURN_ATTR', true)
+endif
+
 if cc.links('''
   #include <stdio.h>
   extern char *__progname;
