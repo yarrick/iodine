@@ -29,6 +29,8 @@
 #include <arpa/inet.h>
 #endif
 
+void network_init(void);
+
 #ifndef HAVE_INET_ATON
 int inet_aton(const char *cp, struct in_addr *inp);
 #endif

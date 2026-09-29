@@ -32,7 +32,6 @@
 
 #ifdef WINDOWS
 #include "windows_dns.h"
-#include <winsock2.h>
 #else
 #include <grp.h>
 #include <pwd.h>
@@ -46,11 +45,6 @@
 #include "client.h"
 #include "encoding.h"
 #include "util.h"
-
-#ifdef WINDOWS
-WORD req_version = MAKEWORD(2, 2);
-WSADATA wsa_data;
-#endif
 
 #ifndef HAVE_PROGNAME
 static char *__progname;
@@ -181,10 +175,7 @@ int main(int argc, char **argv)
 	hostname_maxlen = 0xFF;
 	nameserv_family = AF_UNSPEC;
 
-#ifdef WINDOWS
-	WSAStartup(req_version, &wsa_data);
-#endif
-
+	network_init();
 	client_init();
 
 #ifndef HAVE_PROGNAME

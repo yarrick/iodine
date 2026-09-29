@@ -36,7 +36,6 @@
 
 #ifdef WINDOWS
 #include "windows_dns.h"
-#include <winsock2.h>
 #else
 #include <arpa/nameser.h>
 #ifdef DARWIN
@@ -63,11 +62,6 @@
 
 #ifdef HAVE_SYSTEMD
 # include <systemd/sd-daemon.h>
-#endif
-
-#ifdef WINDOWS
-WORD req_version = MAKEWORD(2, 2);
-WSADATA wsa_data;
 #endif
 
 #define PASSWORD_ENV_VAR "IODINED_PASS"
@@ -2483,9 +2477,7 @@ main(int argc, char **argv)
 
 	retval = 0;
 
-#ifdef WINDOWS
-	WSAStartup(req_version, &wsa_data);
-#endif
+	network_init();
 
 #ifndef HAVE_PROGNAME
 	__progname = strrchr(argv[0], '/');

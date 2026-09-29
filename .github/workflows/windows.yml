@@ -29,3 +29,6 @@ jobs:
     - name: build
       working-directory: build
       run: ninja
+    - name: run tests
+      working-directory: build
+      run: ninja test

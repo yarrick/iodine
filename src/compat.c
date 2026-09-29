@@ -20,6 +20,22 @@
 
 #include <stdio.h>
 
+#ifdef WINDOWS
+#include "windows_dns.h"
+#include <winsock2.h>
+
+WORD req_version = MAKEWORD(2, 2);
+WSADATA wsa_data;
+#endif
+
+void
+network_init(void)
+{
+#ifdef WINDOWS
+	WSAStartup(req_version, &wsa_data);
+#endif
+}
+
 #ifndef HAVE_INET_ATON
 int
 inet_aton(const char *cp, struct in_addr *inp)

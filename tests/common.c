@@ -16,6 +16,7 @@
  */
 
 #include "config.h"
+#include "compat.h"
 #include "process.h"
 
 #include <check.h>
@@ -419,6 +420,7 @@ test_create()
 {
 	TCase *tc;
 	int sock;
+	network_init();
 
 	tc = tcase_create("Common");
 	tcase_add_test(tc, test_topdomain_ok);
