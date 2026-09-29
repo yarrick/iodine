@@ -52,7 +52,7 @@ WORD req_version = MAKEWORD(2, 2);
 WSADATA wsa_data;
 #endif
 
-#if !defined(BSD) && !defined(__GLIBC__)
+#ifndef HAVE_PROGNAME
 static char *__progname;
 #else
 extern char *__progname;
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 
 	client_init();
 
-#if !defined(BSD) && !defined(__GLIBC__)
+#ifndef HAVE_PROGNAME
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
 		__progname = argv[0];

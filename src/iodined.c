@@ -99,7 +99,7 @@ static in_addr_t ns_ip;
 static int bind_port;
 static int debug;
 
-#if !defined(BSD) && !defined(__GLIBC__)
+#ifndef HAVE_PROGNAME
 static char *__progname;
 #else
 extern char *__progname;
@@ -2110,9 +2110,9 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 	msg.msg_flags = 0;
 
 	r = recvmsg(fd, &msg, 0);
-#ifdef __FreeBSD__
+#ifdef FREEBSD
 	addrlen = msg.msg_namelen;
-#endif /* __FreeBSD__ */
+#endif /* FREEBSD */
 #else
 	addrlen = sizeof(struct sockaddr_storage);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
@@ -2480,7 +2480,7 @@ main(int argc, char **argv)
 	WSAStartup(req_version, &wsa_data);
 #endif
 
-#if !defined(BSD) && !defined(__GLIBC__)
+#ifndef HAVE_PROGNAME
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
 		__progname = argv[0];
@@ -2810,7 +2810,7 @@ main(int argc, char **argv)
 #ifdef FREEBSD
 	tzset();
 #endif
-#ifndef WINDOWS
+#ifdef HAVE_SYSLOG
 	openlog(__progname, LOG_NDELAY, LOG_DAEMON);
 #endif
 
