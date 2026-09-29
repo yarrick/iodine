@@ -26,6 +26,7 @@ jobs:
             devel/meson \
             lang/python3
         run: |
+          git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
           cd build
           ninja

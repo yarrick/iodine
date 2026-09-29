@@ -22,9 +22,9 @@ jobs:
           pkg_add \
             check \
             git \
-            pkgconf \
             meson
         run: |
+          git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
           cd build
           ninja
