@@ -176,12 +176,13 @@ putname(char **buf, size_t buflen, const char *host)
 	int left;
 	char *h;
 	char *p;
+	char *saveptr = NULL;
 
 	h = strdup(host);
 	left = buflen;
 	p = *buf;
 
-	word = strtok(h, ".");
+	word = strtok_r(h, ".", &saveptr);
 	while(word) {
 		size_t word_len = strlen(word);
 		if (word_len > 63 || word_len > left) {
@@ -194,7 +195,7 @@ putname(char **buf, size_t buflen, const char *host)
 		memcpy(p, word, word_len);
 		p += word_len;
 
-		word = strtok(NULL, ".");
+		word = strtok_r(NULL, ".", &saveptr);
 	}
 
 	*p++ = 0;
