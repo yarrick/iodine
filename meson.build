@@ -168,6 +168,7 @@ if libcheck.found()
     s = executable('test_@0@'.format(name), [
         'tests/@0@.c'.format(name),
         'tests/test.c',
+        'src/compat.c',
       ] + suite[1],
       include_directories: srcdir,
       dependencies: [libcheck, commondeps],

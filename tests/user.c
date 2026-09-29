@@ -15,13 +15,19 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "config.h"
+
 #include <check.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#ifdef WINDOWS
+#include "windows_dns.h"
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
 
 #include "common.h"
 #include "encoding.h"

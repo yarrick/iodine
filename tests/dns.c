@@ -15,16 +15,22 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "config.h"
+
 #include <check.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <sys/types.h>
+#ifdef WINDOWS
+#include "windows_dns.h"
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <sys/stat.h>
 #include <arpa/nameser.h>
+#endif
+#include <sys/stat.h>
 #ifdef DARWIN
 #define BIND_8_COMPAT
 #include <arpa/nameser_compat.h>

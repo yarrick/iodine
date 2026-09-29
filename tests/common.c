@@ -23,10 +23,14 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
+#ifdef WINDOWS
+#include "windows_dns.h"
+#else
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <netdb.h>
+#endif
 
 START_TEST(test_topdomain_ok)
 {
@@ -309,6 +313,7 @@ START_TEST(test_get_addr_err)
 }
 END_TEST
 
+#ifndef WINDOWS
 START_TEST(test_pidfile_writes_pid)
 {
 	char path[64];
@@ -385,6 +390,7 @@ START_TEST(test_pidfile_rejects_symlink)
 	(void)unlink(target);
 }
 END_TEST
+#endif
 
 START_TEST(test_secure_random)
 {
@@ -424,8 +430,10 @@ test_create()
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 	tcase_add_test(tc, test_get_addr_err);
+#ifndef WINDOWS
 	tcase_add_test(tc, test_pidfile_writes_pid);
 	tcase_add_test(tc, test_pidfile_rejects_symlink);
+#endif
 	tcase_add_test(tc, test_secure_random);
 
 	/* Tests require IPv6 support */
