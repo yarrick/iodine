@@ -105,12 +105,19 @@ static int hostname_maxlen = 0xFF;
 void
 client_init(void)
 {
+	unsigned int r;
+
 	running = 1;
-	rand_seed = ((unsigned int) rand()) & 0xFFFF;
-	send_ping_soon = 1;	/* send ping immediately after startup */
+	/* rand_seed/chunkid identify our outgoing DNS queries and are sent
+	   on the wire; seed them from a CSPRNG (they used to come from
+	   rand() after srand(time(NULL)), making them predictable). */
+	secure_random(&r, sizeof(r));
+	rand_seed = r & 0xFFFF;
+	send_ping_soon = 1;	/* send ping immediately at startup */
 	conn = CONN_DNS_NULL;
 
-	chunkid = ((unsigned int) rand()) & 0xFFFF;
+	secure_random(&r, sizeof(r));
+	chunkid = r & 0xFFFF;
 	chunkid_prev = 0;
 	chunkid_prev2 = 0;
 
@@ -1405,8 +1412,19 @@ handshake_login(int dns_fd, int seed)
 
 				server[64] = 0;
 				client[64] = 0;
-				if (tun_setip(client, server, netmask) == 0 &&
-					tun_setmtu(mtu) == 0) {
+				/* The netmask prefix length comes from the server's reply.
+				   Validate it: tun_setip() computes the mask with
+				   "netmask <<= (32 - netbits)", which is undefined
+				   behavior for netbits < 1 or > 32 (an on-path
+				   attacker can supply the reply - see the lack of
+				   channel authentication). Reject like a malformed
+				   handshake and retry login. */
+				if (netmask < 1 || netmask > 32) {
+					fprintf(stderr,
+						"Received bad handshake (netmask %d)\n",
+						netmask);
+				} else if (tun_setip(client, server, netmask) == 0 &&
+					   tun_setmtu(mtu) == 0) {
 
 					fprintf(stderr, "Server tunnel IP is %s\n", server);
 					return 0;

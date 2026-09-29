@@ -617,6 +617,16 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 #endif
 #endif
 
+	/* netbits is the CIDR prefix length (1..32). Out-of-range values
+	   would make "netmask <<= (32 - netbits)" below undefined
+	   behavior; reject them. Callers normally validate already, but
+	   the netmask can come from untrusted input (client handshake
+	   reply). */
+	if (netbits < 1 || netbits > 32) {
+		fprintf(stderr, "Invalid netmask prefix: %d!\n", netbits);
+		return 1;
+	}
+
 	netmask = 0;
 	for (i = 0; i < netbits; i++) {
 		netmask = (netmask << 1) | 1;

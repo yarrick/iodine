@@ -40,6 +40,7 @@
 #include "common.h"
 #include "tun.h"
 #include "client.h"
+#include "encoding.h"
 #include "util.h"
 
 #ifdef WINDOWS32
@@ -161,7 +162,6 @@ int main(int argc, char **argv)
 #endif
 	username = NULL;
 	memset(password, 0, 33);
-	srand(time(NULL));
 	foreground = 0;
 	newroot = NULL;
 	context = NULL;
@@ -181,7 +181,6 @@ int main(int argc, char **argv)
 	WSAStartup(req_version, &wsa_data);
 #endif
 
-	srand((unsigned) time(NULL));
 	client_init();
 
 #if !defined(BSD) && !defined(__GLIBC__)
@@ -319,6 +318,19 @@ int main(int argc, char **argv)
 
 	if (check_topdomain(topdomain, 0, &errormsg)) {
 		warnx("Invalid topdomain: %s", errormsg);
+		usage();
+		/* NOTREACHED */
+	}
+
+	/* The topdomain plus a small fixed overhead (header + dot +
+	   safety, see hostname_need in encoding.c) must fit into the
+	   maximum hostname length, otherwise no tunnel payload can ever
+	   be carried - and the old code underflowed (size_t) in
+	   build_hostname with such a configuration. */
+	if (hostname_need(topdomain) > (size_t) hostname_maxlen) {
+		warnx("Topdomain too long for -M %d: needs at least %zu characters. "
+			"Use a shorter topdomain or a larger -M.",
+			hostname_maxlen, hostname_need(topdomain));
 		usage();
 		/* NOTREACHED */
 	}

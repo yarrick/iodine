@@ -19,15 +19,35 @@
 #include "common.h"
 #include "encoding.h"
 
+size_t hostname_need(const char *topdomain)
+{
+	/* 8 = 5 max header length + 1 dot before topdomain + 2 safety */
+	return strlen(topdomain) + 8;
+}
+
 int build_hostname(char *buf, size_t buflen, const char *data,
 		   const size_t datalen, const char *topdomain,
 		   const struct encoder *encoder, int maxlen)
 {
 	size_t space;
 	char *b;
+	size_t need;
+	size_t cap;
 
-	space = MIN((size_t)maxlen, buflen) - strlen(topdomain) - 8;
-	/* 8 = 5 max header length + 1 dot before topdomain + 2 safety */
+	need = hostname_need(topdomain);
+	cap = MIN((size_t)maxlen, buflen);
+	if (cap < need) {
+		/* The topdomain plus the fixed overhead do not fit into
+		   the maximum hostname length. Without this check the
+		   subtraction below underflows (size_t) and the encoder
+		   gets an output limit of ~2^64 bytes, writing past the
+		   end of buf. Clamp to 0: no payload fits, emit just the
+		   topdomain (the client refuses such a configuration at
+		   startup anyway - see iodine.c). */
+		space = 0;
+	} else {
+		space = cap - need;
+	}
 
 	if (!encoder->places_dots)
 		space -= (space / 57); /* space for dots */
@@ -39,15 +59,20 @@ int build_hostname(char *buf, size_t buflen, const char *data,
 	if (!encoder->places_dots)
 		inline_dotify(buf, buflen);
 
-	b = buf;
-	b += strlen(buf);
+	b = buf + strlen(buf);
 
-	/* move b back one step to see if the dot is there */
-	b--;
-	if (*b != '.')
-		*++b = '.';
-	b++;
-	/* move b ahead of the string so we can copy to it */
+	if (b > buf) {
+		/* move b back one step to see if the dot is there */
+		b--;
+		if (*b != '.')
+			*++b = '.';
+		/* move b ahead of the string so we can copy to it */
+		b++;
+	} else {
+		/* No encoded data fit; use the buffer start so the
+		   topdomain does not get an empty label in front. */
+		b = buf;
+	}
 
 	strncpy(b, topdomain, strlen(topdomain)+1);
 

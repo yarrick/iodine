@@ -211,6 +211,83 @@ START_TEST(test_read_name_badjump_second)
 }
 END_TEST
 
+START_TEST(test_read_name_truncated_label)
+{
+	/* Label length byte claims 18 bytes but the packet ends after the
+	   first data byte. */
+	unsigned char p[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x12, 'a' };
+	char *pm;
+	char buf[256];
+	char *data;
+	int rv;
+
+	pm = malloc(sizeof(p) + 8);
+	if (pm) {
+		memset(buf, 0, sizeof(buf));
+		memset(pm, 0, sizeof(p) + 8);
+		memcpy(pm, p, sizeof(p));
+		data = (char *) pm + sizeof(HEADER);
+		rv = readname((char *) pm, sizeof(p), &data, buf, 256);
+		ck_assert(rv > 0);
+		ck_assert_msg(buf[255] == 0, "readname ran past its bounds");
+		ck_assert_str_eq("a", buf);
+		free(pm);
+	}
+}
+END_TEST
+
+START_TEST(test_read_name_ptr_at_packet_end)
+{
+	/* Compression pointer as the very last byte of the packet (no low
+	   byte present). */
+	unsigned char p[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xc0 };
+	char *pm = malloc(sizeof(p) + 8);
+	char buf[256];
+	char *data;
+	int rv;
+
+	if (pm) {
+		memset(buf, 0, sizeof(buf));
+		memset(pm, 0, sizeof(p) + 8);
+		memcpy(pm, p, sizeof(p));
+		data = (char *) pm + sizeof(HEADER);
+		rv = readname((char *) pm, sizeof(p), &data, buf, 256);
+		ck_assert(rv == 1);
+		ck_assert_str_eq("", buf);
+		free(pm);
+	}
+}
+END_TEST
+
+START_TEST(test_read_name_ptr_out_of_range)
+{
+	/* Compression pointer with both bytes present but an offset far
+	   outside the packet. Rejected as a bad jump (rv == 0). */
+	unsigned char p[] = {
+		'A', 'A', 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xc0, 0x0e }; /* both pointer bytes present, offset (0x0E0E) is out of range */
+	char *pm = malloc(sizeof(p) + 8);
+	char buf[256];
+	char *data;
+	int rv;
+
+	if (pm) {
+		memset(buf, 0, sizeof(buf));
+		memset(pm, 0, sizeof(p) + 8);
+		memcpy(pm, p, sizeof(p));
+		data = (char *) pm + sizeof(HEADER);
+		rv = readname((char *) pm, sizeof(p), &data, buf, 256);
+		ck_assert(rv == 0);
+		ck_assert(buf[0] == 0);
+		free(pm);
+	}
+}
+END_TEST
+
 START_TEST(test_putname)
 {
 	char out[] = "\x06" "BADGER\x06" "BADGER\x04" "KRYO\x02" "SE\x00";
@@ -284,6 +361,9 @@ test_read_create_tests(void)
 	tcase_add_test(tc, test_read_name_onejump);
 	tcase_add_test(tc, test_read_name_badjump_start);
 	tcase_add_test(tc, test_read_name_badjump_second);
+	tcase_add_test(tc, test_read_name_truncated_label);
+	tcase_add_test(tc, test_read_name_ptr_at_packet_end);
+	tcase_add_test(tc, test_read_name_ptr_out_of_range);
 	tcase_add_test(tc, test_putname);
 	tcase_add_test(tc, test_putname_nodot);
 	tcase_add_test(tc, test_putname_toolong);

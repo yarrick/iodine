@@ -145,6 +145,11 @@ void errx(int eval, const char *fmt, ...);
 
 int recent_seqno(int , int);
 
+/* Fill buf with len bytes of cryptographically-secure random data
+ * (getrandom/arc4random//dev/urandom/CryptoAPI; see common.c).
+ * Used for protocol-seed and nonce generation instead of rand(). */
+void secure_random(void *buf, size_t len);
+
 #ifndef WINDOWS32
 void fd_set_close_on_exec(int fd);
 #endif

@@ -150,7 +150,11 @@ get_external_ip(struct in_addr *ip)
 		struct timeval tv;
 
 		if (attempt) fprintf(stderr, "Retrying external IP lookup\n");
-		query.id = rand();
+		{
+			uint16_t rid;
+			secure_random(&rid, sizeof(rid));
+			query.id = rid;
+		}
 		buflen = sizeof(buf);
 		buflen = dns_encode(buf, buflen, &query, QR_QUERY, target, strlen(target));
 		if (buflen < 0) continue;
@@ -370,12 +374,12 @@ static void save_to_dnscache(int userid, struct query *q, char *answer, int answ
 {
 	int fill;
 
-	if (answerlen > sizeof(users[userid].dnscache_answer[fill]))
-		return;  /* can't store this */
-
 	fill = users[userid].dnscache_lastfilled + 1;
 	if (fill >= DNSCACHE_LEN)
 		fill = 0;
+
+	if (answerlen > sizeof(users[userid].dnscache_answer[fill]))
+		return;  /* can't store this */
 
 	memcpy(&(users[userid].dnscache_q[fill]), q, sizeof(struct query));
 	memcpy(users[userid].dnscache_answer[fill], answer, answerlen);
@@ -799,7 +803,16 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			if (userid >= 0) {
 				int i;
 
-				users[userid].seed = rand();
+				{
+					int newseed;
+					/* CSPRNG seed: the login challenge is
+					   MD5(password XOR seed), so the seed
+					   must not be predictable from server
+					   start time (rand() after
+					   srand(time(NULL)) was). */
+					secure_random(&newseed, sizeof(newseed));
+					users[userid].seed = newseed;
+				}
 				/* Store remote IP number */
 				memcpy(&(users[userid].host), &(q->from), q->fromlen);
 				users[userid].hostlen = q->fromlen;
@@ -1131,7 +1144,9 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		} else {
 			char buf[2048];
 			int i;
-			unsigned int v = ((unsigned int) rand()) & 0xff ;
+			unsigned int v;
+			secure_random(&v, sizeof(v));
+			v &= 0xff;
 
 			memset(buf, 0, sizeof(buf));
 			buf[0] = (req_frag_size >> 8) & 0xff;
@@ -2091,6 +2106,9 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 	msg.msg_flags = 0;
 
 	r = recvmsg(fd, &msg, 0);
+#ifdef __FreeBSD__
+	addrlen = msg.msg_namelen;
+#endif /* __FreeBSD__ */
 #else
 	addrlen = sizeof(struct sockaddr_storage);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
@@ -2466,7 +2484,6 @@ main(int argc, char **argv)
 		__progname++;
 #endif
 
-	srand(time(NULL));
 	fw_query_init();
 
 	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
