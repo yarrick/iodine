@@ -9,6 +9,10 @@ master:
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
 	  patch by Pouria Mousavizadeh Tehrani.
     - Now builds on macOS even without if_utun.h (pre 10.6).
+    - Various security and robustness fixes (cryptographic random,
+      pidfile writing, parsing fixes) contributed by auto-charlie.
+    - Build system changed to meson
+    - FreeBSD bugfix for EINVAL after sendto(), from Sergei Zhmylev.
 
 2023-04-17: 0.8.0 "Burning Snowman"
 	- Mac OS X: Support native utun VPN devices. Patch by
