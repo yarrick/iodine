@@ -33,12 +33,12 @@ Extra README file for Win32 related stuff
 == Building on Windows:
 You need MSYS2 installed.
 Using MSYS2, install the following packages:
-* mingw-w64-x86_64-toolchain
-* mingw-w64-x86_64-zlib
-* mingw-w64-x86_64-meson
-* mingw-w64-x86_64-check (if you want to build and run the tests)
+* mingw-w64-ucrt-x86_64-toolchain
+* mingw-w64-ucrt-x86_64-zlib
+* mingw-w64-ucrt-x86_64-meson
+* mingw-w64-ucrt-x86_64-check (if you want to build and run the tests)
 
-Open a MinGW console, and switch to the iodine directory. Then run:
+Open a MinGW UCRT64 console, and switch to the iodine directory. Then run:
 meson setup build
 cd build
 ninja
@@ -46,9 +46,9 @@ ninja
 
 == Cross-compiling for MinGW:
 You need:
-	MinGW crosscompiler, zlib and meson for MinGW (same packages as above)
+	MinGW UCRT64 crosscompiler, zlib and meson for UCRT64 (same packages as above)
 
-Run the same commands, as on Windows but use mingw64-meson instead in the first
+Run the same commands, as on Windows but use ucrt64-meson instead in the first
 case.
 
 
