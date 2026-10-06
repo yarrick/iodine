@@ -115,9 +115,14 @@ common = files([
   'src/md5.c',
   'src/process.c',
   'src/read.c',
-  'src/tun.c',
   'src/util.c',
 ]) + base64u_c
+
+if host_machine.system() == 'windows'
+  common += 'src/tun_windows.c'
+else
+  common += 'src/tun_unix.c'
+endif
 
 client = files([
   'src/client.c',
