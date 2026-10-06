@@ -121,6 +121,8 @@ int open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len,
 int open_dns_from_host(char *host, int port, int addr_family, int flags);
 void close_dns(int);
 
+int build_netmask(int netbits, struct in_addr *addr);
+
 void read_password(char*, size_t);
 
 int check_topdomain(char *, int, char **);

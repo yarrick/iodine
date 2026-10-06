@@ -297,31 +297,17 @@ int
 tun_setip(const char *ip, const char *other_ip, int netbits)
 {
 	char cmdline[512];
-	int netmask;
-	struct in_addr net;
-	int i;
+	struct in_addr netmask;
 	int r;
 	DWORD status;
 	DWORD ipdata[3];
 	struct in_addr addr;
 	DWORD len;
 
-	/* netbits is the CIDR prefix length (1..32). Out-of-range values
-	   would make "netmask <<= (32 - netbits)" below undefined
-	   behavior; reject them. Callers normally validate already, but
-	   the netmask can come from untrusted input (client handshake
-	   reply). */
-	if (netbits < 1 || netbits > 32) {
-		fprintf(stderr, "Invalid netmask prefix: %d!\n", netbits);
+	if (build_netmask(netbits, &netmask)) {
+		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
 		return 1;
 	}
-
-	netmask = 0;
-	for (i = 0; i < netbits; i++) {
-		netmask = (netmask << 1) | 1;
-	}
-	netmask <<= (32 - netbits);
-	net.s_addr = htonl(netmask);
 
 	if (inet_addr(ip) == INADDR_NONE) {
 		fprintf(stderr, "Invalid IP: %s!\n", ip);
@@ -339,9 +325,9 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	}
 
 	if (inet_aton(ip, &addr)) {
-		ipdata[0] = (DWORD) addr.s_addr;   /* local ip addr */
-		ipdata[1] = net.s_addr & ipdata[0]; /* network addr */
-		ipdata[2] = (DWORD) net.s_addr;    /* netmask */
+		ipdata[0] = (DWORD) addr.s_addr;        /* local ip addr */
+		ipdata[1] = netmask.s_addr & ipdata[0]; /* network addr */
+		ipdata[2] = (DWORD) netmask.s_addr;     /* netmask */
 	} else {
 		return -1;
 	}

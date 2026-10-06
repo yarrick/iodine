@@ -353,9 +353,7 @@ int
 tun_setip(const char *ip, const char *other_ip, int netbits)
 {
 	char cmdline[512];
-	int netmask;
-	struct in_addr net;
-	int i;
+	struct in_addr netmask;
 #ifndef LINUX
 	int r;
 #endif
@@ -364,27 +362,16 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	struct in_addr netip;
 #endif
 
-	/* netbits is the CIDR prefix length (1..32). Out-of-range values
-	   would make "netmask <<= (32 - netbits)" below undefined
-	   behavior; reject them. Callers normally validate already, but
-	   the netmask can come from untrusted input (client handshake
-	   reply). */
-	if (netbits < 1 || netbits > 32) {
-		fprintf(stderr, "Invalid netmask prefix: %d!\n", netbits);
+	if (build_netmask(netbits, &netmask)) {
+		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
 		return 1;
 	}
-
-	netmask = 0;
-	for (i = 0; i < netbits; i++) {
-		netmask = (netmask << 1) | 1;
-	}
-	netmask <<= (32 - netbits);
-	net.s_addr = htonl(netmask);
 
 	if (inet_addr(ip) == INADDR_NONE) {
 		fprintf(stderr, "Invalid IP: %s!\n", ip);
 		return 1;
 	}
+
 #ifdef FREEBSD
 	display_ip = other_ip; /* FreeBSD wants other IP as second IP */
 #else
@@ -395,12 +382,12 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 			if_name,
 			ip,
 			display_ip,
-			inet_ntoa(net));
+			inet_ntoa(netmask));
 
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
 #ifndef LINUX
 	netip.s_addr = inet_addr(ip);
-	netip.s_addr = netip.s_addr & net.s_addr;
+	netip.s_addr = netip.s_addr & netmask.s_addr;
 	r = system(cmdline);
 	if (r != 0) {
 		return r;

@@ -200,6 +200,29 @@ close_dns(int fd)
 	close(fd);
 }
 
+int
+build_netmask(int netbits, struct in_addr *addr)
+{
+	uint32_t netmask;
+	int i;
+	/* netbits is the CIDR prefix length (1..32). Out-of-range values
+	   would make "netmask <<= (32 - netbits)" below undefined
+	   behavior; reject them. Callers normally validate already, but
+	   the netmask can come from untrusted input (client handshake
+	   reply). */
+	if (netbits < 1 || netbits > 32) {
+		return 1;
+	}
+
+	netmask = 0;
+	for (i = 0; i < netbits; i++) {
+		netmask = (netmask << 1) | 1;
+	}
+	netmask <<= (32 - netbits);
+	addr->s_addr = htonl(netmask);
+	return 0;
+}
+
 void
 read_password(char *buf, size_t len)
 {
