@@ -44,4 +44,11 @@ void warnx(const char *fmt, ...);
 void errx(int eval, const char *fmt, ...);
 #endif
 
+#ifndef HAVE_SYSLOG
+void syslog(int priority, const char *fmt, ...);
+#define LOG_NOTICE   1
+#define LOG_INFO     2
+#define LOG_WARNING  3
+#endif
+
 #endif

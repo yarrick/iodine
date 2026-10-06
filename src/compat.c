@@ -109,3 +109,14 @@ errx(int eval, const char *fmt, ...)
 }
 #endif
 
+#ifndef HAVE_SYSLOG
+void
+syslog(int priority, const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	vwarn(fmt, list);
+	va_end(list);
+}
+#endif

@@ -49,6 +49,8 @@
 #include <sys/uio.h>
 #include <pwd.h>
 #include <netdb.h>
+#endif
+#ifdef HAVE_SYSLOG
 #include <syslog.h>
 #endif
 

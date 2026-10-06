@@ -25,7 +25,7 @@
 #include "common.h"
 #include "compat.h"
 
-#ifndef WINDOWS
+#ifdef HAVE_SYSLOG
 #include <syslog.h>
 #endif
 #ifdef HAVE_SETCON

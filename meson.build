@@ -43,7 +43,6 @@ endif
 if host_machine.system() == 'windows'
   add_project_arguments('-DWINVER=0x0501', language: 'c')
   commondeps += declare_dependency(link_args: ['-lws2_32', '-liphlpapi'])
-  cdata.set('syslog(...)', true)
   cdata.set('sleep(seconds)', 'Sleep((seconds)*1000)')
 endif
 
@@ -56,6 +55,7 @@ optional_functions = [
   'getrandom',
   'inet_aton',
   'setgroups',
+  'syslog',
   'warnx',
 ]
 foreach func : optional_functions
