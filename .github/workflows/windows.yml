@@ -21,9 +21,9 @@ jobs:
     - uses: actions/checkout@v7
     - uses: msys2/setup-msys2@v2
       with:
-        msystem: MINGW64
+        msystem: UCRT64
         update: false
-        install: git mingw-w64-x86_64-toolchain mingw-w64-x86_64-zlib mingw-w64-x86_64-meson mingw-w64-x86_64-check
+        install: git mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-zlib mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-check
     - name: setup
       run: meson setup build
     - name: build
