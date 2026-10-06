@@ -343,7 +343,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	/* use netsh to set ip address */
 	fprintf(stderr, "Setting IP of interface '%s' to %s (can take a few seconds)...\n", if_name, ip);
 	snprintf(cmdline, sizeof(cmdline), "netsh interface ip set address \"%s\" static %s %s",
-		if_name, ip, inet_ntoa(net));
+		if_name, ip, inet_ntoa(netmask));
 	return system(cmdline);
 }
 
