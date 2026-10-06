@@ -37,7 +37,7 @@
 START_TEST(test_init_users)
 {
 	in_addr_t ip;
-	char givenip[16];
+	char givenip[32];
 	int i;
 	int count;
 
