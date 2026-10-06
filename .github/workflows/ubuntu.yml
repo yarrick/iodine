@@ -40,3 +40,17 @@ jobs:
     - name: build
       working-directory: build-android
       run: ninja
+
+  build-windows:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: install deps
+      run: sudo apt install meson ninja-build mingw-w64 mingw-w64-tools libz-mingw-w64-dev
+    - name: meson setup
+      run: meson setup build-windows --cross-file .github/ubuntu-windows-x86-64.ini
+    - name: build
+      working-directory: build-windows
+      run: ninja
