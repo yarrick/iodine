@@ -176,8 +176,8 @@ supported request types, for example:
 
 The reply should look like garbled text in all these cases.
 
-#### Mac OS X
-On Mac OS X 10.6 and later, iodine supports the native utun devices built into
+#### macOS
+On macOS 10.6 and later, iodine supports the native utun devices built into
 the OS - use `-d utunX`.
 
 
@@ -382,11 +382,11 @@ PORTABILITY
 -----------
 
 iodine has been tested on Linux (arm, ia64, x86, AMD64 and SPARC64), FreeBSD
-(ia64, x86), OpenBSD (x86), NetBSD (x86), MacOS X (ppc and x86, with
-<http://tuntaposx.sourceforge.net/>). and Windows (with OpenVPN TAP32 driver, see
-win32 readme file).  It should be easy to port to other unix-like systems that
-have TUN/TAP tunneling support. Let us know if you get it to run on other
-platforms.
+(ia64, x86), OpenBSD (x86), NetBSD (x86), macOS (arm64, ppc and x86, with
+utun or <http://tuntaposx.sourceforge.net/> for older versions), and Windows
+(with OpenVPN TAP32 driver, see win32 readme file).  It should be easy to port
+to other unix-like systems that have TUN/TAP tunneling support. Let us know if
+you get it to run on other platforms.
 
 
 THE NAME
