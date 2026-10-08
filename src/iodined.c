@@ -2390,7 +2390,7 @@ static void version(void)
 {
 	fprintf(stderr,
 		"iodine IP over DNS tunneling server\n"
-		"Git version: %s\n", GITREVISION);
+		"Version: %s\n", IODINE_VERSION);
 
 	exit(0);
 }

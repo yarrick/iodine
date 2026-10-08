@@ -9,7 +9,7 @@ project('iodine', 'c',
 
 # config.h contents
 cdata = configuration_data()
-cdata.set('GITREVISION', '"@0@"'.format(meson.project_version()))
+cdata.set('IODINE_VERSION', '"@0@"'.format(meson.project_version()))
 
 srcdir = include_directories('src')
 
