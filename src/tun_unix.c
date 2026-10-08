@@ -431,17 +431,11 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	char cmdline[512];
 	int r;
 	struct in_addr netip;
-	netip.s_addr = inet_addr(ip);
-	netip.s_addr = netip.s_addr & netmask.s_addr;
-	r = system(cmdline);
-	if (r != 0) {
-		return r;
-	} else {
-
-		snprintf(cmdline, sizeof(cmdline),
-				ROUTEPATH "route add %s/%d %s",
-				inet_ntoa(netip), netbits, ip);
-	}
+	netip.s_addr = localaddr.sin_addr.s_addr;
+	netip.s_addr = netip.s_addr & maskaddr.sin_addr.s_addr;
+	snprintf(cmdline, sizeof(cmdline),
+		ROUTEPATH "route add %s/%d %s",
+		inet_ntoa(netip), netbits, ip);
 	fprintf(stderr, "Adding route %s/%d to %s\n", inet_ntoa(netip), netbits, ip);
 	return system(cmdline);
 #endif
