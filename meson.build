@@ -34,6 +34,9 @@ if host_machine.system() == 'linux'
     serverdeps += systemd
   endif
 endif
+if host_machine.system() == 'android'
+  cdata.set10('LINUX', true)
+endif
 if host_machine.system() == 'gnu'
   add_project_arguments('-D_GNU_SOURCE', language: 'c')
 endif
