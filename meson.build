@@ -126,6 +126,9 @@ else
   if cc.has_header('sys/sockio.h')
     cdata.set10('HAVE_SYS_SOCKIO', true)
   endif
+  if cc.has_define('PF_ROUTE')
+    cdata.set10('HAVE_PF_ROUTE', true)
+  endif
 endif
 
 client = files([
