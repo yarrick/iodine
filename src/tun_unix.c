@@ -45,10 +45,6 @@
 #include <sys/sockio.h>
 #endif
 
-#ifndef IFCONFIGPATH
-#define IFCONFIGPATH "PATH=/sbin:/bin "
-#endif
-
 #ifndef ROUTEPATH
 #define ROUTEPATH "PATH=/sbin:/bin "
 #endif
@@ -445,20 +441,32 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 int
 tun_setmtu(const unsigned mtu)
 {
-	char cmdline[512];
+	int sock;
+	struct ifreq ifr;
 
-	if (mtu > 200 && mtu <= 1500) {
-		snprintf(cmdline, sizeof(cmdline),
-				IFCONFIGPATH "ifconfig %s mtu %u",
-				if_name,
-				mtu);
-
-		fprintf(stderr, "Setting MTU of %s to %u\n", if_name, mtu);
-		return system(cmdline);
-	} else {
+	if (mtu <= 200 || mtu > 1500) {
 		warn("MTU out of range: %u\n", mtu);
+		return 1;
 	}
 
-	return 1;
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock < 0) {
+		perror("tun_setmtu: socket creation failed");
+		return 1;
+	}
+
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
+	ifr.ifr_mtu = mtu;
+
+	fprintf(stderr, "Setting MTU of %s to %u\n", if_name, mtu);
+	if (ioctl(sock, SIOCSIFMTU, &ifr) < 0) {
+		perror("tun_setmtu: ioctl SIOCSIFMTU failed");
+		close(sock);
+		return 1;
+	}
+
+	close(sock);
+	return 0;
 }
 
