@@ -18,6 +18,7 @@
 #include <string.h>
 #include "config.h"
 #include "common.h"
+#include "compat.h"
 #include "encoding.h"
 
 size_t hostname_need(const char *topdomain)
@@ -34,6 +35,7 @@ int build_hostname(char *buf, size_t buflen, const char *data,
 	char *b;
 	size_t need;
 	size_t cap;
+	size_t remain;
 
 	need = hostname_need(topdomain);
 	cap = MIN((size_t)maxlen, buflen);
@@ -75,7 +77,8 @@ int build_hostname(char *buf, size_t buflen, const char *data,
 		b = buf;
 	}
 
-	strncpy(b, topdomain, strlen(topdomain)+1);
+	remain = buflen - (b - buf);
+	strlcpy(b, topdomain, remain);
 
 	return space;
 }
