@@ -96,7 +96,8 @@ START_TEST(test_encode_query)
 	if (*d != '.') {
 		*d++ = '.';
 	}
-	strcpy(d, topdomain);
+	len = sizeof(resolv) - (d - resolv);
+	strlcpy(d, topdomain, len);
 	len = sizeof(buf);
 	ret = dns_encode(buf, len, &q, QR_QUERY, resolv, strlen(resolv));
 	len = sizeof(query_packet) - 1; /* Skip extra null character */
