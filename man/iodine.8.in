@@ -1,0 +1,178 @@
+.\" groff -man -Tascii iodine.8
+.TH IODINE 8 "OCT 2026" "User Manuals"
+.SH NAME
+iodine \- tunnel IPv4 over DNS
+.SH SYNOPSIS
+.B iodine [-v]
+
+.B iodine [-h]
+
+.B iodine [-4] [-6] [-f] [-r] [-u
+.I user
+.B ] [-P
+.I password
+.B ] [-m
+.I fragsize
+.B ] [-t
+.I chrootdir
+.B ] [-d
+.I device
+.B ] [-R
+.I rdomain
+.B ] [-m
+.I fragsize
+.B ] [-M
+.I namelen
+.B ] [-z
+.I context
+.B ] [-F
+.I pidfile
+.B ] [-T
+.I dnstype
+.B ] [-O
+.I downenc
+.B ] [-L
+.I 0|1
+.B ] [-I
+.I interval
+.B ]
+.B [
+.I nameserver
+.B ]
+.I topdomain
+
+@DESC_AND_COMMON_OPTIONS@
+.TP
+.B -r
+Skip raw UDP mode. If not used, iodine will try getting the public IP address
+of the iodined host and test if it is reachable directly. If it is, traffic
+will be sent to the server instead of the DNS relay.
+.TP
+.B -R rdomain
+Use OpenBSD routing domain 'rdomain' for the DNS connection.
+.TP
+.B -m fragsize
+Force maximum downstream fragment size. Not setting this will cause the
+client to automatically probe the maximum accepted downstream fragment size.
+.TP
+.B -M namelen
+Maximum length of upstream hostnames, default 255.
+Usable range ca. 100 to 255.
+Use this option to scale back upstream bandwidth in favor of downstream
+bandwidth.
+Also useful for DNS servers that perform unreliably when using full-length
+hostnames, noticeable when fragment size autoprobe returns very
+different results each time.
+.TP
+.B -T dnstype
+DNS request type override.
+By default, autodetection will probe for working DNS request types, and
+will select the request type that is expected to provide the most bandwidth.
+However, it may turn out that a DNS relay imposes limits that skew the
+picture, which may lead to an "unexpected" DNS request type providing
+more bandwidth.
+In that case, use this option to override the autodetection.
+In (expected) decreasing bandwidth order, the supported DNS request types are:
+.IR NULL ,
+.IR PRIVATE ,
+.IR TXT ,
+.IR SRV ,
+.IR MX ,
+.I CNAME
+and
+.I A
+(returning CNAME).
+Note that
+.IR SRV ,
+.I MX
+and
+.I A
+may/will cause additional lookups by "smart" caching
+nameservers to get an actual IP address, which may either slow down or fail
+completely. The
+.IR PRIVATE
+type uses value 65399 (in the 'private use' range) and requires servers
+implementing RFC 3597.
+.TP
+.B -O downenc
+Force downstream encoding type for all query type responses except NULL.
+Default is autodetected, but may not spot all problems for the more advanced
+codecs.
+Use this option to override the autodetection.
+.I Base32
+is the lowest-grade codec and should always work; this is used when
+autodetection fails.
+.I Base64
+provides more bandwidth, but may not work on all nameservers.
+.I Base64u
+is equal to Base64 except in using underscore ('_')
+instead of plus sign ('+'), possibly working where
+.I Base64
+does not.
+.I Base128
+uses high byte values (mostly accented letters in iso8859-1),
+which might work with some nameservers.
+For TXT queries,
+.I Raw
+will provide maximum performance, but this will only work if the nameserver
+path is fully 8-bit-clean for responses that are assumed to be "legible text".
+.TP
+.B -L 0|1
+Lazy-mode switch.
+\-L1 (default): Use lazy mode for improved performance and decreased latency.
+A very small minority of DNS relays appears to be unable to handle the
+lazy mode traffic pattern, resulting in no or very little data coming through.
+The iodine client will detect this and try to switch back to legacy mode,
+but this may not always work.
+In these situations use \-L0 to force running in legacy mode
+(implies \-I1).
+.TP
+.B -I interval
+Maximum interval between requests (pings) so that intermediate DNS
+servers will not time out. Default is 4 in lazy mode, which will work
+fine in most cases. When too many SERVFAIL errors occur, iodine
+will automatically reduce this to 1.
+To get absolute minimum DNS traffic,
+increase well above 4, but not so high that SERVFAIL errors start to occur.
+There are some DNS relays with very small timeouts,
+notably dnsadvantage.com (ultradns), that will give
+SERVFAIL errors even with \-I1; data will still get trough,
+and these errors can be ignored.
+Maximum useful value is 59, since iodined will close a client's
+connection after 60 seconds of inactivity.
+.SS Arguments:
+.TP
+.B nameserver
+The nameserver to use to relay the dns traffic. This can be any relaying
+nameserver or the server running iodined if reachable. This field can be
+given as an IPv4/IPv6 address or as a hostname. This argument is optional,
+and if not specified a nameserver will be read from the
+.I /etc/resolv.conf
+file.
+.TP
+.B topdomain
+The dns traffic will be sent as queries for subdomains under
+\'topdomain'. This is normally a subdomain to a domain you own. Use a short
+domain name to get better throughput. If
+.B nameserver
+is the iodined server, then the topdomain can be chosen freely. This argument
+must be the same on both the client and the server.
+@EXAMPLES_SECURITY@
+.SH ENVIRONMENT
+.SS IODINE_PASS
+If the environment variable
+.B IODINE_PASS
+is set, iodine will use the value it is set to as password instead of asking
+for one. The
+.B -P
+option still has precedence.
+.SH SEE ALSO
+.BR iodined (8)
+.PP
+The README file in the source distribution contains some more elaborate
+information.
+.SH BUGS
+File bugs at https://github.com/yarrick/iodine
+.SH AUTHORS
+Erik Ekman <yarrick@kryo.se> and Bjorn Andersson <flex@kryo.se>. Major
+contributions by Anne Bezemer.

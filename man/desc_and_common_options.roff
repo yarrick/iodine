@@ -1,0 +1,57 @@
+.SH DESCRIPTION
+.B iodine
+lets you tunnel IPv4 data through a DNS
+server. This can be useful in situations where Internet access is firewalled,
+but DNS queries are allowed. It needs a TUN/TAP device to operate. The
+bandwidth is asymmetrical,
+with a measured maximum of 680 kbit/s upstream and 2.3 Mbit/s
+downstream in a wired LAN test network.
+Realistic sustained throughput on a Wifi network using a carrier-grade
+DNS cache has been measured at some 50 kbit/s upstream and over 200 kbit/s
+downstream.
+.B iodine
+is the client application,
+.B iodined
+is the server.
+
+Note: server and client are required to speak the exact same protocol. In most
+cases, this means running the same iodine version. Unfortunately, implementing
+backward and forward protocol compatibility is usually not feasible.
+.SH OPTIONS
+.TP
+.B -v
+Print version info and exit.
+.TP
+.B -h
+Print usage info and exit.
+.TP
+.B -f
+Keep running in foreground.
+.TP
+.B -4
+Force/allow only IPv4 DNS queries
+.TP
+.B -6
+Force/allow only IPv6 DNS queries
+.TP
+.B -u user
+Drop privileges and run as user 'user' after setting up tunnel.
+.TP
+.B -t chrootdir
+Chroot to 'chrootdir' after setting up tunnel.
+.TP
+.B -d device
+Use the TUN device 'device' instead of the normal one, which is dnsX on Linux
+and otherwise tunX. On macOS 10.6 or newer, this can also be utunX, which will
+attempt to use an utun device built into the OS.
+.TP
+.B -P password
+Use 'password' to authenticate. If not used,
+.B stdin
+will be used as input. Only the first 32 characters will be used.
+.TP
+.B -z context
+Apply SELinux 'context' after initialization.
+.TP
+.B -F pidfile
+Create 'pidfile' and write process id in it.

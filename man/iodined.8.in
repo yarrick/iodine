@@ -1,0 +1,149 @@
+.\" groff -man -Tascii iodine.8
+.TH IODINE 8 "APR 2023" "User Manuals"
+.SH NAME
+iodined \- tunnel IPv4 over DNS
+.SH SYNOPSIS
+
+.B iodined [-v]
+
+.B iodined [-h]
+
+.B iodined [-4] [-6] [-c] [-s] [-f] [-D] [-u
+.I user
+.B ] [-t
+.I chrootdir
+.B ] [-d
+.I device
+.B ] [-m
+.I mtu
+.B ] [-l
+.I listen_ip4
+.B ] [-L
+.I listen_ip6
+.B ] [-p
+.I port
+.B ] [-n
+(
+.B auto
+|
+.I external_ip
+)
+.B ] [-b
+.I dnsport
+.B ] [-P
+.I password
+.B ] [-z
+.I context
+.B ] [-F
+.I pidfile
+.B ] [-i
+.I max_idle_time
+.B ]
+.I tunnel_ip
+.B [
+.I /netmask
+.B ]
+.I topdomain
+@DESC_AND_COMMON_OPTIONS@
+.TP
+.B -c
+Disable checking the client IP address on all incoming requests.
+By default, requests originating from non-matching IP addresses will be
+rejected, however this will cause problems when requests are routed
+via a cluster of DNS servers.
+.TP
+.B -s
+Don't try to configure IP address or MTU.
+This should only be used if you have already configured the device that will be
+used.
+.TP
+.B -D
+Increase debug level. Level 1 prints info about each RX/TX packet.
+Implies the
+.B -f
+option.
+On level 2 (\-DD) or higher, DNS queries will be printed literally.
+When using Base128 upstream encoding, this is best viewed as
+ISO Latin-1 text instead of (illegal) UTF-8.
+This is easily done with : "LC_ALL=C luit iodined \-DD ..."
+(see luit(1)).
+.TP
+.B -m mtu
+Set 'mtu' as mtu size for the tun device.
+This will be sent to the client on login, and the client will use the same mtu
+for its tun device.  Default 1130.  Note that the DNS traffic will be
+automatically fragmented when needed.
+.TP
+.B -l external|listen_ip4
+Make the server listen only on 'listen_ip4' for incoming IPv4 requests.
+By default, incoming requests are accepted from all interfaces (0.0.0.0).
+A domain name can be used as argument - use one with only one A record.
+If listen_ip4 is 'external', iodined will use the opendns.com DNS service to
+retrieve the external IP of the host and use that as listen address.
+.TP
+.B -L listen_ip6
+Make the server listen only on 'listen_ip6' for incoming IPv6 requests.
+By default, incoming requests are accepted from all interfaces (::).
+A domain name can be used as argument - use one with only one AAAA record.
+.TP
+.B -p port
+Make the server listen on 'port' instead of 53 for traffic.
+If 'listen_ip4' does not include localhost, this 'port' can be the same
+as 'dnsport'.
+.B Note:
+You must make sure the dns requests are forwarded to this port yourself.
+.TP
+.B -n auto|external_ip
+The IP address to return in NS responses. Default is to return the address used
+as destination in the query.
+If external_ip is 'auto', iodined will use the opendns.com DNS service to
+retrieve the external IP of the host and use that for NS responses.
+.TP
+.B -b dnsport
+If this port is specified, all incoming requests not inside the tunnel domain
+will be forwarded to this port on localhost, to be handled by a real dns.
+If 'listen_ip' does not include localhost, this 'dnsport' can be the
+same as 'port'.
+.B Note:
+The forwarding is not fully transparent, and not advised for use
+in production environments.
+.TP
+.B -i max_idle_time
+Make the server stop itself after max_idle_time seconds if no traffic have been received.
+This should be combined with systemd or upstart on demand activation for being effective.
+.SS Arguments:
+.TP
+.B tunnel_ip[/netmask]
+This is the server's ip address on the tun interface. The client will be
+given the next ip number in the range. It is recommended to use the
+10.0.0.0 or 172.16.0.0 ranges. The default netmask is /27, can be overridden
+by specifying it here. Using a smaller network will limit the number of
+concurrent users.
+.TP
+.B topdomain
+The dns traffic is expected to arrive as queries for
+subdomains under 'topdomain'. This is normally a subdomain to a domain you
+own. Use a short domain name to get better throughput. This argument must be
+the same on both the client and the server. Queries for domains other
+than 'topdomain' will be forwarded when the \-b option is given, otherwise
+they will be dropped. The topdomain can start with '*' which will allow all
+domains ending with the same suffix.
+@EXAMPLES_SECURITY@
+.SH ENVIRONMENT
+.SS IODINED_PASS
+If the environment variable
+.B IODINED_PASS
+is set, iodined will use the value it is set to as password instead of asking
+for one. The
+.B -P
+option still has precedence.
+.SH SEE ALSO
+.BR iodine (8)
+.PP
+The README file in the source distribution contains some more elaborate
+information.
+.SH BUGS
+File bugs at https://github.com/yarrick/iodine
+.SH AUTHORS
+Erik Ekman <yarrick@kryo.se> and Bjorn Andersson <flex@kryo.se>. Major
+contributions by Anne Bezemer.

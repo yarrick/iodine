@@ -1,0 +1,16 @@
+.SH EXAMPLES
+See the README file for both a quick test scenario, and a detailed description
+of real-world deployment.
+.SH SECURITY
+Login is a relatively secure challenge-response MD5 hash, with the
+password never passing the wire.
+However, all other data is
+.B NOT
+encrypted in any way. The DNS traffic is also vulnerable to replay,
+injection and man-in-the-middle attacks, especially when iodined is used
+with the \-c option. Use of ssh or vpn tunneling is strongly recommended.
+On both server and client, use
+.IR iptables ,
+.I pf
+or other firewalls to block all traffic coming in from the tun interfaces,
+except to the used ssh or vpn ports.
