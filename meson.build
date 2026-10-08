@@ -86,9 +86,6 @@ endif
 # For md5
 cdata.set10('ARCH_IS_BIG_ENDIAN', host_machine.endian() == 'big')
 
-configure_file(output: 'config.h',
-  configuration: cdata)
-
 py = import('python').find_installation('python3')
 
 base64u_c = custom_target('gen_base64u',
@@ -135,6 +132,9 @@ client = files([
   'src/client.c',
   'src/iodine.c',
 ])
+
+configure_file(output: 'config.h',
+  configuration: cdata)
 
 executable('iodine',
   sources: client + common,
