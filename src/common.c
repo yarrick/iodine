@@ -93,7 +93,7 @@ format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len)
 			struct in_addr ia;
 			/* Get mapped v4 addr from last 32bit field */
 			memcpy(&ia.s_addr, &addr->sin6_addr.s6_addr[12], sizeof(ia));
-			strcpy(dst, inet_ntoa(ia));
+			strlcpy(dst, inet_ntoa(ia), sizeof(dst));
 		} else {
 			getnameinfo((struct sockaddr *)sockaddr, sockaddr_len, dst, sizeof(dst) - 1, NULL, 0, NI_NUMERICHOST);
 		}
