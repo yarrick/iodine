@@ -20,8 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "encoding.h"
 #include "test.h"
+#include "compat.h"
 
 #define TUPLES 4
 

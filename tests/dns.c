@@ -40,6 +40,7 @@
 #include "dns.h"
 #include "encoding.h"
 #include "test.h"
+#include "compat.h"
 
 static void dump_packet(char *, size_t);
 
