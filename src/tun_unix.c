@@ -425,7 +425,6 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 
 #ifndef LINUX
 	char cmdline[512];
-	int r;
 	struct in_addr netip;
 	netip.s_addr = localaddr.sin_addr.s_addr;
 	netip.s_addr = netip.s_addr & maskaddr.sin_addr.s_addr;
