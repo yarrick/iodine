@@ -12,8 +12,9 @@ permissions:
 jobs:
   build:
     strategy:
-      # Enable tests, use SELinux, use systemd
-      dep: [check, libselinux1-dev, libsystemd-dev]
+      matrix:
+        # Enable tests, use SELinux, use systemd
+        dep: [check, libselinux1-dev, libsystemd-dev]
     runs-on: ubuntu-latest
 
     steps:
