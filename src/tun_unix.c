@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <net/if.h>
 #include <fcntl.h>
 
 #include "config.h"
@@ -38,6 +39,10 @@
 #define UTUN_CONTROL_NAME "com.apple.net.utun_control"
 #define UTUN_OPT_IFNAME 2
 #include <netinet/ip.h>
+#endif
+
+#ifdef HAVE_SYS_SOCKIO
+#include <sys/sockio.h>
 #endif
 
 #ifndef IFCONFIGPATH
@@ -350,40 +355,82 @@ read_tun(int tun_fd, char *buf, size_t len)
 int
 tun_setip(const char *ip, const char *other_ip, int netbits)
 {
-	char cmdline[512];
-	struct in_addr netmask;
-#ifndef LINUX
-	int r;
-#endif
-	const char *display_ip;
-#ifndef LINUX
-	struct in_addr netip;
-#endif
+	int sock;
+	struct ifreq ifr;
+	struct sockaddr_in localaddr, peeraddr, maskaddr;
 
-	if (build_netmask(netbits, &netmask)) {
+	memset(&localaddr, 0, sizeof(localaddr));
+	memset(&peeraddr, 0, sizeof(peeraddr));
+	memset(&maskaddr, 0, sizeof(maskaddr));
+
+	maskaddr.sin_family = AF_INET;
+	if (build_netmask(netbits, &maskaddr.sin_addr)) {
 		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
 		return 1;
 	}
 
-	if (inet_addr(ip) == INADDR_NONE) {
+	localaddr.sin_family = AF_INET;
+	if (inet_pton(AF_INET, ip, &localaddr.sin_addr) <= 0) {
 		fprintf(stderr, "Invalid IP: %s!\n", ip);
 		return 1;
 	}
 
-#ifdef FREEBSD
-	display_ip = other_ip; /* FreeBSD wants other IP as second IP */
-#else
-	display_ip = ip;
-#endif
-	snprintf(cmdline, sizeof(cmdline),
-			IFCONFIGPATH "ifconfig %s %s %s netmask %s",
-			if_name,
-			ip,
-			display_ip,
-			inet_ntoa(netmask));
+	peeraddr.sin_family = AF_INET;
+	if (inet_pton(AF_INET, other_ip, &peeraddr.sin_addr) <= 0) {
+		fprintf(stderr, "Invalid peer IP: %s!\n", other_ip);
+		return 1;
+	}
 
 	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock < 0) {
+		perror("tun_setip: socket creation failed");
+		return 1;
+	}
+
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
+
+	memcpy(&ifr.ifr_addr, &localaddr, sizeof(localaddr));
+	if (ioctl(sock, SIOCSIFADDR, &ifr) < 0) {
+		perror("tun_setip: ioctl SIOCSIFADDR failed");
+		close(sock);
+		return 1;
+	}
+
+	memcpy(&ifr.ifr_addr, &peeraddr, sizeof(peeraddr));
+	if (ioctl(sock, SIOCSIFDSTADDR, &ifr) < 0) {
+		perror("tun_setip: ioctl SIOCSIFDSTADDR failed");
+		close(sock);
+		return 1;
+	}
+
+	memcpy(&ifr.ifr_addr, &maskaddr, sizeof(maskaddr));
+	if (ioctl(sock, SIOCSIFNETMASK, &ifr) < 0) {
+		perror("tun_setip: ioctl SIOCSIFNETMASK failed");
+		close(sock);
+		return 1;
+	}
+
+	if (ioctl(sock, SIOCGIFFLAGS, &ifr) < 0) {
+		perror("tun_setip: ioctl SIOCGIFFLAGS failed");
+		close(sock);
+		return 1;
+	}
+
+	ifr.ifr_flags |= (IFF_UP | IFF_POINTOPOINT | IFF_RUNNING);
+	if (ioctl(sock, SIOCSIFFLAGS, &ifr) < 0) {
+		perror("tun_setip: ioctl SIOCSIFFLAGS failed");
+		close(sock);
+		return 1;
+	}
+
+	close(sock);
+
 #ifndef LINUX
+	char cmdline[512];
+	int r;
+	struct in_addr netip;
 	netip.s_addr = inet_addr(ip);
 	netip.s_addr = netip.s_addr & netmask.s_addr;
 	r = system(cmdline);
@@ -396,8 +443,9 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 				inet_ntoa(netip), netbits, ip);
 	}
 	fprintf(stderr, "Adding route %s/%d to %s\n", inet_ntoa(netip), netbits, ip);
-#endif
 	return system(cmdline);
+#endif
+	return 0;
 }
 
 int

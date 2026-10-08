@@ -126,6 +126,9 @@ if host_machine.system() == 'windows'
   common += 'src/tun_windows.c'
 else
   common += 'src/tun_unix.c'
+  if cc.has_header('sys/sockio.h')
+    cdata.set10('HAVE_SYS_SOCKIO', true)
+  endif
 endif
 
 client = files([
