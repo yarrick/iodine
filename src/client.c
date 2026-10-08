@@ -1280,10 +1280,7 @@ send_handshake_query(int fd, char *prefix)
 	cmc_dot[4] = 0;
 	rand_seed++;
 
-	buf[0] = 0;
-	strncat(buf, prefix, 60); /* 63 - space for 3 CMC bytes */
-	strcat(buf, cmc_dot);
-	strncat(buf, topdomain, sizeof(buf) - strlen(buf) - 1);
+	snprintf(buf, sizeof(buf), "%.60s%s%s", prefix, cmc_dot, topdomain);
 	send_query(fd, buf);
 }
 
