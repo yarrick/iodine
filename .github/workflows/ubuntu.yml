@@ -19,7 +19,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: install deps
-      run: sudo apt install meson ninja-build ${{ dep }}
+      run: sudo apt install meson ninja-build ${{ matrix.dep }}
     - name: meson setup
       run: meson setup build
     - name: build
