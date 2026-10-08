@@ -716,13 +716,13 @@ static void send_version_response(int fd, version_ack_t ack, uint32_t payload,
 
 	switch (ack) {
 	case VERSION_ACK:
-		strncpy(out, "VACK", sizeof(out));
+		strlcpy(out, "VACK", sizeof(out));
 		break;
 	case VERSION_NACK:
-		strncpy(out, "VNAK", sizeof(out));
+		strlcpy(out, "VNAK", sizeof(out));
 		break;
 	case VERSION_FULL:
-		strncpy(out, "VFUL", sizeof(out));
+		strlcpy(out, "VFUL", sizeof(out));
 		break;
 	}
 
@@ -2556,8 +2556,7 @@ main(int argc, char **argv)
 			max_idle_time = atoi(optarg);
 			break;
 		case 'P':
-			strncpy(password, optarg, sizeof(password));
-			password[sizeof(password)-1] = 0;
+			strlcpy(password, optarg, sizeof(password));
 
 			/* XXX: find better way of cleaning up ps(1) */
 			memset(optarg, 0, strlen(optarg));

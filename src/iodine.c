@@ -223,8 +223,7 @@ int main(int argc, char **argv)
 			break;
 #endif
 		case 'P':
-			strncpy(password, optarg, sizeof(password));
-			password[sizeof(password)-1] = 0;
+			strlcpy(password, optarg, sizeof(password));
 
 			/* XXX: find better way of cleaning up ps(1) */
 			memset(optarg, 0, strlen(optarg));

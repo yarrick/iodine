@@ -262,8 +262,7 @@ read_password(char *buf, size_t len)
 	tcsetattr(0, TCSANOW, &old);
 #endif
 
-	strncpy(buf, pwd, len);
-	buf[len-1] = '\0';
+	strlcpy(buf, pwd, len);
 }
 
 int

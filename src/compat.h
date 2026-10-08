@@ -51,4 +51,8 @@ void syslog(int priority, const char *fmt, ...);
 #define LOG_WARNING  3
 #endif
 
+#ifndef HAVE_STRLCPY
+size_t strlcpy(char *dst, const char *src, size_t dsize);
+#endif
+
 #endif

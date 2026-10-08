@@ -55,6 +55,7 @@ optional_functions = [
   'getrandom',
   'inet_aton',
   'setgroups',
+  'strlcpy',
   'syslog',
   'warnx',
 ]

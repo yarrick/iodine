@@ -588,8 +588,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 				memset(name, 0, sizeof(name));
 				readname(packet, packetlen, &data, name, sizeof(name) - 1);
 				name[sizeof(name)-1] = '\0';
-				strncpy(buf, name, buflen);
-				buf[buflen - 1] = '\0';
+				strlcpy(buf, name, buflen);
 				rv = strlen(buf);
 			}
 			if (type == T_A) {
@@ -717,8 +716,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			break;
 		}
 
-		strncpy(q->name, name, sizeof(q->name));
-		q->name[sizeof(q->name) - 1] = '\0';
+		strlcpy(q->name, name, sizeof(q->name));
 		q->type = type;
 		q->id = id;
 

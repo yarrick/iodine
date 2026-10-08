@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include "config.h"
 #include "common.h"
+#include "compat.h"
 #include "util.h"
 
 char *get_resolvconf_addr(void)
@@ -67,8 +68,7 @@ char *get_resolvconf_addr(void)
 
 	ret = GetNetworkParams(fixed_info, &buflen);
 	if (ret == NO_ERROR) {
-		strncpy(addr, fixed_info->DnsServerList.IpAddress.String, sizeof(addr));
-		addr[15] = 0;
+		strlcpy(addr, fixed_info->DnsServerList.IpAddress.String, sizeof(addr));
 		rv = addr;
 	}
 	free(fixed_info);

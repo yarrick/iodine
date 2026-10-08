@@ -87,10 +87,8 @@ open_tun(const char *tun_device)
 	ifreq.ifr_flags = IFF_TUN;
 
 	if (tun_device != NULL) {
-		strncpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
-		ifreq.ifr_name[IFNAMSIZ-1] = '\0';
-		strncpy(if_name, tun_device, sizeof(if_name));
-		if_name[sizeof(if_name)-1] = '\0';
+		strlcpy(ifreq.ifr_name, tun_device, IFNAMSIZ);
+		strlcpy(if_name, tun_device, sizeof(if_name));
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			fprintf(stderr, "Opened %s\n", ifreq.ifr_name);
@@ -170,7 +168,7 @@ open_utun(const char *dev)
 
 	/* Look up the kernel controller ID for utun devices. */
 	bzero(&info, sizeof(info));
-	strncpy(info.ctl_name, UTUN_CONTROL_NAME, MAX_KCTL_NAME);
+	strlcpy(info.ctl_name, UTUN_CONTROL_NAME, MAX_KCTL_NAME);
 
 	err = ioctl(fd, CTLIOCGINFO, &info);
 	if (err != 0) {
@@ -206,7 +204,7 @@ open_utun(const char *dev)
 		return -1;
 	}
 
-	strncpy(if_name, ifname, sizeof(if_name));
+	strlcpy(if_name, ifname, sizeof(if_name));
 
 	fprintf(stderr, "Opened %s\n", ifname);
 	fd_set_close_on_exec(fd);
@@ -234,7 +232,7 @@ open_tun(const char *tun_device)
 #endif
 
 		snprintf(tun_name, sizeof(tun_name), "/dev/%s", tun_device);
-		strncpy(if_name, tun_device, sizeof(if_name));
+		strlcpy(if_name, tun_device, sizeof(if_name));
 		if_name[sizeof(if_name)-1] = '\0';
 
 		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
