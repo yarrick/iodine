@@ -61,7 +61,6 @@ do_setcon(char *context)
 void
 do_pidfile(char *pidfile)
 {
-#ifndef WINDOWS
 	int fd;
 	struct stat st;
 	FILE *file;
@@ -72,7 +71,14 @@ do_pidfile(char *pidfile)
 	 * fstat check below rejects everything that is not a regular
 	 * file anyway. Explicit 0644 mode so the file is not
 	 * world-writable even after do_detach() sets umask(0). */
-	fd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_NONBLOCK, 0644);
+	fd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC
+#ifdef O_NOFOLLOW
+			| O_NOFOLLOW
+#endif
+#ifdef O_NONBLOCK
+			| O_NONBLOCK
+#endif
+			, 0644);
 	if (fd == -1) {
 		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
 		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
@@ -95,9 +101,6 @@ do_pidfile(char *pidfile)
 		fprintf(file, "%d\n", (int)getpid());
 		fclose(file);
 	}
-#else
-	fprintf(stderr, "Windows version does not support pid file\n");
-#endif
 }
 
 /* Provide daemon(3) if required and not available */

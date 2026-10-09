@@ -49,6 +49,7 @@ void syslog(int priority, const char *fmt, ...);
 #define LOG_NOTICE   1
 #define LOG_INFO     2
 #define LOG_WARNING  3
+#define LOG_ERR      4
 #endif
 
 #ifndef HAVE_STRLCPY
