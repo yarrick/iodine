@@ -13,6 +13,10 @@ master:
       pidfile writing, parsing fixes) contributed by auto-charlie.
     - Build system changed to meson
     - FreeBSD bugfix for EINVAL after sendto(), from Sergei Zhmylev.
+    - Updated network interface initialization for Unix to not
+      need to call ifconfig or route binaries.
+    - Merged support for more detailed user capability checking on
+      Linux with libcap-ng, by Oleksandr Natalenko. Fixes bug #80.
 
 2023-04-17: 0.8.0 "Burning Snowman"
 	- Mac OS X: Support native utun VPN devices. Patch by
