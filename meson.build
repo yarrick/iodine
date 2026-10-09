@@ -9,7 +9,7 @@ project('iodine', 'c',
 
 # config.h contents
 cdata = configuration_data()
-cdata.set('IODINE_VERSION', '"@0@"'.format(meson.project_version()))
+cdata.set_quoted('IODINE_VERSION', meson.project_version())
 
 srcdir = include_directories('src')
 
