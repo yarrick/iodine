@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <net/if.h>
 #include <fcntl.h>
 
@@ -34,7 +35,6 @@
 #include <ctype.h>
 #include <sys/kern_control.h>
 #include <sys/sys_domain.h>
-#include <sys/ioctl.h>
 /* Inline used parts of if_utun.h to compile without it. */
 #define UTUN_CONTROL_NAME "com.apple.net.utun_control"
 #define UTUN_OPT_IFNAME 2
