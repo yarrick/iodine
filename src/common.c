@@ -73,11 +73,10 @@ int setgroups(int count, int *groups)
 }
 #endif
 
-#ifndef WINDOWS
 void
 check_privileges(char *username, int port)
 {
-#if defined HAVE_LIBCAPNG
+#ifdef HAVE_LIBCAPNG
 	bool capable = true;
 
 	if (capng_get_caps_process() == -1) {
@@ -123,14 +122,15 @@ check_privileges(char *username, int port)
 	if (!capable) {
 		exit(-1);
 	}
-#else
+#elif defined(HAVE_GETEUID)
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.");
 		exit(-1);
 	}
+#else
+    /* No user permission check supported */
 #endif
 }
-#endif
 
 char *
 format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len)

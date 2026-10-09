@@ -106,13 +106,7 @@ enum connection {
 	CONN_MAX
 };
 
-#ifdef WINDOWS
-static inline void check_privileges(char *username, int port)
-{
-}
-#else
 void check_privileges(char *username, int port);
-#endif
 char *format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len);
 int get_addr(char *, int, int, int, struct sockaddr_storage *);
 int open_dns(struct sockaddr_storage *, size_t);
