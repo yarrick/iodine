@@ -72,11 +72,7 @@ open_tun(const char *tun_device)
 	int i;
 	int tun_fd;
 	struct ifreq ifreq;
-#ifdef ANDROID
-	char *tunnel = "/dev/tun";
-#else
-	char *tunnel = "/dev/net/tun";
-#endif
+	char *tunnel = TUNNEL_DEV_PATH;
 
 	if ((tun_fd = open(tunnel, O_RDWR)) < 0) {
 		warn("open_tun: %s", tunnel);

@@ -129,6 +129,11 @@ else
   if cc.has_header_symbol('net/route.h', 'RTM_ADD', prefix: '#include <sys/socket.h>  #include <net/if.h>')
     cdata.set10('HAVE_RTM_ADD', true)
   endif
+  if host_machine.system() == 'android'
+    cdata.set('TUNNEL_DEV_PATH', '"/dev/tun"')
+  else
+    cdata.set('TUNNEL_DEV_PATH', '"/dev/net/tun"')
+  endif
 endif
 
 configure_file(output: 'config.h',
