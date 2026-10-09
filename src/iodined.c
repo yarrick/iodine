@@ -45,9 +45,7 @@
 #define _XPG4_2
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <grp.h>
 #include <sys/uio.h>
-#include <pwd.h>
 #include <netdb.h>
 #endif
 #ifdef HAVE_SYSLOG
@@ -56,10 +54,11 @@
 
 #include "dns.h"
 #include "encoding.h"
-#include "user.h"
-#include "login.h"
-#include "tun.h"
 #include "fw_query.h"
+#include "login.h"
+#include "run_as.h"
+#include "tun.h"
+#include "user.h"
 #include "version.h"
 
 #ifdef HAVE_SYSTEMD
@@ -2418,11 +2417,9 @@ main(int argc, char **argv)
 	char *listen_ip4;
 	char *listen_ip6;
 	char *errormsg;
-#ifndef WINDOWS
-	struct passwd *pw;
-#endif
 	int foreground;
 	char *username;
+	struct run_as_user *run_as;
 	char *newroot;
 	char *context;
 	char *device;
@@ -2452,11 +2449,9 @@ main(int argc, char **argv)
 	int nb_fds;
 #endif
 
-#ifndef WINDOWS
-	pw = NULL;
-#endif
 	errormsg = NULL;
 	username = NULL;
+	run_as = NULL;
 	newroot = NULL;
 	context = NULL;
 	device = NULL;
@@ -2600,22 +2595,23 @@ main(int argc, char **argv)
 	}
 
 	if (username != NULL) {
-#ifndef WINDOWS
-		if ((pw = getpwnam(username)) == NULL) {
+		if ((run_as = run_as_user_lookup(username)) == NULL) {
 			warnx("User %s does not exist!", username);
 			usage();
+			/* NOTREACHED */
 		}
-#endif
 	}
 
 	if (mtu <= 0) {
 		warnx("Bad MTU given.");
 		usage();
+		/* NOTREACHED */
 	}
 
 	if (port < 1 || port > 65535) {
 		warnx("Bad port number given.");
 		usage();
+		/* NOTREACHED */
 	}
 
 	if (port != 53) {
@@ -2818,15 +2814,12 @@ main(int argc, char **argv)
 		do_chroot(newroot);
 
 	signal(SIGINT, sigint);
-	if (username != NULL) {
-#ifndef WINDOWS
-		gid_t gids[1];
-		gids[0] = pw->pw_gid;
-		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
+	if (run_as != NULL) {
+		if (run_as_user_switch(run_as)) {
 			warnx("Could not switch to user %s!\n", username);
 			usage();
+			/* NOTREACHED */
 		}
-#endif
 	}
 
 	if (context != NULL)

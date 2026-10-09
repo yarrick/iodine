@@ -33,17 +33,16 @@
 #ifdef WINDOWS
 #include "windows_dns.h"
 #else
-#include <grp.h>
-#include <pwd.h>
 #include <netdb.h>
 #endif
 
+#include "client.h"
 #include "common.h"
 #include "compat.h"
-#include "process.h"
-#include "tun.h"
-#include "client.h"
 #include "encoding.h"
+#include "process.h"
+#include "run_as.h"
+#include "tun.h"
 #include "util.h"
 
 #ifndef HAVE_PROGNAME
@@ -125,10 +124,8 @@ int main(int argc, char **argv)
 	char *nameserv_host;
 	char *topdomain;
 	char *errormsg;
-#ifndef WINDOWS
-	struct passwd *pw;
-#endif
 	char *username;
+	struct run_as_user *run_as;
 	char password[33];
 	int foreground;
 	char *newroot;
@@ -155,10 +152,8 @@ int main(int argc, char **argv)
 	nameserv_host = NULL;
 	topdomain = NULL;
 	errormsg = NULL;
-#ifndef WINDOWS
-	pw = NULL;
-#endif
 	username = NULL;
+	run_as = NULL;
 	memset(password, 0, 33);
 	foreground = 0;
 	newroot = NULL;
@@ -335,13 +330,11 @@ int main(int argc, char **argv)
 	client_set_hostname_maxlen(hostname_maxlen);
 
 	if (username != NULL) {
-#ifndef WINDOWS
-		if ((pw = getpwnam(username)) == NULL) {
+		if ((run_as = run_as_user_lookup(username)) == NULL) {
 			warnx("User %s does not exist!\n", username);
 			usage();
 			/* NOTREACHED */
 		}
-#endif
 	}
 
 	if (strlen(password) == 0) {
@@ -392,16 +385,12 @@ int main(int argc, char **argv)
 	if (newroot != NULL)
 		do_chroot(newroot);
 
-	if (username != NULL) {
-#ifndef WINDOWS
-		gid_t gids[1];
-		gids[0] = pw->pw_gid;
-		if (setgroups(1, gids) < 0 || setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0) {
+	if (run_as != NULL) {
+		if (run_as_user_switch(run_as)) {
 			warnx("Could not switch to user %s!\n", username);
 			usage();
 			/* NOTREACHED */
 		}
-#endif
 	}
 
 	if (context != NULL)

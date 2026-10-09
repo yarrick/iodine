@@ -65,14 +65,6 @@
 /* The raw header used when not using DNS protocol */
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
 
-#if !HAVE_SETGROUPS
-int setgroups(int count, int *groups)
-{
-	/* errno = ENOSYS; */
-	return -1;
-}
-#endif
-
 void
 check_privileges(char *username, int port)
 {

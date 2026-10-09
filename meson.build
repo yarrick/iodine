@@ -122,6 +122,7 @@ common = files([
   'src/md5.c',
   'src/process.c',
   'src/read.c',
+  'src/run_as.c',
   'src/util.c',
 ]) + base64u_c
 
