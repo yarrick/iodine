@@ -23,10 +23,12 @@
 #include <errno.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <err.h>
 
 #include "config.h"
 #include "compat.h"
@@ -41,17 +43,12 @@
 #include <netinet/ip.h>
 #endif
 
-#ifdef HAVE_SYS_SOCKIO
+#ifndef LINUX
 #include <sys/sockio.h>
+#include <net/route.h>
+#include <net/if_dl.h>
+#include <netinet/in_var.h>
 #endif
-
-#ifndef ROUTEPATH
-#define ROUTEPATH "PATH=/sbin:/bin "
-#endif
-
-#include <err.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #define TUN_MAX_TRY 50
 
@@ -62,8 +59,6 @@ static char if_name[250];
 
 #ifdef LINUX
 
-#include <sys/ioctl.h>
-#include <net/if.h>
 #include <linux/if_tun.h>
 
 int
@@ -344,12 +339,74 @@ read_tun(int tun_fd, char *buf, size_t len)
 	}
 }
 
+#ifndef LINUX
+static int
+tun_add_route(struct sockaddr_in *localaddr, struct sockaddr_in *maskaddr)
+{
+	int rtsock;
+	struct sockaddr_in netaddr;
+	struct sockaddr_dl devaddr;
+	unsigned int ifindex;
+	struct {
+		struct rt_msghdr rtm;
+		struct sockaddr_in dest;
+		struct sockaddr_dl iface;
+		struct sockaddr_in netmask;
+	} msg;
+
+	ifindex = if_nametoindex(if_name);
+	if (ifindex == 0) {
+		perror("tun_add_route: if_nametoindex failed");
+		return 1;
+	}
+
+	rtsock = socket(PF_ROUTE, SOCK_RAW, 0);
+	if (rtsock < 0) {
+		perror("tun_add_route: socket(PF_ROUTE) failed");
+		return 1;
+	}
+
+	memset(&msg, 0, sizeof(msg));
+	msg.rtm.rtm_msglen = sizeof(msg);
+	msg.rtm.rtm_version = RTM_VERSION;
+	msg.rtm.rtm_type = RTM_ADD;
+	msg.rtm.rtm_flags = RTF_UP | RTF_STATIC;
+	msg.rtm.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
+	msg.rtm.rtm_pid = getpid();
+
+	memcpy(&netaddr, localaddr, sizeof(netaddr));
+	netaddr.sin_addr.s_addr &= maskaddr->sin_addr.s_addr;
+	memcpy(&msg.dest, &netaddr, sizeof(netaddr));
+
+	memset(&devaddr, 0, sizeof(devaddr));
+	devaddr.sdl_len = sizeof(devaddr);
+	devaddr.sdl_family = AF_LINK;
+	devaddr.sdl_index = ifindex;
+	memcpy(&msg.iface, &devaddr, sizeof(devaddr));
+
+	memcpy(&msg.netmask, maskaddr, sizeof(*maskaddr));
+
+	if (write(rtsock, &msg, sizeof(msg)) < 0) {
+		perror("tun_add_route: Routing add write failed");
+		close(rtsock);
+		return 1;
+	}
+
+	close(rtsock);
+	return 0;
+}
+#endif
+
 int
 tun_setip(const char *ip, const char *other_ip, int netbits)
 {
 	int sock;
-	struct ifreq ifr;
 	struct sockaddr_in localaddr, peeraddr, maskaddr;
+#ifdef LINUX
+	struct ifreq ifr;
+#else
+	struct in_aliasreq ifra;
+#endif
 
 	memset(&localaddr, 0, sizeof(localaddr));
 	memset(&peeraddr, 0, sizeof(peeraddr));
@@ -380,6 +437,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		return 1;
 	}
 
+#ifdef LINUX
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
 
@@ -416,21 +474,28 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		close(sock);
 		return 1;
 	}
+	close(sock);
+	return 0;
+#else
+	memset(&ifra, 0, sizeof(ifra));
+	strlcpy(ifra.ifra_name, if_name, IFNAMSIZ);
+
+	localaddr.sin_len = sizeof(localaddr);
+	memcpy(&ifra.ifra_addr, &localaddr, sizeof(localaddr));
+	peeraddr.sin_len = sizeof(peeraddr);
+	memcpy(&ifra.ifra_dstaddr, &peeraddr, sizeof(peeraddr));
+	maskaddr.sin_len = sizeof(maskaddr);
+	memcpy(&ifra.ifra_mask, &maskaddr, sizeof(maskaddr));
+
+	if (ioctl(sock, SIOCAIFADDR, &ifra) < 0) {
+		perror("tun_setip: ioctl SIOCAIFADDR failed");
+		close(sock);
+		return 1;
+	}
 
 	close(sock);
-
-#ifndef LINUX
-	char cmdline[512];
-	struct in_addr netip;
-	netip.s_addr = localaddr.sin_addr.s_addr;
-	netip.s_addr = netip.s_addr & maskaddr.sin_addr.s_addr;
-	snprintf(cmdline, sizeof(cmdline),
-		ROUTEPATH "route add %s/%d %s",
-		inet_ntoa(netip), netbits, ip);
-	fprintf(stderr, "Adding route %s/%d to %s\n", inet_ntoa(netip), netbits, ip);
-	return system(cmdline);
+	return tun_add_route(&localaddr, &maskaddr);
 #endif
-	return 0;
 }
 
 int
