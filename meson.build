@@ -33,6 +33,11 @@ if host_machine.system() == 'linux'
     cdata.set10('HAVE_SYSTEMD', true)
     serverdeps += systemd
   endif
+  libcapng = dependency('libcap-ng', required: false)
+  if libcapng.found()
+    cdata.set10('HAVE_LIBCAPNG', true)
+    commondeps += libcapng
+  endif
 endif
 if host_machine.system() == 'android'
   cdata.set10('LINUX', true)
@@ -54,6 +59,7 @@ optional_functions = [
   'arc4random_buf',
   'chroot',
   'daemon',
+  'geteuid',
   'getpwnam',
   'getrandom',
   'inet_aton',
