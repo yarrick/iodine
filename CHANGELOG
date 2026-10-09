@@ -9,6 +9,11 @@ master:
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
 	  patch by Pouria Mousavizadeh Tehrani.
     - Now builds on macOS even without if_utun.h (pre 10.6).
+    - Nameservers from /etc/resolve.conf and similar can now be
+      up to 256 characters long, up from 16.
+    - Answer NXDOMAIN for _.xxx.yyy.top.domain, which is sent by
+      recursive nameservers trying to do QNAME minimization.
+      This keeps the servers from waiting before sending the next query.
     - Various security and robustness fixes (cryptographic random,
       pidfile writing, parsing fixes) contributed by auto-charlie.
     - Build system changed to meson
