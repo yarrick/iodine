@@ -126,7 +126,7 @@ else
   if cc.has_header('sys/sockio.h')
     cdata.set10('HAVE_SYS_SOCKIO', true)
   endif
-  if cc.has_header_symbol('net/route.h', 'RTM_ADD')
+  if cc.has_header_symbol('net/route.h', 'RTM_ADD', prefix: '#include <sys/socket.h>  #include <net/if.h>')
     cdata.set10('HAVE_RTM_ADD', true)
   endif
 endif
