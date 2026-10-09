@@ -101,7 +101,7 @@ do_pidfile(char *pidfile)
 }
 
 /* Provide daemon(3) if required and not available */
-#if !ANDROID && !WINDOWS && !HAVE_DAEMON
+#if CAN_DETACH && !HAVE_DAEMON
 static int daemon(int nochdir, int noclose)
 {
 	int fd, i;
@@ -140,13 +140,13 @@ static int daemon(int nochdir, int noclose)
 void
 do_detach(void)
 {
-#ifndef WINDOWS
+#if CAN_DETACH
 	fprintf(stderr, "Detaching from terminal...\n");
 	daemon(0, 0);
 	umask(0);
 	alarm(0);
 #else
-	fprintf(stderr, "Windows version does not support detaching\n");
+	fprintf(stderr, "Detaching not supported\n");
 #endif
 }
 

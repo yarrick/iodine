@@ -54,6 +54,9 @@ if host_machine.system() == 'windows'
   cdata.set('sleep(seconds)', 'Sleep((seconds)*1000)')
 endif
 
+cdata.set10('CAN_DETACH',
+            not ['android', 'windows'].contains(host_machine.system()))
+
 cc = meson.get_compiler('c')
 optional_functions = [
   'arc4random_buf',
