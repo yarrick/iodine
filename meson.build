@@ -193,11 +193,12 @@ if libcheck.found()
     ['base32', ['src/base32.c']],
     ['base64', ['src/base64.c']],
     ['base64u', [base64u_c]],
-    ['common', ['src/common.c', 'src/process.c']],
+    ['common', ['src/common.c']],
     ['dns', ['src/base32.c', 'src/dns.c', 'src/encoding.c', 'src/read.c']],
     ['encoding', ['src/encoding.c', 'src/base32.c']],
     ['fw_query', ['src/fw_query.c']],
     ['login', ['src/login.c', 'src/md5.c']],
+    ['process', ['src/process.c']],
     ['read', ['src/read.c']],
     ['user', ['src/user.c']],
   ]
