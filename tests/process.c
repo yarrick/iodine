@@ -24,7 +24,9 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#ifndef WINDOWS
 #include <sys/wait.h>
+#endif
 
 START_TEST(test_pidfile_writes_pid)
 {
