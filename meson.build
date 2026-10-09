@@ -120,9 +120,9 @@ common = files([
 ]) + base64u_c
 
 if host_machine.system() == 'windows'
-  common += 'src/tun_windows.c'
+  common += files('src/tun_windows.c')
 else
-  common += 'src/tun_unix.c'
+  common += files('src/tun_unix.c')
   if cc.has_header('sys/sockio.h')
     cdata.set10('HAVE_SYS_SOCKIO', true)
   endif
@@ -131,13 +131,13 @@ else
   endif
 endif
 
+configure_file(output: 'config.h',
+  configuration: cdata)
+
 client = files([
   'src/client.c',
   'src/iodine.c',
 ])
-
-configure_file(output: 'config.h',
-  configuration: cdata)
 
 executable('iodine',
   sources: client + common,
@@ -195,11 +195,11 @@ if libcheck.found()
 
   foreach suite : suites
     name = suite[0]
-    s = executable('test_@0@'.format(name), [
+    s = executable('test_@0@'.format(name), files([
         'tests/@0@.c'.format(name),
         'tests/test.c',
         'src/compat.c',
-      ] + suite[1],
+      ]) + suite[1],
       include_directories: srcdir,
       dependencies: [libcheck, commondeps],
       c_args: '-DSUITE_NAME="@0@"'.format(name))
