@@ -13,8 +13,8 @@ jobs:
   build:
     strategy:
       matrix:
-        # Enable tests, use SELinux, use systemd
-        dep: [check, libselinux1-dev, libsystemd-dev]
+        # Enable tests, use SELinux, use systemd, use libcap-ng
+        dep: [check, libselinux1-dev, libsystemd-dev, libcap-ng-dev]
     runs-on: ubuntu-latest
 
     steps:
