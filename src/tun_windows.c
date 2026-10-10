@@ -301,13 +301,13 @@ read_tun(int tun_fd, char *buf, size_t len)
 int
 tun_setip(const char *ip, const char *other_ip, int netbits)
 {
-	char cmdline[512];
 	struct in_addr netmask;
 	int r;
 	DWORD status;
 	DWORD ipdata[3];
 	struct in_addr addr;
 	DWORD len;
+	MIB_UNICASTIPADDRESS_ROW ip_row;
 
 	if (build_netmask(netbits, &netmask)) {
 		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
@@ -345,11 +345,24 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		return -1;
 	}
 
-	/* use netsh to set ip address */
-	fprintf(stderr, "Setting IP of interface '%s' to %s (can take a few seconds)...\n", if_name, ip);
-	snprintf(cmdline, sizeof(cmdline), "netsh interface ip set address \"%s\" static %s %s",
-		if_name, ip, inet_ntoa(netmask));
-	return system(cmdline);
+	fprintf(stderr, "Setting IP of interface '%s' to %s\n", if_name, ip);
+	InitializeUnicastIpAddressEntry(&ip_row);
+	ip_row.InterfaceLuid = luid;
+	ip_row.OnLinkPrefixLength = netbits;
+	ip_row.Address.Ipv4.sin_family = AF_INET;
+	ip_row.Address.Ipv4.sin_addr = addr;
+	status = CreateUnicastIpAddressEntry(&ip_row);
+	if (status == ERROR_OBJECT_ALREADY_EXISTS) {
+		status = SetUnicastIpAddressEntry(&ip_row);
+		if (status != NO_ERROR) {
+			warnx("tun_setmtu: SetUnicastIpAddressEntry failed: status %d", status);
+			return 1;
+		}
+	} else if (status != NO_ERROR) {
+		warnx("tun_setmtu: CreateUnicastIpAddressEntry failed: status %d", status);
+		return 1;
+	}
+	return 0;
 }
 
 int
@@ -370,7 +383,7 @@ tun_setmtu(const unsigned mtu)
 	fprintf(stderr, "Setting MTU of %s to %u\n", if_name, mtu);
 	res = SetIpInterfaceEntry(&row);
 	if (res != NO_ERROR) {
-		warn("tun_setmtu: SetIpInterfaceEntry failed: status %d", res);
+		warnx("tun_setmtu: SetIpInterfaceEntry failed: status %d", res);
 		return 1;
 	}
 	return 0;
