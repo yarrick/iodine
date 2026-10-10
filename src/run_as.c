@@ -26,6 +26,9 @@
 #if HAVE_LIBCAPNG
 #include <cap-ng.h>
 #endif
+#if HAVE_CHECKTOKENMEMBERSHIP
+#include <windows.h>
+#endif
 
 /* Only used once to switch user the program is running as */
 static struct run_as_user run_as;
@@ -65,3 +68,41 @@ run_as_user_switch(struct run_as_user *runas)
 #endif
 }
 
+void
+run_thread_as_restricted_privilege_user(void)
+{
+#if HAVE_CHECKTOKENMEMBERSHIP
+	HANDLE hProcessToken = NULL;
+	HANDLE hRestrictedToken = NULL;
+	HANDLE hImpersonationToken = NULL;
+	PSID pEveryoneSid = NULL;
+	SID_IDENTIFIER_AUTHORITY SidWorldAuthority = SECURITY_WORLD_SID_AUTHORITY;
+	SID_AND_ATTRIBUTES sidToRestrict = { 0 };
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY, &hProcessToken)) {
+		warnx("Failed to open process token, err %lu", GetLastError());
+		return;
+	}
+
+	AllocateAndInitializeSid(&SidWorldAuthority, 1, SECURITY_WORLD_RID, 0, 0, 0, 0, 0, 0, 0, &pEveryoneSid);
+	sidToRestrict.Sid = pEveryoneSid;
+	sidToRestrict.Attributes = 0;
+
+	/* Strips all elevated privileges and disables Admin SIDs */
+	if (CreateRestrictedToken(hProcessToken, DISABLE_MAX_PRIVILEGE,
+				  0, NULL, 0, NULL, 1, &sidToRestrict, &hRestrictedToken)) {
+		if (DuplicateToken(hRestrictedToken, SecurityImpersonation, &hImpersonationToken)) {
+			if (!SetThreadToken(NULL, hImpersonationToken)) {
+				warnx("Failed to set thread token, err %lu", GetLastError());
+			}
+			CloseHandle(hImpersonationToken);
+		} else {
+			warnx("Failed to duplicate token, err %lu", GetLastError());
+		}
+		CloseHandle(hRestrictedToken);
+	} else {
+		warnx("Failed to create restricted token, err %d", GetLastError());
+	}
+	FreeSid(pEveryoneSid);
+	CloseHandle(hProcessToken);
+#endif
+}

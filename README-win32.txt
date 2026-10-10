@@ -58,7 +58,6 @@ The following fixable limitations apply:
 
 The following (probably) un-fixable limitations apply:
 - A password entered as -P argument can be shown in process list
-- Priviligies cannot be dropped
 - chroot() cannot be used
 - Detaching from terminal not possible
 - Server on windows must be run with /30 netmask

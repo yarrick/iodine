@@ -28,6 +28,7 @@
 
 #include "config.h"
 #include "compat.h"
+#include "run_as.h"
 
 #include <winsock2.h>
 #include <windows.h>
@@ -187,6 +188,7 @@ DWORD WINAPI tun_reader(LPVOID arg)
 	sock = open_dns_from_host("127.0.0.1", 0, AF_INET, 0);
 
 	olpd.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    run_thread_as_restricted_privilege_user();
 
 	while(TRUE) {
 		olpd.Offset = 0;

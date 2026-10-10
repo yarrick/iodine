@@ -22,6 +22,7 @@ master:
       need to call ifconfig or route binaries.
     - Merged support for more detailed user capability checking on
       Linux with libcap-ng, by Oleksandr Natalenko. Fixes bug #80.
+    - Added removal of privileges on Windows after tunnel setup.
 
 2023-04-17: 0.8.0 "Burning Snowman"
 	- Mac OS X: Support native utun VPN devices. Patch by
