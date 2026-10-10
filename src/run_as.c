@@ -23,6 +23,9 @@
 #ifdef HAVE_SETGROUPS
 #include <grp.h>
 #endif
+#ifdef HAVE_LIBCAPNG
+#include <cap-ng.h>
+#endif
 
 /* Only used once to switch user the program is running as */
 static struct run_as_user run_as;
@@ -42,7 +45,10 @@ run_as_user_lookup(char *username)
 int
 run_as_user_switch(struct run_as_user *runas)
 {
-#ifdef HAVE_GETPWNAM
+#if defined(HAVE_GETPWNAM) && defined(HAVE_LIBCAPNG)
+	return capng_change_id(runas->pw->pw_uid, runas->pw->pw_gid,
+			       CAPNG_DROP_SUPP_GRP);
+#elif defined(HAVE_GETPWNAM)
 #ifdef HAVE_SETGROUPS
        int result;
        gid_t gids[1];
