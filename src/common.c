@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -55,7 +56,6 @@
 #endif
 
 #ifdef HAVE_LIBCAPNG
-#include <stdbool.h>
 #include <cap-ng.h>
 #endif
 
@@ -64,6 +64,21 @@
 
 /* The raw header used when not using DNS protocol */
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
+
+#ifdef HAVE_CHECKTOKENMEMBERSHIP
+bool is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
+	BOOL is_member = FALSE;
+	byte sid_buffer[SECURITY_MAX_SID_SIZE];
+	PSID sid = (PSID)sid_buffer;
+	DWORD sid_size = sizeof(sid_buffer);
+
+	if (CreateWellKnownSid(sid_type, NULL, sid, &sid_size)) {
+		CheckTokenMembership(NULL, sid, &is_member);
+	}
+
+	return is_member;
+}
+#endif
 
 void
 check_privileges(char *username, int port)
@@ -117,6 +132,12 @@ check_privileges(char *username, int port)
 #elif defined(HAVE_GETEUID)
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.");
+		exit(-1);
+	}
+#elif defined(HAVE_CHECKTOKENMEMBERSHIP)
+	if (!is_user_in(WinBuiltinAdministratorsSid) &&
+	    !is_user_in(WinBuiltinNetworkConfigurationOperatorsSid)) {
+		warnx("Missing admin or network config operator permissions.");
 		exit(-1);
 	}
 #else

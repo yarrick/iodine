@@ -71,6 +71,7 @@ cdata.set10('CAN_DETACH',
 
 cc = meson.get_compiler('c')
 optional_functions = [
+  'CheckTokenMembership',
   'arc4random_buf',
   'chroot',
   'daemon',
