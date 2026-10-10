@@ -7,6 +7,7 @@ project('iodine', 'c',
   version : '0.8.0-git' + run_command('git', 'rev-parse',  '--short', 'HEAD', check: true).stdout().strip(),
 )
 fs = import('fs')
+cc = meson.get_compiler('c')
 
 # config.h contents
 cdata = configuration_data()
@@ -51,7 +52,8 @@ if host_machine.system() == 'darwin'
 endif
 if host_machine.system() == 'windows'
   add_project_arguments('-DWINVER=0x0501', language: 'c')
-  commondeps += declare_dependency(link_args: ['-lws2_32', '-liphlpapi'])
+  commondeps += cc.find_library('ws2_32', required: true)
+  commondeps += cc.find_library('iphlpapi', required: true)
   cdata.set('sleep(seconds)', 'Sleep((seconds)*1000)')
 
   zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
@@ -69,7 +71,6 @@ endif
 cdata.set10('CAN_DETACH',
             not ['android', 'windows'].contains(host_machine.system()))
 
-cc = meson.get_compiler('c')
 optional_functions = [
   'CheckTokenMembership',
   'arc4random_buf',
