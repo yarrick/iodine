@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v7
     - name: install deps
       run: brew install check meson
-    - name: setup
+    - name: meson setup
       run: meson setup build
     - name: build
       working-directory: build

@@ -11,8 +11,11 @@ permissions:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        runner: [windows-latest, windows-11-arm]
 
-    runs-on: windows-latest
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: msys2 {0}

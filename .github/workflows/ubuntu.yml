@@ -15,7 +15,8 @@ jobs:
       matrix:
         # Enable tests, use SELinux, use systemd, use libcap-ng
         dep: [check, libselinux1-dev, libsystemd-dev, libcap-ng-dev]
-    runs-on: ubuntu-latest
+        runner: [ubuntu-latest, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.runner }}
 
     steps:
     - uses: actions/checkout@v7
