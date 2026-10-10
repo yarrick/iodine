@@ -4,7 +4,9 @@ project('iodine', 'c',
   ],
   license: 'ISC',
   meson_version: '>=0.64.0',
-  version : '0.8.0-git' + run_command('git', 'rev-parse',  '--short', 'HEAD', check: true).stdout().strip(),
+  version : '0.8.0-git' +
+    run_command('git', 'rev-parse',  '--short', 'HEAD',
+                check: true).stdout().strip(),
 )
 fs = import('fs')
 cc = meson.get_compiler('c')
@@ -60,19 +62,21 @@ if host_machine.system() == 'windows'
   commondeps += cc.find_library('ws2_32', required: true)
   commondeps += cc.find_library('iphlpapi', required: true)
   target_dir = get_option('bindir')
-  fs.copyfile('wintun/bin' / host_machine.cpu_family() / 'wintun.dll',
-    'wintun.dll',
+  fs.copyfile(
+    'wintun/bin' / host_machine.cpu_family() / 'wintun.dll',
     install:true,
-    install_dir: target_dir)
+    install_dir: target_dir,
+  )
 
   zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
   if zdir != ''
     zlib_dll = zdir / 'bin' / 'zlib1.dll'
     if fs.exists(zlib_dll)
-      fs.copyfile(zlib_dll,
-        'zlib1.dll',
+      fs.copyfile(
+        zlib_dll,
         install:true,
-        install_dir: target_dir)
+        install_dir: target_dir,
+      )
     endif
   endif
 endif
@@ -101,16 +105,14 @@ endforeach
 cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
 cdata.set10('HAVE_NORETURN_ATTR', cc.has_function_attribute('noreturn'))
 
-if cc.links('''
+cdata.set10('HAVE_PROGNAME', cc.links('''
   #include <stdio.h>
   extern char *__progname;
   int main() {
     printf("Started as %s\n", __progname);
     return 0;
   }
-''')
-  cdata.set10('HAVE_PROGNAME', true)
-endif
+'''))
 
 # For md5
 cdata.set10('ARCH_IS_BIG_ENDIAN', host_machine.endian() == 'big')
@@ -133,7 +135,7 @@ open(sys.argv[2], "w").write(text)
   ]
 )
 
-common_sources = files([
+common_sources = files(
   'src/base32.c',
   'src/base64.c',
   'src/base128.c',
@@ -147,7 +149,7 @@ common_sources = files([
   'src/read.c',
   'src/run_as.c',
   'src/util.c',
-]) + base64u_c
+) + base64u_c
 
 if host_machine.system() == 'windows'
   common_sources += files('src/tun_windows.c')
@@ -170,32 +172,33 @@ libcommon = static_library(
 configure_file(output: 'config.h',
   configuration: cdata)
 
-client = files([
+client = files(
   'src/client.c',
   'src/iodine.c',
-])
+)
 
 executable('iodine',
   sources: client,
   link_with: libcommon,
-  dependencies: commondeps,
   include_directories: includes,
   install: true,
-  install_dir: target_dir)
+  install_dir: target_dir,
+)
 
-server = files([
+server = files(
   'src/fw_query.c',
   'src/iodined.c',
   'src/user.c',
-])
+)
 
 executable('iodined',
   sources: server,
   link_with: libcommon,
-  dependencies: commondeps + serverdeps,
+  dependencies: serverdeps,
   include_directories: includes,
   install: true,
-  install_dir: target_dir)
+  install_dir: target_dir,
+)
 
 man_conf = configuration_data()
 man_desc = fs.read('man/desc_and_common_options.roff')
@@ -218,22 +221,23 @@ libcheck = dependency('check', required: false)
 
 if libcheck.found()
   suites = [
-    'base32', 'base64','base64u', 'common', 'dns', 'encoding', 'fw_query',
+    'base32', 'base64', 'base64u', 'common', 'dns', 'encoding', 'fw_query',
     'login', 'process', 'read', 'user'
   ]
 
   foreach suite : suites
-    name = suite
-    s = executable('test_@0@'.format(name), files([
-        'tests/@0@.c'.format(name),
+    test(suite, executable(
+      'test_@0@'.format(suite),
+      files(
+        'tests/@0@.c'.format(suite),
         'tests/test.c',
         'src/fw_query.c',
         'src/user.c',
-      ]),
+      ),
       link_with: libcommon,
       include_directories: includes,
-      dependencies: [libcheck, commondeps],
-      c_args: '-DSUITE_NAME="@0@"'.format(name))
-    test(name, s)
+      dependencies: [libcheck],
+      c_args: '-DSUITE_NAME="@0@"'.format(suite),
+    ))
   endforeach
 endif
