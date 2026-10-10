@@ -153,7 +153,7 @@ START_TEST(test_encode_response)
 	len = sizeof(buf);
 	memset(&buf, 0, sizeof(buf));
 	memset(&q, 0, sizeof(struct query));
-	strncpy(q.name, host, strlen(host));
+	strlcpy(q.name, host, QUERY_NAME_SIZE);
 	q.type = T_NULL;
 	q.id = 1337;
 
