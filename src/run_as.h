@@ -20,12 +20,12 @@
 
 #include "config.h"
 
-#ifdef HAVE_GETPWNAM
+#if HAVE_GETPWNAM
 #include <pwd.h>
 #endif
 
 struct run_as_user {
-#ifdef HAVE_GETPWNAM
+#if HAVE_GETPWNAM
        struct passwd *pw;
 #else
        /* Don't leave struct empty */

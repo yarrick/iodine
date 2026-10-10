@@ -25,10 +25,10 @@
 #include "common.h"
 #include "compat.h"
 
-#ifdef HAVE_SYSLOG
+#if HAVE_SYSLOG
 #include <syslog.h>
 #endif
-#ifdef HAVE_SETCON
+#if HAVE_SETCON
 # include <selinux/selinux.h>
 #endif
 
@@ -50,7 +50,7 @@ do_chroot(char *newroot)
 void
 do_setcon(char *context)
 {
-#ifdef HAVE_SETCON
+#if HAVE_SETCON
 	if (-1 == setcon(context))
 		err(1, "%s", context);
 #else

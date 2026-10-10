@@ -48,7 +48,7 @@
 #include <sys/uio.h>
 #include <netdb.h>
 #endif
-#ifdef HAVE_SYSLOG
+#if HAVE_SYSLOG
 #include <syslog.h>
 #endif
 
@@ -61,7 +61,7 @@
 #include "user.h"
 #include "version.h"
 
-#ifdef HAVE_SYSTEMD
+#if HAVE_SYSTEMD
 # include <systemd/sd-daemon.h>
 #endif
 
@@ -94,13 +94,13 @@ static in_addr_t ns_ip;
 static int bind_port;
 static int debug;
 
-#ifndef HAVE_PROGNAME
-static char *__progname;
-#else
+#if HAVE_PROGNAME
 extern char *__progname;
+#else
+static char *__progname;
 #endif
 
-#ifdef HAVE_NORETURN_ATTR
+#if HAVE_NORETURN_ATTR
 /* mark as no return to help some compilers to avoid warnings
  * about use of uninitialized variables */
 static inline void usage(void) __attribute__((noreturn));
@@ -2445,7 +2445,7 @@ main(int argc, char **argv)
 	int dns4addr_len;
 	struct sockaddr_storage dns6addr;
 	int dns6addr_len;
-#ifdef HAVE_SYSTEMD
+#if HAVE_SYSTEMD
 	int nb_fds;
 #endif
 
@@ -2476,7 +2476,7 @@ main(int argc, char **argv)
 
 	network_init();
 
-#ifndef HAVE_PROGNAME
+#if !HAVE_PROGNAME
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
 		__progname = argv[0];
@@ -2732,7 +2732,7 @@ main(int argc, char **argv)
 		free((void*) other_ip);
 	}
 
-#ifdef HAVE_SYSTEMD
+#if HAVE_SYSTEMD
 	nb_fds = sd_listen_fds(0);
 	if (nb_fds < 0) {
 		warnx("Failed to receive file descriptors from systemd: %s", strerror(-nb_fds));
@@ -2753,7 +2753,7 @@ main(int argc, char **argv)
 			retval = 1;
 			goto cleanup;
 		}
-#ifdef HAVE_SYSTEMD
+#if HAVE_SYSTEMD
 	} else if (nb_fds <= 2) {
 		/* systemd may pass up to two sockets, for ip4 and ip6, try to figure out
 			which is which */
@@ -2806,7 +2806,7 @@ main(int argc, char **argv)
 #ifdef FREEBSD
 	tzset();
 #endif
-#ifdef HAVE_SYSLOG
+#if HAVE_SYSLOG
 	openlog(__progname, LOG_NDELAY, LOG_DAEMON);
 #endif
 

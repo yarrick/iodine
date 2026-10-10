@@ -55,7 +55,7 @@
 #include <netdb.h>
 #endif
 
-#ifdef HAVE_LIBCAPNG
+#if HAVE_LIBCAPNG
 #include <cap-ng.h>
 #endif
 
@@ -65,7 +65,7 @@
 /* The raw header used when not using DNS protocol */
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
 
-#ifdef HAVE_CHECKTOKENMEMBERSHIP
+#if HAVE_CHECKTOKENMEMBERSHIP
 bool is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
 	BOOL is_member = FALSE;
 	byte sid_buffer[SECURITY_MAX_SID_SIZE];
@@ -83,7 +83,7 @@ bool is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
 void
 check_privileges(char *username, int port)
 {
-#ifdef HAVE_LIBCAPNG
+#if HAVE_LIBCAPNG
 	bool capable = true;
 
 	if (capng_get_caps_process() == -1) {
@@ -129,12 +129,12 @@ check_privileges(char *username, int port)
 	if (!capable) {
 		exit(-1);
 	}
-#elif defined(HAVE_GETEUID)
+#elif HAVE_GETEUID
 	if (geteuid() != 0) {
 		warnx("Run as root and you'll be happy.");
 		exit(-1);
 	}
-#elif defined(HAVE_CHECKTOKENMEMBERSHIP)
+#elif HAVE_CHECKTOKENMEMBERSHIP
 	if (!is_user_in(WinBuiltinAdministratorsSid) &&
 	    !is_user_in(WinBuiltinNetworkConfigurationOperatorsSid)) {
 		warnx("Missing admin or network config operator permissions.");

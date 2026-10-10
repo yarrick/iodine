@@ -91,16 +91,11 @@ optional_functions = [
   'warnx',
 ]
 foreach func : optional_functions
-  if cc.has_function(func)
-    cdata.set10('HAVE_@0@'.format(func).to_upper(), true)
-  endif
+  cdata.set10('HAVE_@0@'.format(func).to_upper(), cc.has_function(func))
 endforeach
 
 cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
-
-if cc.has_function_attribute('noreturn')
-  cdata.set10('HAVE_NORETURN_ATTR', true)
-endif
+cdata.set10('HAVE_NORETURN_ATTR', cc.has_function_attribute('noreturn'))
 
 if cc.links('''
   #include <stdio.h>

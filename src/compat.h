@@ -31,11 +31,11 @@
 
 void network_init(void);
 
-#ifndef HAVE_INET_ATON
+#if !HAVE_INET_ATON
 int inet_aton(const char *cp, struct in_addr *inp);
 #endif
 
-#ifndef HAVE_WARNX
+#if !HAVE_WARNX
 void vwarn(const char *fmt, va_list list);
 void warn(const char *fmt, ...);
 void err(int eval, const char *fmt, ...);
@@ -44,7 +44,7 @@ void warnx(const char *fmt, ...);
 void errx(int eval, const char *fmt, ...);
 #endif
 
-#ifndef HAVE_SYSLOG
+#if !HAVE_SYSLOG
 void syslog(int priority, const char *fmt, ...);
 #define LOG_NOTICE   1
 #define LOG_INFO     2
@@ -52,7 +52,7 @@ void syslog(int priority, const char *fmt, ...);
 #define LOG_ERR      4
 #endif
 
-#ifndef HAVE_STRLCPY
+#if !HAVE_STRLCPY
 size_t strlcpy(char *dst, const char *src, size_t dsize);
 #endif
 

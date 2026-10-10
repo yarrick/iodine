@@ -45,10 +45,10 @@
 #include "tun.h"
 #include "util.h"
 
-#ifndef HAVE_PROGNAME
-static char *__progname;
-#else
+#if HAVE_PROGNAME
 extern char *__progname;
+#else
+static char *__progname;
 #endif
 
 #define PASSWORD_ENV_VAR "IODINE_PASS"
@@ -59,7 +59,7 @@ sighandler(int sig)
 	client_stop();
 }
 
-#ifdef HAVE_NORETURN_ATTR
+#if HAVE_NORETURN_ATTR
 /* mark as no return to help some compilers to avoid warnings
  * about use of uninitialized variables */
 static inline void usage(void) __attribute__((noreturn));
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
 	network_init();
 	client_init();
 
-#ifndef HAVE_PROGNAME
+#if !HAVE_PROGNAME
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
 		__progname = argv[0];

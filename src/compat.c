@@ -36,7 +36,7 @@ network_init(void)
 #endif
 }
 
-#ifndef HAVE_INET_ATON
+#if !HAVE_INET_ATON
 int
 inet_aton(const char *cp, struct in_addr *inp)
 {
@@ -45,7 +45,7 @@ inet_aton(const char *cp, struct in_addr *inp)
 }
 #endif
 
-#ifndef HAVE_WARNX
+#if !HAVE_WARNX
 void
 vwarn(const char *fmt, va_list list)
 {
@@ -109,7 +109,7 @@ errx(int eval, const char *fmt, ...)
 }
 #endif
 
-#ifndef HAVE_SYSLOG
+#if !HAVE_SYSLOG
 void
 syslog(int priority, const char *fmt, ...)
 {
@@ -121,7 +121,7 @@ syslog(int priority, const char *fmt, ...)
 }
 #endif
 
-#ifndef HAVE_STRLCPY
+#if !HAVE_STRLCPY
 size_t strlcpy(char *dst, const char *src, size_t dsize) {
 	size_t srclen = strlen(src);
 

@@ -20,10 +20,10 @@
 #include "compat.h"
 
 #include <unistd.h>
-#ifdef HAVE_SETGROUPS
+#if HAVE_SETGROUPS
 #include <grp.h>
 #endif
-#ifdef HAVE_LIBCAPNG
+#if HAVE_LIBCAPNG
 #include <cap-ng.h>
 #endif
 
@@ -33,7 +33,7 @@ static struct run_as_user run_as;
 struct run_as_user *
 run_as_user_lookup(char *username)
 {
-#ifdef HAVE_GETPWNAM
+#if HAVE_GETPWNAM
        run_as.pw = getpwnam(username);
        if (!run_as.pw)
                return NULL;
@@ -45,11 +45,11 @@ run_as_user_lookup(char *username)
 int
 run_as_user_switch(struct run_as_user *runas)
 {
-#if defined(HAVE_GETPWNAM) && defined(HAVE_LIBCAPNG)
+#if HAVE_GETPWNAM && HAVE_LIBCAPNG
 	return capng_change_id(runas->pw->pw_uid, runas->pw->pw_gid,
 			       CAPNG_DROP_SUPP_GRP);
-#elif defined(HAVE_GETPWNAM)
-#ifdef HAVE_SETGROUPS
+#elif HAVE_GETPWNAM
+#if HAVE_SETGROUPS
        int result;
        gid_t gids[1];
        gids[0] = runas->pw->pw_gid;
