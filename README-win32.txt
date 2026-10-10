@@ -9,13 +9,13 @@ Extra README file for Win32 related stuff
 
 == Running iodine on Windows:
 
-0. You need Windows XP or newer to run.
+0. You need Windows Vista or newer to run.
 
 1. Install the TAP driver
    https://openvpn.net/index.php/open-source/downloads.html
    Download the OpenVPN TAP driver (under section Tap-windows)
    Problems has been reported with the NDIS6 version (9.2x.y), use the
-   NDIS5 version for now if possible.
+   NDIS5 version for now if possible (9.9.2 is good).
 
 2. Have at least one TAP32 interface installed. There are scripts for adding
    and removing in the OpenVPN bin directory. If you have more than one
@@ -25,7 +25,7 @@ Extra README file for Win32 related stuff
 3. Make sure the interface you want to use does not have a default gateway set.
 
 4. Run iodine/iodined as normal (see the main README file).
-   You may have to run it as administrator depending on user privileges.
+   Run it in a window running as administrator.
 
 5. Enjoy!
 

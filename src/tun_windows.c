@@ -63,6 +63,7 @@ static void get_name(char *ifname, int namelen, char *dev_name);
 #include "common.h"
 
 static char if_name[250];
+static NET_LUID luid;
 
 static void
 get_device(char *device, int device_len, const char *wanted_dev)
@@ -207,6 +208,7 @@ open_tun(const char *tun_device)
 {
 	char adapter[256];
 	char tapfile[512];
+	wchar_t wname[256];
 	int tunfd;
 	struct sockaddr_storage localsock;
 	int localsock_len;
@@ -231,6 +233,9 @@ open_tun(const char *tun_device)
 		warnx("Could not open device!");
 		return -1;
 	}
+
+	MultiByteToWideChar(CP_ACP, 0, if_name, -1, wname, ARRAYSIZE(wname));
+	ConvertInterfaceAliasToLuid(wname, &luid);
 
 	/* Use a UDP connection to forward packets from tun,
 	 * so we can still use select() in main code.
@@ -350,6 +355,24 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 int
 tun_setmtu(const unsigned mtu)
 {
+	MIB_IPINTERFACE_ROW row;
+	NETIO_STATUS res;
+
+	if (mtu <= 200 || mtu > 1500) {
+		warn("MTU out of range: %u\n", mtu);
+		return 1;
+	}
+
+	InitializeIpInterfaceEntry(&row);
+	row.Family = AF_INET;
+	row.InterfaceLuid = luid;
+	row.NlMtu = mtu;
+	fprintf(stderr, "Setting MTU of %s to %u\n", if_name, mtu);
+	res = SetIpInterfaceEntry(&row);
+	if (res != NO_ERROR) {
+		warn("tun_setmtu: SetIpInterfaceEntry failed: status %d", res);
+		return 1;
+	}
 	return 0;
 }
 

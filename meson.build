@@ -51,7 +51,11 @@ if host_machine.system() == 'darwin'
   add_project_arguments('-D__APPLE_USE_RFC_3542', language: 'c')
 endif
 if host_machine.system() == 'windows'
-  add_project_arguments('-DWINVER=0x0501', language: 'c')
+  add_project_arguments(
+    '-DWINVER=0x0600',
+    '-D_WIN32_WINNT=0x0600',
+    language: 'c'
+  )
   commondeps += cc.find_library('ws2_32', required: true)
   commondeps += cc.find_library('iphlpapi', required: true)
   cdata.set('sleep(seconds)', 'Sleep((seconds)*1000)')
