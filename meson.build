@@ -3,9 +3,10 @@ project('iodine', 'c',
     'c_std=c99',
   ],
   license: 'ISC',
-  meson_version: '>=0.60.3',
+  meson_version: '>=0.64.0',
   version : '0.8.0-git' + run_command('git', 'rev-parse',  '--short', 'HEAD', check: true).stdout().strip(),
 )
+fs = import('fs')
 
 # config.h contents
 cdata = configuration_data()
@@ -52,6 +53,17 @@ if host_machine.system() == 'windows'
   add_project_arguments('-DWINVER=0x0501', language: 'c')
   commondeps += declare_dependency(link_args: ['-lws2_32', '-liphlpapi'])
   cdata.set('sleep(seconds)', 'Sleep((seconds)*1000)')
+
+  zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
+  if zdir != ''
+    zlib_dll = zdir / 'bin' / 'zlib1.dll'
+    if fs.exists(zlib_dll)
+      fs.copyfile(zlib_dll,
+        'zlib1.dll',
+        install:true,
+        install_dir: get_option('sbindir'))
+    endif
+  endif
 endif
 
 cdata.set10('CAN_DETACH',
@@ -171,7 +183,6 @@ executable('iodined',
   install_dir: get_option('sbindir'))
 
 man_conf = configuration_data()
-fs = import('fs')
 man_desc = fs.read('man/desc_and_common_options.roff')
 man_conf.set('DESC_AND_COMMON_OPTIONS', man_desc)
 man_example = fs.read('man/examples_and_security.roff')
