@@ -13,7 +13,7 @@ cc = meson.get_compiler('c')
 cdata = configuration_data()
 cdata.set_quoted('IODINE_VERSION', meson.project_version())
 
-srcdir = include_directories('src')
+includes = include_directories('src', 'wintun/include')
 target_dir = get_option('sbindir')
 
 zlib = dependency('zlib')
@@ -53,14 +53,18 @@ if host_machine.system() == 'darwin'
 endif
 if host_machine.system() == 'windows'
   add_project_arguments(
-    '-DWINVER=0x0600',
-    '-D_WIN32_WINNT=0x0600',
+    '-DWINVER=0x0601',
+    '-D_WIN32_WINNT=0x0601',
     language: 'c'
   )
   commondeps += cc.find_library('ws2_32', required: true)
   commondeps += cc.find_library('iphlpapi', required: true)
-
   target_dir = get_option('bindir')
+  fs.copyfile('wintun/bin' / host_machine.cpu_family() / 'wintun.dll',
+    'wintun.dll',
+    install:true,
+    install_dir: target_dir)
+
   zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
   if zdir != ''
     zlib_dll = zdir / 'bin' / 'zlib1.dll'
@@ -167,7 +171,7 @@ client = files([
 executable('iodine',
   sources: client + common,
   dependencies: commondeps,
-  include_directories: srcdir,
+  include_directories: includes,
   install: true,
   install_dir: target_dir)
 
@@ -180,7 +184,7 @@ server = files([
 executable('iodined',
   sources: common + server,
   dependencies: commondeps + serverdeps,
-  include_directories: srcdir,
+  include_directories: includes,
   install: true,
   install_dir: target_dir)
 
@@ -225,7 +229,7 @@ if libcheck.found()
         'tests/test.c',
         'src/compat.c',
       ]) + suite[1],
-      include_directories: srcdir,
+      include_directories: includes,
       dependencies: [libcheck, commondeps],
       c_args: '-DSUITE_NAME="@0@"'.format(name))
     test(name, s)
