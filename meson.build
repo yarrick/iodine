@@ -133,7 +133,7 @@ open(sys.argv[2], "w").write(text)
   ]
 )
 
-common = files([
+common_sources = files([
   'src/base32.c',
   'src/base64.c',
   'src/base128.c',
@@ -150,15 +150,22 @@ common = files([
 ]) + base64u_c
 
 if host_machine.system() == 'windows'
-  common += files('src/tun_windows.c')
+  common_sources += files('src/tun_windows.c')
 else
-  common += files('src/tun_unix.c')
+  common_sources += files('src/tun_unix.c')
   if host_machine.system() == 'android'
     cdata.set('TUNNEL_DEV_PATH', '"/dev/tun"')
   else
     cdata.set('TUNNEL_DEV_PATH', '"/dev/net/tun"')
   endif
 endif
+
+libcommon = static_library(
+  'common',
+  common_sources,
+  include_directories: includes,
+  dependencies: commondeps,
+)
 
 configure_file(output: 'config.h',
   configuration: cdata)
@@ -169,7 +176,8 @@ client = files([
 ])
 
 executable('iodine',
-  sources: client + common,
+  sources: client,
+  link_with: libcommon,
   dependencies: commondeps,
   include_directories: includes,
   install: true,
@@ -182,7 +190,8 @@ server = files([
 ])
 
 executable('iodined',
-  sources: common + server,
+  sources: server,
+  link_with: libcommon,
   dependencies: commondeps + serverdeps,
   include_directories: includes,
   install: true,
@@ -209,26 +218,19 @@ libcheck = dependency('check', required: false)
 
 if libcheck.found()
   suites = [
-    ['base32', ['src/base32.c']],
-    ['base64', ['src/base64.c']],
-    ['base64u', [base64u_c]],
-    ['common', ['src/common.c']],
-    ['dns', ['src/base32.c', 'src/dns.c', 'src/encoding.c', 'src/read.c']],
-    ['encoding', ['src/encoding.c', 'src/base32.c']],
-    ['fw_query', ['src/fw_query.c']],
-    ['login', ['src/login.c', 'src/md5.c']],
-    ['process', ['src/process.c']],
-    ['read', ['src/read.c']],
-    ['user', ['src/user.c']],
+    'base32', 'base64','base64u', 'common', 'dns', 'encoding', 'fw_query',
+    'login', 'process', 'read', 'user'
   ]
 
   foreach suite : suites
-    name = suite[0]
+    name = suite
     s = executable('test_@0@'.format(name), files([
         'tests/@0@.c'.format(name),
         'tests/test.c',
-        'src/compat.c',
-      ]) + suite[1],
+        'src/fw_query.c',
+        'src/user.c',
+      ]),
+      link_with: libcommon,
       include_directories: includes,
       dependencies: [libcheck, commondeps],
       c_args: '-DSUITE_NAME="@0@"'.format(name))
