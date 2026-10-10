@@ -2471,6 +2471,8 @@ main(int argc, char **argv)
 	debug = 0;
 	netmask = 27;
 	pidfile = NULL;
+	dns4addr_len = 0;
+	dns6addr_len = 0;
 
 	retval = 0;
 
