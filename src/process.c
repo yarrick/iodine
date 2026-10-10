@@ -62,8 +62,56 @@ void
 do_pidfile(char *pidfile)
 {
 	int fd;
-	struct stat st;
 	FILE *file;
+#ifdef WINDOWS
+	BY_HANDLE_FILE_INFORMATION fileInfo;
+	HANDLE hFile = CreateFileA(
+		pidfile,
+		GENERIC_WRITE,
+		0,
+		NULL,
+		CREATE_NEW,
+		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
+		NULL);
+
+	if (hFile == INVALID_HANDLE_VALUE && GetLastError() == ERROR_FILE_EXISTS) {
+		hFile = CreateFileA(
+			pidfile,
+			GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
+			NULL);
+	}
+
+	if (hFile == INVALID_HANDLE_VALUE) {
+		err(1, "do_pidfile: Cannot write pidfile to %s", pidfile);
+	}
+
+	if (GetFileInformationByHandle(hFile, &fileInfo)) {
+		if (fileInfo.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+			CloseHandle(hFile);
+			errx(1, "do_pidfile: %s is a symbolic link", pidfile);
+		}
+	}
+
+	if ((GetFileType(hFile) & 0xFFFF) != FILE_TYPE_DISK) {
+		CloseHandle(hFile);
+		DeleteFileA(pidfile);
+		errx(1, "do_pidfile: %s is not a regular file", pidfile);
+	}
+
+	/* Truncate file */
+	SetEndOfFile(hFile);
+
+	fd = _open_osfhandle((intptr_t)hFile, _O_WRONLY);
+	if (fd == -1) {
+		CloseHandle(hFile);
+		err(1, "do_pidfile: Cannot obtain file descriptor for %s", pidfile);
+	}
+#else
+	struct stat st;
 
 	/* Open without following symlinks so a local user cannot
 	 * redirect the write (done as root) to an arbitrary file.
@@ -71,14 +119,7 @@ do_pidfile(char *pidfile)
 	 * fstat check below rejects everything that is not a regular
 	 * file anyway. Explicit 0644 mode so the file is not
 	 * world-writable even after do_detach() sets umask(0). */
-	fd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC
-#ifdef O_NOFOLLOW
-			| O_NOFOLLOW
-#endif
-#ifdef O_NONBLOCK
-			| O_NONBLOCK
-#endif
-			, 0644);
+	fd = open(pidfile, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_NONBLOCK, 0644);
 	if (fd == -1) {
 		syslog(LOG_ERR, "Cannot write pidfile to %s, exiting", pidfile);
 		err(1, "do_pidfile: Can not write pidfile to %s", pidfile);
@@ -92,6 +133,7 @@ do_pidfile(char *pidfile)
 		syslog(LOG_ERR, "Refusing to write pidfile: %s is not a regular file", pidfile);
 		err(1, "do_pidfile: %s is not a regular file", pidfile);
 	}
+#endif
 
 	if ((file = fdopen(fd, "w")) == NULL) {
 		close(fd);
