@@ -2797,11 +2797,11 @@ main(int argc, char **argv)
 	}
 	fprintf(stderr, "Listening to dns for domain %s\n", topdomain);
 
-	if (foreground == 0)
-		do_detach();
-
 	if (pidfile != NULL)
 		do_pidfile(pidfile);
+
+	if (foreground == 0)
+		do_detach();
 
 #ifdef FREEBSD
 	tzset();

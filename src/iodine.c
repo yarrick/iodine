@@ -370,11 +370,11 @@ int main(int argc, char **argv)
 
 	fprintf(stderr, "Connection setup complete, transmitting data.\n");
 
-	if (foreground == 0)
-		do_detach();
-
 	if (pidfile != NULL)
 		do_pidfile(pidfile);
+
+	if (foreground == 0)
+		do_detach();
 
 	if (newroot != NULL)
 		do_chroot(newroot);
