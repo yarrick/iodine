@@ -77,6 +77,8 @@ foreach func : optional_functions
   endif
 endforeach
 
+cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
+
 if cc.has_function_attribute('noreturn')
   cdata.set10('HAVE_NORETURN_ATTR', true)
 endif

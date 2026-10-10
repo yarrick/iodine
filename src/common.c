@@ -204,9 +204,7 @@ open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only)
 #endif
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
 
-#ifndef WINDOWS
 	fd_set_close_on_exec(fd);
-#endif
 
 	if (sockaddr->ss_family == AF_INET6 && v6only >= 0) {
 		setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (const void*) &v6only, sizeof(v6only));
@@ -444,13 +442,13 @@ int recent_seqno(int ourseqno, int gotseqno)
 	return 0;
 }
 
-#ifndef WINDOWS
 /* Set FD_CLOEXEC flag on file descriptor.
  * This stops it from being inherited by system() calls.
  */
 void
 fd_set_close_on_exec(int fd)
 {
+#if HAVE_FD_CLOEXEC
 	int flags;
 
 	flags = fcntl(fd, F_GETFD);
@@ -459,8 +457,8 @@ fd_set_close_on_exec(int fd)
 	flags |= FD_CLOEXEC;
 	if (fcntl(fd, F_SETFD, flags) == -1)
 		err(4, "Failed to set fd flags");
-}
 #endif
+}
 
 /* Fill a buffer with random bytes.
  *

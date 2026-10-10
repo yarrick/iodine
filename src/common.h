@@ -130,8 +130,6 @@ int recent_seqno(int , int);
  * Used for protocol-seed and nonce generation instead of rand(). */
 void secure_random(void *buf, size_t len);
 
-#ifndef WINDOWS
 void fd_set_close_on_exec(int fd);
-#endif
 
 #endif
