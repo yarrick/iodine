@@ -310,6 +310,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	struct in_addr addr;
 	DWORD len;
 	MIB_UNICASTIPADDRESS_ROW ip_row;
+	PMIB_UNICASTIPADDRESS_TABLE table = NULL;
 
 	if (build_netmask(netbits, &netmask)) {
 		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
@@ -347,6 +348,16 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		return -1;
 	}
 
+	/* Remove earlier IP addresses on interface */
+	if (GetUnicastIpAddressTable(AF_INET, &table) == NO_ERROR) {
+		for (DWORD i = 0; i < table->NumEntries; i++) {
+			if (table->Table[i].InterfaceLuid.Value == luid.Value) {
+				DeleteUnicastIpAddressEntry(&table->Table[i]);
+			}
+		}
+		FreeMibTable(table);
+	}
+
 	fprintf(stderr, "Setting IP of interface '%s' to %s\n", if_name, ip);
 	InitializeUnicastIpAddressEntry(&ip_row);
 	ip_row.InterfaceLuid = luid;
@@ -354,14 +365,8 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	ip_row.Address.Ipv4.sin_family = AF_INET;
 	ip_row.Address.Ipv4.sin_addr = addr;
 	status = CreateUnicastIpAddressEntry(&ip_row);
-	if (status == ERROR_OBJECT_ALREADY_EXISTS) {
-		status = SetUnicastIpAddressEntry(&ip_row);
-		if (status != NO_ERROR) {
-			warnx("tun_setmtu: SetUnicastIpAddressEntry failed: status %d", status);
-			return 1;
-		}
-	} else if (status != NO_ERROR) {
-		warnx("tun_setmtu: CreateUnicastIpAddressEntry failed: status %d", status);
+	if (status != NO_ERROR) {
+		warnx("tun_setmtu: CreateUnicastIpAddressEntry failed: status %lu", status);
 		return 1;
 	}
 	return 0;
