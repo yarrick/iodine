@@ -14,6 +14,7 @@ cdata = configuration_data()
 cdata.set_quoted('IODINE_VERSION', meson.project_version())
 
 srcdir = include_directories('src')
+target_dir = get_option('sbindir')
 
 zlib = dependency('zlib')
 commondeps = [zlib]
@@ -59,6 +60,7 @@ if host_machine.system() == 'windows'
   commondeps += cc.find_library('ws2_32', required: true)
   commondeps += cc.find_library('iphlpapi', required: true)
 
+  target_dir = get_option('bindir')
   zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
   if zdir != ''
     zlib_dll = zdir / 'bin' / 'zlib1.dll'
@@ -66,7 +68,7 @@ if host_machine.system() == 'windows'
       fs.copyfile(zlib_dll,
         'zlib1.dll',
         install:true,
-        install_dir: get_option('sbindir'))
+        install_dir: target_dir)
     endif
   endif
 endif
@@ -172,7 +174,7 @@ executable('iodine',
   dependencies: commondeps,
   include_directories: srcdir,
   install: true,
-  install_dir: get_option('sbindir'))
+  install_dir: target_dir)
 
 server = files([
   'src/fw_query.c',
@@ -185,7 +187,7 @@ executable('iodined',
   dependencies: commondeps + serverdeps,
   include_directories: srcdir,
   install: true,
-  install_dir: get_option('sbindir'))
+  install_dir: target_dir)
 
 man_conf = configuration_data()
 man_desc = fs.read('man/desc_and_common_options.roff')
