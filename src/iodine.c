@@ -142,9 +142,7 @@ int main(int argc, char **argv)
 	int lazymode;
 	int selecttimeout;
 	int hostname_maxlen;
-#ifdef OPENBSD
 	int rtable = 0;
-#endif
 	struct sockaddr_storage nameservaddr;
 	int nameservaddr_len;
 	int nameserv_family;
@@ -212,11 +210,9 @@ int main(int argc, char **argv)
 		case 'd':
 			device = optarg;
 			break;
-#ifdef OPENBSD
 		case 'R':
 			rtable = atoi(optarg);
 			break;
-#endif
 		case 'P':
 			strlcpy(password, optarg, sizeof(password));
 
@@ -354,10 +350,8 @@ int main(int argc, char **argv)
 		retval = 1;
 		goto cleanup2;
 	}
-#ifdef OPENBSD
 	if (rtable > 0)
 		socket_setrtable(dns_fd, rtable);
-#endif
 
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);

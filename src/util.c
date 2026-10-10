@@ -76,7 +76,6 @@ char *get_resolvconf_addr(void)
 	return rv;
 }
 
-#ifdef OPENBSD
 void
 socket_setrtable(int fd, int rtable)
 {
@@ -87,4 +86,3 @@ socket_setrtable(int fd, int rtable)
 	fprintf(stderr, "Routing domain support was not available at compile time.\n");
 #endif
 }
-#endif
