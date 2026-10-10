@@ -386,7 +386,6 @@ int main(int argc, char **argv)
 			/* NOTREACHED */
 		}
 	}
-    run_thread_as_restricted_privilege_user();
 
 	if (context != NULL)
 		do_setcon(context);

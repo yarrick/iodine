@@ -35,6 +35,5 @@ struct run_as_user {
 
 struct run_as_user *run_as_user_lookup(char *username);
 int run_as_user_switch(struct run_as_user *runas);
-void run_thread_as_restricted_privilege_user(void);
 
 #endif
