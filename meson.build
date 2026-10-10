@@ -58,7 +58,6 @@ if host_machine.system() == 'windows'
   )
   commondeps += cc.find_library('ws2_32', required: true)
   commondeps += cc.find_library('iphlpapi', required: true)
-  cdata.set('sleep(seconds)', 'Sleep((seconds)*1000)')
 
   zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
   if zdir != ''
