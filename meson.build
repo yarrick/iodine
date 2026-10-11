@@ -1,5 +1,6 @@
 project('iodine', 'c',
   default_options: [
+    'buildtype=release',
     'c_std=c99',
     'warning_level=3',
   ],
