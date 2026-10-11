@@ -1,6 +1,7 @@
 project('iodine', 'c',
   default_options: [
     'c_std=c99',
+    'warning_level=3',
   ],
   license: 'ISC',
   meson_version: '>=0.64.0',
