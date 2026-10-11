@@ -314,7 +314,7 @@ write_tun(int tun_fd, char *data, size_t len)
 #endif
 	}
 
-	if (write(tun_fd, data, len) != len) {
+	if (write(tun_fd, data, len) != (ssize_t)len) {
 		warn("write_tun");
 		return 1;
 	}
