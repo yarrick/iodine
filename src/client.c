@@ -317,7 +317,7 @@ send_raw(int fd, char *buf, unsigned int buflen, int cmd)
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (userid & 0x0F);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv, sizeof(raw_serv));
+	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv, raw_serv_len);
 }
 
 static void
