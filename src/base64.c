@@ -27,7 +27,7 @@
 #define BASE64_BLKSIZE_ENC 4
 
 struct alphabet {
-    unsigned char forward[64];
+    unsigned char forward[65];
     unsigned char reverse[256];
     int reverse_init;
 };
@@ -76,9 +76,9 @@ static int base64_gen_encode(struct alphabet *a, char *buf, size_t *buflen,
 {
 	unsigned char *cb64 = a->forward;
 	unsigned char *udata = (unsigned char *) data;
-	int iout = 0;	/* to-be-filled output char */
-	int iin = 0;	/* one more than last input byte that can be
-			   successfully decoded */
+	unsigned int iout = 0;	/* to-be-filled output char */
+	unsigned int iin = 0;	/* one more than last input byte that can be
+				   successfully decoded */
 
 	/* Note: Don't bother to optimize manually. GCC optimizes
 	   better(!) when using simplistic array indexing. */
@@ -140,8 +140,8 @@ static int base64_gen_decode(struct alphabet *a, void *buf, size_t *buflen,
 {
 	unsigned char *rev64 = a->reverse;
 	unsigned char *ubuf = (unsigned char *) buf;
-	int iout = 0;	/* to-be-filled output byte */
-	int iin = 0;	/* next input char to use in decoding */
+	unsigned int iout = 0;	/* to-be-filled output byte */
+	unsigned int iin = 0;	/* next input char to use in decoding */
 
 	base64_reverse_init(a);
 

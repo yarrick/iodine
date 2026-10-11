@@ -81,9 +81,9 @@ static int base128_encode(char *buf, size_t *buflen, const void *data,
 {
 	unsigned char *ubuf = (unsigned char *) buf;
 	unsigned char *udata = (unsigned char *) data;
-	int iout = 0;	/* to-be-filled output char */
-	int iin = 0;	/* one more than last input byte that can be
-			   successfully decoded */
+	unsigned int iout = 0;	/* to-be-filled output char */
+	unsigned int iin = 0;	/* one more than last input byte that can be
+				   successfully decoded */
 
 	/* Note: Don't bother to optimize manually. GCC optimizes
 	   better(!) when using simplistic array indexing. */
@@ -177,8 +177,8 @@ static int base128_decode(void *buf, size_t *buflen, const char *str,
 {
 	unsigned char *ustr = (unsigned char *) str;
 	unsigned char *ubuf = (unsigned char *) buf;
-	int iout = 0;	/* to-be-filled output byte */
-	int iin = 0;	/* next input char to use in decoding */
+	unsigned int iout = 0;	/* to-be-filled output byte */
+	unsigned int iin = 0;	/* next input char to use in decoding */
 
 	base128_reverse_init();
 
