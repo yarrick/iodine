@@ -789,7 +789,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	if (domain_len < 2)
 		return;
 
-	memcpy(in, q->name, MIN(domain_len, sizeof(in)));
+	memcpy(in, q->name, MIN((unsigned int)domain_len, sizeof(in)));
 
 	if (in[0] == 'V' || in[0] == 'v') {
 		int version = 0;
@@ -1452,7 +1452,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 					   users[userid].encoder);
 
 			/* copy to packet buffer, update length */
-			read = MIN(read, sizeof(users[userid].inpacket.data) - users[userid].inpacket.offset);
+			read = MIN((unsigned int)read, sizeof(users[userid].inpacket.data) - users[userid].inpacket.offset);
 			memcpy(users[userid].inpacket.data + users[userid].inpacket.offset, unpacked, read);
 			users[userid].inpacket.len += read;
 			users[userid].inpacket.offset += read;
@@ -2256,8 +2256,8 @@ write_dns(int fd, struct query *q, const char *data, size_t datalen, char downen
 	} else if (q->type == T_MX || q->type == T_SRV) {
 		char mxbuf[64*1024];
 		char *b = mxbuf;
-		int offset = 0;
-		int res;
+		unsigned int offset = 0;
+		unsigned int res;
 
 		while (1) {
 			res = write_dns_nameenc(b, sizeof(mxbuf) - (b - mxbuf),

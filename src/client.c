@@ -991,7 +991,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		}
 		inpkt.fragment = new_down_fragment;
 
-		datalen = MIN(read - 2, sizeof(inpkt.data) - inpkt.len);
+		datalen = MIN((unsigned int)(read - 2), sizeof(inpkt.data) - inpkt.len);
 
 		/* we are here only when read > 2, so datalen "always" >=1 */
 
