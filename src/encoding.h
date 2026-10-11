@@ -40,8 +40,10 @@
 
 struct encoder {
 	const char name[8];
-	int (*encode)(char *dst, size_t *dstlen, const void *src, size_t srclen);
-	int (*decode)(void *dst, size_t *dstlen, const char *src, size_t srclen);
+	unsigned int (*encode)(char *dst, size_t *dstlen,
+			       const void *src, size_t srclen);
+	unsigned int (*decode)(void *dst, size_t *dstlen,
+			       const char *src, size_t srclen);
 
 	const bool places_dots;
 	const bool eats_dots;

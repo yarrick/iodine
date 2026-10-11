@@ -70,7 +70,8 @@ int b32_8to5(int in)
  * return value    : #bytes filled in buf   (excluding \0)
  * sets *buflen to : #bytes encoded from data
  */
-static int base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
+static unsigned int base32_encode(char *buf, size_t *buflen,
+				  const void *data, size_t size)
 {
 	unsigned char *udata = (unsigned char *) data;
 	unsigned int iout = 0;	/* to-be-filled output char */
@@ -162,8 +163,8 @@ static int base32_encode(char *buf, size_t *buflen, const void *data, size_t siz
  *
  * return value    : #bytes filled in buf   (excluding \0)
  */
-static int base32_decode(void *buf, size_t *buflen, const char *str,
-			 size_t slen)
+static unsigned int base32_decode(void *buf, size_t *buflen,
+				  const char *str, size_t slen)
 {
 	unsigned char *ubuf = (unsigned char *) buf;
 	unsigned int iout = 0;	/* to-be-filled output byte */
