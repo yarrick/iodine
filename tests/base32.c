@@ -48,7 +48,7 @@ START_TEST(test_base32_encode)
 	len = sizeof(buf);
 	val = base32_ops.encode(buf, &len, testpairs[_i].a, strlen(testpairs[_i].a));
 
-	ck_assert(val == strlen(testpairs[_i].b));
+	ck_assert_int_eq(val, strlen(testpairs[_i].b));
 	ck_assert_str_eq(buf, testpairs[_i].b);
 }
 END_TEST
@@ -62,7 +62,7 @@ START_TEST(test_base32_decode)
 	len = sizeof(buf);
 	val = base32_ops.decode(buf, &len, testpairs[_i].b, strlen(testpairs[_i].b));
 
-	ck_assert(val == strlen(testpairs[_i].a));
+	ck_assert_int_eq(val, strlen(testpairs[_i].a));
 	ck_assert_str_eq(buf, testpairs[_i].a);
 }
 END_TEST
@@ -85,7 +85,7 @@ START_TEST(test_base32_blksize)
 	size_t enclen;
 	char *rawbuf;
 	char *encbuf;
-	int i;
+	unsigned int i;
 	int val;
 
 	rawlen = base32_ops.blocksize_raw;

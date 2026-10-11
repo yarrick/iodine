@@ -75,8 +75,8 @@ START_TEST(test_build_hostname)
 	char data[256];
 	char buf[1024];
 	char *topdomain = "a.c";
-	int buflen;
-	int i;
+	unsigned int buflen;
+	unsigned int i;
 
 	for (i = 0; i < sizeof(data); i++) {
 		data[i] = i & 0xFF;
@@ -87,7 +87,7 @@ START_TEST(test_build_hostname)
 	for (i = 1; i < sizeof(data); i++) {
 		int len = build_hostname(buf, buflen, data, i, topdomain, &base32_ops, sizeof(buf));
 
-		ck_assert(len <= i);
+		ck_assert_int_le(len, i);
 		ck_assert_msg(strstr(buf, "..") == NULL,
 			"Found double dots when encoding data len %d! buf: %s", i, buf);
 	}

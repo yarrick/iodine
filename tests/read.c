@@ -70,8 +70,8 @@ START_TEST(test_read_putlong)
 	uint32_t k;
 	uint32_t l;
 	char* p;
-	int i;
-	int j;
+	unsigned int i;
+	unsigned int j;
 
 	for (i = 0; i < 32; i++) {
 		p = (char*)&k;
@@ -306,7 +306,7 @@ START_TEST(test_putname)
 	b = buf;
 	ret = putname(&b, 256, domain);
 
-	ck_assert(ret == strlen(domain) + 1);
+	ck_assert_int_eq(ret, strlen(domain) + 1);
 	ck_assert_msg(strncmp(buf, out, ret) == 0, "Happy flow failed");
 }
 END_TEST
