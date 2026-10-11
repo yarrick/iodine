@@ -29,7 +29,7 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 	char *s;
 	char *d;
 	char *pktend;
-	int len;
+	unsigned int len;
 	int offset;
 	char c;
 
@@ -147,7 +147,7 @@ int
 readtxtbin(char *packet, char **src, size_t srcremain, char *dst, size_t dstremain)
 {
 	unsigned char *uc;
-	int tocopy;
+	unsigned int tocopy;
 	int dstused = 0;
 	(void)packet;
 
@@ -177,7 +177,7 @@ int
 putname(char **buf, size_t buflen, const char *host)
 {
 	char *word;
-	int left;
+	unsigned int left;
 	char *h;
 	char *p;
 	char *saveptr = NULL;
@@ -187,7 +187,7 @@ putname(char **buf, size_t buflen, const char *host)
 	p = *buf;
 
 	word = strtok_r(h, ".", &saveptr);
-	while(word) {
+	while (word) {
 		size_t word_len = strlen(word);
 		if (word_len > 63 || word_len > left) {
 			free(h);
@@ -265,7 +265,7 @@ puttxtbin(char **buf, size_t bufremain, const char *from, size_t fromremain)
 	unsigned char uc;
 	unsigned char *ucp = &uc;
 	char *cp = (char *) ucp;
-	int tocopy;
+	unsigned int tocopy;
 	int bufused = 0;
 
 	while (fromremain > 0)
