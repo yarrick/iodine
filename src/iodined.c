@@ -2439,6 +2439,7 @@ main(int argc, char **argv)
 	int skipipconfig;
 	char *netsize;
 	int ns_get_externalip;
+	struct in_addr resolved_external_ip;
 	int retval;
 	int max_idle_time = 0;
 	struct sockaddr_storage dns4addr;
@@ -2465,6 +2466,7 @@ main(int argc, char **argv)
 	port = 53;
 	ns_ip = INADDR_ANY;
 	ns_get_externalip = 0;
+	resolved_external_ip.s_addr = INADDR_ANY;
 	addrfamily = AF_UNSPEC;
 	check_ip = 1;
 	skipipconfig = 0;
@@ -2630,13 +2632,12 @@ main(int argc, char **argv)
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET) {
 		if (listen_ip4 && strcmp("external", listen_ip4) == 0) {
-			struct in_addr extip;
-			int res = get_external_ip(&extip);
+			int res = get_external_ip(&resolved_external_ip);
 			if (res) {
 				fprintf(stderr, "Failed to get external IP via DNS query.\n");
 				exit(3);
 			}
-			listen_ip4 = inet_ntoa(extip);
+			listen_ip4 = inet_ntoa(resolved_external_ip);
 			fprintf(stderr, "Will listen on external IP %s\n", listen_ip4);
 		}
 		dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr);
@@ -2690,14 +2691,15 @@ main(int argc, char **argv)
 	}
 
 	if (ns_get_externalip) {
-		struct in_addr extip;
-		int res = get_external_ip(&extip);
-		if (res) {
-			fprintf(stderr, "Failed to get external IP via DNS query.\n");
-			exit(3);
+		if (resolved_external_ip.s_addr == INADDR_ANY) {
+			int res = get_external_ip(&resolved_external_ip);
+			if (res) {
+				fprintf(stderr, "Failed to get external IP via DNS query.\n");
+				exit(3);
+			}
 		}
-		ns_ip = extip.s_addr;
-		fprintf(stderr, "Using %s as external IP.\n", inet_ntoa(extip));
+		ns_ip = resolved_external_ip.s_addr;
+		fprintf(stderr, "Using %s as external IP.\n", inet_ntoa(resolved_external_ip));
 	}
 
 	if (ns_ip == INADDR_NONE) {
