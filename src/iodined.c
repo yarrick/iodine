@@ -142,9 +142,8 @@ get_external_ip(struct in_addr *ip)
 	memset(&query, 0, sizeof(query));
 
 	query.type = T_A;
-	res = get_addr("resolver1.opendns.com", 53, AF_INET, 0, &query.destination);
-	if (res < 0) return 1;
-	query.dest_len = res;
+	if(get_addr("resolver1.opendns.com", 53, AF_INET, 0, &query.destination, &query.dest_len))
+		return 1;
 
 	fd = open_dns_from_host(NULL, 0, AF_INET, AI_PASSIVE);
 	if (fd < 0) return 2;
@@ -2444,9 +2443,9 @@ main(int argc, char **argv)
 	int retval;
 	int max_idle_time = 0;
 	struct sockaddr_storage dns4addr;
-	int dns4addr_len;
+	socklen_t dns4addr_len;
 	struct sockaddr_storage dns6addr;
-	int dns6addr_len;
+	socklen_t dns6addr_len;
 #if HAVE_SYSTEMD
 	int nb_fds;
 #endif
@@ -2641,8 +2640,7 @@ main(int argc, char **argv)
 			listen_ip4 = inet_ntoa(resolved_external_ip);
 			fprintf(stderr, "Will listen on external IP %s\n", listen_ip4);
 		}
-		dns4addr_len = get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr);
-		if (dns4addr_len < 0) {
+		if (get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr, &dns4addr_len)) {
 			warnx("Bad IPv4 address to listen on: '%s'", listen_ip4);
 			usage();
 		}
@@ -2650,8 +2648,7 @@ main(int argc, char **argv)
 		listen_ip4 = NULL;
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
-		int addr6_res = get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr);
-		if (addr6_res < 0) {
+		if (get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr, &dns6addr_len)) {
 			if (listen_ip6 == NULL) {
 				if (addrfamily == AF_INET6) {
 					fprintf(stderr, "IPv6 not supported");
@@ -2661,13 +2658,11 @@ main(int argc, char **argv)
 					addrfamily = AF_INET;
 				}
 			} else {
-				warnx("Failed to get IPv6 address to listen on: '%s': %s",
-					listen_ip6, gai_strerror(addr6_res));
+				warnx("Failed to get IPv6 address to listen on: '%s'",
+					listen_ip6);
 				usage();
 				/* NOTREACHED */
 			}
-		} else {
-			dns6addr_len = addr6_res;
 		}
 		// Use dns6addr from here on.
 		listen_ip6 = NULL;

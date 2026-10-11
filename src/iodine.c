@@ -145,7 +145,7 @@ int main(int argc, char **argv)
 	int hostname_maxlen;
 	int rtable = 0;
 	struct sockaddr_storage nameservaddr;
-	int nameservaddr_len;
+	socklen_t nameservaddr_len;
 	int nameserv_family;
 
 	nameserv_host = NULL;
@@ -290,10 +290,9 @@ int main(int argc, char **argv)
 	}
 
 	if (nameserv_host) {
-		nameservaddr_len = get_addr(nameserv_host, DNS_PORT, nameserv_family, 0, &nameservaddr);
-		if (nameservaddr_len < 0) {
-			errx(1, "Cannot lookup nameserver '%s': %s ",
-				nameserv_host, gai_strerror(nameservaddr_len));
+		if (get_addr(nameserv_host, DNS_PORT, nameserv_family, 0,
+			     &nameservaddr, &nameservaddr_len)) {
+			errx(1, "Cannot lookup nameserver '%s'", nameserv_host);
 		}
 		client_set_nameserver(&nameservaddr, nameservaddr_len);
 	} else {

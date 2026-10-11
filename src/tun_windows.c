@@ -126,7 +126,7 @@ open_tun(const char *tun_device)
 	wchar_t wname[250];
 	int tunfd;
 	struct sockaddr_storage localsock;
-	int localsock_len;
+	socklen_t localsock_len;
 
 	if(wintun_init()) {
 		warnx("Could not load wintun.dll");
@@ -163,7 +163,8 @@ open_tun(const char *tun_device)
 	 * so we can still use select() in main code.
 	 * A thread does blocking reads on the tun device and
 	 * sends data as udp to this socket */
-	localsock_len = get_addr("127.0.0.1", 55353, AF_INET, 0, &localsock);
+	if (get_addr("127.0.0.1", 55353, AF_INET, 0, &localsock, &localsock_len))
+        return -1;
 	tunfd = open_dns(&localsock, localsock_len);
 
 	data.session = session_handle;

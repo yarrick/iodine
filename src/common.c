@@ -148,7 +148,7 @@ check_privileges(char *username, int port)
 }
 
 char *
-format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len)
+format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 {
 	static char dst[INET6_ADDRSTRLEN + 1];
 
@@ -172,12 +172,11 @@ format_addr(struct sockaddr_storage *sockaddr, int sockaddr_len)
 }
 
 int
-get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_storage *out)
+get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_storage *out, socklen_t *outlen)
 {
 	struct addrinfo hints, *addr;
 	int res;
 	char portnum[8];
-	int addrlen;
 
 	memset(portnum, 0, sizeof(portnum));
 	snprintf(portnum, sizeof(portnum) - 1, "%d", port);
@@ -198,21 +197,21 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 		return -1;
 	}
 
-	addrlen = addr->ai_addrlen;
 	/* Grab first result */
 	memcpy(out, addr->ai_addr, addr->ai_addrlen);
 	freeaddrinfo(addr);
-	return addrlen;
+	if (outlen) *outlen = addr->ai_addrlen;
+	return 0;
 }
 
 int
-open_dns(struct sockaddr_storage *sockaddr, size_t sockaddr_len)
+open_dns(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 {
 	return open_dns_opt(sockaddr, sockaddr_len, -1);
 }
 
 int
-open_dns_opt(struct sockaddr_storage *sockaddr, size_t sockaddr_len, int v6only)
+open_dns_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6only)
 {
 	int flag;
 	int fd;
@@ -251,11 +250,12 @@ int
 open_dns_from_host(char *host, int port, int addr_family, int flags)
 {
 	struct sockaddr_storage addr;
-	int addrlen;
+	socklen_t addrlen;
+	int res;
 
-	addrlen = get_addr(host, port, addr_family, flags, &addr);
-	if (addrlen < 0)
-		return addrlen;
+	res = get_addr(host, port, addr_family, flags, &addr, &addrlen);
+	if (res)
+		return res;
 
 	return open_dns(&addr, addrlen);
 }

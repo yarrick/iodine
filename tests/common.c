@@ -203,16 +203,16 @@ START_TEST(test_parse_format_ipv4)
 	char *formatted;
 	struct sockaddr_storage addr;
 	struct sockaddr_in *v4addr;
-	int addr_len;
+	socklen_t addrlen;
 
-	addr_len = get_addr(host, 53, AF_INET, 0, &addr);
-	ck_assert_int_eq(addr_len, sizeof(struct sockaddr_in));
+	ck_assert_int_eq(get_addr(host, 53, AF_INET, 0, &addr, &addrlen), 0);
+	ck_assert_int_eq(addrlen, sizeof(struct sockaddr_in));
 
 	v4addr = (struct sockaddr_in *) &addr;
 	ck_assert_int_eq(v4addr->sin_addr.s_addr, htonl(0xc0a8020a));
 	ck_assert_int_eq(v4addr->sin_port, htons(53));
 
-	formatted = format_addr(&addr, addr_len);
+	formatted = format_addr(&addr, addrlen);
 	ck_assert_str_eq(host, formatted);
 }
 END_TEST
@@ -223,16 +223,16 @@ START_TEST(test_parse_format_ipv4_listen_all)
 	char *formatted;
 	struct sockaddr_storage addr;
 	struct sockaddr_in *v4addr;
-	int addr_len;
+	socklen_t addrlen;
 
-	addr_len = get_addr(NULL, 53, AF_INET, AI_PASSIVE, &addr);
-	ck_assert_int_eq(addr_len, sizeof(struct sockaddr_in));
+	ck_assert_int_eq(get_addr(host, 53, AF_INET, 0, &addr, &addrlen), 0);
+	ck_assert_int_eq(addrlen, sizeof(struct sockaddr_in));
 
 	v4addr = (struct sockaddr_in *) &addr;
 	ck_assert_int_eq(v4addr->sin_addr.s_addr, htonl(0x00000000));
 	ck_assert_int_eq(v4addr->sin_port, htons(53));
 
-	formatted = format_addr(&addr, addr_len);
+	formatted = format_addr(&addr, addrlen);
 	ck_assert_str_eq(host, formatted);
 }
 END_TEST
@@ -248,16 +248,16 @@ START_TEST(test_parse_format_ipv6)
 	char *formatted;
 	struct sockaddr_storage addr;
 	struct sockaddr_in6 *v6addr;
-	int addr_len;
+	socklen_t addrlen;
 
-	addr_len = get_addr(host, 53, AF_UNSPEC, 0, &addr);
-	ck_assert_int_eq(addr_len, sizeof(struct sockaddr_in6));
+	ck_assert_int_eq(get_addr(host, 53, AF_UNSPEC, 0, &addr, &addrlen), 0);
+	ck_assert_int_eq(addrlen, sizeof(struct sockaddr_in6));
 
 	v6addr = (struct sockaddr_in6 *) &addr;
 	ck_assert_mem_eq(&v6addr->sin6_addr, v6_bits, sizeof(v6_bits));
 	ck_assert_int_eq(v6addr->sin6_port, htons(53));
 
-	formatted = format_addr(&addr, addr_len);
+	formatted = format_addr(&addr, addrlen);
 	ck_assert_str_eq(compact, formatted);
 }
 END_TEST
@@ -273,17 +273,17 @@ START_TEST(test_parse_format_ipv4_mapped_ipv6)
 	char *formatted;
 	struct sockaddr_storage addr;
 	struct sockaddr_in6 *v6addr;
-	int addr_len;
+	socklen_t addrlen;
 
-	addr_len = get_addr(v4mapped, 53, AF_INET6, 0, &addr);
-	ck_assert_int_eq(addr_len, sizeof(struct sockaddr_in6));
+	ck_assert_int_eq(get_addr(v4mapped, 53, AF_INET6, 0, &addr, &addrlen), 0);
+	ck_assert_int_eq(addrlen, sizeof(struct sockaddr_in6));
 
 	v6addr = (struct sockaddr_in6 *) &addr;
 	ck_assert_mem_eq(&v6addr->sin6_addr, v6_bits, sizeof(v6_bits));
 	ck_assert_int_eq(v6addr->sin6_port, htons(53));
 
 	/* Format as IPv4 address */
-	formatted = format_addr(&addr, addr_len);
+	formatted = format_addr(&addr, addrlen);
 	ck_assert_str_eq(host, formatted);
 }
 END_TEST
@@ -292,21 +292,17 @@ START_TEST(test_get_addr_err)
 {
 	char *host = "192.168.2.10";
 	struct sockaddr_storage addr;
-	int addr_len;
+	socklen_t addrlen;
 	int flags = AI_PASSIVE;
 
 	/* Invalid host */
-	addr_len = get_addr(NULL, -1, flags, 0, &addr);
-	ck_assert_int_eq(addr_len, -1);
+	ck_assert_int_ne(get_addr(NULL, -1, flags, 0, &addr, &addrlen), 0);
 	/* Invalid port */
-	addr_len = get_addr(host, -1, flags, 0, &addr);
-	ck_assert_int_eq(addr_len, -1);
+	ck_assert_int_ne(get_addr(host, -1, flags, 0, &addr, &addrlen), 0);
 	/* Invalid flag */
-	addr_len = get_addr(host, 53, flags | 0xFFF, 0, &addr);
-	ck_assert_int_eq(addr_len, -1);
+	ck_assert_int_ne(get_addr(host, 53, flags | 0xFFF, 0, &addr, &addrlen), 0);
 	/* Invalid addr */
-	addr_len = get_addr(host, 53, flags, 0, (struct sockaddr_storage *)NULL);
-	ck_assert_int_eq(addr_len, -1);
+	ck_assert_int_ne(get_addr(host, 53, flags, 0, (struct sockaddr_storage *)NULL, NULL), 0);
 }
 END_TEST
 
