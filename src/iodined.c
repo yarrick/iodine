@@ -189,6 +189,7 @@ get_external_ip(struct in_addr *ip)
 static void
 sigint(int sig)
 {
+	(void)sig;
 	running = 0;
 }
 
@@ -2408,6 +2409,7 @@ static void prepare_dns_fd(int fd)
 #endif
 
 #endif
+	(void)fd;
 }
 
 int

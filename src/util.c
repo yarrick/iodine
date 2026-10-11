@@ -79,6 +79,8 @@ char *get_resolvconf_addr(void)
 void
 socket_setrtable(int fd, int rtable)
 {
+	(void)fd;
+	(void)rtable;
 #ifdef SO_RTABLE
 	if (setsockopt (fd, IPPROTO_IP, SO_RTABLE, &rtable, sizeof(rtable)) == -1)
 		err(1, "Failed to set routing table %d", rtable);

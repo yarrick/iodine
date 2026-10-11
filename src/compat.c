@@ -113,6 +113,7 @@ errx(int eval, const char *fmt, ...)
 void
 syslog(int priority, const char *fmt, ...)
 {
+	(void)priority;
 	va_list list;
 
 	va_start(list, fmt);

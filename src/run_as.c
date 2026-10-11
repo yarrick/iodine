@@ -33,6 +33,7 @@ static struct run_as_user run_as;
 struct run_as_user *
 run_as_user_lookup(char *username)
 {
+	(void)username;
 #if HAVE_GETPWNAM
        run_as.pw = getpwnam(username);
        if (!run_as.pw)
@@ -45,6 +46,7 @@ run_as_user_lookup(char *username)
 int
 run_as_user_switch(struct run_as_user *runas)
 {
+	(void)runas;
 #if HAVE_GETPWNAM && HAVE_LIBCAPNG
 	return capng_change_id(runas->pw->pw_uid, runas->pw->pw_gid,
 			       CAPNG_DROP_SUPP_GRP);

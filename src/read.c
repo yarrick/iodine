@@ -105,6 +105,7 @@ int
 readshort(char *packet, char **src, unsigned short *dst)
 {
 	unsigned char *p;
+	(void)packet;
 
 	p = (unsigned char *) *src;
 	*dst = (p[0] << 8) | p[1];
@@ -118,6 +119,7 @@ readlong(char *packet, char **src, uint32_t *dst)
 {
 	/* A long as described in dns protocol is always 32 bits */
 	unsigned char *p;
+	(void)packet;
 
 	p = (unsigned char *) *src;
 
@@ -134,6 +136,7 @@ int
 readdata(char *packet, char **src, char *dst, size_t len)
 {
 	memcpy(dst, *src, len);
+	(void)packet;
 
 	(*src) += len;
 
@@ -146,6 +149,7 @@ readtxtbin(char *packet, char **src, size_t srcremain, char *dst, size_t dstrema
 	unsigned char *uc;
 	int tocopy;
 	int dstused = 0;
+	(void)packet;
 
 	while (srcremain > 0)
 	{

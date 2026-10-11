@@ -35,6 +35,7 @@
 void
 do_chroot(char *newroot)
 {
+	(void)newroot;
 #if HAVE_CHROOT
 	if (chroot(newroot) != 0 || chdir("/") != 0)
 		err(1, "%s", newroot);
@@ -50,6 +51,7 @@ do_chroot(char *newroot)
 void
 do_setcon(char *context)
 {
+	(void)context;
 #if HAVE_SETCON
 	if (-1 == setcon(context))
 		err(1, "%s", context);

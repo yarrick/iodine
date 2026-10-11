@@ -184,6 +184,7 @@ close_tun(int tun_fd)
 int
 write_tun(int tun_fd, char *data, size_t len)
 {
+	(void)tun_fd;
 	if (len < 4)
 		return -1;
 
@@ -222,6 +223,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	DWORD status;
 	MIB_UNICASTIPADDRESS_ROW ip_row;
 	PMIB_UNICASTIPADDRESS_TABLE table = NULL;
+	(void)other_ip;
 
 	if (build_netmask(netbits, &netmask)) {
 		fprintf(stderr, "Invalid netmask: %d!\n", netbits);

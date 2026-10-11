@@ -83,6 +83,8 @@ bool is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
 void
 check_privileges(char *username, int port)
 {
+	(void)username;
+	(void)port;
 #if HAVE_LIBCAPNG
 	bool capable = true;
 
@@ -479,6 +481,7 @@ fd_set_close_on_exec(int fd)
 	if (fcntl(fd, F_SETFD, flags) == -1)
 		err(4, "Failed to set fd flags");
 #endif
+	(void)fd;
 }
 
 /* Fill a buffer with random bytes.

@@ -56,6 +56,7 @@ static char *__progname;
 static void
 sighandler(int sig)
 {
+	(void)sig;
 	client_stop();
 }
 
