@@ -78,9 +78,9 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 
 struct packet
 {
-	int len;		/* Total packet length */
-	int sentlen;		/* Length of chunk currently transmitted */
-	int offset;		/* Current offset */
+	unsigned int len;	/* Total packet length */
+	unsigned int sentlen;	/* Length of chunk currently transmitted */
+	unsigned int offset;	/* Current offset */
 	char data[64*1024];	/* The data */
 	char seqno;		/* The packet sequence number */
 	char fragment;		/* Fragment index */

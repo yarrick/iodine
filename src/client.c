@@ -86,7 +86,7 @@ static uint16_t chunkid_prev2;
 
 /* The encoder used for data packets
  * Defaults to Base32, can be changed after handshake */
-const static struct encoder *dataenc = &base32_ops;
+static const struct encoder *dataenc = &base32_ops;
 
 /* The encoder to use for downstream data */
 static char downenc = ' ';
@@ -302,7 +302,7 @@ send_query(int fd, char *hostname)
 }
 
 static void
-send_raw(int fd, char *buf, int buflen, int cmd)
+send_raw(int fd, char *buf, unsigned int buflen, int cmd)
 {
 	char packet[4096];
 	int len;
@@ -349,8 +349,8 @@ static void
 send_chunk(int fd)
 {
 	char buf[4096];
-	int avail;
-	int code;
+	unsigned int avail;
+	unsigned int code;
 	char *p;
 	static int datacmc = 0;
 	char *datacmcchars = "abcdefghijklmnopqrstuvwxyz0123456789";

@@ -18,11 +18,8 @@
 #ifndef __CLIENT_H__
 #define __CLIENT_H__
 
-#ifdef WINDOWS
-#include "windows_dns.h"
-#else
-#include <sys/socket.h>
-#endif
+#include "config.h"
+#include "common.h"
 
 void client_init(void);
 void client_stop(void);
