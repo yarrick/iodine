@@ -261,10 +261,10 @@ static int check_authenticated_user_and_ip_and_options(int userid, struct query 
 	return 0;
 }
 
-static void send_raw(int fd, char *buf, int buflen, int user, int cmd, struct query *q)
+static void send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct query *q)
 {
 	char packet[4096];
-	int len;
+	size_t len;
 
 	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
 
@@ -277,7 +277,7 @@ static void send_raw(int fd, char *buf, int buflen, int user, int cmd, struct qu
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
 	if (debug >= 2) {
-		fprintf(stderr, "TX-raw: client %s, cmd %d, %d bytes\n",
+		fprintf(stderr, "TX-raw: client %s, cmd %d, %zu bytes\n",
 			format_addr(&q->from, q->fromlen), cmd, len);
 	}
 
@@ -376,7 +376,7 @@ static int get_from_outpacketq(int userid)
    number, and of course data.)
 */
 
-static void save_to_dnscache(int userid, struct query *q, char *answer, int answerlen)
+static void save_to_dnscache(int userid, struct query *q, char *answer, unsigned int answerlen)
 /* Store answer in our little DNS cache. */
 {
 	int fill;
@@ -571,7 +571,7 @@ static inline int answer_from_qmem_data(int dns_fd, int userid,
 static int send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 {
 	char pkt[4096];
-	int datalen = 0;
+	unsigned int datalen = 0;
 	int last = 0;
 
 	/* If re-sent too many times, drop entire packet */
@@ -654,7 +654,7 @@ static int send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 
 static int tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 {
-	unsigned long outlen;
+	size_t outlen;
 	struct ip *header;
 	char out[64*1024];
 	char in[64*1024];
