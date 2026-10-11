@@ -2111,9 +2111,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 	msg.msg_flags = 0;
 
 	r = recvmsg(fd, &msg, 0);
-#ifdef FREEBSD
 	addrlen = msg.msg_namelen;
-#endif /* FREEBSD */
 #else
 	addrlen = sizeof(struct sockaddr_storage);
 	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
