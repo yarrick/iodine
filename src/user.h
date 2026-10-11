@@ -56,7 +56,7 @@ struct tun_user {
 	char downenc;
 	int out_acked_seqno;
 	int out_acked_fragment;
-	int fragsize;
+	unsigned int fragsize;
 	enum connection conn;
 	int lazy;
 	unsigned char qmemping_cmc[QMEMPING_LEN * 4];

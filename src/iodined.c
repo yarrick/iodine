@@ -117,7 +117,7 @@ struct dnsfd {
 };
 
 static int read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q);
-static void write_dns(int fd, struct query *q, const char *data, int datalen, char downenc);
+static void write_dns(int fd, struct query *q, const char *data, size_t datalen, char downenc);
 static void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid);
 
 static int
@@ -284,7 +284,7 @@ static void send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct
 }
 
 
-static void start_new_outpacket(int userid, char *data, int datalen)
+static void start_new_outpacket(int userid, char *data, unsigned int datalen)
 /* Copies data to .outpacket and resets all counters.
    data is expected to be compressed already. */
 {
@@ -300,7 +300,7 @@ static void start_new_outpacket(int userid, char *data, int datalen)
 
 #ifdef OUTPACKETQ_LEN
 
-static int save_to_outpacketq(int userid, char *data, int datalen)
+static int save_to_outpacketq(int userid, char *data, unsigned int datalen)
 /* Find space in outpacket-queue and store data (expected compressed already).
    Returns: 1 = okay, 0 = no space. */
 {
@@ -608,7 +608,7 @@ static int send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 		((users[userid].outpacket.fragment & 15) << 1) | (last & 1);
 
 	if (debug >= 1) {
-		fprintf(stderr, "OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %d, total %d, to user %d\n",
+		fprintf(stderr, "OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %u, total %d, to user %d\n",
 			users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15,
 			last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
 	}
@@ -1164,7 +1164,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 		return;
 	} else if (in[0] == 'N' || in[0] == 'n') {
-		int max_frag_size;
+		unsigned int max_frag_size;
 
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
 
@@ -2170,7 +2170,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 }
 
 static size_t
-write_dns_nameenc(char *buf, size_t buflen, const char *data, int datalen, char downenc)
+write_dns_nameenc(char *buf, size_t buflen, const char *data, size_t datalen, char downenc)
 /* Returns #bytes of data that were encoded */
 {
 	static int td1 = 0;
@@ -2240,7 +2240,7 @@ write_dns_nameenc(char *buf, size_t buflen, const char *data, int datalen, char 
 }
 
 static void
-write_dns(int fd, struct query *q, const char *data, int datalen, char downenc)
+write_dns(int fd, struct query *q, const char *data, size_t datalen, char downenc)
 {
 	char buf[64*1024];
 	int len = 0;
@@ -2320,7 +2320,7 @@ write_dns(int fd, struct query *q, const char *data, int datalen, char downenc)
 	}
 
 	if (debug >= 2) {
-		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes data\n",
+		fprintf(stderr, "TX: client %s, type %d, name %s, %zu bytes data\n",
 			format_addr(&q->from, q->fromlen), q->type, q->name, datalen);
 	}
 
