@@ -199,8 +199,8 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 
 	/* Grab first result */
 	memcpy(out, addr->ai_addr, addr->ai_addrlen);
-	freeaddrinfo(addr);
 	if (outlen) *outlen = addr->ai_addrlen;
+	freeaddrinfo(addr);
 	return 0;
 }
 
