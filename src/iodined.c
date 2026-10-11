@@ -654,7 +654,7 @@ static int send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 
 static int tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 {
-	size_t outlen;
+	unsigned long outlen;
 	struct ip *header;
 	char out[64*1024];
 	char in[64*1024];
