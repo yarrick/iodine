@@ -26,23 +26,17 @@ cdata.set10('@0@'.format(host_machine.system().to_upper()), true)
 if host_machine.system() == 'linux'
   add_project_arguments('-D_GNU_SOURCE', language: 'c')
   selinux = dependency('libselinux', required: false)
-  if selinux.found()
-    cdata.set10('HAVE_SETCON', true)
-    commondeps += selinux
-  endif
+  cdata.set10('HAVE_SETCON', selinux.found())
+  commondeps += selinux
   systemd = dependency('libsystemd', required: false)
   if not systemd.found()
     systemd = dependency('libsystemd-daemon', required: false)
   endif
-  if systemd.found()
-    cdata.set10('HAVE_SYSTEMD', true)
-    serverdeps += systemd
-  endif
+  cdata.set10('HAVE_SYSTEMD', systemd.found())
+  serverdeps += systemd
   libcapng = dependency('libcap-ng', required: false)
-  if libcapng.found()
-    cdata.set10('HAVE_LIBCAPNG', true)
-    commondeps += libcapng
-  endif
+  cdata.set10('HAVE_LIBCAPNG', libcapng.found())
+  commondeps += libcapng
 endif
 if host_machine.system() == 'android'
   cdata.set10('LINUX', true)
