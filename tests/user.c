@@ -118,7 +118,8 @@ END_TEST
 START_TEST(test_find_available_user)
 {
 	in_addr_t ip;
-	int i;
+	unsigned int i;
+	unsigned int user;
 
 	ip = inet_addr("127.0.0.1");
 	init_users(ip, 27);
@@ -126,52 +127,59 @@ START_TEST(test_find_available_user)
 	for (i = 0; i < USERS; i++) {
 		users[i].authenticated = 1;
 		users[i].authenticated_raw = 1;
-		ck_assert_int_eq(find_available_user(), i);
+		ck_assert_int_ne(find_available_user(&user), 0);
+		ck_assert_uint_eq(user, i);
 		ck_assert_int_eq(users[i].authenticated, 0);
 		ck_assert_int_eq(users[i].authenticated_raw, 0);
 	}
 
 	for (i = 0; i < USERS; i++) {
-		ck_assert_int_eq(find_available_user(), -1);
+		ck_assert_int_eq(find_available_user(&user), 0);
 	}
 
 	users[3].active = 0;
 
-	ck_assert_int_eq(find_available_user(), 3);
-	ck_assert_int_eq(find_available_user(), -1);
+	ck_assert_int_ne(find_available_user(&user), 0);
+	ck_assert_uint_eq(user, 3);
+	ck_assert_int_eq(find_available_user(&user), 0);
 
 	users[3].last_pkt = 55;
 
-	ck_assert_int_eq(find_available_user(), 3);
-	ck_assert_int_eq(find_available_user(), -1);
+	ck_assert_int_ne(find_available_user(&user), 0);
+	ck_assert_uint_eq(user, 3);
+	ck_assert_int_eq(find_available_user(&user), 0);
 }
 END_TEST
 
 START_TEST(test_find_available_user_small_net)
 {
 	in_addr_t ip;
-	int i;
+	unsigned int i;
+	unsigned int user;
 
 	ip = inet_addr("127.0.0.1");
 	init_users(ip, 29); /* this should result in 5 enabled users */
 
 	for (i = 0; i < 5; i++) {
-		ck_assert_int_eq(find_available_user(), i);
+		ck_assert_int_ne(find_available_user(&user), 0);
+		ck_assert_uint_eq(user, i);
 	}
 
 	for (i = 0; i < USERS; i++) {
-		ck_assert_int_eq(find_available_user(), -1);
+		ck_assert_int_eq(find_available_user(&user), 0);
 	}
 
 	users[3].active = 0;
 
-	ck_assert_int_eq(find_available_user(), 3);
-	ck_assert_int_eq(find_available_user(), -1);
+	ck_assert_int_ne(find_available_user(&user), 0);
+	ck_assert_uint_eq(user, 3);
+	ck_assert_int_eq(find_available_user(&user), 0);
 
 	users[3].last_pkt = 55;
 
-	ck_assert_int_eq(find_available_user(), 3);
-	ck_assert_int_eq(find_available_user(), -1);
+	ck_assert_int_ne(find_available_user(&user), 0);
+	ck_assert_uint_eq(user, 3);
+	ck_assert_int_eq(find_available_user(&user), 0);
 }
 END_TEST
 

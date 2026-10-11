@@ -37,21 +37,22 @@
 #include "user.h"
 
 struct tun_user *users;
-unsigned usercount;
+static unsigned int usercount;
 
 int init_users(in_addr_t my_ip, int netbits)
 {
-	int i;
+	unsigned int i;
 	int skip = 0;
 	char newip[32];
 
 	int maxusers;
 
+	int n;
 	in_addr_t netmask = 0;
 	struct in_addr net;
 	struct in_addr ipstart;
 
-	for (i = 0; i < netbits; i++) {
+	for (n = 0; n < netbits; n++) {
 		netmask = (netmask << 1) | 1;
 	}
 	netmask <<= (32 - netbits);
@@ -96,7 +97,7 @@ const char *users_get_first_ip(void)
 int find_user_by_ip(uint32_t ip)
 {
 	int ret;
-	int i;
+	unsigned int i;
 
 	ret = -1;
 	for (i = 0; i < usercount; i++) {
@@ -121,7 +122,7 @@ int all_users_waiting_to_send(void)
 {
 	time_t now;
 	int ret;
-	int i;
+	unsigned int i;
 
 	ret = 1;
 	now = time(NULL);
@@ -144,10 +145,9 @@ int all_users_waiting_to_send(void)
 	return ret;
 }
 
-int find_available_user(void)
+int find_available_user(unsigned int *user)
 {
-	int ret = -1;
-	int i;
+	unsigned int i;
 	for (i = 0; i < usercount; i++) {
 		/* Not used at all or not used in one minute */
 		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
@@ -158,24 +158,24 @@ int find_available_user(void)
 			users[i].last_pkt = time(NULL);
 			users[i].fragsize = 4096;
 			users[i].conn = CONN_DNS_NULL;
-			ret = i;
-			break;
+			*user = i;
+			return 1;
 		}
 	}
-	return ret;
+	return 0;
 }
 
-void user_switch_codec(int userid, const struct encoder *enc)
+void user_switch_codec(unsigned int userid, const struct encoder *enc)
 {
-	if (userid < 0 || userid >= usercount)
+	if (userid >= usercount)
 		return;
 
 	users[userid].encoder = enc;
 }
 
-void user_set_conn_type(int userid, enum connection c)
+void user_set_conn_type(unsigned int userid, enum connection c)
 {
-	if (userid < 0 || userid >= usercount)
+	if (userid >= usercount)
 		return;
 
 	if (c < CONN_RAW_UDP || c >= CONN_MAX)

@@ -780,7 +780,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	char out[64*1024];
 	char unpacked[64*1024];
 	char *tmp[2];
-	int userid;
+	unsigned int userid;
 	int read;
 
 	userid = -1;
@@ -805,8 +805,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		if (version == PROTOCOL_VERSION) {
-			userid = find_available_user();
-			if (userid >= 0) {
+			if (find_available_user(&userid)) {
 				int i;
 
 				{
