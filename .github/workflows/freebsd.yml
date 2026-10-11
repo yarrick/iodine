@@ -23,8 +23,7 @@ jobs:
             devel/check \
             devel/git \
             devel/pkgconf \
-            devel/meson \
-            lang/python3
+            devel/meson
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build

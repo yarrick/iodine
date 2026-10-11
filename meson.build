@@ -111,24 +111,6 @@ cdata.set10('HAVE_PROGNAME', cc.links('''
 # For md5
 cdata.set10('ARCH_IS_BIG_ENDIAN', host_machine.endian() == 'big')
 
-py = import('python').find_installation('python3')
-
-base64u_c = custom_target('gen_base64u',
-  input : 'src/base64.c',
-  output : 'base64u.c',
-  command : [
-    py, '-c',
-    '''
-import sys, re;
-text = open(sys.argv[1]).read();
-text = re.sub(r"([Bb][Aa][Ss][Ee]64)", lambda m: m.group(1) + "u", text);
-text = text.replace("0123456789+", "0123456789_");
-open(sys.argv[2], "w").write(text)
-    ''',
-    '@INPUT@', '@OUTPUT@'
-  ]
-)
-
 common_sources = files(
   'src/base32.c',
   'src/base64.c',
@@ -143,7 +125,7 @@ common_sources = files(
   'src/read.c',
   'src/run_as.c',
   'src/util.c',
-) + base64u_c
+)
 
 if host_machine.system() == 'windows'
   common_sources += files('src/tun_windows.c')

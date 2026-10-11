@@ -26,25 +26,39 @@
 #define BASE64_BLKSIZE_RAW 3
 #define BASE64_BLKSIZE_ENC 4
 
-/* Note: the "unofficial" char is last here, which means that the \377 pattern
-   in DOWNCODECCHECK1 ('Y' request) will properly test it. */
-static const char cb64[] =
-	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789+";
-static unsigned char rev64[256];
-static int reverse_init = 0;
+struct alphabet {
+    unsigned char forward[64];
+    unsigned char reverse[256];
+    int reverse_init;
+};
 
-inline static void base64_reverse_init(void)
+static struct alphabet standard = {
+	/* Note: the "unofficial" char is last here, which means that the \377 pattern
+	in DOWNCODECCHECK1 ('Y' request) will properly test it. */
+	.forward = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789+",
+	.reverse = {0},
+	.reverse_init = 0,
+};
+
+static struct alphabet underscore = {
+	/* Note: the "unofficial" char is last here, which means that the \377 pattern
+	in DOWNCODECCHECK1 ('Y' request) will properly test it. */
+	.forward = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789_",
+	.reverse = {0},
+	.reverse_init = 0,
+};
+
+inline static void base64_reverse_init(struct alphabet *a)
 {
 	int i;
 	unsigned char c;
 
-	if (!reverse_init) {
-		memset(rev64, 0, 256);
+	if (!a->reverse_init) {
 		for (i = 0; i < 64; i++) {
-			c = cb64[i];
-			rev64[(int) c] = i;
+			c = a->forward[i];
+			a->reverse[(int) c] = i;
 		}
-		reverse_init = 1;
+		a->reverse_init = 1;
 	}
 }
 
@@ -57,9 +71,10 @@ inline static void base64_reverse_init(void)
  * return value    : #bytes filled in buf   (excluding \0)
  * sets *buflen to : #bytes encoded from data
  */
-static int base64_encode(char *buf, size_t *buflen, const void *data,
-			 size_t size)
+static int base64_gen_encode(struct alphabet *a, char *buf, size_t *buflen,
+			     const void *data, size_t size)
 {
+	unsigned char *cb64 = a->forward;
 	unsigned char *udata = (unsigned char *) data;
 	int iout = 0;	/* to-be-filled output char */
 	int iin = 0;	/* one more than last input byte that can be
@@ -120,14 +135,15 @@ static int base64_encode(char *buf, size_t *buflen, const void *data,
  *
  * return value    : #bytes filled in buf   (excluding \0)
  */
-static int base64_decode(void *buf, size_t *buflen, const char *str,
-			 size_t slen)
+static int base64_gen_decode(struct alphabet *a, void *buf, size_t *buflen,
+			     const char *str, size_t slen)
 {
+	unsigned char *rev64 = a->reverse;
 	unsigned char *ubuf = (unsigned char *) buf;
 	int iout = 0;	/* to-be-filled output byte */
 	int iin = 0;	/* next input char to use in decoding */
 
-	base64_reverse_init();
+	base64_reverse_init(a);
 
 	/* Note: Don't bother to optimize manually. GCC optimizes
 	   better(!) when using simplistic array indexing. */
@@ -163,11 +179,50 @@ static int base64_decode(void *buf, size_t *buflen, const char *str,
 	return iout;
 }
 
+#undef REV64
+
+static int base64_encode(char *buf, size_t *buflen, const void *data,
+			 size_t size)
+{
+	return base64_gen_encode(&standard, buf, buflen, data, size);
+}
+
+static int base64_decode(void *buf, size_t *buflen, const char *str,
+			 size_t slen)
+{
+	return base64_gen_decode(&standard, buf, buflen, str, slen);
+}
+
 const struct encoder base64_ops = {
 	.name = "Base64",
 
 	.encode = base64_encode,
 	.decode = base64_decode,
+
+	.places_dots = false,
+	.eats_dots = false,
+
+	.blocksize_raw = BASE64_BLKSIZE_RAW,
+	.blocksize_encoded = BASE64_BLKSIZE_ENC,
+};
+
+static int base64u_encode(char *buf, size_t *buflen, const void *data,
+			  size_t size)
+{
+	return base64_gen_encode(&underscore, buf, buflen, data, size);
+}
+
+static int base64u_decode(void *buf, size_t *buflen, const char *str,
+			  size_t slen)
+{
+	return base64_gen_decode(&underscore, buf, buflen, str, slen);
+}
+
+const struct encoder base64u_ops = {
+	.name = "Base64u",
+
+	.encode = base64u_encode,
+	.decode = base64u_decode,
 
 	.places_dots = false,
 	.eats_dots = false,
