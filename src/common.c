@@ -141,7 +141,7 @@ check_privileges(char *username, int port)
 		exit(-1);
 	}
 #else
-    /* No user permission check supported */
+	/* No user permission check supported */
 #endif
 }
 
@@ -195,7 +195,7 @@ get_addr(char *host, int port, int addr_family, int flags, struct sockaddr_stora
 	if (res != 0) {
 		return -1;
 	}
-	
+
 	addrlen = addr->ai_addrlen;
 	/* Grab first result */
 	memcpy(out, addr->ai_addr, addr->ai_addrlen);
@@ -332,7 +332,7 @@ read_password(char *buf, size_t len)
 int
 check_topdomain(char *str, int allow_wildcard, char **errormsg)
 {
-	int i;
+	unsigned int i;
 	int dots = 0;
 	int chunklen = 0;
 
