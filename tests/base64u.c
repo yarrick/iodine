@@ -114,16 +114,16 @@ START_TEST(test_base64u_blksize)
 
 	val = base64u_ops.encode(encbuf, &enclen, rawbuf, rawlen);
 
-	ck_assert_msg(rawlen == 3, "raw length was %zu not 3", rawlen);
-	ck_assert_msg(enclen == 3, "encoded %zu bytes, not 3", enclen);
-	ck_assert_msg(val == 4, "encoded string %s was length %d", encbuf, val);
+	ck_assert_int_eq(rawlen, 3);
+	ck_assert_int_eq(enclen, 3);
+	ck_assert_int_eq(val, 4);
 
 	memset(rawbuf, 0, rawlen + 16);
 
 	enclen = val;
 	val = base64u_ops.decode(rawbuf, &rawlen, encbuf, enclen);
 
-	ck_assert_msg(rawlen == 3, "raw length was %zu not 3", rawlen);
+	ck_assert_int_eq(rawlen, 3);
 	ck_assert_int_eq(val, 3);
 	for (i = 0; i < rawlen; i++) {
 		ck_assert_int_eq(rawbuf[i], 'A');

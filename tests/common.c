@@ -33,18 +33,18 @@ START_TEST(test_topdomain_ok)
 {
 	char *error = NULL;
 
-	ck_assert(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 0, &error) == 0);
-	ck_assert(error == NULL);
+	ck_assert_int_eq(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 0, &error), 0);
+	ck_assert_ptr_null(error);
 	/* Allowing wildcard */
-	ck_assert(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 1, &error) == 0);
-	ck_assert(error == NULL);
+	ck_assert_int_eq(check_topdomain("foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 1, &error), 0);
+	ck_assert_ptr_null(error);
 
 	/* Not allowed to start with dot */
-	ck_assert(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 0, &error));
+	ck_assert_int_ne(check_topdomain(".foo.0123456789.qwertyuiop.asdfghjkl.zxcvbnm.com", 0, &error), 0);
 	ck_assert_str_eq("Starts with a dot", error);
 
 	/* Test missing error msg ptr */
-	ck_assert(check_topdomain(".foo", 0, NULL));
+	ck_assert_int_ne(check_topdomain(".foo", 0, NULL), 0);
 }
 END_TEST
 
@@ -53,33 +53,33 @@ START_TEST(test_topdomain_length)
 	char *error;
 
 	/* Test empty and too short */
-	ck_assert(check_topdomain("", 0, &error));
+	ck_assert_int_ne(check_topdomain("", 0, &error), 0);
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain("a", 0, &error));
+	ck_assert_int_ne(check_topdomain("a", 0, &error), 0);
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain(".a", 0, &error));
+	ck_assert_int_ne(check_topdomain(".a", 0, &error), 0);
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain("a.", 0, &error));
+	ck_assert_int_ne(check_topdomain("a.", 0, &error), 0);
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain("ab", 0, &error));
+	ck_assert_int_ne(check_topdomain("ab", 0, &error), 0);
 	ck_assert_str_eq("Too short (< 3)", error);
 	error = NULL;
-	ck_assert(check_topdomain("a.b", 0, &error) == 0);
+	ck_assert_int_eq(check_topdomain("a.b", 0, &error), 0);
 
 	/* Test too long (over 128, need rest of space for data) */
-	ck_assert(check_topdomain(
+	ck_assert_int_ne(check_topdomain(
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
-		"abcd12345.abcd12345.foo129xxx", 0, &error));
+		"abcd12345.abcd12345.foo129xxx", 0, &error), 0);
 	ck_assert_str_eq("Too long (> 128)", error);
-	ck_assert(check_topdomain(
+	ck_assert_int_eq(check_topdomain(
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
 		"abcd12345.abcd12345.abcd12345.abcd12345.abcd12345."
-		"abcd12345.abcd12345.foo128xx", 0, &error) == 0);
+		"abcd12345.abcd12345.foo128xx", 0, &error), 0);
 }
 END_TEST
 
@@ -88,35 +88,35 @@ START_TEST(test_topdomain_chunks)
 	char *error;
 
 	/* Must have at least one dot */
-	ck_assert(check_topdomain("abcde.gh", 0, &error) == 0);
-	ck_assert(check_topdomain("abcdefgh", 0, &error));
+	ck_assert_int_eq(check_topdomain("abcde.gh", 0, &error), 0);
+	ck_assert_int_ne(check_topdomain("abcdefgh", 0, &error), 0);
 	ck_assert_str_eq("No dots", error);
 
 	/* Not two consecutive dots */
-	ck_assert(check_topdomain("abc..defgh", 0, &error));
+	ck_assert_int_ne(check_topdomain("abc..defgh", 0, &error), 0);
 	ck_assert_str_eq("Consecutive dots", error);
 
 	/* Not end with a dots */
-	ck_assert(check_topdomain("abc.defgh.", 0, &error));
+	ck_assert_int_ne(check_topdomain("abc.defgh.", 0, &error), 0);
 	ck_assert_str_eq("Ends with a dot", error);
 
 	/* No chunk longer than 63 chars */
-	ck_assert(check_topdomain("123456789012345678901234567890"
-		"123456789012345678901234567890333.com", 0, &error) == 0);
-	ck_assert(check_topdomain("123456789012345678901234567890"
-		"1234567890123456789012345678904444.com", 0, &error));
+	ck_assert_int_eq(check_topdomain("123456789012345678901234567890"
+		"123456789012345678901234567890333.com", 0, &error), 0);
+	ck_assert_int_ne(check_topdomain("123456789012345678901234567890"
+		"1234567890123456789012345678904444.com", 0, &error), 0);
 	ck_assert_str_eq("Too long domain part (> 63)", error);
 
-	ck_assert(check_topdomain("abc.123456789012345678901234567890"
-		"123456789012345678901234567890333.com", 0, &error) == 0);
-	ck_assert(check_topdomain("abc.123456789012345678901234567890"
-		"1234567890123456789012345678904444.com", 0, &error));
+	ck_assert_int_eq(check_topdomain("abc.123456789012345678901234567890"
+		"123456789012345678901234567890333.com", 0, &error), 0);
+	ck_assert_int_ne(check_topdomain("abc.123456789012345678901234567890"
+		"1234567890123456789012345678904444.com", 0, &error), 0);
 	ck_assert_str_eq("Too long domain part (> 63)", error);
 
-	ck_assert(check_topdomain("abc.123456789012345678901234567890"
-		"123456789012345678901234567890333", 0, &error) == 0);
-	ck_assert(check_topdomain("abc.123456789012345678901234567890"
-		"1234567890123456789012345678904444", 0, &error));
+	ck_assert_int_eq(check_topdomain("abc.123456789012345678901234567890"
+		"123456789012345678901234567890333", 0, &error), 0);
+	ck_assert_int_ne(check_topdomain("abc.123456789012345678901234567890"
+		"1234567890123456789012345678904444", 0, &error), 0);
 	ck_assert_str_eq("Too long domain part (> 63)", error);
 }
 END_TEST
@@ -125,28 +125,28 @@ START_TEST(test_topdomain_wild)
 {
 	char *error = NULL;
 
-	ck_assert(check_topdomain("*.a", 0, &error) == 1);
+	ck_assert_int_eq(check_topdomain("*.a", 0, &error), 1);
 	ck_assert_str_eq("Contains illegal character (allowed: [a-zA-Z0-9-.])", error);
 	error = NULL;
-	ck_assert(check_topdomain("*.a", 1, &error) == 0);
-	ck_assert(error == NULL);
+	ck_assert_int_eq(check_topdomain("*.a", 1, &error), 0);
+	ck_assert_ptr_null(error);
 
-	ck_assert(check_topdomain("b*.a", 0, &error) == 1);
+	ck_assert_int_eq(check_topdomain("b*.a", 0, &error), 1);
 	ck_assert_str_eq("Contains illegal character (allowed: [a-zA-Z0-9-.])", error);
 	error = NULL;
-	ck_assert(check_topdomain("b*.a", 1, &error) == 1);
+	ck_assert_int_eq(check_topdomain("b*.a", 1, &error), 1);
 	ck_assert_str_eq("Wildcard (*) only allowed as first char", error);
 
-	ck_assert(check_topdomain("*b.a", 0, &error) == 1);
+	ck_assert_int_eq(check_topdomain("*b.a", 0, &error), 1);
 	ck_assert_str_eq("Contains illegal character (allowed: [a-zA-Z0-9-.])", error);
 	error = NULL;
-	ck_assert(check_topdomain("*b.a", 1, &error) == 1);
+	ck_assert_int_eq(check_topdomain("*b.a", 1, &error), 1);
 	ck_assert_str_eq("Wildcard (*) must be followed by dot", error);
 
-	ck_assert(check_topdomain("*.*.a", 0, &error) == 1);
+	ck_assert_int_eq(check_topdomain("*.*.a", 0, &error), 1);
 	ck_assert_str_eq("Contains illegal character (allowed: [a-zA-Z0-9-.])", error);
 	error = NULL;
-	ck_assert(check_topdomain("*.*.a", 1, &error) == 1);
+	ck_assert_int_eq(check_topdomain("*.*.a", 1, &error), 1);
 	ck_assert_str_eq("Wildcard (*) only allowed as first char", error);
 }
 END_TEST
@@ -155,20 +155,20 @@ START_TEST(test_query_datalen)
 {
 	char *topdomain = "r.foo.com";
 	/* With data */
-	ck_assert(query_datalen("foobar.r.foo.com", topdomain) == 7);
-	ck_assert(query_datalen("foobar.r.FoO.Com", topdomain) == 7);
-	ck_assert(query_datalen("foo.bar.r.FoO.Com", topdomain) == 8);
-	ck_assert(query_datalen(".r.foo.com", topdomain) == 1);
+	ck_assert_int_eq(query_datalen("foobar.r.foo.com", topdomain), 7);
+	ck_assert_int_eq(query_datalen("foobar.r.FoO.Com", topdomain), 7);
+	ck_assert_int_eq(query_datalen("foo.bar.r.FoO.Com", topdomain), 8);
+	ck_assert_int_eq(query_datalen(".r.foo.com", topdomain), 1);
 	/* Without data */
-	ck_assert(query_datalen("r.foo.com", topdomain) == 0);
-	ck_assert(query_datalen("R.foo.com", topdomain) == 0);
+	ck_assert_int_eq(query_datalen("r.foo.com", topdomain), 0);
+	ck_assert_int_eq(query_datalen("R.foo.com", topdomain), 0);
 	/* Shorter query name */
-	ck_assert(query_datalen("foo.com", topdomain) == -1);
+	ck_assert_int_eq(query_datalen("foo.com", topdomain), -1);
 	/* Mismatched query name */
-	ck_assert(query_datalen("b.foo.com", topdomain) == -1);
-	ck_assert(query_datalen("*.foo.com", topdomain) == -1);
+	ck_assert_int_eq(query_datalen("b.foo.com", topdomain), -1);
+	ck_assert_int_eq(query_datalen("*.foo.com", topdomain), -1);
 	/* Query name overlaps topdomain, but is longer */
-	ck_assert(query_datalen("bar.foo.com", topdomain) == -1);
+	ck_assert_int_eq(query_datalen("bar.foo.com", topdomain), -1);
 }
 END_TEST
 
@@ -176,24 +176,24 @@ START_TEST(test_query_datalen_wild)
 {
 	char *topdomain = "*.foo.com";
 	/* With data */
-	ck_assert(query_datalen("foobar.a.foo.com", topdomain) == 7);
-	ck_assert(query_datalen("foobar.r.FoO.Com", topdomain) == 7);
-	ck_assert(query_datalen("foo.bar.r.FoO.Com", topdomain) == 8);
-	ck_assert(query_datalen("foo.Ab.foo.cOm", topdomain) == 4);
-	ck_assert(query_datalen("foo.Abcd.Foo.com", topdomain) == 4);
-	ck_assert(query_datalen("***.STARs.foo.com", topdomain) == 4);
-	ck_assert(query_datalen(".a.foo.com", topdomain) == 1);
-	ck_assert(query_datalen(".ab.foo.com", topdomain) == 1);
+	ck_assert_int_eq(query_datalen("foobar.a.foo.com", topdomain), 7);
+	ck_assert_int_eq(query_datalen("foobar.r.FoO.Com", topdomain), 7);
+	ck_assert_int_eq(query_datalen("foo.bar.r.FoO.Com", topdomain), 8);
+	ck_assert_int_eq(query_datalen("foo.Ab.foo.cOm", topdomain), 4);
+	ck_assert_int_eq(query_datalen("foo.Abcd.Foo.com", topdomain), 4);
+	ck_assert_int_eq(query_datalen("***.STARs.foo.com", topdomain), 4);
+	ck_assert_int_eq(query_datalen(".a.foo.com", topdomain), 1);
+	ck_assert_int_eq(query_datalen(".ab.foo.com", topdomain), 1);
 	/* Without data */
-	ck_assert(query_datalen("rr.foo.com", topdomain) == 0);
-	ck_assert(query_datalen("b.foo.com", topdomain) == 0);
-	ck_assert(query_datalen("B.foo.com", topdomain) == 0);
+	ck_assert_int_eq(query_datalen("rr.foo.com", topdomain), 0);
+	ck_assert_int_eq(query_datalen("b.foo.com", topdomain), 0);
+	ck_assert_int_eq(query_datalen("B.foo.com", topdomain), 0);
 	/* Shorter query name */
-	ck_assert(query_datalen("foo.com", topdomain) == -1);
+	ck_assert_int_eq(query_datalen("foo.com", topdomain), -1);
 	/* Wildcard part of query name matching topdomain */
-	ck_assert(query_datalen("aa.*.foo.com", topdomain) == -1);
+	ck_assert_int_eq(query_datalen("aa.*.foo.com", topdomain), -1);
 	/* Mismatched query name */
-	ck_assert(query_datalen("bar.r.boo.com", topdomain) == -1);
+	ck_assert_int_eq(query_datalen("bar.r.boo.com", topdomain), -1);
 }
 END_TEST
 
@@ -206,11 +206,11 @@ START_TEST(test_parse_format_ipv4)
 	int addr_len;
 
 	addr_len = get_addr(host, 53, AF_INET, 0, &addr);
-	ck_assert(addr_len == sizeof(struct sockaddr_in));
+	ck_assert_int_eq(addr_len, sizeof(struct sockaddr_in));
 
 	v4addr = (struct sockaddr_in *) &addr;
-	ck_assert(v4addr->sin_addr.s_addr == htonl(0xc0a8020a));
-	ck_assert(v4addr->sin_port == htons(53));
+	ck_assert_int_eq(v4addr->sin_addr.s_addr, htonl(0xc0a8020a));
+	ck_assert_int_eq(v4addr->sin_port, htons(53));
 
 	formatted = format_addr(&addr, addr_len);
 	ck_assert_str_eq(host, formatted);
@@ -226,11 +226,11 @@ START_TEST(test_parse_format_ipv4_listen_all)
 	int addr_len;
 
 	addr_len = get_addr(NULL, 53, AF_INET, AI_PASSIVE, &addr);
-	ck_assert(addr_len == sizeof(struct sockaddr_in));
+	ck_assert_int_eq(addr_len, sizeof(struct sockaddr_in));
 
 	v4addr = (struct sockaddr_in *) &addr;
-	ck_assert(v4addr->sin_addr.s_addr == htonl(0x00000000));
-	ck_assert(v4addr->sin_port == htons(53));
+	ck_assert_int_eq(v4addr->sin_addr.s_addr, htonl(0x00000000));
+	ck_assert_int_eq(v4addr->sin_port, htons(53));
 
 	formatted = format_addr(&addr, addr_len);
 	ck_assert_str_eq(host, formatted);
@@ -251,11 +251,11 @@ START_TEST(test_parse_format_ipv6)
 	int addr_len;
 
 	addr_len = get_addr(host, 53, AF_UNSPEC, 0, &addr);
-	ck_assert(addr_len == sizeof(struct sockaddr_in6));
+	ck_assert_int_eq(addr_len, sizeof(struct sockaddr_in6));
 
 	v6addr = (struct sockaddr_in6 *) &addr;
-	ck_assert(memcmp(&v6addr->sin6_addr, v6_bits, sizeof(v6_bits)) == 0);
-	ck_assert(v6addr->sin6_port == htons(53));
+	ck_assert_mem_eq(&v6addr->sin6_addr, v6_bits, sizeof(v6_bits));
+	ck_assert_int_eq(v6addr->sin6_port, htons(53));
 
 	formatted = format_addr(&addr, addr_len);
 	ck_assert_str_eq(compact, formatted);
@@ -276,11 +276,11 @@ START_TEST(test_parse_format_ipv4_mapped_ipv6)
 	int addr_len;
 
 	addr_len = get_addr(v4mapped, 53, AF_INET6, 0, &addr);
-	ck_assert(addr_len == sizeof(struct sockaddr_in6));
+	ck_assert_int_eq(addr_len, sizeof(struct sockaddr_in6));
 
 	v6addr = (struct sockaddr_in6 *) &addr;
-	ck_assert(memcmp(&v6addr->sin6_addr, v6_bits, sizeof(v6_bits)) == 0);
-	ck_assert(v6addr->sin6_port == htons(53));
+	ck_assert_mem_eq(&v6addr->sin6_addr, v6_bits, sizeof(v6_bits));
+	ck_assert_int_eq(v6addr->sin6_port, htons(53));
 
 	/* Format as IPv4 address */
 	formatted = format_addr(&addr, addr_len);
@@ -297,16 +297,16 @@ START_TEST(test_get_addr_err)
 
 	/* Invalid host */
 	addr_len = get_addr(NULL, -1, flags, 0, &addr);
-	ck_assert(addr_len == -1);
+	ck_assert_int_eq(addr_len, -1);
 	/* Invalid port */
 	addr_len = get_addr(host, -1, flags, 0, &addr);
-	ck_assert(addr_len == -1);
+	ck_assert_int_eq(addr_len, -1);
 	/* Invalid flag */
 	addr_len = get_addr(host, 53, flags | 0xFFF, 0, &addr);
-	ck_assert(addr_len == -1);
+	ck_assert_int_eq(addr_len, -1);
 	/* Invalid addr */
 	addr_len = get_addr(host, 53, flags, 0, (struct sockaddr_storage *)NULL);
-	ck_assert(addr_len == -1);
+	ck_assert_int_eq(addr_len, -1);
 }
 END_TEST
 
@@ -322,7 +322,7 @@ START_TEST(test_secure_random)
 	nonzero = 0;
 	for (i = 0; i < (int)sizeof(a); i++)
 		nonzero += (a[i] != 0);
-	ck_assert(nonzero > 0);
+	ck_assert_int_gt(nonzero, 0);
 
 	/* Two independent draws of 64 random bytes must differ; a
 	   no-op (or all-zero) implementation would make them equal. */

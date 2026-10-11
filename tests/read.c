@@ -52,15 +52,11 @@ START_TEST(test_read_putshort)
 	for (i = 0; i < 65536; i++) {
 		p = (char*)&k;
 		putshort(&p, i);
-		ck_assert_msg(ntohs(k) == i,
-				"Bad value on putshort for %d: %d != %d",
-					i, ntohs(k), i);
+		ck_assert_int_eq(ntohs(k), i);
 
 		p = (char*)&k;
 		readshort(NULL, &p, &l);
-		ck_assert_msg(l == i,
-				"Bad value on readshort for %d: %d != %d",
-					i, l, i);
+		ck_assert_int_eq(l, i);
 	}
 }
 END_TEST
@@ -76,17 +72,12 @@ START_TEST(test_read_putlong)
 	for (i = 0; i < 32; i++) {
 		p = (char*)&k;
 		j = 0xf << i;
-
 		putlong(&p, j);
-
-		ck_assert_msg(ntohl(k) == j,
-				"Bad value on putlong for %d: %d != %d", i, ntohl(j), j);
+		ck_assert_int_eq(ntohl(k), j);
 
 		p = (char*)&k;
 		readlong(NULL, &p, &l);
-
-		ck_assert_msg(l == j,
-				"Bad value on readlong for %d: %d != %d", i, l, j);
+		ck_assert_int_eq(l, j);
 	}
 }
 END_TEST
@@ -104,8 +95,8 @@ START_TEST(test_read_name_empty_loop)
 	data = (char*) emptyloop + sizeof(HEADER);
 	buf[1023] = 'A';
 	rv = readname((char *) emptyloop, sizeof(emptyloop), &data, buf, 1023);
-	ck_assert(rv == 0);
-	ck_assert(buf[1023] == 'A');
+	ck_assert_int_eq(rv, 0);
+	ck_assert_int_eq(buf[1023], 'A');
 }
 END_TEST
 
@@ -122,8 +113,8 @@ START_TEST(test_read_name_inf_loop)
 	data = (char*) infloop + sizeof(HEADER);
 	buf[4] = '\a';
 	rv = readname((char*) infloop, sizeof(infloop), &data, buf, 4);
-	ck_assert(rv == 3);
-	ck_assert(buf[4] == '\a');
+	ck_assert_int_eq(rv, 3);
+	ck_assert_int_eq(buf[4], '\a');
 }
 END_TEST
 
@@ -146,8 +137,8 @@ START_TEST(test_read_name_longname)
 	data = (char*) longname + sizeof(HEADER);
 	buf[256] = '\a';
 	rv = readname((char*) longname, sizeof(longname), &data, buf, 256);
-	ck_assert(rv == 256);
-	ck_assert(buf[256] == '\a');
+	ck_assert_int_eq(rv, 256);
+	ck_assert_int_eq(buf[256], '\a');
 }
 END_TEST
 
@@ -163,7 +154,7 @@ START_TEST(test_read_name_onejump)
 	memset(buf, 0, sizeof(buf));
 	data = (char*) onejump + sizeof(HEADER);
 	rv = readname((char*) onejump, sizeof(onejump), &data, buf, 256);
-	ck_assert(rv == 9);
+	ck_assert_int_eq(rv, 9);
 }
 END_TEST
 
@@ -185,8 +176,8 @@ START_TEST(test_read_name_badjump_start)
 		data = (char*) jumper + sizeof(HEADER);
 		rv = readname((char*) jumper, sizeof(badjump), &data, buf, 256);
 
-		ck_assert(rv == 0);
-		ck_assert(buf[0] == 0);
+		ck_assert_int_eq(rv, 0);
+		ck_assert_int_eq(buf[0], 0);
 	}
 	free(jumper);
 }
@@ -210,7 +201,7 @@ START_TEST(test_read_name_badjump_second)
 		data = (char*) jumper + sizeof(HEADER);
 		rv = readname((char*) jumper, sizeof(badjump2), &data, buf, 256);
 
-		ck_assert(rv == 4);
+		ck_assert_int_eq(rv, 4);
 		ck_assert_str_eq("BA.", buf);
 	}
 	free(jumper);
@@ -236,7 +227,7 @@ START_TEST(test_read_name_truncated_label)
 		memcpy(pm, p, sizeof(p));
 		data = (char *) pm + sizeof(HEADER);
 		rv = readname((char *) pm, sizeof(p), &data, buf, 256);
-		ck_assert(rv > 0);
+		ck_assert_int_gt(rv, 0);
 		ck_assert_msg(buf[255] == 0, "readname ran past its bounds");
 		ck_assert_str_eq("a", buf);
 		free(pm);
@@ -262,7 +253,7 @@ START_TEST(test_read_name_ptr_at_packet_end)
 		memcpy(pm, p, sizeof(p));
 		data = (char *) pm + sizeof(HEADER);
 		rv = readname((char *) pm, sizeof(p), &data, buf, 256);
-		ck_assert(rv == 1);
+		ck_assert_int_eq(rv, 1);
 		ck_assert_str_eq("", buf);
 		free(pm);
 	}
@@ -287,8 +278,8 @@ START_TEST(test_read_name_ptr_out_of_range)
 		memcpy(pm, p, sizeof(p));
 		data = (char *) pm + sizeof(HEADER);
 		rv = readname((char *) pm, sizeof(p), &data, buf, 256);
-		ck_assert(rv == 0);
-		ck_assert(buf[0] == 0);
+		ck_assert_int_eq(rv, 0);
+		ck_assert_str_eq("", buf);
 		free(pm);
 	}
 }
@@ -307,7 +298,7 @@ START_TEST(test_putname)
 	ret = putname(&b, 256, domain);
 
 	ck_assert_int_eq(ret, strlen(domain) + 1);
-	ck_assert_msg(strncmp(buf, out, ret) == 0, "Happy flow failed");
+	ck_assert_str_eq(buf, out);
 }
 END_TEST
 
@@ -324,8 +315,8 @@ START_TEST(test_putname_nodot)
 	b = buf;
 	ret = putname(&b, 256, nodot);
 
-	ck_assert(ret == -1);
-	ck_assert(b == buf);
+	ck_assert_int_eq(ret, -1);
+	ck_assert_ptr_eq(b, buf);
 }
 END_TEST
 
@@ -346,8 +337,8 @@ START_TEST(test_putname_toolong)
 	b = buf;
 	ret = putname(&b, 256, toolong);
 
-	ck_assert(ret == -1);
-	ck_assert(b == buf);
+	ck_assert_int_eq(ret, -1);
+	ck_assert_ptr_eq(b, buf);
 }
 END_TEST
 

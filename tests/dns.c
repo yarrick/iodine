@@ -228,7 +228,7 @@ START_TEST(test_get_id_short_packet)
 	memset(&buf, 5, sizeof(buf));
 
 	id = dns_get_id(buf, len);
-	ck_assert(id == 0);
+	ck_assert_int_eq(id, 0);
 }
 END_TEST
 
@@ -237,7 +237,7 @@ START_TEST(test_get_id_low)
 	unsigned short id;
 
 	id = dns_get_id(answer_packet, sizeof(answer_packet));
-	ck_assert(id == 1337);
+	ck_assert_int_eq(id, 1337);
 }
 END_TEST
 
@@ -246,7 +246,7 @@ START_TEST(test_get_id_high)
 	unsigned short id;
 
 	id = dns_get_id(answer_packet_high_trans_id, sizeof(answer_packet_high_trans_id));
-	ck_assert(id == 0x8539);
+	ck_assert_int_eq(id, 0x8539);
 }
 END_TEST
 
