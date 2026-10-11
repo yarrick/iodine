@@ -2570,10 +2570,12 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	check_privileges(username, port);
-
-	if (argc != 2)
+	if (argc != 2) {
 		usage();
+		/* NOTREACHED */
+	}
+
+	check_privileges(username, port);
 
 	netsize = strchr(argv[0], '/');
 	if (netsize) {
