@@ -1091,10 +1091,8 @@ client_tunnel(int tun_fd, int dns_fd)
 {
 	struct timeval tv;
 	fd_set fds;
-	int rv;
 	int i;
 
-	rv = 0;
 	lastdownstreamtime = time(NULL);
 	send_query_sendcnt = 0;  /* start counting now */
 
@@ -1182,7 +1180,7 @@ client_tunnel(int tun_fd, int dns_fd)
 		}
 	}
 
-	return rv;
+	return 0;
 }
 
 static void
