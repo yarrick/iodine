@@ -487,7 +487,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 	char *pktend;
 	unsigned short rlen;
 	int id;
-	int rv;
+	unsigned int rv;
 
 	q->id2 = 0;
 	rv = 0;
@@ -685,7 +685,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 				return 0;
 
 			rv = readtxtbin(packet, &data, rlen, rdata,
-					        sizeof(rdata));
+				        sizeof(rdata));
 			if (rv >= 1) {
 				rv = MIN(rv, buflen);
 				memcpy(buf, rdata, rv);

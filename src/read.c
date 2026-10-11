@@ -22,7 +22,7 @@
 #include "config.h"
 #include "read.h"
 
-static int
+static unsigned int
 readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length, size_t loop)
 {
 	char *dummy;
@@ -95,13 +95,13 @@ end:
 	return len;
 }
 
-int
+unsigned int
 readname(char *packet, int packetlen, char **src, char *dst, size_t length)
 {
 	return readname_loop(packet, packetlen, src, dst, length, 10);
 }
 
-int
+unsigned int
 readshort(char *packet, char **src, unsigned short *dst)
 {
 	unsigned char *p;
@@ -114,7 +114,7 @@ readshort(char *packet, char **src, unsigned short *dst)
 	return sizeof(unsigned short);
 }
 
-int
+unsigned int
 readlong(char *packet, char **src, uint32_t *dst)
 {
 	/* A long as described in dns protocol is always 32 bits */
@@ -132,7 +132,7 @@ readlong(char *packet, char **src, uint32_t *dst)
 	return sizeof(uint32_t);
 }
 
-int
+unsigned int
 readdata(char *packet, char **src, char *dst, size_t len)
 {
 	memcpy(dst, *src, len);
@@ -143,12 +143,12 @@ readdata(char *packet, char **src, char *dst, size_t len)
 	return len;
 }
 
-int
+unsigned int
 readtxtbin(char *packet, char **src, size_t srcremain, char *dst, size_t dstremain)
 {
 	unsigned char *uc;
 	unsigned int tocopy;
-	int dstused = 0;
+	unsigned int dstused = 0;
 	(void)packet;
 
 	while (srcremain > 0)
