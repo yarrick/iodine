@@ -329,7 +329,7 @@ START_TEST(test_secure_random)
 END_TEST
 
 TCase *
-test_create()
+test_create(void)
 {
 	TCase *tc;
 	int sock;

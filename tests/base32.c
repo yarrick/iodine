@@ -119,7 +119,7 @@ START_TEST(test_base32_blksize)
 END_TEST
 
 TCase *
-test_create()
+test_create(void)
 {
 	TCase *tc;
 

@@ -270,7 +270,7 @@ dump_packet(char *buf, size_t len)
 }
 
 TCase *
-test_create()
+test_create(void)
 {
 	TCase *tc;
 

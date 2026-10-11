@@ -59,7 +59,7 @@ START_TEST(test_login_hash_short)
 END_TEST
 
 TCase *
-test_create()
+test_create(void)
 {
 	TCase *tc;
 

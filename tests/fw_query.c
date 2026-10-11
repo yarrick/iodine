@@ -76,7 +76,7 @@ START_TEST(test_fw_query_edge)
 END_TEST
 
 TCase *
-test_create()
+test_create(void)
 {
 	TCase *tc;
 

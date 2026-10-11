@@ -18,7 +18,7 @@
 #ifndef __TEST_H__
 #define __TEST_H__
 
-TCase *test_create();
+TCase *test_create(void);
 
 char *va_str(const char *, ...);
 

@@ -95,7 +95,7 @@ START_TEST(test_build_hostname)
 END_TEST
 
 TCase *
-test_create()
+test_create(void)
 {
 	TCase *tc;
 

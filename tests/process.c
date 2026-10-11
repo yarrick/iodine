@@ -108,7 +108,7 @@ END_TEST
 #endif
 
 TCase *
-test_create()
+test_create(void)
 {
 	TCase *tc;
 	network_init();
