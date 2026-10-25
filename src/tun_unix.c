@@ -183,7 +183,7 @@ open_utun(const char *dev)
 
 	err = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
 	if (err != 0) {
-		warn("open_utun: connect");
+		warn("open_utun: connect(%s)", dev);
 		close(fd);
 		return -1;
 	}
