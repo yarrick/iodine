@@ -471,6 +471,8 @@ unsigned short dns_get_id(char *packet, size_t packetlen)
 
 #define CHECKLEN(x) if (packetlen < (x) + (size_t)(data-packet))  return 0
 
+#define SRV_MX_NAMES (250)
+
 int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 	       size_t packetlen)
 {
@@ -609,11 +611,11 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			   numbering are not jumped over (->truncated).
 			   Hopefully DNS servers won't mess around too much.
 			 */
-			char names[250][QUERY_NAME_SIZE];
+			char names[SRV_MX_NAMES][QUERY_NAME_SIZE];
 			char *rdatastart;
 			unsigned short pref;
 			int i;
-			int offset;
+			size_t offset;
 
 			memset(names, 0, sizeof(names));
 
@@ -640,7 +642,7 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 				}
 
 				if (pref % 10 == 0 && pref >= 10 &&
-				    pref < 2500) {
+				    pref < (SRV_MX_NAMES * 10)) {
 					readname(packet, packetlen, &data,
 						 names[pref / 10 - 1],
 						 QUERY_NAME_SIZE - 1);
@@ -656,17 +658,21 @@ int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			/* output is like Hname10.com\0Hname20.com\0\0 */
 			offset = 0;
 			i = 0;
-			while (names[i][0] != '\0') {
-				int l = MIN(strlen(names[i]), buflen-offset-2);
+			while (i < SRV_MX_NAMES && names[i][0] != '\0') {
+				size_t l;
+				if (offset + 2 > buflen)
+					break;
+				l = MIN(strlen(names[i]), buflen - offset - 2);
 				if (l <= 0)
 					break;
 				memcpy(buf + offset, names[i], l);
 				offset += l;
-				*(buf + offset) = '\0';
-				offset++;
+				buf[offset++] = '\0';
 				i++;
 			}
-			*(buf + offset) = '\0';
+			if (offset >= buflen)
+				return 0;
+			buf[offset] = '\0';
 			rv = offset;
 		}
 		else if (type == T_TXT && buf) {
