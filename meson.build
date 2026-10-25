@@ -203,6 +203,13 @@ if libcheck.found()
     'fw_query', 'login', 'process', 'read', 'user'
   ]
 
+  # Silence warning from check.h
+  # ('warning: token pasting of ',' and __VA_ARGS__ is a GNU extension')
+  testargs = []
+  if cc.get_id() == 'clang'
+    testargs += '-Wno-gnu-zero-variadic-macro-arguments'
+  endif
+
   foreach suite : suites
     test(suite, executable(
       'test_@0@'.format(suite),
@@ -215,7 +222,7 @@ if libcheck.found()
       link_with: libcommon,
       include_directories: includes,
       dependencies: [libcheck],
-      c_args: '-DSUITE_NAME="@0@"'.format(suite),
+      c_args: testargs + '-DSUITE_NAME="@0@"'.format(suite),
     ))
   endforeach
 endif
