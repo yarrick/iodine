@@ -154,6 +154,26 @@ START_TEST(test_read_name_onejump)
 	data = (char*) onejump + sizeof(HEADER);
 	rv = readname((char*) onejump, sizeof(onejump), &data, buf, 256);
 	ck_assert_int_eq(rv, 9);
+	ck_assert_str_eq(buf, "hh.zBCDE");
+}
+END_TEST
+
+START_TEST(test_read_name_endjump)
+{
+	/* Declare as array to not get zero-terminating byte added */
+	unsigned char onejump[] = {
+		'A', 'A', 0x81, 0x0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x02, 'h', 'h', 0x05, 'z', 'B', 'C', 'D', 'E', 0x00, 0xc0, 0x0c
+	};
+	char buf[1024];
+	char *data;
+	int rv;
+
+	memset(buf, 0, sizeof(buf));
+	data = (char*) onejump + sizeof(HEADER) + 10;
+	rv = readname((char*) onejump, sizeof(onejump), &data, buf, 256);
+	ck_assert_int_eq(rv, 9);
+	ck_assert_str_eq(buf, "hh.zBCDE");
 }
 END_TEST
 
@@ -354,6 +374,7 @@ test_create(void)
 	tcase_add_test(tc, test_read_name_inf_loop);
 	tcase_add_test(tc, test_read_name_longname);
 	tcase_add_test(tc, test_read_name_onejump);
+	tcase_add_test(tc, test_read_name_endjump);
 	tcase_add_test(tc, test_read_name_badjump_start);
 	tcase_add_test(tc, test_read_name_badjump_second);
 	tcase_add_test(tc, test_read_name_truncated_label);

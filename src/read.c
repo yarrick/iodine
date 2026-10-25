@@ -48,11 +48,12 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 
 		/* is this a compressed label? */
 		if ((c & 0xc0) == 0xc0) {
-			if (s + 1 >= pktend) {
+			/* s is already incremented to the low byte here */
+			if (s >= pktend) {
 				/* pointer high byte present, low byte missing */
 				s = pktend - 1;
 				if (len == 0) {
-					/* Bad jump first in packet */
+					/* Bad jump first in name */
 					return 0;
 				}
 				break; /* Bad jump after some data */
