@@ -67,10 +67,9 @@ open_tun(const char *tun_device)
 	int i;
 	int tun_fd;
 	struct ifreq ifreq;
-	char *tunnel = TUNNEL_DEV_PATH;
 
-	if ((tun_fd = open(tunnel, O_RDWR)) < 0) {
-		warn("open_tun: %s", tunnel);
+	if ((tun_fd = open(LINUX_TUN_DEV_PATH, O_RDWR)) < 0) {
+		warn("open_tun: open(%s)", LINUX_TUN_DEV_PATH);
 		return -1;
 	}
 

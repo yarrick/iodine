@@ -134,11 +134,8 @@ if host_machine.system() == 'windows'
   common_sources += files('src/tun_windows.c')
 else
   common_sources += files('src/tun_unix.c')
-  if host_machine.system() == 'android'
-    cdata.set('TUNNEL_DEV_PATH', '"/dev/tun"')
-  else
-    cdata.set('TUNNEL_DEV_PATH', '"/dev/net/tun"')
-  endif
+  cdata.set_quoted('LINUX_TUN_DEV_PATH',
+    host_machine.system() == 'android' ? '/dev/tun' : '/dev/net/tun')
 endif
 
 libcommon = static_library(
