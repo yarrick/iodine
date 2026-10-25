@@ -222,12 +222,12 @@ START_TEST(test_decode_response_compressed_mx)
 {
 	char packet[4096];
 	char out[4096];
-	int answers;
+	unsigned int answers;
 
 	for (answers = 1; answers < 20; answers++) {
 		char *p = packet;
 		struct query q;
-		int i;
+		unsigned int i;
 		int ret;
 
 		memset(packet, 0, sizeof(packet));
