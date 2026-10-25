@@ -178,7 +178,7 @@ The reply should look like garbled text in all these cases.
 
 #### macOS
 On macOS 10.6 and later, iodine supports the native utun devices built into
-the OS - use `-d utunX`.
+the OS. They will tried automatically, use `-d utunX` to pick a specific device.
 
 
 Operational info
@@ -383,7 +383,7 @@ PORTABILITY
 
 iodine has been tested on Linux (arm, ia64, x86, AMD64 and SPARC64), FreeBSD
 (ia64, x86), OpenBSD (x86), NetBSD (x86), macOS (arm64, ppc and x86, with
-utun or <http://tuntaposx.sourceforge.net/> for older versions), and Windows
+utun or <https://tuntaposx.sourceforge.net/> for older versions), and Windows
 (with included wintun driver, see README-win32.txt). It runs on rooted Android
 devices (see details in README-android.txt). The build system supports cross
 compilation (examples at <https://github.com/yarrick/iodine/actions>).
