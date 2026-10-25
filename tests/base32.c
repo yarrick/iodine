@@ -115,6 +115,8 @@ START_TEST(test_base32_blksize)
 	for (i = 0; i < rawlen; i++) {
 		ck_assert_int_eq(rawbuf[i], 'A');
 	}
+	free(rawbuf);
+	free(encbuf);
 }
 END_TEST
 
