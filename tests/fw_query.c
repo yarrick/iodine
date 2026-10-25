@@ -17,7 +17,7 @@
 #include <check.h>
 
 #include "fw_query.h"
-#include "test.h"
+#include "test_main.h"
 
 START_TEST(test_fw_query_simple)
 {

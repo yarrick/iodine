@@ -21,9 +21,9 @@
 #include <string.h>
 
 #include "config.h"
-#include "encoding.h"
-#include "test.h"
 #include "compat.h"
+#include "encoding.h"
+#include "test_main.h"
 
 #define TUPLES 4
 

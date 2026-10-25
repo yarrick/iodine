@@ -32,7 +32,7 @@
 #include "common.h"
 #include "encoding.h"
 #include "user.h"
-#include "test.h"
+#include "test_main.h"
 
 START_TEST(test_init_users)
 {

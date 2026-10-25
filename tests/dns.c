@@ -37,10 +37,10 @@
 #endif
 
 #include "common.h"
+#include "compat.h"
 #include "dns.h"
 #include "encoding.h"
-#include "test.h"
-#include "compat.h"
+#include "test_main.h"
 
 static void dump_packet(char *, size_t);
 

@@ -215,7 +215,6 @@ if libcheck.found()
       'test_@0@'.format(suite),
       files(
         'tests/@0@.c'.format(suite),
-        'tests/test.c',
       ),
       link_with: [libcommon, libserver],
       include_directories: includes,

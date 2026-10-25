@@ -21,7 +21,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "test.h"
+#ifndef __TEST_MAIN_H__
+#define __TEST_MAIN_H__
+
+TCase *test_create(void);
 
 int
 main(void)
@@ -44,3 +47,5 @@ main(void)
 
 	return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
+
+#endif

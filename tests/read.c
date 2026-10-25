@@ -40,7 +40,7 @@
 #include "encoding.h"
 #include "dns.h"
 #include "read.h"
-#include "test.h"
+#include "test_main.h"
 
 START_TEST(test_read_putshort)
 {

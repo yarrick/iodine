@@ -18,8 +18,8 @@
 #include <check.h>
 #include <string.h>
 
-#include "test.h"
 #include "login.h"
+#include "test_main.h"
 
 START_TEST(test_login_hash)
 {

@@ -18,6 +18,7 @@
 #include "config.h"
 #include "compat.h"
 #include "common.h"
+#include "test_main.h"
 
 #include <check.h>
 #include <unistd.h>
