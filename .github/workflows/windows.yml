@@ -13,8 +13,23 @@ jobs:
   build:
     strategy:
       matrix:
-        runner: [windows-latest, windows-11-arm]
+        include:
+          - name: x86_64 GCC (UCRT64)
+            runner: windows-latest
+            msystem: UCRT64
+            pkg_prefix: mingw-w64-ucrt-x86_64
 
+          - name: x86_64 Clang (CLANG64)
+            runner: windows-latest
+            msystem: CLANG64
+            pkg_prefix: mingw-w64-clang-x86_64
+
+          - name: ARM64 Clang (CLANGARM64)
+            runner: windows-11-arm
+            msystem: CLANGARM64
+            pkg_prefix: mingw-w64-clang-aarch64
+
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -24,10 +39,15 @@ jobs:
     - uses: actions/checkout@v7
     - uses: msys2/setup-msys2@v2
       with:
-        msystem: UCRT64
+        msystem: ${{ matrix.msystem }}
         update: false
-        install: git mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-zlib mingw-w64-ucrt-x86_64-meson mingw-w64-ucrt-x86_64-check
-    - name: setup
+        install: >-
+          git
+          ${{ matrix.pkg_prefix }}-toolchain
+          ${{ matrix.pkg_prefix }}-zlib
+          ${{ matrix.pkg_prefix }}-meson
+          ${{ matrix.pkg_prefix }}-check
+    - name: meson setup
       run: meson setup build
     - name: build
       working-directory: build
