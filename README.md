@@ -384,9 +384,11 @@ PORTABILITY
 iodine has been tested on Linux (arm, ia64, x86, AMD64 and SPARC64), FreeBSD
 (ia64, x86), OpenBSD (x86), NetBSD (x86), macOS (arm64, ppc and x86, with
 utun or <http://tuntaposx.sourceforge.net/> for older versions), and Windows
-(with OpenVPN TAP32 driver, see win32 readme file).  It should be easy to port
-to other unix-like systems that have TUN/TAP tunneling support. Let us know if
-you get it to run on other platforms.
+(with included wintun driver, see README-win32.txt). It runs on rooted Android
+devices (see details in README-android.txt). The build system supports cross
+compilation (examples at <https://github.com/yarrick/iodine/actions>).
+It should be easy to port to other unix-like systems that have TUN/TAP
+tunneling support. Let us know if you get it to run on other platforms.
 
 
 THE NAME
