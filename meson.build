@@ -199,8 +199,8 @@ libcheck = dependency('check', required: false)
 
 if libcheck.found()
   suites = [
-    'base32', 'base64', 'base64u', 'common', 'dns', 'encoding', 'fw_query',
-    'login', 'process', 'read', 'user'
+    'base32', 'base64', 'base64u', 'base128', 'common', 'dns', 'encoding',
+    'fw_query', 'login', 'process', 'read', 'user'
   ]
 
   foreach suite : suites
