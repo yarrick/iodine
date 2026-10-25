@@ -163,15 +163,15 @@ executable('iodine',
   install_dir: target_dir,
 )
 
-server = files(
-  'src/fw_query.c',
-  'src/iodined.c',
-  'src/user.c',
+libserver = static_library(
+  'server',
+  files('src/fw_query.c', 'src/user.c'),
+  include_directories: includes,
 )
 
 executable('iodined',
-  sources: server,
-  link_with: libcommon,
+  sources: files('src/iodined.c'),
+  link_with: [libcommon, libserver],
   dependencies: serverdeps,
   include_directories: includes,
   install: true,
@@ -216,10 +216,8 @@ if libcheck.found()
       files(
         'tests/@0@.c'.format(suite),
         'tests/test.c',
-        'src/fw_query.c',
-        'src/user.c',
       ),
-      link_with: libcommon,
+      link_with: [libcommon, libserver],
       include_directories: includes,
       dependencies: [libcheck],
       c_args: testargs + '-DSUITE_NAME="@0@"'.format(suite),
