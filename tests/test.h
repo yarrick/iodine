@@ -20,6 +20,4 @@
 
 TCase *test_create(void);
 
-char *va_str(const char *, ...);
-
 #endif
