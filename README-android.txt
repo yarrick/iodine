@@ -23,11 +23,13 @@ Extra README file for Android
 		cd /data/local/tmp
 		chmod 777 iodine
 
-4. Run iodine (see the man page for parameters)
+4. Add a IP rule to use main routing table
+
+        ip rule add priority 10 lookup main
+
+5. Run iodine (see the man page for parameters)
 
 		./iodine ...
-
-For more information: http://blog.bokhorst.biz/5123
 
 == Building iodine for Android:
 1. Note the path where you unpacked the Android NDK
