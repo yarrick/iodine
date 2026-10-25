@@ -12,10 +12,17 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        # Enable tests, use SELinux, use systemd, use libcap-ng
-        dep: [check, libselinux1-dev, libsystemd-dev, libcap-ng-dev]
-        runner: [ubuntu-latest, ubuntu-26.04-arm]
+        runner: [ubuntu-latest]
+        selinux: [libselinux1-dev, ""]
+        systemd: [libsystemd-dev, ""]
+        capng: [libcap-ng-dev, ""]
+        include:
+          - runner: ubuntu-24.04-arm
+            selinux: libselinux1-dev
+            systemd: libsystemd-dev
+            capng: libcap-ng-dev
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -23,7 +30,13 @@ jobs:
     - name: apt update
       run: sudo apt update
     - name: install deps
-      run: sudo apt install meson ninja-build ${{ matrix.dep }}
+      run: >-
+        sudo apt install -y
+        meson ninja-build
+        check
+        ${{ matrix.selinux }}
+        ${{ matrix.systemd }}
+        ${{ matrix.capng }}
     - name: meson setup
       run: meson setup build
     - name: build
