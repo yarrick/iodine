@@ -20,6 +20,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+    - name: apt update
+      run: sudo apt update
     - name: install deps
       run: sudo apt install meson ninja-build ${{ matrix.dep }}
     - name: meson setup
@@ -37,6 +39,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+    - name: apt update
+      run: sudo apt update
     - name: install deps
       run: sudo apt install meson ninja-build check
     - name: meson setup
@@ -51,6 +55,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+    - name: apt update
+      run: sudo apt update
     - name: install deps
       run: sudo apt install meson ninja-build mingw-w64 mingw-w64-tools libz-mingw-w64-dev
     - name: meson setup
