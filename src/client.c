@@ -39,7 +39,6 @@
 #include "android_dns.h"
 #endif
 #ifdef DARWIN
-#define BIND_8_COMPAT
 #include <arpa/nameser_compat.h>
 #endif
 #include <grp.h>
