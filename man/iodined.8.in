@@ -1,5 +1,5 @@
 .\" groff -man -Tascii iodine.8
-.TH IODINE 8 "APR 2023" "User Manuals"
+.TH IODINED 8 "OCT 2026" "User Manuals"
 .SH NAME
 iodined \- tunnel IPv4 over DNS
 .SH SYNOPSIS
