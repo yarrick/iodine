@@ -176,20 +176,22 @@ executable('iodined',
   install_dir: target_dir,
 )
 
-man_conf = configuration_data()
-man_desc = fs.read('man/desc_and_common_options.roff')
-man_conf.set('DESC_AND_COMMON_OPTIONS', man_desc)
-man_example = fs.read('man/examples_and_security.roff')
-man_conf.set('EXAMPLES_SECURITY', man_example)
-foreach page : ['iodine', 'iodined']
-  configure_file(
-    input: 'man/@0@.8.in'.format(page),
-    output: '@0@.8'.format(page),
-    configuration: man_conf,
-    install: true,
-    install_dir: get_option('mandir') / 'man8',
-  )
-endforeach
+if not ['android', 'windows'].contains(host_machine.system())
+  man_conf = configuration_data()
+  man_desc = fs.read('man/desc_and_common_options.roff')
+  man_conf.set('DESC_AND_COMMON_OPTIONS', man_desc)
+  man_example = fs.read('man/examples_and_security.roff')
+  man_conf.set('EXAMPLES_SECURITY', man_example)
+  foreach page : ['iodine', 'iodined']
+    configure_file(
+      input: 'man/@0@.8.in'.format(page),
+      output: '@0@.8'.format(page),
+      configuration: man_conf,
+      install: true,
+      install_dir: get_option('mandir') / 'man8',
+    )
+  endforeach
+endif
 
 install_data('README.md', install_dir: get_option('datadir') / 'doc' / 'iodine')
 
