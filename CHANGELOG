@@ -8,22 +8,23 @@ CHANGES:
 master:
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
 	  patch by Pouria Mousavizadeh Tehrani.
-    - Now builds on macOS even without if_utun.h (pre 10.6).
-    - Nameservers from /etc/resolve.conf and similar can now be
-      up to 256 characters long, up from 16.
-    - Answer NXDOMAIN for _.xxx.yyy.top.domain, which is sent by
-      recursive nameservers trying to do QNAME minimization.
-      This keeps the servers from waiting before sending the next query.
-    - Various security and robustness fixes (cryptographic random,
-      pidfile writing, parsing fixes) contributed by auto-charlie.
-    - Build system changed to meson
-    - BSD server bugfix for EINVAL after sendto(), from Sergei Zhmylev.
-    - Updated network interface initialization for Unix to not
-      need to call ifconfig or route binaries.
-    - Merged support for more detailed user capability checking on
-      Linux with libcap-ng, by Oleksandr Natalenko. Fixes bug #80.
-    - Windows tun driver changed to wintun.
-    - Raw mode for macOS & BSD clients (bug #79) fixed, patch by Marco Visin.
+	- Now builds on macOS even without if_utun.h (pre 10.6).
+	- Nameservers from /etc/resolve.conf and similar can now be
+	  up to 256 characters long, up from 16.
+	- Answer NXDOMAIN for _.xxx.yyy.top.domain, which is sent by
+	  recursive nameservers trying to do QNAME minimization.
+	  This keeps the servers from waiting before sending the next query.
+	- Various security and robustness fixes (cryptographic random,
+	  pidfile writing, parsing fixes) contributed by auto-charlie.
+	- Build system changed to meson
+	- BSD server bugfix for EINVAL after sendto(), from Sergei Zhmylev.
+	- Updated network interface initialization for Unix to not
+	  need to call ifconfig or route binaries.
+	- Merged support for more detailed user capability checking on
+	  Linux with libcap-ng, by Oleksandr Natalenko. Fixes bug #80.
+	- Windows tun driver changed to wintun. <https://www.wintun.net/>
+	- Raw mode for macOS/BSD clients (bug #79) fixed, patch by Marco Visin.
+	- Fixed bounds checks in dns_decode for MX/SRV types, from Akhil Koul.
 
 2023-04-17: 0.8.0 "Burning Snowman"
 	- Mac OS X: Support native utun VPN devices. Patch by
