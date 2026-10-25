@@ -27,7 +27,6 @@
 #endif
 #include <sys/stat.h>
 #ifdef DARWIN
-#define BIND_8_COMPAT
 #include <arpa/nameser_compat.h>
 #endif
 #include <stdio.h>
