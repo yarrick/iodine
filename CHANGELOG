@@ -5,7 +5,7 @@ iodine - https://code.kryo.se/iodine
 
 CHANGES:
 
-master:
+2026-10-25: 0.9.0 "20 years"
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
 	  patch by Pouria Mousavizadeh Tehrani.
 	- Now builds on macOS even without if_utun.h (pre 10.6).
@@ -150,7 +150,7 @@ master:
 	- Fixed bug #21, now only IP address part of each packet is checked.
 		Should remove the need for the -c option and also work with
 		bugfixed DNS servers worldwide.
-	- Added -D option on server to enable debugging. Debug level 1 now 
+	- Added -D option on server to enable debugging. Debug level 1 now
 		prints info about each RX/TX datagram.
 
 2007-11-30: 0.4.1 "Tea Online"
