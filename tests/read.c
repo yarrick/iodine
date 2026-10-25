@@ -71,7 +71,7 @@ START_TEST(test_read_putlong)
 
 	for (i = 0; i < 32; i++) {
 		p = (char*)&k;
-		j = 0xf << i;
+		j = 0xfLL << i;
 		putlong(&p, j);
 		ck_assert_int_eq(ntohl(k), j);
 
