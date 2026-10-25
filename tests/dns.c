@@ -34,6 +34,7 @@
 #include "dns.h"
 #include "encoding.h"
 #include "test.h"
+#include "read.h"
 
 static void dump_packet(char *, size_t);
 
@@ -198,6 +199,56 @@ START_TEST(test_decode_response_with_high_trans_id)
 }
 END_TEST
 
+START_TEST(test_decode_response_compressed_mx)
+{
+	char packet[4096];
+	char out[4096];
+	int answers;
+
+	for (answers = 1; answers < 20; answers++) {
+		char *p = packet;
+		struct query q;
+		int i;
+		int ret;
+
+		memset(packet, 0, sizeof(packet));
+		/* Response, one question, many MX answers. */
+		putshort(&p, 0x1234);
+		putshort(&p, 0x8000);
+		putshort(&p, 1);
+		putshort(&p, answers);
+		putshort(&p, 0);
+		putshort(&p, 0);
+
+		/* A 253-character presentation name (255 bytes on the wire). */
+		for (i = 0; i < 4; i++) {
+			int label_len = (i == 3) ? 61 : 63;
+			*p++ = (unsigned char)label_len;
+			memset(p, 'a' + i, (size_t)label_len);
+			p += label_len;
+		}
+		*p++ = 0;
+		putshort(&p, 15); /* MX */
+		putshort(&p, 1);  /* IN */
+
+		for (i = 0; i < answers; i++) {
+			/* Owner and exchange both compress to the question at offset 12. */
+			putshort(&p, 0xc00c);
+			putshort(&p, 15); /* MX */
+			putshort(&p, 1);  /* IN */
+			putlong(&p, 0);
+			putshort(&p, 4);
+			putshort(&p, (unsigned int)(10 * (i + 1)));
+			putshort(&p, 0xc00c);
+		}
+
+		ret = dns_decode(out, sizeof(out), &q, QR_ANSWER,
+				 packet, (size_t)(p - packet));
+		ck_assert_int_eq(ret, MIN(sizeof(packet) - 1, answers * 254));
+	}
+}
+END_TEST
+
 START_TEST(test_get_id_short_packet)
 {
 	char buf[5];
@@ -260,6 +311,7 @@ test_dns_create_tests()
 	tcase_add_test(tc, test_encode_response);
 	tcase_add_test(tc, test_decode_response);
 	tcase_add_test(tc, test_decode_response_with_high_trans_id);
+	tcase_add_test(tc, test_decode_response_compressed_mx);
 	tcase_add_test(tc, test_get_id_short_packet);
 	tcase_add_test(tc, test_get_id_low);
 	tcase_add_test(tc, test_get_id_high);
