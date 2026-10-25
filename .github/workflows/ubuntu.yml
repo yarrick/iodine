@@ -54,7 +54,7 @@ jobs:
     - name: install deps
       run: sudo apt install meson ninja-build mingw-w64 mingw-w64-tools libz-mingw-w64-dev
     - name: meson setup
-      run: meson setup build-windows --cross-file .github/ubuntu-windows-x86-64.ini
+      run: meson setup build-windows --cross-file .github/ubuntu-windows-x86_64.ini
     - name: build
       working-directory: build-windows
       run: ninja
