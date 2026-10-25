@@ -6,9 +6,7 @@ project('iodine', 'c',
   ],
   license: 'ISC',
   meson_version: '>=0.64.0',
-  version : '0.8.0-git' +
-    run_command('git', 'rev-parse',  '--short', 'HEAD',
-                check: true).stdout().strip(),
+  version : '0.9.0',
 )
 fs = import('fs')
 cc = meson.get_compiler('c')
