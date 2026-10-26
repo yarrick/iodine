@@ -1,0 +1,18 @@
+option(
+  'libcapng',
+  type : 'feature',
+  description : 'build with libcapng support, to check capabilities and not just root',
+  value : 'auto',
+)
+option(
+  'selinux',
+  type : 'feature',
+  description : 'build with selinux support, to set security context',
+  value : 'auto',
+)
+option(
+  'systemd',
+  type : 'feature',
+  description : 'build with systemd support, for socket-based activation',
+  value : 'auto',
+)
