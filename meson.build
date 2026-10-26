@@ -27,16 +27,16 @@ serverdeps = []
 cdata.set10('@0@'.format(host_machine.system().to_upper()), true)
 if host_machine.system() == 'linux'
   add_project_arguments('-D_GNU_SOURCE', language: 'c')
-  selinux = dependency('libselinux', required: false)
+  selinux = dependency('libselinux', required: get_option('selinux'))
   cdata.set10('HAVE_SETCON', selinux.found())
   commondeps += selinux
-  systemd = dependency('libsystemd', required: false)
+  systemd = dependency('libsystemd', required: get_option('systemd'))
   if not systemd.found()
-    systemd = dependency('libsystemd-daemon', required: false)
+    systemd = dependency('libsystemd-daemon', required: get_option('systemd'))
   endif
   cdata.set10('HAVE_SYSTEMD', systemd.found())
   serverdeps += systemd
-  libcapng = dependency('libcap-ng', required: false)
+  libcapng = dependency('libcap-ng', required: get_option('libcapng'))
   cdata.set10('HAVE_LIBCAPNG', libcapng.found())
   commondeps += libcapng
 endif
