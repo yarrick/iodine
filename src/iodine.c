@@ -355,6 +355,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Sending raw traffic directly to %s\n", client_get_raw_addr());
 	}
 
+	/* Drop any tun packets received so far (MDNS etc) during possibly slow handshake. */
+	tun_flush_rx(tun_fd);
+
 	fprintf(stderr, "Connection setup complete, transmitting data.\n");
 
 	if (pidfile != NULL)

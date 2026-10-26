@@ -122,6 +122,7 @@ open_tun(const char *tun_device)
 	int tunfd;
 	struct sockaddr_storage localsock;
 	socklen_t localsock_len;
+	u_long mode;
 
 	if(wintun_init()) {
 		warnx("Could not load wintun.dll");
@@ -159,8 +160,14 @@ open_tun(const char *tun_device)
 	 * A thread does blocking reads on the tun device and
 	 * sends data as udp to this socket */
 	if (get_addr("127.0.0.1", 55353, AF_INET, 0, &localsock, &localsock_len))
-        return -1;
+		return -1;
 	tunfd = open_dns(&localsock, localsock_len);
+
+	/* Enable non-blocking mode for socket */
+	mode = 1;
+	if (ioctlsocket(tunfd, FIONBIO, &mode)) {
+		return -1;
+	}
 
 	data.session = session_handle;
 	memcpy(&(data.addr), &localsock, localsock_len);
@@ -277,3 +284,13 @@ tun_setmtu(const unsigned mtu)
 	return 0;
 }
 
+void
+tun_flush_rx(int tun_fd)
+{
+	ssize_t len;
+	char buffer[4096];
+
+	do {
+		len = read(tun_fd, buffer, sizeof(buffer));
+	} while (len > 0);
+}

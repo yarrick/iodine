@@ -72,7 +72,7 @@ open_tun(const char *tun_device)
 	int tun_fd;
 	struct ifreq ifreq;
 
-	if ((tun_fd = open(LINUX_TUN_DEV_PATH, O_RDWR)) < 0) {
+	if ((tun_fd = open(LINUX_TUN_DEV_PATH, O_RDWR | O_NONBLOCK)) < 0) {
 		warn("open_tun: open(%s)", LINUX_TUN_DEV_PATH);
 		return -1;
 	}
@@ -152,12 +152,24 @@ open_utun(const char *dev)
 	char ifname[10];
 	socklen_t ifname_len = sizeof(ifname);
 	int unit;
+	int flags;
 	int fd = -1;
 	int err = 0;
 
 	fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
 	if (fd < 0) {
 		warn("open_utun: socket(PF_SYSTEM)");
+		return -1;
+	}
+
+	/* Set socket in non-blocking mode */
+	flags = fcntl(fd, F_GETFL, 0);
+	if (flags < 0) {
+		close(fd);
+		return -1;
+	}
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+		close(fd);
 		return -1;
 	}
 
@@ -230,7 +242,7 @@ open_tun(const char *tun_device)
 		strlcpy(if_name, tun_device, sizeof(if_name));
 		if_name[sizeof(if_name)-1] = '\0';
 
-		if ((tun_fd = open(tun_name, O_RDWR)) < 0) {
+		if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) < 0) {
 			warn("open_tun: %s", tun_name);
 			return -1;
 		}
@@ -242,7 +254,7 @@ open_tun(const char *tun_device)
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
 
-			if ((tun_fd = open(tun_name, O_RDWR)) >= 0) {
+			if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) >= 0) {
 				fprintf(stderr, "Opened %s\n", tun_name);
 				snprintf(if_name, sizeof(if_name), "tun%d", i);
 				fd_set_close_on_exec(tun_fd);
@@ -551,3 +563,13 @@ tun_setmtu(const unsigned mtu)
 	return 0;
 }
 
+void
+tun_flush_rx(int tun_fd)
+{
+	ssize_t len;
+	char buffer[4096];
+
+	do {
+		len = read(tun_fd, buffer, sizeof(buffer));
+	} while (len > 0);
+}
