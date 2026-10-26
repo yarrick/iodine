@@ -161,7 +161,7 @@ libserver = static_library(
 )
 
 executable('iodined',
-  sources: files('src/iodined.c'),
+  sources: files('src/iodined.c', 'src/server.c'),
   link_with: [libcommon, libserver],
   dependencies: serverdeps + zlib,
   include_directories: includes,
