@@ -22,7 +22,7 @@ jobs:
           - os: openbsd
             prepare: pkg_add check git meson
 
-    name: ${{ matrix.vm }}
+    name: ${{ matrix.os }}
     runs-on: ubuntu-latest
 
     steps:
