@@ -31,9 +31,6 @@ if host_machine.system() == 'linux'
   cdata.set10('HAVE_SETCON', selinux.found())
   commondeps += selinux
   systemd = dependency('libsystemd', required: get_option('systemd'))
-  if not systemd.found()
-    systemd = dependency('libsystemd-daemon', required: get_option('systemd'))
-  endif
   cdata.set10('HAVE_SYSTEMD', systemd.found())
   serverdeps += systemd
   libcapng = dependency('libcap-ng', required: get_option('libcapng'))
