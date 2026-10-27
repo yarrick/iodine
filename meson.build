@@ -215,6 +215,7 @@ if libcheck.found()
       link_with: [libcommon, libserver],
       include_directories: includes,
       dependencies: [libcheck],
+      build_by_default: false,
       c_args: testargs + '-DSUITE_NAME="@0@"'.format(suite),
     ))
   endforeach
