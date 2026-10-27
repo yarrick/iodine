@@ -64,37 +64,34 @@ fuzz_server = executable('fuzz_server',
   link_with: libserver,
 )
 
-py3 = import('python').find_installation(required: false)
-if py3.found()
-  bench_deps = [tun_ping]
-  if host_machine.system() == 'windows'
-    bench_deps += fs.copyfile(wintun_dll)
-  endif
-  run_target('tun_bench',
-    command: [
-      py3,
-      files('tun_bench.py'),
-      tun_ping.full_path(),
-      host_machine.system(),
-    ],
-    depends: bench_deps,
-  )
-  test_server_deps = [thin_server]
-  if host_machine.system() == 'windows' and fs.exists(zlib_dll)
-    test_server_deps += fs.copyfile(zlib_dll)
-  endif
-  run_target('test_server',
-    command: [
-      py3,
-      files('test_server.py'),
-      thin_server.full_path(),
-      host_machine.system(),
-    ],
-    depends: test_server_deps,
-  )
-  if meson.can_run_host_binaries()
-    message('Extra test targets:\n',
-            '- tun_bench (requires privileges + ping3 python module)\n',
-            '- test_server (requires internet access + dnspython python module)')
-  endif
+bench_deps = [tun_ping]
+if host_machine.system() == 'windows'
+  bench_deps += fs.copyfile(wintun_dll)
+endif
+run_target('tun_bench',
+  command: [
+    py3,
+    files('tun_bench.py'),
+    tun_ping.full_path(),
+    host_machine.system(),
+  ],
+  depends: bench_deps,
+)
+test_server_deps = [thin_server]
+if host_machine.system() == 'windows' and fs.exists(zlib_dll)
+  test_server_deps += fs.copyfile(zlib_dll)
+endif
+run_target('test_server',
+  command: [
+    py3,
+    files('test_server.py'),
+    thin_server.full_path(),
+    host_machine.system(),
+  ],
+  depends: test_server_deps,
+)
+if meson.can_run_host_binaries()
+  message('Extra test targets:\n',
+          '- tun_bench (requires privileges + ping3 python module)\n',
+          '- test_server (requires internet access + dnspython python module)')
 endif

@@ -284,4 +284,15 @@ if fs.exists(os_readme)
   )
 endif
 
+py3 = import('python').find_installation()
+run_target('package',
+  command: [
+    py3,
+    files('misc/package.py'),
+    meson.project_version(),
+    host_machine.system(),
+    host_machine.cpu_family(),
+  ]
+)
+
 subdir('tests')
