@@ -19,6 +19,10 @@ cdata.set_quoted('IODINE_VERSION', meson.project_version())
 
 includes = include_directories('src', 'wintun/include')
 target_dir = get_option('sbindir')
+docdir = get_option('docdir')
+if docdir == ''
+        docdir = get_option('datadir') / 'doc' / 'iodine'
+endif
 
 zlib = dependency('zlib')
 commondeps = []
@@ -186,7 +190,13 @@ if not ['android', 'windows'].contains(host_machine.system())
   endforeach
 endif
 
-install_data('README.md', install_dir: get_option('datadir') / 'doc' / 'iodine')
+install_data('README.md', install_dir: docdir)
+if host_machine.system() == 'windows'
+  install_data('README-win32.txt', install_dir: docdir)
+endif
+if host_machine.system() == 'android'
+  install_data('README-android.txt', install_dir: docdir)
+endif
 
 libcheck = dependency('check', required: false)
 
