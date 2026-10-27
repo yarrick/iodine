@@ -1,18 +1,24 @@
 option(
+  'docdir',
+  type : 'string',
+  description : 'Path inside prefix to install docs to. Default is <datadir>/doc/iodine',
+  value : '',
+)
+option(
   'libcapng',
   type : 'feature',
-  description : 'build with libcapng support, to check capabilities and not just root',
+  description : 'build with libcapng support on Linux, to check capabilities and not just root',
   value : 'auto',
 )
 option(
   'selinux',
   type : 'feature',
-  description : 'build with selinux support, to set security context',
+  description : 'build with selinux support on Linux, to set security context',
   value : 'auto',
 )
 option(
   'systemd',
   type : 'feature',
-  description : 'build with systemd support, for socket-based activation',
+  description : 'build with systemd support on Linux, for socket-based activation',
   value : 'auto',
 )
