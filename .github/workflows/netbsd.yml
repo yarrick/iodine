@@ -19,7 +19,7 @@ jobs:
       uses: vmactions/netbsd-vm@v1.5.2
       with:
         prepare: |
-          pkg install -y \
+          pkg_add \
             devel/check \
             devel/git \
             devel/pkgconf \
