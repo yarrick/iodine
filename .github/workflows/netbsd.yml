@@ -19,8 +19,7 @@ jobs:
       uses: vmactions/netbsd-vm@v1.5.2
       with:
         prepare: |
-          pkg_add -u
-          pkg_add check git pkgconf meson
+          pkg_add -u check git pkgconf meson
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
