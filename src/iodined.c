@@ -25,6 +25,11 @@
 
 #include "config.h"
 
+#include "common.h"
+#include "compat.h"
+#include "process.h"
+#include "server.h"
+
 #ifdef WINDOWS
 #include "windows_dns.h"
 #else
@@ -47,15 +52,11 @@
 # include <systemd/sd-daemon.h>
 #endif
 
-#include "common.h"
-#include "compat.h"
 #include "dns.h"
 #include "encoding.h"
 #include "fw_query.h"
 #include "login.h"
-#include "process.h"
 #include "run_as.h"
-#include "server.h"
 #include "tun.h"
 #include "user.h"
 #include "version.h"
