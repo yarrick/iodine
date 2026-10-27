@@ -20,10 +20,10 @@ jobs:
       with:
         prepare: |
           pkg_add \
-            devel/check \
-            devel/git \
-            devel/pkgconf \
-            devel/meson
+            check \
+            git \
+            pkgconf \
+            meson
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
