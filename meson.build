@@ -21,7 +21,7 @@ includes = include_directories('src', 'wintun/include')
 target_dir = get_option('sbindir')
 
 zlib = dependency('zlib')
-commondeps = [zlib]
+commondeps = []
 serverdeps = []
 
 cdata.set10('@0@'.format(host_machine.system().to_upper()), true)
@@ -148,15 +148,11 @@ libcommon = static_library(
 configure_file(output: 'config.h',
   configuration: cdata)
 
-client = files(
-  'src/client.c',
-  'src/iodine.c',
-)
-
 executable('iodine',
-  sources: client,
+  sources: files('src/client.c', 'src/iodine.c'),
   link_with: libcommon,
   include_directories: includes,
+  dependencies: zlib,
   install: true,
   install_dir: target_dir,
 )
@@ -170,7 +166,7 @@ libserver = static_library(
 executable('iodined',
   sources: files('src/iodined.c'),
   link_with: [libcommon, libserver],
-  dependencies: serverdeps,
+  dependencies: serverdeps + zlib,
   include_directories: includes,
   install: true,
   install_dir: target_dir,
