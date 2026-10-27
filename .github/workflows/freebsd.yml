@@ -1,0 +1,32 @@
+name: freebsd
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+    contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: make
+      uses: vmactions/freebsd-vm@v1.5.8
+      with:
+        prepare: |
+          pkg install -y \
+            devel/check \
+            devel/git \
+            devel/pkgconf \
+            devel/meson
+        run: |
+          git config --global --add safe.directory /home/runner/work/iodine/iodine
+          meson setup build
+          cd build
+          ninja
+          ninja test
