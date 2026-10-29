@@ -31,10 +31,6 @@
 
 void network_init(void);
 
-#if !HAVE_INET_ATON
-int inet_aton(const char *cp, struct in_addr *inp);
-#endif
-
 #if !HAVE_WARNX
 void vwarn(const char *fmt, va_list list);
 void warn(const char *fmt, ...);

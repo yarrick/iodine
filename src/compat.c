@@ -36,15 +36,6 @@ network_init(void)
 #endif
 }
 
-#if !HAVE_INET_ATON
-int
-inet_aton(const char *cp, struct in_addr *inp)
-{
- inp->s_addr = inet_addr(cp);
- return inp->s_addr != INADDR_ANY;
-}
-#endif
-
 #if !HAVE_WARNX
 void
 vwarn(const char *fmt, va_list list)

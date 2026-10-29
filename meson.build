@@ -90,7 +90,6 @@ optional_functions = [
   'geteuid',
   'getpwnam',
   'getrandom',
-  'inet_aton',
   'setgroups',
   'strlcpy',
   'syslog',
