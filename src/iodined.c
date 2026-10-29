@@ -236,6 +236,7 @@ main(int argc, char **argv)
 	char *username;
 	char *topdomain;
 	struct run_as_user *run_as;
+	char *nameserver_ip;
 	char *newroot;
 	char *context;
 	char *device;
@@ -254,7 +255,7 @@ main(int argc, char **argv)
 	struct in_addr my_ip;
 	int choice;
 	int port;
-	in_addr_t ns_ip;
+	struct in_addr ns_ip;
 	int mtu;
 	int check_ip;
 	int skipipconfig;
@@ -277,6 +278,7 @@ main(int argc, char **argv)
 	username = NULL;
 	topdomain = NULL;
 	run_as = NULL;
+	nameserver_ip = NULL;
 	newroot = NULL;
 	context = NULL;
 	device = NULL;
@@ -289,7 +291,7 @@ main(int argc, char **argv)
 	listen_ip4 = NULL;
 	listen_ip6 = NULL;
 	port = 53;
-	ns_ip = INADDR_ANY;
+	ns_ip.s_addr = INADDR_ANY;
 	ns_get_externalip = 0;
 	resolved_external_ip.s_addr = INADDR_ANY;
 	addrfamily = AF_UNSPEC;
@@ -366,7 +368,7 @@ main(int argc, char **argv)
 			if (optarg && strcmp("auto", optarg) == 0) {
 				ns_get_externalip = 1;
 			} else {
-				ns_ip = inet_addr(optarg);
+				nameserver_ip = optarg;
 			}
 			break;
 		case 'b':
@@ -517,13 +519,15 @@ main(int argc, char **argv)
 				exit(3);
 			}
 		}
-		ns_ip = resolved_external_ip.s_addr;
+		ns_ip = resolved_external_ip;
 		fprintf(stderr, "Using %s as external IP.\n", inet_ntoa(resolved_external_ip));
 	}
 
-	if (ns_ip == INADDR_NONE) {
-		warnx("Bad IP address to return as nameserver.");
-		usage();
+	if (nameserver_ip) {
+		if (inet_pton(AF_INET, nameserver_ip, &ns_ip) <= 0) {
+			warnx("Bad IP address to return as nameserver.");
+			usage();
+		}
 	}
 	if (netmask > 30 || netmask < 8) {
 		warnx("Bad netmask (%d bits). Use 8-30 bits.", netmask);
@@ -657,7 +661,7 @@ main(int argc, char **argv)
 	params.tunnel_mtu = mtu;
 	params.server_ip = my_ip.s_addr;
 	params.netmask = netmask;
-	params.nameserver_ip = ns_ip;
+	params.nameserver_ip = ns_ip.s_addr;
 	params.bind_port = bind_port;
 	params.debug = debug;
 
