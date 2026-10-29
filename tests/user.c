@@ -36,62 +36,58 @@
 
 START_TEST(test_init_users)
 {
-	in_addr_t ip;
+	struct in_addr ip;
+	struct in_addr uip;
 	char givenip[32];
 	int i;
 	int count;
 
-	ip = inet_addr("127.0.0.1");
-	count = init_users(ip, 27);
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	count = init_users(ip.s_addr, 27);
 	for (i = 0; i < count; i++) {
 		ck_assert_int_eq(users[i].id, i);
 		ck_assert_int_eq(users[i].q.id, 0);
 		ck_assert_int_eq(users[i].inpacket.len, 0);
 		ck_assert_int_eq(users[i].outpacket.len, 0);
 		snprintf(givenip, sizeof(givenip), "127.0.0.%d", i + 2);
-		ck_assert_uint_eq(users[i].tun_ip, inet_addr(givenip));
+        inet_pton(AF_INET, givenip, &uip);
+		ck_assert_uint_eq(users[i].tun_ip, gip.s_addr);
 	}
 }
 END_TEST
 
 START_TEST(test_find_user_by_ip)
 {
-	in_addr_t ip;
-	unsigned int testip;
+	struct in_addr ip;
+	struct in_addr testip;
 
-	ip = inet_addr("127.0.0.1");
-	init_users(ip, 27);
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	init_users(ip.s_addr, 27);
 	users[0].conn = CONN_DNS_NULL;
 
-	testip = (unsigned int) inet_addr("10.0.0.1");
-	ck_assert_int_eq(find_user_by_ip(testip), -1);
+	inet_pton(AF_INET, "10.0.0.1", &testip);
+	ck_assert_int_eq(find_user_by_ip(testip.s_addr), -1);
 
-	testip = (unsigned int) inet_addr("127.0.0.2");
-	ck_assert_int_eq(find_user_by_ip(testip), -1);
+	inet_pton(AF_INET, "127.0.0.2", &testip);
+	ck_assert_int_eq(find_user_by_ip(testip.s_addr), -1);
 
 	users[0].active = 1;
-
-	testip = (unsigned int) inet_addr("127.0.0.2");
-	ck_assert_int_eq(find_user_by_ip(testip), -1);
+	ck_assert_int_eq(find_user_by_ip(testip.s_addr), -1);
 
 	users[0].last_pkt = time(NULL);
-
-	testip = (unsigned int) inet_addr("127.0.0.2");
-	ck_assert_int_eq(find_user_by_ip(testip), -1);
+	ck_assert_int_eq(find_user_by_ip(testip.s_addr), -1);
 
 	users[0].authenticated = 1;
-
-	testip = (unsigned int) inet_addr("127.0.0.2");
-	ck_assert_int_eq(find_user_by_ip(testip), 0);
+	ck_assert_int_eq(find_user_by_ip(testip.s_addr), 0);
 }
 END_TEST
 
 START_TEST(test_all_users_waiting_to_send)
 {
-	in_addr_t ip;
+	struct in_addr ip;
 
-	ip = inet_addr("127.0.0.1");
-	init_users(ip, 27);
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	init_users(ip.s_addr, 27);
 
 	ck_assert_int_eq(all_users_waiting_to_send(), 1);
 
@@ -117,12 +113,12 @@ END_TEST
 
 START_TEST(test_find_available_user)
 {
-	in_addr_t ip;
+	struct in_addr ip;
 	unsigned int i;
 	unsigned int user;
 
-	ip = inet_addr("127.0.0.1");
-	init_users(ip, 27);
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	init_users(ip.s_addr, 27);
 
 	for (i = 0; i < USERS; i++) {
 		users[i].authenticated = 1;
@@ -153,12 +149,12 @@ END_TEST
 
 START_TEST(test_find_available_user_small_net)
 {
-	in_addr_t ip;
+	struct in_addr ip;
 	unsigned int i;
 	unsigned int user;
 
-	ip = inet_addr("127.0.0.1");
-	init_users(ip, 29); /* this should result in 5 enabled users */
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	init_users(ip.s_addr, 29); /* this should result in 5 enabled users */
 
 	for (i = 0; i < 5; i++) {
 		ck_assert_int_ne(find_available_user(&user), 0);
