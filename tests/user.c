@@ -50,8 +50,8 @@ START_TEST(test_init_users)
 		ck_assert_int_eq(users[i].inpacket.len, 0);
 		ck_assert_int_eq(users[i].outpacket.len, 0);
 		snprintf(givenip, sizeof(givenip), "127.0.0.%d", i + 2);
-        inet_pton(AF_INET, givenip, &uip);
-		ck_assert_uint_eq(users[i].tun_ip, gip.s_addr);
+		inet_pton(AF_INET, givenip, &uip);
+		ck_assert_uint_eq(users[i].tun_ip, uip.s_addr);
 	}
 }
 END_TEST
