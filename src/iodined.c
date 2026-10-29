@@ -251,7 +251,7 @@ main(int argc, char **argv)
 	int bind_port;
 
 	int created_users;
-	in_addr_t my_ip;
+	struct in_addr my_ip;
 	int choice;
 	int port;
 	in_addr_t ns_ip;
@@ -411,9 +411,7 @@ main(int argc, char **argv)
 		netmask = atoi(netsize);
 	}
 
-	my_ip = inet_addr(argv[0]);
-
-	if (my_ip == INADDR_NONE) {
+	if (inet_pton(AF_INET, argv[0], &my_ip) <= 0) {
 		warnx("Bad IP address to use inside tunnel.");
 		usage();
 	}
@@ -543,7 +541,7 @@ main(int argc, char **argv)
 	dns_fds.v4fd = -1;
 	dns_fds.v6fd = -1;
 
-	created_users = init_users(my_ip, netmask);
+	created_users = init_users(my_ip.s_addr, netmask);
 
 	if ((tun_fd = open_tun(device)) == -1) {
 		/* nothing to clean up, just return */
@@ -657,7 +655,7 @@ main(int argc, char **argv)
 	params.users = created_users;
 	params.check_ip = check_ip;
 	params.tunnel_mtu = mtu;
-	params.server_ip = my_ip;
+	params.server_ip = my_ip.s_addr;
 	params.netmask = netmask;
 	params.nameserver_ip = ns_ip;
 	params.bind_port = bind_port;
