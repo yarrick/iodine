@@ -220,7 +220,7 @@ int
 tun_setip(const char *ip, const char *other_ip, int netbits)
 {
 	struct in_addr netmask;
-	in_addr_t localaddr;
+	struct in_addr localaddr;
 	DWORD status;
 	MIB_UNICASTIPADDRESS_ROW ip_row;
 	PMIB_UNICASTIPADDRESS_TABLE table = NULL;
@@ -231,8 +231,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		return 1;
 	}
 
-	localaddr = inet_addr(ip);
-	if (localaddr == INADDR_NONE) {
+	if (inet_pton(AF_INET, ip, &localaddr) <= 0) {
 		fprintf(stderr, "Invalid IP: %s!\n", ip);
 		return 1;
 	}
@@ -252,7 +251,7 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 	ip_row.InterfaceLuid = luid;
 	ip_row.OnLinkPrefixLength = netbits;
 	ip_row.Address.Ipv4.sin_family = AF_INET;
-	ip_row.Address.Ipv4.sin_addr.s_addr = localaddr;
+	ip_row.Address.Ipv4.sin_addr = localaddr;
 	status = CreateUnicastIpAddressEntry(&ip_row);
 	if (status != NO_ERROR) {
 		warnx("tun_setmtu: CreateUnicastIpAddressEntry failed: status %lu", status);
