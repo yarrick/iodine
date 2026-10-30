@@ -66,8 +66,13 @@ jobs:
     - uses: actions/setup-python@v7
       with:
         python-version: "3.x"
+    - name: install meson
+      shell: pwsh
+      run: choco install -y meson
     - name: meson setup
+      shell: pwsh
       run: meson setup build-android --cross-file .github\windows-android-aarch64.ini
     - name: build
+      shell: pwsh
       working-directory: build-android
       run: ninja
