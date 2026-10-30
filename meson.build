@@ -67,8 +67,9 @@ if host_machine.system() == 'windows'
     if fs.exists(zlib_dll)
       fs.copyfile(
         zlib_dll,
-        install:true,
+        install: true,
         install_dir: target_dir,
+        install_tag: 'runtime',
       )
     endif
   endif
@@ -129,8 +130,9 @@ if host_machine.system() == 'windows'
   common_sources += files('src/tun_windows.c')
   fs.copyfile(
     'wintun/bin' / host_machine.cpu_family() / 'wintun.dll',
-    install:true,
+    install: true,
     install_dir: target_dir,
+    install_tag: 'runtime',
   )
 else
   common_sources += files('src/tun_unix.c')
@@ -185,16 +187,25 @@ if not ['android', 'windows'].contains(host_machine.system())
       configuration: man_conf,
       install: true,
       install_dir: get_option('mandir') / 'man8',
+      install_tag: 'man',
     )
   endforeach
 endif
 
-install_data('README.md', install_dir: docdir)
+install_data('README.md',
+  install_tag: 'doc',
+  install_dir: docdir)
 if host_machine.system() == 'windows'
-  install_data('README-win32.txt', install_dir: docdir)
+  install_data('README-win32.txt',
+    install_dir: docdir,
+    install_tag: 'doc',
+  )
 endif
 if host_machine.system() == 'android'
-  install_data('README-android.txt', install_dir: docdir)
+  install_data('README-android.txt',
+    install_dir: docdir,
+    install_tag: 'doc',
+  )
 endif
 
 libcheck = dependency('check', required: false)
