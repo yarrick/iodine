@@ -15,17 +15,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: x86_64 GCC (UCRT64)
+          - name: build UCRT64
             runner: windows-latest
             msystem: UCRT64
             pkg_prefix: mingw-w64-ucrt-x86_64
 
-          - name: x86_64 Clang (CLANG64)
+          - name: build CLANG64
             runner: windows-latest
             msystem: CLANG64
             pkg_prefix: mingw-w64-clang-x86_64
 
-          - name: ARM64 Clang (CLANGARM64)
+          - name: build CLANGARM64
             runner: windows-11-arm
             msystem: CLANGARM64
             pkg_prefix: mingw-w64-clang-aarch64
@@ -60,6 +60,9 @@ jobs:
   build-android:
 
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
 
     steps:
     - uses: actions/checkout@v7
@@ -69,7 +72,7 @@ jobs:
         update: false
         install: >-
           git
-          mingw-w64-ucrt-x86_64-meson
+          meson
     - name: meson setup
       run: meson setup build-android --cross-file .github/windows-android-aarch64.ini
     - name: build
