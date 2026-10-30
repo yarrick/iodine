@@ -397,7 +397,7 @@ tun_add_route(struct sockaddr_in *localaddr, struct sockaddr_in *maskaddr)
 #endif
 
 int
-tun_setip(const char *ip, const char *other_ip, int netbits)
+tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 {
 	int sock;
 	struct sockaddr_in localaddr, peeraddr, maskaddr;
@@ -408,28 +408,22 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 #endif
 
 	memset(&localaddr, 0, sizeof(localaddr));
-	memset(&peeraddr, 0, sizeof(peeraddr));
-	memset(&maskaddr, 0, sizeof(maskaddr));
+	localaddr.sin_family = AF_INET;
+	localaddr.sin_addr.s_addr = *ip;
 
+	memset(&peeraddr, 0, sizeof(peeraddr));
+	peeraddr.sin_family = AF_INET;
+	peeraddr.sin_addr.s_addr = *peer_ip;
+
+	memset(&maskaddr, 0, sizeof(maskaddr));
 	maskaddr.sin_family = AF_INET;
 	if (build_netmask(netbits, &maskaddr.sin_addr)) {
 		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
 		return 1;
 	}
 
-	localaddr.sin_family = AF_INET;
-	if (inet_pton(AF_INET, ip, &localaddr.sin_addr) <= 0) {
-		fprintf(stderr, "Invalid IP: %s!\n", ip);
-		return 1;
-	}
-
-	peeraddr.sin_family = AF_INET;
-	if (inet_pton(AF_INET, other_ip, &peeraddr.sin_addr) <= 0) {
-		fprintf(stderr, "Invalid peer IP: %s!\n", other_ip);
-		return 1;
-	}
-
-	fprintf(stderr, "Setting IP of %s to %s\n", if_name, ip);
+	fprintf(stderr, "Setting IP of %s to %s\n",
+		if_name, format_inaddr(&localaddr.sin_addr));
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0) {
 		perror("tun_setip: socket creation failed");

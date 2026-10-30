@@ -552,13 +552,10 @@ main(int argc, char **argv)
 		return 1;
 	}
 	if (!skipipconfig) {
-		const char *other_ip = users_get_first_ip();
-		if (tun_setip(argv[0], other_ip, netmask) != 0 || tun_setmtu(mtu) != 0) {
+		if (tun_setip(&my_ip.s_addr, users_get_first_ip(), netmask) != 0 || tun_setmtu(mtu) != 0) {
 			retval = 1;
-			free((void*) other_ip);
 			goto cleanup;
 		}
-		free((void*) other_ip);
 	}
 
 #if HAVE_SYSTEMD

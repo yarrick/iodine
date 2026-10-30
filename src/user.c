@@ -87,11 +87,9 @@ int init_users(in_addr_t my_ip, int netbits)
 	return usercount;
 }
 
-const char *users_get_first_ip(void)
+const in_addr_t *users_get_first_ip(void)
 {
-	struct in_addr ip;
-	ip.s_addr = users[0].tun_ip;
-	return strdup(format_inaddr(&ip));
+	return &users[0].tun_ip;
 }
 
 int find_user_by_ip(uint32_t ip)

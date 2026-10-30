@@ -81,7 +81,7 @@ struct tun_user {
 extern struct tun_user *users;
 
 int init_users(in_addr_t, int);
-const char* users_get_first_ip(void);
+const in_addr_t* users_get_first_ip(void);
 int find_user_by_ip(uint32_t);
 int all_users_waiting_to_send(void);
 int find_available_user(unsigned int*);

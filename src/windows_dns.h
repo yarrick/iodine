@@ -18,7 +18,7 @@
 #ifndef __FIX_WINDOWS_H__
 #define __FIX_WINDOWS_H__
 
-typedef unsigned int in_addr_t;
+typedef unsigned long in_addr_t;
 
 #include <winsock2.h>
 #include <windows.h>

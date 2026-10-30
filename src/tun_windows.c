@@ -217,24 +217,21 @@ read_tun(int tun_fd, char *buf, size_t len)
 }
 
 int
-tun_setip(const char *ip, const char *other_ip, int netbits)
+tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 {
 	struct in_addr netmask;
 	struct in_addr localaddr;
 	DWORD status;
 	MIB_UNICASTIPADDRESS_ROW ip_row;
 	PMIB_UNICASTIPADDRESS_TABLE table = NULL;
-	(void)other_ip;
+	(void)peer_ip;
 
 	if (build_netmask(netbits, &netmask)) {
 		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
 		return 1;
 	}
 
-	if (inet_pton(AF_INET, ip, &localaddr) <= 0) {
-		fprintf(stderr, "Invalid IP: %s!\n", ip);
-		return 1;
-	}
+	localaddr.s_addr = *ip;
 
 	/* Remove earlier IP addresses on interface */
 	if (GetUnicastIpAddressTable(AF_INET, &table) == NO_ERROR) {
@@ -246,7 +243,8 @@ tun_setip(const char *ip, const char *other_ip, int netbits)
 		FreeMibTable(table);
 	}
 
-	fprintf(stderr, "Setting IP of interface '%s' to %s\n", if_name, ip);
+	fprintf(stderr, "Setting IP of interface '%s' to %s\n",
+		if_name, format_inaddr(&localaddr));
 	InitializeUnicastIpAddressEntry(&ip_row);
 	ip_row.InterfaceLuid = luid;
 	ip_row.OnLinkPrefixLength = netbits;

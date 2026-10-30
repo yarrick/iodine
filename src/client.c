@@ -1382,8 +1382,6 @@ handshake_login(int dns_fd, int seed)
 {
 	char in[4096];
 	char login[16];
-	char server[65];
-	char client[65];
 	int mtu;
 	int i;
 	int read;
@@ -1397,7 +1395,12 @@ handshake_login(int dns_fd, int seed)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'l', 'L', i+1);
 
 		if (read > 0) {
+			struct in_addr serveraddr;
+			struct in_addr clientaddr;
+			char server[65];
+			char client[65];
 			int netmask;
+
 			if (strncmp("LNAK", in, 4) == 0) {
 				fprintf(stderr, "Bad password\n");
 				return 1;
@@ -1405,8 +1408,7 @@ handshake_login(int dns_fd, int seed)
 				warnx("BADIP: Server rejected sender IP address (maybe iodined -c will help)");
 				return 1;
 			} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d",
-				server, client, &mtu, &netmask) == 4) {
-
+				   server, client, &mtu, &netmask) == 4) {
 				server[64] = 0;
 				client[64] = 0;
 				/* The netmask prefix length comes from the server's reply.
@@ -1420,9 +1422,18 @@ handshake_login(int dns_fd, int seed)
 					fprintf(stderr,
 						"Received bad handshake (netmask %d)\n",
 						netmask);
-				} else if (tun_setip(client, server, netmask) == 0 &&
+				} else if (inet_pton(AF_INET, client, &clientaddr) <= 0) {
+					fprintf(stderr,
+						"Received bad client IP (%s)\n",
+						client);
+				} else if (inet_pton(AF_INET, server, &serveraddr) <= 0) {
+					fprintf(stderr,
+						"Received bad server IP (%s)\n",
+						server);
+				} else if (tun_setip(&clientaddr.s_addr,
+						     &serveraddr.s_addr,
+						     netmask) == 0 &&
 					   tun_setmtu(mtu) == 0) {
-
 					fprintf(stderr, "Server tunnel IP is %s\n", server);
 					return 0;
 				} else {
