@@ -28,7 +28,7 @@ zlib = dependency('zlib')
 commondeps = []
 serverdeps = []
 
-cdata.set10('@0@'.format(host_machine.system().to_upper()), true)
+cdata.set10(host_machine.system().to_upper(), true)
 if host_machine.system() == 'linux'
   add_project_arguments('-D_GNU_SOURCE', language: 'c')
   selinux = dependency('libselinux', required: get_option('selinux'))
@@ -60,11 +60,6 @@ if host_machine.system() == 'windows'
   commondeps += cc.find_library('ws2_32', required: true)
   commondeps += cc.find_library('iphlpapi', required: true)
   target_dir = get_option('bindir')
-  fs.copyfile(
-    'wintun/bin' / host_machine.cpu_family() / 'wintun.dll',
-    install:true,
-    install_dir: target_dir,
-  )
 
   zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
   if zdir != ''
@@ -132,6 +127,11 @@ common_sources = files(
 
 if host_machine.system() == 'windows'
   common_sources += files('src/tun_windows.c')
+  fs.copyfile(
+    'wintun/bin' / host_machine.cpu_family() / 'wintun.dll',
+    install:true,
+    install_dir: target_dir,
+  )
 else
   common_sources += files('src/tun_unix.c')
   cdata.set_quoted('LINUX_TUN_DEV_PATH',
