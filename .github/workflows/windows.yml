@@ -56,3 +56,22 @@ jobs:
     - name: run tests
       working-directory: build
       run: ninja test
+
+  build-android:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: false
+        install: >-
+          git
+          mingw-w64-ucrt-x86_64-meson
+    - name: meson setup
+      run: meson setup build-android --cross-file .github/windows-android-aarch64.ini
+    - name: build
+      working-directory: build-android
+      run: ninja
