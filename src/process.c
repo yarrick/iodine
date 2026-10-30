@@ -54,7 +54,7 @@ do_setcon(char *context)
 	(void)context;
 #if HAVE_SETCON
 	if (-1 == setcon(context))
-		err(1, "%s", context);
+		err(1, "setcon(%s)", context);
 #else
 	warnx("No SELinux support built in");
 #endif
