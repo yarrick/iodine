@@ -215,6 +215,9 @@ START_TEST(test_parse_format_ipv4)
 
 	formatted = format_addr(&addr, addrlen);
 	ck_assert_str_eq(host, formatted);
+
+	formatted = format_inaddr(&v4addr->sin_addr);
+	ck_assert_str_eq(host, formatted);
 }
 END_TEST
 
@@ -234,6 +237,9 @@ START_TEST(test_parse_format_ipv4_listen_all)
 	ck_assert_int_eq(v4addr->sin_port, htons(53));
 
 	formatted = format_addr(&addr, addrlen);
+	ck_assert_str_eq(host, formatted);
+
+	formatted = format_inaddr(&v4addr->sin_addr);
 	ck_assert_str_eq(host, formatted);
 }
 END_TEST
