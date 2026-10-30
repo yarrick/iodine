@@ -66,15 +66,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - uses: msys2/setup-msys2@v2
+    - uses: actions/setup-python@v7
       with:
-        msystem: UCRT64
-        update: false
-        install: >-
-          git
-          mingw-w64-ucrt-x86_64-meson
+        python-version: "3.x"
     - name: meson setup
-      run: meson setup build-android --cross-file .github/windows-android-aarch64.ini
+      run: meson setup build-android --cross-file .github\windows-android-aarch64.ini
     - name: build
       working-directory: build-android
       run: ninja
