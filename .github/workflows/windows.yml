@@ -73,6 +73,7 @@ jobs:
         install: >-
           git
           meson
+          mingw-w64-python
     - name: meson setup
       run: meson setup build-android --cross-file .github/windows-android-aarch64.ini
     - name: build
