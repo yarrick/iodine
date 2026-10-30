@@ -40,3 +40,17 @@ jobs:
     - name: build
       working-directory: build-android
       run: ninja
+
+  build-windows:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: install deps
+      run: brew install check meson mingw-w64
+    - name: meson setup
+      run: meson setup build-windows --cross-file .github/ubuntu-windows-x86_64.ini
+    - name: build
+      working-directory: build-windows
+      run: ninja
