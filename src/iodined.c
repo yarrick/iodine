@@ -462,7 +462,7 @@ main(int argc, char **argv)
 				fprintf(stderr, "Failed to get external IP via DNS query.\n");
 				exit(3);
 			}
-			listen_ip4 = inet_ntoa(resolved_external_ip);
+			listen_ip4 = format_inaddr(&resolved_external_ip);
 			fprintf(stderr, "Will listen on external IP %s\n", listen_ip4);
 		}
 		if (get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr, &dns4addr_len)) {
@@ -520,7 +520,7 @@ main(int argc, char **argv)
 			}
 		}
 		ns_ip = resolved_external_ip;
-		fprintf(stderr, "Using %s as external IP.\n", inet_ntoa(resolved_external_ip));
+		fprintf(stderr, "Using %s as external IP.\n", format_inaddr(&resolved_external_ip));
 	}
 
 	if (nameserver_ip) {

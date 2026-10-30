@@ -91,7 +91,7 @@ const char *users_get_first_ip(void)
 {
 	struct in_addr ip;
 	ip.s_addr = users[0].tun_ip;
-	return strdup(inet_ntoa(ip));
+	return strdup(format_inaddr(&ip));
 }
 
 int find_user_by_ip(uint32_t ip)

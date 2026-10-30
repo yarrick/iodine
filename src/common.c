@@ -147,6 +147,17 @@ check_privileges(char *username, int port)
 }
 
 char *
+format_inaddr(struct in_addr *addr)
+{
+	static char dst[INET_ADDRSTRLEN + 1];
+	memset(dst, 0, sizeof(dst));
+	if (inet_ntop(AF_INET, addr, dst, sizeof(dst)) == NULL) {
+		dst[0] = '?';
+	}
+	return dst;
+}
+
+char *
 format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 {
 	static char dst[INET6_ADDRSTRLEN + 1];
@@ -160,7 +171,7 @@ format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 			struct in_addr ia;
 			/* Get mapped v4 addr from last 32bit field */
 			memcpy(&ia.s_addr, &addr->sin6_addr.s6_addr[12], sizeof(ia));
-			strlcpy(dst, inet_ntoa(ia), sizeof(dst));
+			return format_inaddr(&ia);
 		} else {
 			getnameinfo((struct sockaddr *)sockaddr, sockaddr_len, dst, sizeof(dst) - 1, NULL, 0, NI_NUMERICHOST);
 		}

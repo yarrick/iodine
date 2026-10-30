@@ -701,7 +701,6 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	char logindata[16];
 	char out[64*1024];
 	char unpacked[64*1024];
-	char *tmp[2];
 	unsigned int userid;
 	int read;
 
@@ -819,14 +818,15 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			login_calculate(logindata, 16, password, users[userid].seed);
 
 			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
+				char *tmp[2];
 				/* Store login ok */
 				users[userid].authenticated = 1;
 
 				/* Send ip/mtu/netmask info */
 				tempip.s_addr = my_ip;
-				tmp[0] = strdup(inet_ntoa(tempip));
+				tmp[0] = strdup(format_inaddr(&tempip));
 				tempip.s_addr = users[userid].tun_ip;
-				tmp[1] = strdup(inet_ntoa(tempip));
+				tmp[1] = strdup(format_inaddr(&tempip));
 
 				read = snprintf(out, sizeof(out), "%s-%s-%d-%d",
 						tmp[0], tmp[1], my_mtu, netmask);
