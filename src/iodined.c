@@ -86,7 +86,7 @@ get_external_ip(struct in_addr *ip)
 	memset(&query, 0, sizeof(query));
 
 	query.type = T_A;
-	if (get_addr("resolver1.opendns.com", 53, AF_INET, 0, &query.destination, &query.dest_len))
+	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &query.destination, &query.dest_len))
 		return 1;
 
 	fd = open_dns_from_host(NULL, 0, AF_INET, AI_PASSIVE);
@@ -286,7 +286,7 @@ main(int argc, char **argv)
 			   higher for NULL; tun/zlib adds ~17 bytes. */
 	listen_ip4 = NULL;
 	listen_ip6 = NULL;
-	port = 53;
+	port = DNS_PORT;
 	ns_ip.s_addr = INADDR_ANY;
 	ns_get_externalip = 0;
 	resolved_external_ip.s_addr = INADDR_ANY;
@@ -433,7 +433,7 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
-	if (port != 53) {
+	if (port != DNS_PORT) {
 		fprintf(stderr, "ALERT! Other dns servers expect you to run on port 53.\n");
 		fprintf(stderr, "You must manually forward port 53 to port %d for things to work.\n", port);
 	}
