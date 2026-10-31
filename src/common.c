@@ -193,6 +193,10 @@ get_addr(char *host, int port, int addr_family, int flags,
 	int res;
 	char portnum[8];
 
+	if (out == NULL) {
+		return -1;
+	}
+
 	memset(portnum, 0, sizeof(portnum));
 	snprintf(portnum, sizeof(portnum) - 1, "%d", port);
 
