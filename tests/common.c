@@ -198,6 +198,54 @@ START_TEST(test_query_datalen_wild)
 }
 END_TEST
 
+START_TEST(test_build_netmask)
+{
+	struct in_addr mask;
+	char *formatted;
+
+	ck_assert_int_ne(build_netmask(-1, &mask), 0);
+	ck_assert_int_ne(build_netmask(0, &mask), 0);
+
+	ck_assert_int_eq(build_netmask(1, &mask), 0);
+	ck_assert_int_eq(mask.s_addr, htonl(0x80000000));
+	formatted = format_inaddr(&mask);
+	ck_assert_str_eq(formatted, "128.0.0.0");
+
+	ck_assert_int_eq(build_netmask(2, &mask), 0);
+	ck_assert_int_eq(mask.s_addr, htonl(0xc0000000));
+	formatted = format_inaddr(&mask);
+	ck_assert_str_eq(formatted, "192.0.0.0");
+
+	ck_assert_int_eq(build_netmask(24, &mask), 0);
+	ck_assert_int_eq(mask.s_addr, htonl(0xffffff00));
+	formatted = format_inaddr(&mask);
+	ck_assert_str_eq(formatted, "255.255.255.0");
+
+	ck_assert_int_eq(build_netmask(25, &mask), 0);
+	ck_assert_int_eq(mask.s_addr, htonl(0xffffff80));
+	formatted = format_inaddr(&mask);
+	ck_assert_str_eq(formatted, "255.255.255.128");
+
+	ck_assert_int_eq(build_netmask(26, &mask), 0);
+	ck_assert_int_eq(mask.s_addr, htonl(0xffffffc0));
+	formatted = format_inaddr(&mask);
+	ck_assert_str_eq(formatted, "255.255.255.192");
+
+	ck_assert_int_eq(build_netmask(27, &mask), 0);
+	ck_assert_int_eq(mask.s_addr, htonl(0xffffffe0));
+	formatted = format_inaddr(&mask);
+	ck_assert_str_eq(formatted, "255.255.255.224");
+
+	ck_assert_int_eq(build_netmask(32, &mask), 0);
+	ck_assert_int_eq(mask.s_addr, htonl(0xffffffff));
+	formatted = format_inaddr(&mask);
+	ck_assert_str_eq(formatted, "255.255.255.255");
+
+	ck_assert_int_ne(build_netmask(33, &mask), 0);
+	ck_assert_int_ne(build_netmask(34, &mask), 0);
+}
+END_TEST
+
 START_TEST(test_parse_format_ipv4)
 {
 	char *host = "192.168.2.10";
@@ -349,6 +397,7 @@ test_create(void)
 	tcase_add_test(tc, test_topdomain_wild);
 	tcase_add_test(tc, test_query_datalen);
 	tcase_add_test(tc, test_query_datalen_wild);
+	tcase_add_test(tc, test_build_netmask);
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 	tcase_add_test(tc, test_get_addr_err);
