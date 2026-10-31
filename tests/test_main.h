@@ -21,19 +21,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "compat.h"
+
 #ifndef __TEST_MAIN_H__
 #define __TEST_MAIN_H__
 
 TCase *test_create(void);
 
 int
-main(void)
+main(int argc, char **argv)
 {
 	SRunner *runner;
 	Suite *iodine;
 	TCase *test;
 	int failed;
 
+	(void)argc;
+	progname_init(argv[0]);
 	iodine = suite_create(SUITE_NAME);
 
 	test = test_create();

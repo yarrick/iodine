@@ -209,8 +209,8 @@ endif
 libcheck = dependency('check', required: false)
 if libcheck.found()
   suites = [
-    'base32', 'base64', 'base64u', 'base128', 'common', 'dns', 'encoding',
-    'fw_query', 'login', 'process', 'read', 'user'
+    'base32', 'base64', 'base64u', 'base128', 'common', 'compat', 'dns',
+    'encoding', 'fw_query', 'login', 'process', 'read', 'user'
   ]
 
   # Silence warning from check.h
@@ -219,6 +219,8 @@ if libcheck.found()
   if cc.get_id() == 'clang'
     testargs += '-Wno-gnu-zero-variadic-macro-arguments'
   endif
+  testargs += '-DPROGNAME_SUFFIX=@0@'.format(
+    host_machine.system() == 'windows' ? '".exe"' : '""')
 
   foreach suite : suites
     test(suite, executable(
