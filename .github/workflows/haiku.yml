@@ -1,0 +1,27 @@
+name: haiku
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+    contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: make
+      uses: vmactions/haiku-vm@v1
+      with:
+        prepare: pkgman install meson check_devel
+        run: |
+          git config --global --add safe.directory /home/runner/work/iodine/iodine
+          meson setup build
+          cd build
+          ninja
+          ninja test
