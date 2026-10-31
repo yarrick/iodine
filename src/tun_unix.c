@@ -50,6 +50,10 @@
 #include <netinet/in_var.h>
 #endif
 
+#ifdef HAIKU
+#include <sys/sockio.h>
+#endif
+
 #define TUN_MAX_TRY 50
 
 #include "tun.h"
@@ -278,8 +282,8 @@ close_tun(int tun_fd)
 static int
 tun_uses_header(void)
 {
-#if defined (FREEBSD) || defined (NETBSD)
-	/* FreeBSD/NetBSD has no header */
+#if defined (FREEBSD) || defined (NETBSD) || HAIKU
+	/* FreeBSD/NetBSD/Haiku has no header */
 	return 0;
 #elif defined (DARWIN)
 	/* Darwin tun has no header, Darwin utun does */
@@ -401,8 +405,13 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 {
 	int sock;
 	struct sockaddr_in localaddr, peeraddr, maskaddr;
-#ifdef LINUX
+#if LINUX
 	struct ifreq ifr;
+#elif HAIKU
+	char cmd[512];
+	char local_str[INET_ADDRSTRLEN];
+	char peer_str[INET_ADDRSTRLEN];
+	char mask_str[INET_ADDRSTRLEN];
 #else
 	struct in_aliasreq ifra;
 #endif
@@ -422,6 +431,24 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 		return 1;
 	}
 
+#if HAIKU
+	(void)sock;
+	inet_ntop(AF_INET, &localaddr.sin_addr, local_str, sizeof(local_str));
+	inet_ntop(AF_INET, &peeraddr.sin_addr, peer_str, sizeof(peer_str));
+	inet_ntop(AF_INET, &maskaddr.sin_addr, mask_str, sizeof(mask_str));
+
+	fprintf(stderr, "Setting IP of %s to %s\n", if_name, local_str);
+
+	snprintf(cmd, sizeof(cmd),
+		 "ifconfig %s %s peer %s netmask %s up",
+		 if_name, local_str, peer_str, mask_str);
+	if (system(cmd) != 0) {
+		fprintf(stderr, "tun_setip: ifconfig failed\n");
+		return 1;
+	}
+	return 0;
+#else
+
 	fprintf(stderr, "Setting IP of %s to %s\n",
 		if_name, format_inaddr(&localaddr.sin_addr));
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -430,7 +457,7 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 		return 1;
 	}
 
-#ifdef LINUX
+#if LINUX
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
 
@@ -488,6 +515,7 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 
 	close(sock);
 	return tun_add_route(&localaddr, &maskaddr);
+#endif
 #endif
 }
 

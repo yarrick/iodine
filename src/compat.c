@@ -22,7 +22,10 @@ char *__progname = "?";
 #endif
 #include "compat.h"
 
+#include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef WINDOWS
 #include "windows_dns.h"
@@ -65,13 +68,14 @@ vwarn(const char *fmt, va_list list)
 {
 	fprintf(stderr, "%s: ", __progname);
 	if (fmt) vfprintf(stderr, fmt, list);
-#ifndef ANDROID
+#ifdef WINDOWS
 	if (errno == 0) {
 		fprintf(stderr, ": WSA error %d\n", WSAGetLastError());
-	} else {
+	} else
+#endif
+	{
 		fprintf(stderr, ": %s\n", strerror(errno));
 	}
-#endif
 }
 
 void

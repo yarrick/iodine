@@ -7,6 +7,7 @@ CHANGES:
 
 master:
 	- Fixed parsing of -z flag (SELinux context) for iodine client.
+    - Added Haiku support, tested on R1/beta 6.
 
 2026-10-25: 0.9.0 "20 years"
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
