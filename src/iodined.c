@@ -92,7 +92,7 @@ get_external_ip(struct in_addr *ip)
 	memset(&query, 0, sizeof(query));
 
 	query.type = T_A;
-	if(get_addr("resolver1.opendns.com", 53, AF_INET, 0, &query.destination, &query.dest_len))
+	if (get_addr("resolver1.opendns.com", 53, AF_INET, 0, &query.destination, &query.dest_len))
 		return 1;
 
 	fd = open_dns_from_host(NULL, 0, AF_INET, AI_PASSIVE);
@@ -125,7 +125,8 @@ get_external_ip(struct in_addr *ip)
 			buflen = sizeof(buf);
 			buflen = recv(fd, buf, buflen, 0);
 			if (buflen > 0) {
-				out_len = dns_decode((char *)ip, sizeof(struct in_addr), &query, QR_ANSWER, buf, buflen);
+				out_len = dns_decode((char *)ip, sizeof(struct in_addr),
+						     &query, QR_ANSWER, buf, buflen);
 				if (out_len > 0) break;
 			}
 		}
@@ -553,7 +554,8 @@ main(int argc, char **argv)
 		return 1;
 	}
 	if (!skipipconfig) {
-		if (tun_setip(&my_ip.s_addr, users_get_first_ip(), netmask) != 0 || tun_setmtu(mtu) != 0) {
+		if (tun_setip(&my_ip.s_addr, users_get_first_ip(), netmask) != 0 ||
+		    tun_setmtu(mtu) != 0) {
 			retval = 1;
 			goto cleanup;
 		}
