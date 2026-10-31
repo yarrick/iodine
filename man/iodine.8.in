@@ -169,7 +169,7 @@ option still has precedence.
 .SH SEE ALSO
 .BR iodined (8)
 .PP
-The README file in the source distribution contains some more elaborate
+The README.md file in the source distribution contains some more elaborate
 information.
 .SH BUGS
 File bugs at https://github.com/yarrick/iodine
