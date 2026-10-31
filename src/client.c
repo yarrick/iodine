@@ -1478,7 +1478,7 @@ handshake_raw_udp(int dns_fd, int seed)
 			struct sockaddr_in *raw4_serv = (struct sockaddr_in *) &raw_serv;
 			raw4_serv->sin_family = AF_INET;
 			memcpy(&raw4_serv->sin_addr, &in[1], sizeof(struct in_addr));
-			raw4_serv->sin_port = htons(53);
+			raw4_serv->sin_port = htons(DNS_PORT);
 			raw_serv_len = sizeof(struct sockaddr_in);
 			got_addr = 1;
 			break;
@@ -1488,7 +1488,7 @@ handshake_raw_udp(int dns_fd, int seed)
 			struct sockaddr_in6 *raw6_serv = (struct sockaddr_in6 *) &raw_serv;
 			raw6_serv->sin6_family = AF_INET6;
 			memcpy(&raw6_serv->sin6_addr, &in[1], sizeof(struct in6_addr));
-			raw6_serv->sin6_port = htons(53);
+			raw6_serv->sin6_port = htons(DNS_PORT);
 			raw_serv_len = sizeof(struct sockaddr_in6);
 			got_addr = 1;
 			break;
