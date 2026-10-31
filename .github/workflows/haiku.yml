@@ -18,7 +18,7 @@ jobs:
     - name: make
       uses: vmactions/haiku-vm@v1
       with:
-        prepare: pkgman install git meson check_devel
+        prepare: pkgman install -y meson check_devel
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
