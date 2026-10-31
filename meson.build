@@ -64,6 +64,10 @@ if host_machine.system() == 'windows'
   zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
   if zdir != ''
     zlib_dll = zdir / 'bin' / 'zlib1.dll'
+    if not fs.exists(zlib_dll)
+      # Try the debian location (their mingw pkg-config data is incorrect)
+      zlib_dll = '/usr/x86_64-w64-mingw32/bin/zlib1.dll'
+    endif
     if fs.exists(zlib_dll)
       fs.copyfile(
         zlib_dll,
