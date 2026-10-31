@@ -44,9 +44,6 @@ endif
 if host_machine.system() == 'android'
   cdata.set10('LINUX', true)
 endif
-if host_machine.system() == 'gnu'
-  add_project_arguments('-D_GNU_SOURCE', language: 'c')
-endif
 if host_machine.system() == 'darwin'
   add_project_arguments('-D__APPLE_USE_RFC_3542', language: 'c')
   add_project_arguments('-DBIND_8_COMPAT', language: 'c')
