@@ -204,10 +204,13 @@ get_addr(char *host, int port, int addr_family, int flags,
 	hints.ai_family = addr_family;
 #if defined(WINDOWS) || defined(OPENBSD)
 	/* AI_ADDRCONFIG misbehaves on windows, and does not exist in OpenBSD */
-	hints.ai_flags = flags;
-#else
-	hints.ai_flags = AI_ADDRCONFIG | flags;
+	if (addr_family == AI_UNSPEC) {
+		hints.ai_flags = AI_ADDRCONFIG | flags;
+	} else
 #endif
+	{
+		hints.ai_flags = flags;
+	}
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
 
