@@ -202,15 +202,12 @@ get_addr(char *host, int port, int addr_family, int flags,
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = addr_family;
-#if !defined(WINDOWS) && !defined(OPENBSD)
-	/* AI_ADDRCONFIG misbehaves on windows, and does not exist in OpenBSD */
-	if (addr_family == AF_UNSPEC) {
-		hints.ai_flags = AI_ADDRCONFIG | flags;
-	} else
+#if defined(WINDOWS) || defined(HAIKU) || defined(OPENBSD)
+	/* AI_ADDRCONFIG misbehaves on windows/haiku, and does not exist in OpenBSD */
+	hints.ai_flags = flags;
+#else
+	hints.ai_flags = AI_ADDRCONFIG | flags;
 #endif
-	{
-		hints.ai_flags = flags;
-	}
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
 
