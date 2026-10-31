@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -627,7 +628,7 @@ main(int argc, char **argv)
 	if (foreground == 0)
 		do_detach();
 
-#ifdef FREEBSD
+#ifdef HAVE_TZSET
 	tzset();
 #endif
 #if HAVE_SYSLOG
