@@ -61,9 +61,11 @@ if host_machine.system() == 'windows'
   commondeps += cc.find_library('iphlpapi', required: true)
   target_dir = get_option('bindir')
 
-  zlib_dll = zlib.get_variable(pkgconfig: 'sharedlibdir') / 'zlib1.dll'
+  zlib_dll = zlib.get_variable(pkgconfig: 'sharedlibdir',
+                               default_value: '') / 'zlib1.dll'
   if not fs.exists(zlib_dll)
-    zlib_dll = zlib.get_variable(pkgconfig: 'exec_prefix') / 'bin' / 'zlib1.dll'
+    zlib_dll = zlib.get_variable(pkgconfig: 'exec_prefix',
+                                 default_value: '') / 'bin' / 'zlib1.dll'
   endif
   if fs.exists(zlib_dll)
     fs.copyfile(
