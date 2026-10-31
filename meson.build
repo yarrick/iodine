@@ -61,21 +61,17 @@ if host_machine.system() == 'windows'
   commondeps += cc.find_library('iphlpapi', required: true)
   target_dir = get_option('bindir')
 
-  zdir = zlib.get_variable(pkgconfig: 'exec_prefix', default_value: '')
-  if zdir != ''
-    zlib_dll = zdir / 'bin' / 'zlib1.dll'
-    if not fs.exists(zlib_dll)
-      # Try the debian location (their mingw pkg-config data is incorrect)
-      zlib_dll = '/usr/x86_64-w64-mingw32/bin/zlib1.dll'
-    endif
-    if fs.exists(zlib_dll)
-      fs.copyfile(
-        zlib_dll,
-        install: true,
-        install_dir: target_dir,
-        install_tag: 'runtime',
-      )
-    endif
+  zlib_dll = zlib.get_variable(pkgconfig: 'sharedlibdir') / 'zlib1.dll'
+  if not fs.exists(zlib_dll)
+    zlib_dll = zlib.get_variable(pkgconfig: 'exec_prefix') / 'bin' / 'zlib1.dll'
+  endif
+  if fs.exists(zlib_dll)
+    fs.copyfile(
+      zlib_dll,
+      install: true,
+      install_dir: target_dir,
+      install_tag: 'runtime',
+    )
   endif
 endif
 
