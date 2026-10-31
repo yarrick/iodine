@@ -50,6 +50,11 @@ if host_machine.system() == 'darwin'
 endif
 if host_machine.system() == 'haiku'
   commondeps += cc.find_library('network', required: true)
+  bsd_dep = cc.find_library('bsd', required: false)
+  if bsd_dep.found()
+    commondeps += bsd_dep
+    add_project_arguments('-D_BSD_SOURCE', language: 'c')
+  endif
 endif
 if host_machine.system() == 'windows'
   add_project_arguments(
@@ -95,7 +100,8 @@ optional_functions = [
   'warnx',
 ]
 foreach func : optional_functions
-  cdata.set10('HAVE_@0@'.format(func).to_upper(), cc.has_function(func))
+  cdata.set10('HAVE_@0@'.format(func).to_upper(),
+    cc.has_function(func, dependencies: commondeps))
 endforeach
 
 cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
