@@ -20,7 +20,7 @@ jobs:
       with:
         prepare: pkgman install -y meson check_devel
         run: |
-          git config --global --add safe.directory /home/runner/work/iodine/iodine
+          git config --global --add safe.directory /boot/home/runner/work/iodine/iodine
           meson setup build
           cd build
           ninja
