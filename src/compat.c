@@ -37,11 +37,17 @@ progname_init(char *arg)
 {
 	(void)arg;
 #if !HAVE_PROGNAME
-	__progname = strrchr(arg, PROGNAME_PATH_SEPARATOR);
-	if (__progname == NULL)
-		__progname = arg;
-	else
+	__progname = strrchr(arg, '/');
+	if (__progname) {
 		__progname++;
+		return;
+	}
+	__progname = strrchr(arg, '\\');
+	if (__progname) {
+		__progname++;
+		return;
+	}
+	__progname = arg;
 #endif
 }
 

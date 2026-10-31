@@ -106,8 +106,6 @@ cdata.set10('HAVE_PROGNAME', cc.links('''
     return 0;
   }
 '''))
-cdata.set('PROGNAME_PATH_SEPARATOR',
-  host_machine.system() == 'windows' ? '\'\\\\\'' : '\'/\'')
 
 # For md5
 cdata.set10('ARCH_IS_BIG_ENDIAN', host_machine.endian() == 'big')
