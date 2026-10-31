@@ -49,12 +49,9 @@ if host_machine.system() == 'darwin'
   add_project_arguments('-DBIND_8_COMPAT', language: 'c')
 endif
 if host_machine.system() == 'haiku'
-  commondeps += cc.find_library('network', required: true)
-  bsd_dep = cc.find_library('bsd', required: false)
-  if bsd_dep.found()
-    commondeps += bsd_dep
-    add_project_arguments('-D_BSD_SOURCE', language: 'c')
-  endif
+  commondeps += cc.find_library('network')
+  commondeps += cc.find_library('bsd')
+  add_project_arguments('-D_BSD_SOURCE', language: 'c')
 endif
 if host_machine.system() == 'windows'
   add_project_arguments(
@@ -62,8 +59,8 @@ if host_machine.system() == 'windows'
     '-D_WIN32_WINNT=0x0601',
     language: 'c'
   )
-  commondeps += cc.find_library('ws2_32', required: true)
-  commondeps += cc.find_library('iphlpapi', required: true)
+  commondeps += cc.find_library('ws2_32')
+  commondeps += cc.find_library('iphlpapi')
   target_dir = get_option('bindir')
 
   zlib_dll = zlib.get_variable(pkgconfig: 'sharedlibdir',
