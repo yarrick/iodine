@@ -193,23 +193,18 @@ if not ['android', 'windows'].contains(host_machine.system())
 endif
 
 install_data('README.md',
+  install_dir: docdir,
   install_tag: 'doc',
-  install_dir: docdir)
-if host_machine.system() == 'windows'
-  install_data('README-win32.txt',
-    install_dir: docdir,
-    install_tag: 'doc',
-  )
-endif
-if host_machine.system() == 'android'
-  install_data('README-android.txt',
+)
+os_readme = 'README-@0@.txt'.format(host_machine.system())
+if fs.exists(os_readme)
+  install_data(os_readme,
     install_dir: docdir,
     install_tag: 'doc',
   )
 endif
 
 libcheck = dependency('check', required: false)
-
 if libcheck.found()
   suites = [
     'base32', 'base64', 'base64u', 'base128', 'common', 'dns', 'encoding',
