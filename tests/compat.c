@@ -27,7 +27,8 @@
 
 START_TEST(test_progname)
 {
-	ck_assert_str_eq(__progname, "test_compat" PROGNAME_SUFFIX);
+	char *refname = "test_compat" PROGNAME_SUFFIX;
+	ck_assert_str_eq(__progname, refname);
 }
 END_TEST
 
