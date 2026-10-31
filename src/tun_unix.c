@@ -43,7 +43,7 @@
 #include <netinet/ip.h>
 #endif
 
-#ifndef LINUX
+#if TUN_ADD_ROUTE
 #include <sys/sockio.h>
 #include <net/route.h>
 #include <net/if_dl.h>
@@ -338,7 +338,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 	}
 }
 
-#ifndef LINUX
+#if TUN_ADD_ROUTE
 static int
 tun_add_route(struct sockaddr_in *localaddr, struct sockaddr_in *maskaddr)
 {
