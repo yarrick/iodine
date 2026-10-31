@@ -29,6 +29,9 @@
 #include <arpa/inet.h>
 #endif
 
+extern char *__progname;
+
+void progname_init(char *);
 void network_init(void);
 
 #if !HAVE_WARNX

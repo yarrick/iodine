@@ -64,12 +64,6 @@
 
 #define PASSWORD_ENV_VAR "IODINED_PASS"
 
-#if HAVE_PROGNAME
-extern char *__progname;
-#else
-static char *__progname;
-#endif
-
 #if HAVE_NORETURN_ATTR
 /* mark as no return to help some compilers to avoid warnings
  * about use of uninitialized variables */
@@ -307,16 +301,8 @@ main(int argc, char **argv)
 
 	retval = 0;
 
+	progname_init(argv[0]);
 	network_init();
-
-#if !HAVE_PROGNAME
-	__progname = strrchr(argv[0], '/');
-	if (__progname == NULL)
-		__progname = argv[0];
-	else
-		__progname++;
-#endif
-
 	fw_query_init();
 
 	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {

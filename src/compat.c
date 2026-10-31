@@ -16,6 +16,10 @@
  */
 
 #include "config.h"
+
+#if !HAVE_PROGNAME
+char *__progname = "?";
+#endif
 #include "compat.h"
 
 #include <stdio.h>
@@ -29,6 +33,19 @@ WSADATA wsa_data;
 #endif
 
 void
+progname_init(char *arg)
+{
+	(void)arg;
+#if !HAVE_PROGNAME
+	__progname = strrchr(arg, PROGNAME_PATH_SEPARATOR);
+	if (__progname == NULL)
+		__progname = arg;
+	else
+		__progname++;
+#endif
+}
+
+void
 network_init(void)
 {
 #ifdef WINDOWS
@@ -40,6 +57,7 @@ network_init(void)
 void
 vwarn(const char *fmt, va_list list)
 {
+	fprintf(stderr, "%s: ", __progname);
 	if (fmt) vfprintf(stderr, fmt, list);
 #ifndef ANDROID
 	if (errno == 0) {
@@ -74,6 +92,7 @@ err(int eval, const char *fmt, ...)
 void
 vwarnx(const char *fmt, va_list list)
 {
+	fprintf(stderr, "%s: ", __progname);
 	if (fmt) vfprintf(stderr, fmt, list);
 	fprintf(stderr, "\n");
 }

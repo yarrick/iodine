@@ -45,12 +45,6 @@
 #include "tun.h"
 #include "util.h"
 
-#if HAVE_PROGNAME
-extern char *__progname;
-#else
-static char *__progname;
-#endif
-
 #define PASSWORD_ENV_VAR "IODINE_PASS"
 
 static void
@@ -169,16 +163,9 @@ int main(int argc, char **argv)
 	hostname_maxlen = 0xFF;
 	nameserv_family = AF_UNSPEC;
 
+	progname_init(argv[0]);
 	network_init();
 	client_init();
-
-#if !HAVE_PROGNAME
-	__progname = strrchr(argv[0], '/');
-	if (__progname == NULL)
-		__progname = argv[0];
-	else
-		__progname++;
-#endif
 
 	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:z:")) != -1) {
 		switch(choice) {
