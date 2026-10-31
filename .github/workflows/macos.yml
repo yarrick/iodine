@@ -34,7 +34,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: install deps
-      run: brew install check meson
+      run: brew install meson
     - name: meson setup
       run: meson setup build-android --cross-file .github/macos-android-aarch64.ini
     - name: build

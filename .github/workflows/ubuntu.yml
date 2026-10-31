@@ -55,7 +55,7 @@ jobs:
     - name: apt update
       run: sudo apt update
     - name: install deps
-      run: sudo apt install meson ninja-build check
+      run: sudo apt install meson ninja-build
     - name: meson setup
       run: meson setup build-android --cross-file .github/ubuntu-android-aarch64.ini
     - name: build
