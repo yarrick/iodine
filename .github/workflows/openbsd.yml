@@ -22,10 +22,13 @@ jobs:
           pkg_add \
             check \
             git \
-            meson
+            meson \
+            py3-pip
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
           cd build
           ninja
           ninja test
+          pip install ping3 --break-system-packages
+          ninja tun_bench
