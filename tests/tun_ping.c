@@ -15,6 +15,7 @@
 #include <netinet/ip.h>
 #endif
 
+#include "compat.h"
 #include "tun.h"
 #include "ui.h"
 
@@ -116,6 +117,7 @@ main(int argc, char **argv)
 		ui_log("Missing device name as argument\n");
 		return 1;
 	}
+	network_init();
 	fd = open_tun(argv[1]);
 	if (fd < 0) {
 		exit(-1);
