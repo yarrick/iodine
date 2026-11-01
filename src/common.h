@@ -106,7 +106,6 @@ enum connection {
 	CONN_MAX
 };
 
-void check_privileges(char *username, int port);
 char *format_inaddr(struct in_addr *addr);
 char *format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len);
 int get_addr(char *host, int port, int addr_family, int flags,
