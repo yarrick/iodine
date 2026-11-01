@@ -20,17 +20,106 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "config.h"
 #include "common.h"
 #include "compat.h"
 
+#ifdef WINDOWS
+#include <windows.h>
+#endif
 #if HAVE_SYSLOG
 #include <syslog.h>
 #endif
 #if HAVE_SETCON
 # include <selinux/selinux.h>
 #endif
+#if HAVE_LIBCAPNG
+#include <cap-ng.h>
+#endif
+
+#if HAVE_CHECKTOKENMEMBERSHIP
+bool is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
+	BOOL is_member = FALSE;
+	byte sid_buffer[SECURITY_MAX_SID_SIZE];
+	PSID sid = (PSID)sid_buffer;
+	DWORD sid_size = sizeof(sid_buffer);
+
+	if (CreateWellKnownSid(sid_type, NULL, sid, &sid_size)) {
+		CheckTokenMembership(NULL, sid, &is_member);
+	}
+
+	return is_member;
+}
+#endif
+
+void
+check_privileges(char *username, int port)
+{
+	(void)username;
+	(void)port;
+#if HAVE_LIBCAPNG
+	bool capable = true;
+
+	if (capng_get_caps_process() == -1) {
+		warnx("Unable to get capabilities");
+		exit(-1);
+	}
+
+	if (!capng_have_capability(CAPNG_EFFECTIVE, CAP_NET_ADMIN)) {
+		warnx("capabilities: CAP_NET_ADMIN required");
+		capable = false;
+	}
+
+	if (port) {
+		unsigned short int ip_unprivileged_port_start = 1024;
+
+		FILE *file = fopen("/proc/sys/net/ipv4/ip_unprivileged_port_start", "r");
+		if (!file) {
+			warnx("sysctl: unable to get ip_unprivileged_port_start value");
+			/* do not bail out here in case systemd.service has ProcSubset=pid set */
+		} else {
+			fscanf(file, "%hu", &ip_unprivileged_port_start);
+			fclose(file);
+		}
+
+		if (port < ip_unprivileged_port_start &&
+			!capng_have_capability(CAPNG_EFFECTIVE, CAP_NET_BIND_SERVICE)) {
+			warnx("capabilities: CAP_NET_BIND_SERVICE required");
+			capable = false;
+		}
+	}
+
+	if (username) {
+		if (!capng_have_capability(CAPNG_EFFECTIVE, CAP_SETUID)) {
+			warnx("capabilities: CAP_SETUID required");
+			capable = false;
+		}
+		if (!capng_have_capability(CAPNG_EFFECTIVE, CAP_SETGID)) {
+			warnx("capabilities: CAP_SETGID required");
+			capable = false;
+		}
+	}
+
+	if (!capable) {
+		exit(-1);
+	}
+#elif HAVE_GETEUID
+	if (geteuid() != 0) {
+		warnx("Run as root and you'll be happy.");
+		exit(-1);
+	}
+#elif HAVE_CHECKTOKENMEMBERSHIP
+	if (!is_user_in(WinBuiltinAdministratorsSid) &&
+	    !is_user_in(WinBuiltinNetworkConfigurationOperatorsSid)) {
+		warnx("Missing admin or network config operator permissions.");
+		exit(-1);
+	}
+#else
+	/* No user permission check supported */
+#endif
+}
 
 void
 do_chroot(char *newroot)

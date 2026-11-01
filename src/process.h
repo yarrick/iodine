@@ -18,6 +18,7 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
+void check_privileges(char *username, int port);
 void do_chroot(char *);
 void do_setcon(char *);
 void do_detach(void);
