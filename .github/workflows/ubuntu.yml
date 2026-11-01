@@ -98,4 +98,4 @@ jobs:
       run: ninja tun_ping
     - name: run bench
       working-directory: build
-      run: sudo ninja tun_bench
+      run: sudo -E ninja tun_bench
