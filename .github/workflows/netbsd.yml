@@ -22,7 +22,7 @@ jobs:
           pkg_add -u check git pkgconf meson python314 py314-pip
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
-          python3.14 /usr/pkg/bin/meson setup build
+          meson setup build
           cd build
           ninja
           ninja test
