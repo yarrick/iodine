@@ -19,16 +19,19 @@ jobs:
             runner: windows-latest
             msystem: UCRT64
             pkg_prefix: mingw-w64-ucrt-x86_64
+            bench: true
 
           - name: build CLANG64
             runner: windows-latest
             msystem: CLANG64
             pkg_prefix: mingw-w64-clang-x86_64
+            bench: false
 
           - name: build CLANGARM64
             runner: windows-11-arm
             msystem: CLANGARM64
             pkg_prefix: mingw-w64-clang-aarch64
+            bench: true
 
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
@@ -56,6 +59,17 @@ jobs:
     - name: run tests
       working-directory: build
       run: ninja test
+    - name: install ping3
+      if: matrix.bench
+      run: python3 -m pip install ping3
+    - name: build tun_ping
+      if: matrix.bench
+      working-directory: build
+      run: ninja tun_ping
+    - name: run bench
+      if: matrix.bench
+      working-directory: build
+      run: ninja tun_bench
 
   build-android:
 
