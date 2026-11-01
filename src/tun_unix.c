@@ -32,6 +32,7 @@
 
 #include "config.h"
 #include "compat.h"
+#include "ui.h"
 
 #ifdef DARWIN
 #include <ctype.h>
@@ -86,7 +87,7 @@ open_tun(const char *tun_device)
 		strlcpy(if_name, tun_device, sizeof(if_name));
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
-			fprintf(stderr, "Opened %s\n", ifreq.ifr_name);
+			ui_log("Opened %s\n", ifreq.ifr_name);
 			fd_set_close_on_exec(tun_fd);
 			return tun_fd;
 		}
@@ -100,7 +101,7 @@ open_tun(const char *tun_device)
 			snprintf(ifreq.ifr_name, IFNAMSIZ, "dns%d", i);
 
 			if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
-				fprintf(stderr, "Opened %s\n", ifreq.ifr_name);
+				ui_log("Opened %s\n", ifreq.ifr_name);
 				snprintf(if_name, sizeof(if_name), "dns%d", i);
 				fd_set_close_on_exec(tun_fd);
 				return tun_fd;
@@ -213,7 +214,7 @@ open_utun(const char *dev)
 
 	strlcpy(if_name, ifname, sizeof(if_name));
 
-	fprintf(stderr, "Opened %s\n", ifname);
+	ui_log("Opened %s\n", ifname);
 	fd_set_close_on_exec(fd);
 
 	return fd;
@@ -247,7 +248,7 @@ open_tun(const char *tun_device)
 			return -1;
 		}
 
-		fprintf(stderr, "Opened %s\n", tun_name);
+		ui_log("Opened %s\n", tun_name);
 		fd_set_close_on_exec(tun_fd);
 		return tun_fd;
 	} else {
@@ -255,7 +256,7 @@ open_tun(const char *tun_device)
 			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
 
 			if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) >= 0) {
-				fprintf(stderr, "Opened %s\n", tun_name);
+				ui_log("Opened %s\n", tun_name);
 				snprintf(if_name, sizeof(if_name), "tun%d", i);
 				fd_set_close_on_exec(tun_fd);
 				return tun_fd;
@@ -266,7 +267,7 @@ open_tun(const char *tun_device)
 		}
 
 #ifdef DARWIN
-		fprintf(stderr, "No tun devices found, trying utun\n");
+		ui_log("No tun devices found, trying utun\n");
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "utun%d", i);
 			tun_fd = open_utun(tun_name);
@@ -439,7 +440,7 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 	memset(&maskaddr, 0, sizeof(maskaddr));
 	maskaddr.sin_family = AF_INET;
 	if (build_netmask(netbits, &maskaddr.sin_addr)) {
-		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
+		ui_log("Invalid netmask: %d!\n", netbits);
 		return 1;
 	}
 
@@ -449,19 +450,19 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 	inet_ntop(AF_INET, &peeraddr.sin_addr, peer_str, sizeof(peer_str));
 	inet_ntop(AF_INET, &maskaddr.sin_addr, mask_str, sizeof(mask_str));
 
-	fprintf(stderr, "Setting IP of %s to %s\n", if_name, local_str);
+	ui_log("Setting IP of %s to %s\n", if_name, local_str);
 
 	snprintf(cmd, sizeof(cmd),
 		 "ifconfig %s %s peer %s netmask %s up",
 		 if_name, local_str, peer_str, mask_str);
 	if (system(cmd) != 0) {
-		fprintf(stderr, "tun_setip: ifconfig failed\n");
+		ui_log("tun_setip: ifconfig failed\n");
 		return 1;
 	}
 	return 0;
 #else
 
-	fprintf(stderr, "Setting IP of %s to %s\n",
+	ui_log("Setting IP of %s to %s\n",
 		if_name, format_inaddr(&localaddr.sin_addr));
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0) {
@@ -552,7 +553,7 @@ tun_setmtu(const unsigned mtu)
 	strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
 	ifr.ifr_mtu = mtu;
 
-	fprintf(stderr, "Setting MTU of %s to %u\n", if_name, mtu);
+	ui_log("Setting MTU of %s to %u\n", if_name, mtu);
 	if (ioctl(sock, SIOCSIFMTU, &ifr) < 0) {
 		perror("tun_setmtu: ioctl SIOCSIFMTU failed");
 		close(sock);

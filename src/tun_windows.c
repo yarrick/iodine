@@ -25,6 +25,7 @@
 #include "common.h"
 #include "compat.h"
 #include "tun.h"
+#include "ui.h"
 #include "wintun.h"
 
 #include <winsock2.h>
@@ -136,7 +137,7 @@ open_tun(const char *tun_device)
 		wcscpy_s(wname, ARRAYSIZE(wname), L"DNS Tunnel");
 		snprintf(if_name, sizeof(if_name), "DNS Tunnel");
 	}
-	fprintf(stderr, "Opening Wintun interface '%s'...\n", if_name);
+	ui_log("Opening Wintun interface '%s'...\n", if_name);
 
 	adapter_handle = WintunOpenAdapter(wname);
 	if (!adapter_handle) {
@@ -229,7 +230,7 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 	(void)peer_ip;
 
 	if (build_netmask(netbits, &netmask)) {
-		fprintf(stderr, "Invalid netmask: %d!\n", netbits);
+		ui_log("Invalid netmask: %d!\n", netbits);
 		return 1;
 	}
 
@@ -245,7 +246,7 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 		FreeMibTable(table);
 	}
 
-	fprintf(stderr, "Setting IP of interface '%s' to %s\n",
+	ui_log("Setting IP of interface '%s' to %s\n",
 		if_name, format_inaddr(&localaddr));
 	InitializeUnicastIpAddressEntry(&ip_row);
 	ip_row.InterfaceLuid = luid;
@@ -275,7 +276,7 @@ tun_setmtu(const unsigned mtu)
 	row.Family = AF_INET;
 	row.InterfaceLuid = luid;
 	row.NlMtu = mtu;
-	fprintf(stderr, "Setting MTU of '%s' to %u\n", if_name, mtu);
+	ui_log("Setting MTU of '%s' to %u\n", if_name, mtu);
 	res = SetIpInterfaceEntry(&row);
 	if (res != NO_ERROR) {
 		warnx("tun_setmtu: SetIpInterfaceEntry failed: status %d", res);

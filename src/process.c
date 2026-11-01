@@ -25,6 +25,7 @@
 #include "config.h"
 #include "common.h"
 #include "compat.h"
+#include "ui.h"
 
 #ifdef WINDOWS
 #include <windows.h>
@@ -277,12 +278,12 @@ void
 do_detach(void)
 {
 #if CAN_DETACH
-	fprintf(stderr, "Detaching from terminal...\n");
+	ui_log("Detaching from terminal...\n");
 	daemon(0, 0);
 	umask(0);
 	alarm(0);
 #else
-	fprintf(stderr, "Detaching not supported\n");
+	ui_log("Detaching not supported\n");
 #endif
 }
 

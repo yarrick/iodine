@@ -19,6 +19,7 @@
 #include "config.h"
 #include "common.h"
 #include "compat.h"
+#include "ui.h"
 #include "util.h"
 
 char *get_resolvconf_addr(void)
@@ -85,6 +86,6 @@ socket_setrtable(int fd, int rtable)
 	if (setsockopt (fd, IPPROTO_IP, SO_RTABLE, &rtable, sizeof(rtable)) == -1)
 		err(1, "Failed to set routing table %d", rtable);
 #else
-	fprintf(stderr, "Routing domain support was not available at compile time.\n");
+	ui_log("Routing domain support was not available at compile time.\n");
 #endif
 }

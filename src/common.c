@@ -52,6 +52,7 @@
 
 #include "common.h"
 #include "compat.h"
+#include "ui.h"
 
 /* The raw header used when not using DNS protocol */
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
@@ -170,7 +171,7 @@ open_dns_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6on
 	if (bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
 		err(1, "bind() to %s", format_addr(sockaddr, sockaddr_len));
 
-	fprintf(stderr, "Opened IPv%d UDP socket\n", sockaddr->ss_family == AF_INET6 ? 6 : 4);
+	ui_log("Opened IPv%d UDP socket\n", sockaddr->ss_family == AF_INET6 ? 6 : 4);
 
 	return fd;
 }

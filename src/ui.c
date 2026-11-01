@@ -28,14 +28,34 @@
 #include "ui.h"
 
 void
+ui_log(const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	vfprintf(stderr, fmt, list);
+	va_end(list);
+}
+
+void
+ui_log_partial(const char *fmt, ...)
+{
+	va_list list;
+
+	va_start(list, fmt);
+	vfprintf(stderr, fmt, list);
+	va_end(list);
+	fflush(stderr);
+}
+
+void
 ui_read_password(char *buf, size_t len)
 {
 	char pwd[80] = {0};
 #ifdef WINDOWS
 	int i;
 
-	fprintf(stderr, "Enter tunnel password: ");
-	fflush(stderr);
+	ui_log_partial("Enter tunnel password: ");
 	for (i = 0; i < sizeof(pwd); i++) {
 		pwd[i] = getch();
 		if (pwd[i] == '\r' || pwd[i] == '\n') {
@@ -46,7 +66,7 @@ ui_read_password(char *buf, size_t len)
 			if (i >=0) i--; 	/* If not first char, remove one more */
 		}
 	}
-	fprintf(stderr, "\n");
+	ui_log("\n");
 
 #else
 	struct termios old;
@@ -58,10 +78,9 @@ ui_read_password(char *buf, size_t len)
 	tp.c_lflag &= (~ECHO);
 	tcsetattr(0, TCSANOW, &tp);
 
-	fprintf(stderr, "Enter tunnel password: ");
-	fflush(stderr);
+	ui_log_partial("Enter tunnel password: ");
 	fscanf(stdin, "%79[^\n]", pwd);
-	fprintf(stderr, "\n");
+	ui_log("\n");
 
 	tcsetattr(0, TCSANOW, &old);
 #endif

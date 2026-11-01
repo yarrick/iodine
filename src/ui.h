@@ -18,6 +18,9 @@
 #ifndef __UI_H__
 #define __UI_H__
 
+void ui_log(const char *fmt, ...);
+/* For logs not ending with newline, will flush. */
+void ui_log_partial(const char *fmt, ...);
 void ui_read_password(char*, size_t);
 
 #endif
