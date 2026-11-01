@@ -254,3 +254,23 @@ if libcheck.found()
     ))
   endforeach
 endif
+
+tun_ping = executable('tun_ping',
+  sources: files('tests/tun_ping.c'),
+  build_by_default: false,
+  include_directories: includes,
+  link_with: libcommon,
+)
+
+py3 = import('python').find_installation('python3')
+if py3.found()
+  run_target('tun_bench',
+    command: [
+      py3,
+      files('tests/tun_bench.py'),
+      tun_ping.full_path(),
+      host_machine.system(),
+    ],
+    depends: tun_ping,
+  )
+endif
