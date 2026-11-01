@@ -566,10 +566,13 @@ tun_setmtu(const unsigned mtu)
 void
 tun_flush_rx(int tun_fd)
 {
+	(void)tun_fd;
+#ifndef HAIKU
 	ssize_t len;
 	char buffer[4096];
 
 	do {
 		len = read(tun_fd, buffer, sizeof(buffer));
 	} while (len > 0);
+#endif
 }
