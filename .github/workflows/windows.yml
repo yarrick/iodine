@@ -63,10 +63,6 @@ jobs:
     - name: install ping3
       if: matrix.bench
       run: python3 -m pip install ping3
-    - name: build tun_ping
-      if: matrix.bench
-      working-directory: build
-      run: ninja tun_ping
     - name: run bench
       if: matrix.bench
       working-directory: build

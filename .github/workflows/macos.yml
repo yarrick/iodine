@@ -28,9 +28,6 @@ jobs:
       run: ninja test
     - name: install ping3
       run: /opt/homebrew/bin/python3 -m pip install ping3 --break-system-packages
-    - name: build tun_ping
-      working-directory: build
-      run: ninja tun_ping
     - name: run bench
       working-directory: build
       run: sudo -E ninja tun_bench

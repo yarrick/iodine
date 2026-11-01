@@ -93,9 +93,6 @@ jobs:
       run: pip install ping3
     - name: meson setup
       run: meson setup build
-    - name: build tun_ping
-      working-directory: build
-      run: ninja tun_ping
     - name: run bench
       working-directory: build
       run: sudo -E ninja tun_bench
