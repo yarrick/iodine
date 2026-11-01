@@ -59,6 +59,7 @@
 #include "login.h"
 #include "run_as.h"
 #include "tun.h"
+#include "ui.h"
 #include "user.h"
 #include "version.h"
 
@@ -526,7 +527,7 @@ main(int argc, char **argv)
 		if (NULL != getenv(PASSWORD_ENV_VAR))
 			snprintf(password, sizeof(password), "%s", getenv(PASSWORD_ENV_VAR));
 		else
-			read_password(password, sizeof(password));
+			ui_read_password(password, sizeof(password));
 	}
 
 	/* Mark both file descriptors as unused */

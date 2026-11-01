@@ -1,0 +1,70 @@
+/* Copyright (c) 2006-2014 Erik Ekman <yarrick@kryo.se>,
+ * 2006-2009 Bjorn Andersson <flex@kryo.se>
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#include "config.h"
+
+#include <stdio.h>
+#include <string.h>
+#ifdef WINDOWS
+#include <conio.h>
+#else
+#include <termios.h>
+#endif
+
+#include "compat.h"
+#include "ui.h"
+
+void
+ui_read_password(char *buf, size_t len)
+{
+	char pwd[80] = {0};
+#ifdef WINDOWS
+	int i;
+
+	fprintf(stderr, "Enter tunnel password: ");
+	fflush(stderr);
+	for (i = 0; i < sizeof(pwd); i++) {
+		pwd[i] = getch();
+		if (pwd[i] == '\r' || pwd[i] == '\n') {
+			pwd[i] = 0;
+			break;
+		} else if (pwd[i] == '\b') {
+			i--; 			/* Remove the \b char */
+			if (i >=0) i--; 	/* If not first char, remove one more */
+		}
+	}
+	fprintf(stderr, "\n");
+
+#else
+	struct termios old;
+	struct termios tp;
+
+	tcgetattr(0, &tp);
+	old = tp;
+
+	tp.c_lflag &= (~ECHO);
+	tcsetattr(0, TCSANOW, &tp);
+
+	fprintf(stderr, "Enter tunnel password: ");
+	fflush(stderr);
+	fscanf(stdin, "%79[^\n]", pwd);
+	fprintf(stderr, "\n");
+
+	tcsetattr(0, TCSANOW, &old);
+#endif
+
+	strlcpy(buf, pwd, len);
+}

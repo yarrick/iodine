@@ -102,8 +102,6 @@ void close_dns(int);
 
 int build_netmask(int netbits, struct in_addr *addr);
 
-void read_password(char*, size_t);
-
 int check_topdomain(char *, int, char **);
 
 int query_datalen(const char *qname, const char *topdomain);

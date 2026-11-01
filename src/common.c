@@ -22,7 +22,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
@@ -37,7 +36,6 @@
 
 #ifdef WINDOWS
 #include <winsock2.h>
-#include <conio.h>
 #include <windows.h>
 #include <wincrypt.h>
 #else
@@ -45,7 +43,6 @@
 #ifdef DARWIN
 #include <arpa/nameser_compat.h>
 #endif
-#include <termios.h>
 #include <err.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -219,48 +216,6 @@ build_netmask(int netbits, struct in_addr *addr)
 	netmask <<= (32 - netbits);
 	addr->s_addr = htonl(netmask);
 	return 0;
-}
-
-void
-read_password(char *buf, size_t len)
-{
-	char pwd[80] = {0};
-#ifndef WINDOWS
-	struct termios old;
-	struct termios tp;
-
-	tcgetattr(0, &tp);
-	old = tp;
-
-	tp.c_lflag &= (~ECHO);
-	tcsetattr(0, TCSANOW, &tp);
-#else
-	int i;
-#endif
-
-	fprintf(stderr, "Enter tunnel password: ");
-	fflush(stderr);
-#ifndef WINDOWS
-	fscanf(stdin, "%79[^\n]", pwd);
-#else
-	for (i = 0; i < sizeof(pwd); i++) {
-		pwd[i] = getch();
-		if (pwd[i] == '\r' || pwd[i] == '\n') {
-			pwd[i] = 0;
-			break;
-		} else if (pwd[i] == '\b') {
-			i--; 			/* Remove the \b char */
-			if (i >=0) i--; 	/* If not first char, remove one more */
-		}
-	}
-#endif
-	fprintf(stderr, "\n");
-
-#ifndef WINDOWS
-	tcsetattr(0, TCSANOW, &old);
-#endif
-
-	strlcpy(buf, pwd, len);
 }
 
 int

@@ -43,6 +43,7 @@
 #include "process.h"
 #include "run_as.h"
 #include "tun.h"
+#include "ui.h"
 #include "util.h"
 
 #define PASSWORD_ENV_VAR "IODINE_PASS"
@@ -324,7 +325,7 @@ int main(int argc, char **argv)
 		if (NULL != getenv(PASSWORD_ENV_VAR))
 			snprintf(password, sizeof(password), "%s", getenv(PASSWORD_ENV_VAR));
 		else
-			read_password(password, sizeof(password));
+			ui_read_password(password, sizeof(password));
 	}
 
 	client_set_password(password);
