@@ -1,8 +1,1 @@
-/bin/
-*.o
-/src/base64u.c
-/src/base64u.h
-/tests/test
-*.o.d
-/src/obj/local/*/iodine
-/src/libs/*/iodine
+.*swp
