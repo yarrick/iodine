@@ -31,8 +31,11 @@
 static int debuglevel = 0;
 
 static void
-vlog(const char *fmt, va_list list)
+vlog(int level, const char *fmt, va_list list)
 {
+	if (level) {
+		fprintf(stderr, "[D%d] ", level);
+	}
 	vfprintf(stderr, fmt, list);
 }
 
@@ -48,9 +51,8 @@ ui_debug(int level, const char *fmt, ...)
 	va_list list;
 
 	if (debuglevel >= level) {
-        ui_log("[D%d] ", level);
 		va_start(list, fmt);
-		vlog(fmt, list);
+		vlog(level, fmt, list);
 		va_end(list);
 	}
 }
@@ -61,7 +63,7 @@ ui_log(const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	vlog(fmt, list);
+	vlog(0, fmt, list);
 	va_end(list);
 }
 
@@ -71,7 +73,7 @@ ui_log_partial(const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	vlog(fmt, list);
+	vlog(0, fmt, list);
 	va_end(list);
 	fflush(stderr);
 }
