@@ -27,7 +27,7 @@ jobs:
       working-directory: build
       run: ninja test
     - name: install ping3
-      run: sudo pip install ping3
+      run: sudo python -m pip install ping3
     - name: build tun_ping
       working-directory: build
       run: ninja tun_ping
