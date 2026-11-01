@@ -526,7 +526,7 @@ tun_setmtu(const unsigned mtu)
 	struct ifreq ifr;
 
 	if (mtu <= 200 || mtu > 1500) {
-		warn("MTU out of range: %u\n", mtu);
+		warnx("tun_setmtu: MTU out of range: %u\n", mtu);
 		return 1;
 	}
 

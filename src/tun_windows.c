@@ -247,7 +247,7 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 	ip_row.Address.Ipv4.sin_addr = localaddr;
 	status = CreateUnicastIpAddressEntry(&ip_row);
 	if (status != NO_ERROR) {
-		warnx("tun_setmtu: CreateUnicastIpAddressEntry failed: status %lu", status);
+		warnx("tun_setip: CreateUnicastIpAddressEntry failed: status %lu", status);
 		return 1;
 	}
 	return 0;
@@ -260,7 +260,7 @@ tun_setmtu(const unsigned mtu)
 	NETIO_STATUS res;
 
 	if (mtu <= 200 || mtu > 1500) {
-		warn("MTU out of range: %u\n", mtu);
+		warnx("tun_setmtu: MTU out of range: %u\n", mtu);
 		return 1;
 	}
 
