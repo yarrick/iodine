@@ -108,19 +108,12 @@ static int hostname_maxlen = 0xFF;
 void
 client_init(void)
 {
-	unsigned int r;
-
 	running = 1;
-	/* rand_seed/chunkid identify our outgoing DNS queries and are sent
-	   on the wire; seed them from a CSPRNG (they used to come from
-	   rand() after srand(time(NULL)), making them predictable). */
-	secure_random(&r, sizeof(r));
-	rand_seed = r & 0xFFFF;
+	secure_random(&rand_seed, sizeof(rand_seed));
 	send_ping_soon = 1;	/* send ping immediately at startup */
 	conn = CONN_DNS_NULL;
 
-	secure_random(&r, sizeof(r));
-	chunkid = r & 0xFFFF;
+	secure_random(&chunkid, sizeof(chunkid));
 	chunkid_prev = 0;
 	chunkid_prev2 = 0;
 

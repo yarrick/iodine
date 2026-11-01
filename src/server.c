@@ -717,16 +717,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			if (find_available_user(&userid)) {
 				int i;
 
-				{
-					int newseed;
-					/* CSPRNG seed: the login challenge is
-					   MD5(password XOR seed), so the seed
-					   must not be predictable from server
-					   start time (rand() after
-					   srand(time(NULL)) was). */
-					secure_random(&newseed, sizeof(newseed));
-					users[userid].seed = newseed;
-				}
+				secure_random(&users[userid].seed, sizeof(users[userid].seed));
 				/* Store remote IP number */
 				memcpy(&(users[userid].host), &(q->from), q->fromlen);
 				users[userid].hostlen = q->fromlen;

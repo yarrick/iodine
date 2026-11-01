@@ -98,12 +98,10 @@ get_external_ip(struct in_addr *ip)
 		int buflen;
 		fd_set fds;
 		struct timeval tv;
-		uint16_t rid;
 
 		if (attempt)
 			ui_log("Retrying external IP lookup\n");
-		secure_random(&rid, sizeof(rid));
-		query.id = rid;
+		secure_random(&query.id, sizeof(query.id));
 		buflen = sizeof(buf);
 		buflen = dns_encode(buf, buflen, &query, QR_QUERY, target, strlen(target));
 		if (buflen < 0) continue;
