@@ -33,6 +33,7 @@
 #include "compat.h"
 #include "process.h"
 #include "server.h"
+#include "ui.h"
 
 #ifdef WINDOWS
 #include "windows_dns.h"
@@ -77,7 +78,6 @@ static int netmask;
 static in_addr_t ns_ip;
 
 static int bind_port;
-static int debug;
 
 
 static int read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q);
@@ -102,7 +102,6 @@ server_init(struct server_params *params)
 	netmask = params->netmask;
 	ns_ip = params->nameserver_ip;
 	bind_port = params->bind_port;
-	debug = params->debug;
 }
 
 static int
@@ -197,10 +196,8 @@ static void send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX-raw: client %s, cmd %d, %zu bytes\n",
-			format_addr(&q->from, q->fromlen), cmd, len);
-	}
+	ui_debug(2, "TX-raw: client %s, cmd %d, %zu bytes\n",
+		 format_addr(&q->from, q->fromlen), cmd, len);
 
 	sendto(fd, packet, len, 0, (struct sockaddr *) &q->from, q->fromlen);
 }
@@ -243,9 +240,7 @@ static int save_to_outpacketq(int userid, char *data, unsigned int datalen)
 
 	users[userid].outpacketq_filled++;
 
-	if (debug >= 3)
-		fprintf(stderr, "    Qstore, now %d\n",
-			users[userid].outpacketq_filled);
+	ui_debug(3, "    Qstore, now %d\n", users[userid].outpacketq_filled);
 
 	return 1;
 }
@@ -271,9 +266,7 @@ static int get_from_outpacketq(int userid)
 	users[userid].outpacketq_nexttouse = use;
 	users[userid].outpacketq_filled--;
 
-	if (debug >= 3)
-		fprintf(stderr, "    Qget, now %d\n",
-			users[userid].outpacketq_filled);
+	ui_debug(3, "    Qget, now %d\n", users[userid].outpacketq_filled);
 
 	return 1;
 }
@@ -340,8 +333,7 @@ static int answer_from_dnscache(int dns_fd, int userid, struct query *q)
 			continue;
 
 		/* okay, match */
-		if (debug >= 1)
-			fprintf(stderr, "OUT  user %d %s from dnscache\n", userid, q->name);
+		ui_debug(1, "OUT  user %d %s from dnscache\n", userid, q->name);
 
 		write_dns(dns_fd, q, users[userid].dnscache_answer[use],
 			  users[userid].dnscache_answerlen[use],
@@ -449,8 +441,8 @@ static int answer_from_qmem(int dns_fd, struct query *q,
 			continue;
 
 		/* okay, match */
-		if (debug >= 1)
-			fprintf(stderr, "OUT  from qmem for %s == duplicate, sending illegal reply\n", q->name);
+		ui_debug(1, "OUT  from qmem for %s == duplicate, sending illegal reply\n",
+			 q->name);
 
 		write_dns(dns_fd, q, "x", 1, 'T');
 
@@ -529,19 +521,16 @@ static int send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 	pkt[1] = ((users[userid].outpacket.seqno & 7) << 5) |
 		((users[userid].outpacket.fragment & 15) << 1) | (last & 1);
 
-	if (debug >= 1) {
-		fprintf(stderr, "OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %u, total %d, to user %d\n",
-			users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15,
-			last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
-	}
+	ui_debug(1, "OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %u, total %d, to user %d\n",
+		 users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15,
+		 last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
 	write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
 
 	if (q->id2 != 0) {
 		q->id = q->id2;
 		q->fromlen = q->fromlen2;
 		memcpy(&(q->from), &(q->from2), q->fromlen2);
-		if (debug >= 1)
-			fprintf(stderr, "OUT  again to last duplicate\n");
+		ui_debug(1, "OUT  again to last duplicate\n");
 		write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
 	}
 
@@ -563,8 +552,7 @@ static int send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 #ifdef OUTPACKETQ_LEN
 		/* Maybe more in queue, prepare for next time */
 		if (get_from_outpacketq(userid) == 1) {
-			if (debug >= 3)
-				fprintf(stderr, "    Chunk & fromqueue: callagain\n");
+			ui_debug(3, "    Chunk & fromqueue: callagain\n");
 			return 1;	/* call us again */
 		}
 #endif
@@ -1160,10 +1148,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			   Our answer will go to both.
 			   (If we already sent an answer, qmem/cache will
 			   have triggered.) */
-			if (debug >= 2) {
-				fprintf(stderr, "PING pkt from user %d = dupe from impatient DNS server, remembering\n",
-					userid);
-			}
+			ui_debug(2, "PING pkt from user %d = dupe from impatient DNS server, remembering\n",
+				 userid);
 			users[userid].q.id2 = q->id;
 			users[userid].q.fromlen2 = q->fromlen;
 			memcpy(&(users[userid].q.from2), &(q->from), q->fromlen);
@@ -1175,10 +1161,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		    !strcmp(q->name, users[userid].q_sendrealsoon.name)) {
 			/* Outer select loop will send answer immediately,
 			   to both queries. */
-			if (debug >= 2) {
-				fprintf(stderr, "PING pkt from user %d = dupe from impatient DNS server, remembering\n",
-					userid);
-			}
+			ui_debug(2, "PING pkt from user %d = dupe from impatient DNS server, remembering\n",
+				 userid);
 			users[userid].q_sendrealsoon.id2 = q->id;
 			users[userid].q_sendrealsoon.fromlen2 = q->fromlen;
 			memcpy(&(users[userid].q_sendrealsoon.from2),
@@ -1189,17 +1173,13 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		dn_seq = unpacked[1] >> 4;
 		dn_frag = unpacked[1] & 15;
 
-		if (debug >= 1) {
-			fprintf(stderr, "PING pkt from user %d, ack for downstream %d/%d\n",
-				userid, dn_seq, dn_frag);
-		}
+		ui_debug(1, "PING pkt from user %d, ack for downstream %d/%d\n",
+			 userid, dn_seq, dn_frag);
 
 		process_downstream_ack(userid, dn_seq, dn_frag);
 
-		if (debug >= 3) {
-			fprintf(stderr, "PINGret (if any) will ack upstream %d/%d\n",
-				users[userid].inpacket.seqno, users[userid].inpacket.fragment);
-		}
+		ui_debug(3, "PINGret (if any) will ack upstream %d/%d\n",
+			 users[userid].inpacket.seqno, users[userid].inpacket.fragment);
 
 		/* If there is a query that must be returned real soon, do it.
 		   May contain new downstream data if the ping had a new ack.
@@ -1288,10 +1268,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			   Our answer will go to both.
 			   (If we already sent an answer, qmem/cache will
 			   have triggered.) */
-			if (debug >= 2) {
-				fprintf(stderr, "IN   pkt from user %d = dupe from impatient DNS server, remembering\n",
-					userid);
-			}
+			ui_debug(2, "IN   pkt from user %d = dupe from impatient DNS server, remembering\n",
+				 userid);
 			users[userid].q.id2 = q->id;
 			users[userid].q.fromlen2 = q->fromlen;
 			memcpy(&(users[userid].q.from2), &(q->from), q->fromlen);
@@ -1303,10 +1281,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		    !strcmp(q->name, users[userid].q_sendrealsoon.name)) {
 			/* Outer select loop will send answer immediately,
 			   to both queries. */
-			if (debug >= 2) {
-				fprintf(stderr, "IN   pkt from user %d = dupe from impatient DNS server, remembering\n",
-					userid);
-			}
+			ui_debug(2, "IN   pkt from user %d = dupe from impatient DNS server, remembering\n",
+				 userid);
 			users[userid].q_sendrealsoon.id2 = q->id;
 			users[userid].q_sendrealsoon.fromlen2 = q->fromlen;
 			memcpy(&(users[userid].q_sendrealsoon.from2),
@@ -1333,20 +1309,16 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			   If it's a _really_ old frag, it's a nameserver
 			   that tries again, and sending our current (non-
 			   matching) fragno won't be a problem. */
-			if (debug >= 1) {
-				fprintf(stderr, "IN   pkt seq# %d, frag %d, dropped duplicate frag\n",
-					up_seq, up_frag);
-			}
+			ui_debug(1, "IN   pkt seq# %d, frag %d, dropped duplicate frag\n",
+				 up_seq, up_frag);
 			upstream_ok = 0;
 		}
 		else if (up_seq != users[userid].inpacket.seqno &&
 			 recent_seqno(users[userid].inpacket.seqno, up_seq)) {
 			/* Duplicate of recent upstream data packet; probably
 			   need to answer this to keep DNS server happy */
-			if (debug >= 1) {
-				fprintf(stderr, "IN   pkt seq# %d, frag %d, dropped duplicate recent seqno\n",
-					up_seq, up_frag);
-			}
+			ui_debug(1, "IN   pkt seq# %d, frag %d, dropped duplicate recent seqno\n",
+				 up_seq, up_frag);
 			upstream_ok = 0;
 		}
 		else if (up_seq != users[userid].inpacket.seqno) {
@@ -1362,11 +1334,9 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			users[userid].inpacket.fragment = up_frag;
 		}
 
-		if (debug >= 3) {
-			fprintf(stderr, "INpack with upstream %d/%d, we are going to ack upstream %d/%d\n",
-				up_seq, up_frag,
-				users[userid].inpacket.seqno, users[userid].inpacket.fragment);
-		}
+		ui_debug(3, "INpack with upstream %d/%d, we are going to ack upstream %d/%d\n",
+			 up_seq, up_frag,
+			 users[userid].inpacket.seqno, users[userid].inpacket.fragment);
 
 		if (upstream_ok) {
 			/* decode with this user's encoding */
@@ -1379,10 +1349,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			users[userid].inpacket.len += read;
 			users[userid].inpacket.offset += read;
 
-			if (debug >= 1) {
-				fprintf(stderr, "IN   pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
-					up_seq, up_frag, lastfrag, read, users[userid].inpacket.len, userid);
-			}
+			ui_debug(1, "IN   pkt seq# %d, frag %d (last=%d), fragsize %d, total %d, from user %d\n",
+				 up_seq, up_frag, lastfrag, read, users[userid].inpacket.len, userid);
 		}
 
 		if (upstream_ok && lastfrag) { /* packet is complete */
@@ -1488,10 +1456,8 @@ handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 		return;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes NS reply\n",
-			format_addr(&q->from, q->fromlen), q->type, q->name, len);
-	}
+	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes NS reply\n",
+		 format_addr(&q->from, q->fromlen), q->type, q->name, len);
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("ns reply send error");
 	}
@@ -1530,10 +1496,8 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 		return;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes A reply\n",
-			format_addr(&q->from, q->fromlen), q->type, q->name, len);
-	}
+	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes A reply\n",
+		 format_addr(&q->from, q->fromlen), q->type, q->name, len);
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("a reply send error");
 	}
@@ -1551,10 +1515,8 @@ handle_underscore_request(int dns_fd, struct query *q, const char *topdomain)
 		return;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: client %s, type %d, name %s, %d bytes NXDOMAIN reply\n",
-			format_addr(&q->from, q->fromlen), q->type, q->name, len);
-	}
+	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes NXDOMAIN reply\n",
+		 format_addr(&q->from, q->fromlen), q->type, q->name, len);
 	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("nxdomain reply send error");
 	}
@@ -1586,9 +1548,7 @@ forward_query(int bind_fd, struct query *q)
 	memcpy(&(myaddr->sin_addr), &newaddr, sizeof(in_addr_t));
 	myaddr->sin_port = htons(bind_port);
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: NS reply \n");
-	}
+	ui_debug(2, "TX: NS reply \n");
 
 	if (sendto(bind_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
 		warn("forward query error");
@@ -1615,23 +1575,17 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 
 	id = dns_get_id(packet, r);
 
-	if (debug >= 2) {
-		fprintf(stderr, "RX: Got response on query %u from DNS\n", (id & 0xFFFF));
-	}
+	ui_debug(2, "RX: Got response on query %u from DNS\n", (id & 0xFFFF));
 
 	/* Get sockaddr from id */
 	fw_query_get(id, &query);
 	if (!query) {
-		if (debug >= 2) {
-			fprintf(stderr, "Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
-		}
+		ui_debug(2, "Lost sender of id %u, dropping reply\n", (id & 0xFFFF));
 		return 0;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: client %s id %u, %d bytes\n",
-			format_addr(&query->addr, query->addrlen), (id & 0xffff), r);
-	}
+	ui_debug(2, "TX: client %s id %u, %d bytes\n",
+		 format_addr(&query->addr, query->addrlen), (id & 0xffff), r);
 
 	dns_fd = get_dns_fd(dns_fds, &query->addr);
 	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr),
@@ -1652,10 +1606,8 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	if ((read = read_dns(dns_fd, dns_fds, tun_fd, &q)) <= 0)
 		return 0;
 
-	if (debug >= 2) {
-		fprintf(stderr, "RX: client %s, type %d, name %s\n",
-			format_addr(&q.from, q.fromlen), q.type, q.name);
-	}
+	ui_debug(2, "RX: client %s, type %d, name %s\n",
+		 format_addr(&q.from, q.fromlen), q.type, q.name);
 
 	domain_len = query_datalen(q.name, topdomain);
 	if (domain_len >= 0) {
@@ -1795,7 +1747,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 							users[userid].last_pkt : last_action;
 					}
 					if (last_action + max_idle_time < time(NULL)) {
-						fprintf(stderr, "Idling since too long, shutting down...\n");
+						ui_log("Idling since too long, shutting down...\n");
 						running = 0;
 					}
 				}
@@ -1882,8 +1834,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 			}
 		}
 	} else {
-		if (debug >= 1)
-			fprintf(stderr, "Discarded data, uncompress() result: %d\n", ret);
+		ui_debug(1, "Discarded data, uncompress() result: %d\n", ret);
 	}
 
 	/* This packet is done */
@@ -1905,10 +1856,7 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 	if (!users[userid].authenticated) return;
 	if (users[userid].last_pkt + 60 < time(NULL)) return;
 
-	if (debug >= 1) {
-		fprintf(stderr, "IN   login raw, len %d, from user %d\n",
-			len, userid);
-	}
+	ui_debug(1, "IN   login raw, len %d, from user %d\n", len, userid);
 
 	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, password, users[userid].seed + 1);
@@ -1947,10 +1895,8 @@ handle_raw_data(char *packet, int len, struct query *q, struct dnsfd *dns_fds, i
 	memcpy(users[userid].inpacket.data, packet, len);
 	users[userid].inpacket.len = len;
 
-	if (debug >= 1) {
-		fprintf(stderr, "IN   pkt raw, total %d, from user %d\n",
-			users[userid].inpacket.len, userid);
-	}
+	ui_debug(1, "IN   pkt raw, total %d, from user %d\n",
+		 users[userid].inpacket.len, userid);
 
 	handle_full_packet(tun_fd, dns_fds, userid);
 }
@@ -1967,9 +1913,7 @@ handle_raw_ping(struct query *q, int dns_fd, int userid)
 	users[userid].last_pkt = time(NULL);
 	memcpy(&(users[userid].q), q, sizeof(struct query));
 
-	if (debug >= 1) {
-		fprintf(stderr, "IN   ping raw, from user %d\n", userid);
-	}
+	ui_debug(1, "IN   ping raw, from user %d\n", userid);
 
 	/* Send ping reply */
 	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, q);
@@ -2239,10 +2183,8 @@ write_dns(int fd, struct query *q, const char *data, size_t datalen, char downen
 		return;
 	}
 
-	if (debug >= 2) {
-		fprintf(stderr, "TX: client %s, type %d, name %s, %zu bytes data\n",
-			format_addr(&q->from, q->fromlen), q->type, q->name, datalen);
-	}
+	ui_debug(2, "TX: client %s, type %d, name %s, %zu bytes data\n",
+		 format_addr(&q->from, q->fromlen), q->type, q->name, datalen);
 
 	sendto(fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen);
 }

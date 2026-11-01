@@ -16,6 +16,7 @@
 
 #include "config.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #ifdef WINDOWS
@@ -27,13 +28,40 @@
 #include "compat.h"
 #include "ui.h"
 
+static int debuglevel = 0;
+
+static void
+vlog(const char *fmt, va_list list)
+{
+	vfprintf(stderr, fmt, list);
+}
+
+void
+ui_set_debuglevel(int level)
+{
+	debuglevel = level;
+}
+
+void
+ui_debug(int level, const char *fmt, ...)
+{
+	va_list list;
+
+	if (debuglevel >= level) {
+        ui_log("[D%d] ", level);
+		va_start(list, fmt);
+		vlog(fmt, list);
+		va_end(list);
+	}
+}
+
 void
 ui_log(const char *fmt, ...)
 {
 	va_list list;
 
 	va_start(list, fmt);
-	vfprintf(stderr, fmt, list);
+	vlog(fmt, list);
 	va_end(list);
 }
 
@@ -43,7 +71,7 @@ ui_log_partial(const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	vfprintf(stderr, fmt, list);
+	vlog(fmt, list);
 	va_end(list);
 	fflush(stderr);
 }

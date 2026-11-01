@@ -45,7 +45,6 @@ struct server_params {
 	int netmask;
 	in_addr_t nameserver_ip;
 	int bind_port;
-	int debug;
 };
 
 void server_init(struct server_params *params);

@@ -635,6 +635,7 @@ main(int argc, char **argv)
 		do_setcon(context);
 
 	syslog(LOG_INFO, "started, listening on port %d", port);
+	ui_set_debuglevel(debug);
 
 	params.topdomain = topdomain;
 	params.password = password;
@@ -645,7 +646,6 @@ main(int argc, char **argv)
 	params.netmask = netmask;
 	params.nameserver_ip = ns_ip.s_addr;
 	params.bind_port = bind_port;
-	params.debug = debug;
 
 	server_init(&params);
 
