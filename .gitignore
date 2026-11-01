@@ -1,1 +1,4 @@
 .*swp
+subprojects/.wraplock
+subprojects/packagecache
+subprojects/zlib-*
