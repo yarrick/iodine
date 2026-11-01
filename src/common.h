@@ -41,7 +41,6 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <err.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
 
@@ -55,20 +54,6 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #endif
 
 #define QUERY_NAME_SIZE 256
-
-#if defined IP_MTU_DISCOVER
-  /* Linux */
-# define IP_OPT_DONT_FRAG IP_MTU_DISCOVER
-# define DONT_FRAG_VALUE IP_PMTUDISC_DO
-#elif defined IP_DONTFRAG
-  /* FreeBSD */
-# define IP_OPT_DONT_FRAG IP_DONTFRAG
-# define DONT_FRAG_VALUE 1
-#elif defined IP_DONTFRAGMENT
-  /* Winsock2 */
-# define IP_OPT_DONT_FRAG IP_DONTFRAGMENT
-# define DONT_FRAG_VALUE 1
-#endif
 
 #define T_PRIVATE 65399
 /* Undefined RR type; "private use" range, see

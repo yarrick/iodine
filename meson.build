@@ -113,6 +113,17 @@ cdata.set10('HAVE_PROGNAME', cc.links('''
   }
 '''))
 
+if cc.has_header_symbol('netinet/in.h', 'IP_MTU_DISCOVER')
+  cdata.set('IP_OPT_DONT_FRAG', 'IP_MTU_DISCOVER')
+  cdata.set('DONT_FRAG_VALUE', 'IP_PMTUDISC_DO')
+elif cc.has_header_symbol('netinet/in.h', 'IP_DONTFRAG')
+  cdata.set('IP_OPT_DONT_FRAG', 'IP_DONTFRAG')
+  cdata.set('DONT_FRAG_VALUE', 1)
+elif cc.has_header_symbol('ws2tcpip.h', 'IP_DONTFRAGMENT')
+  cdata.set('IP_OPT_DONT_FRAG', 'IP_DONTFRAGMENT')
+  cdata.set('DONT_FRAG_VALUE', 1)
+endif
+
 # For md5
 cdata.set10('ARCH_IS_BIG_ENDIAN', host_machine.endian() == 'big')
 
