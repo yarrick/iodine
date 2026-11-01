@@ -28,6 +28,16 @@
 #include "compat.h"
 #include "ui.h"
 
+#ifdef WINDOWS
+static int (*ui_getch)(void) = getch;
+
+void
+ui_test_set_getch_fn(int (*getch_fn)(void))
+{
+	ui_getch = getch_fn;
+}
+#endif
+
 static int debuglevel = 0;
 
 static void
@@ -81,24 +91,34 @@ ui_log_partial(const char *fmt, ...)
 void
 ui_read_password(char *buf, size_t len)
 {
-	char pwd[80] = {0};
 #ifdef WINDOWS
-	int i;
+	size_t idx = 0;
+	size_t typed = 0;
 
 	ui_log_partial("Enter tunnel password: ");
-	for (i = 0; i < sizeof(pwd); i++) {
-		pwd[i] = getch();
-		if (pwd[i] == '\r' || pwd[i] == '\n') {
-			pwd[i] = 0;
+	for (;;) {
+		int c = ui_getch();
+
+		if (c == '\r' || c == '\n') {
 			break;
-		} else if (pwd[i] == '\b') {
-			i--; 			/* Remove the \b char */
-			if (i >=0) i--; 	/* If not first char, remove one more */
+		} else if (c == '\b') {
+			if (typed > 0) {
+				typed--;
+				if (typed < len - 1) {
+					idx = typed;
+				}
+			}
+		} else {
+			if (typed < len - 1) {
+				buf[idx++] = c;
+			}
+			typed++;
 		}
 	}
+	buf[idx] = '\0';
 	ui_log("\n");
-
 #else
+	char pwd[80] = {0};
 	struct termios old;
 	struct termios tp;
 
@@ -113,7 +133,7 @@ ui_read_password(char *buf, size_t len)
 	ui_log("\n");
 
 	tcsetattr(0, TCSANOW, &old);
-#endif
 
 	strlcpy(buf, pwd, len);
+#endif
 }

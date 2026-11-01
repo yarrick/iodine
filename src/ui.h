@@ -26,5 +26,8 @@ void ui_log(const char *fmt, ...);
 void ui_log_partial(const char *fmt, ...);
 
 void ui_read_password(char*, size_t);
+#ifdef WINDOWS
+void ui_test_set_getch_fn(int (*getch_fn)(void));
+#endif
 
 #endif
