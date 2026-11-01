@@ -37,7 +37,7 @@ You need:
 
 Build with the same commands, but pass a --cross-file describing the
 compiler setup when calling meson. An example for non-UCRT mingw is
-included in the file .github/ubuntu-windows-x86_64.ini
+included in the file .github/mingw-windows-x86_64.ini
 
 == Results of crappy Win32 API:
 The following fixable limitations apply:
