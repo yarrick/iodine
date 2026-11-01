@@ -26,6 +26,14 @@ jobs:
     - name: run tests
       working-directory: build
       run: ninja test
+    - name: install ping3
+      run: pip install ping3
+    - name: build tun_ping
+      working-directory: build
+      run: ninja tun_ping
+    - name: run bench
+      working-directory: build
+      run: sudo -E ninja tun_bench
 
   build-android:
 
