@@ -51,6 +51,7 @@ jobs:
           ${{ matrix.pkg_prefix }}-zlib
           ${{ matrix.pkg_prefix }}-meson
           ${{ matrix.pkg_prefix }}-check
+          ${{ matrix.pkg_prefix }}-python-pip
     - name: meson setup
       run: meson setup build
     - name: build
