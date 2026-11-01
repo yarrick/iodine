@@ -33,4 +33,4 @@ jobs:
           ninja
           ninja test
           python3 -m pip install ping3
-          sudo -E ninja tun_bench
+          ninja tun_bench
