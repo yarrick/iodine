@@ -17,6 +17,7 @@
 #endif
 
 #include "compat.h"
+#include "process.h"
 #include "tun.h"
 #include "ui.h"
 
@@ -118,6 +119,7 @@ main(int argc, char **argv)
 		ui_log("Missing device name as argument\n");
 		return 1;
 	}
+	check_privileges(NULL, 0);
 	network_init();
 	fd = open_tun(argv[1]);
 	if (fd < 0) {
