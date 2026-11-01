@@ -98,13 +98,12 @@ get_external_ip(struct in_addr *ip)
 		int buflen;
 		fd_set fds;
 		struct timeval tv;
+		uint16_t rid;
 
-		if (attempt) fprintf(stderr, "Retrying external IP lookup\n");
-		{
-			uint16_t rid;
-			secure_random(&rid, sizeof(rid));
-			query.id = rid;
-		}
+		if (attempt)
+			ui_log("Retrying external IP lookup\n");
+		secure_random(&rid, sizeof(rid));
+		query.id = rid;
 		buflen = sizeof(buf);
 		buflen = dns_encode(buf, buflen, &query, QR_QUERY, target, strlen(target));
 		if (buflen < 0) continue;
@@ -197,9 +196,8 @@ static void help(FILE *stream)
 
 static void version(void)
 {
-	fprintf(stderr,
-		"iodine IP over DNS tunneling server\n"
-		"Version: %s\n", IODINE_VERSION);
+	ui_log("iodine IP over DNS tunneling server\n"
+	       "Version: %s\n", IODINE_VERSION);
 
 	exit(0);
 }
@@ -435,24 +433,23 @@ main(int argc, char **argv)
 	}
 
 	if (port != DNS_PORT) {
-		fprintf(stderr, "ALERT! Other dns servers expect you to run on port 53.\n");
-		fprintf(stderr, "You must manually forward port 53 to port %d for things to work.\n", port);
+		ui_log("ALERT! Other dns servers expect you to run on port 53.\n");
+		ui_log("You must manually forward port 53 to port %d for things to work.\n", port);
 	}
 
 	if (debug) {
-		fprintf(stderr, "Debug level %d enabled, will stay in foreground.\n", debug);
-		fprintf(stderr, "Add more -D switches to set higher debug level.\n");
+		ui_log("Debug level %d enabled, will stay in foreground.\n", debug);
+		ui_log("Add more -D switches to set higher debug level.\n");
 		foreground = 1;
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET) {
 		if (listen_ip4 && strcmp("external", listen_ip4) == 0) {
 			int res = get_external_ip(&resolved_external_ip);
 			if (res) {
-				fprintf(stderr, "Failed to get external IP via DNS query.\n");
-				exit(3);
+				errx(3, "Failed to get external IP via DNS query.");
 			}
 			listen_ip4 = format_inaddr(&resolved_external_ip);
-			fprintf(stderr, "Will listen on external IP %s\n", listen_ip4);
+			ui_log("Will listen on external IP %s\n", listen_ip4);
 		}
 		if (get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr, &dns4addr_len)) {
 			warnx("Bad IPv4 address to listen on: '%s'", listen_ip4);
@@ -465,8 +462,7 @@ main(int argc, char **argv)
 		if (get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr, &dns6addr_len)) {
 			if (listen_ip6 == NULL) {
 				if (addrfamily == AF_INET6) {
-					fprintf(stderr, "IPv6 not supported");
-					exit(3);
+					errx(3, "IPv6 not supported");
 				} else {
 					warnx("IPv6 not supported, skipping");
 					addrfamily = AF_INET;
@@ -492,11 +488,11 @@ main(int argc, char **argv)
 		/* Avoid forwarding loops */
 		if (bind_port == port && (dns_ip == INADDR_ANY || dns_ip == htonl(0x7f000001L))) {
 			warnx("Forward port is same as listen port (%d), will create a loop!", bind_port);
-			fprintf(stderr, "Use -l to set listen ip to avoid this.\n");
+			ui_log("Use -l to set listen ip to avoid this.\n");
 			usage();
 			/* NOTREACHED */
 		}
-		fprintf(stderr, "Requests for domains outside of %s will be forwarded to port %d\n",
+		ui_log("Requests for domains outside of %s will be forwarded to port %d\n",
 			topdomain, bind_port);
 	}
 
@@ -504,12 +500,11 @@ main(int argc, char **argv)
 		if (resolved_external_ip.s_addr == INADDR_ANY) {
 			int res = get_external_ip(&resolved_external_ip);
 			if (res) {
-				fprintf(stderr, "Failed to get external IP via DNS query.\n");
-				exit(3);
+				errx(3, "Failed to get external IP via DNS query.\n");
 			}
 		}
 		ns_ip = resolved_external_ip;
-		fprintf(stderr, "Using %s as external IP.\n", format_inaddr(&resolved_external_ip));
+		ui_log("Using %s as external IP.\n", format_inaddr(&resolved_external_ip));
 	}
 
 	if (nameserver_ip) {
@@ -606,10 +601,10 @@ main(int argc, char **argv)
 	}
 
 	if (created_users < USERS) {
-		fprintf(stderr, "Limiting to %d simultaneous users because of netmask /%d\n",
+		ui_log("Limiting to %d simultaneous users because of netmask /%d\n",
 			created_users, netmask);
 	}
-	fprintf(stderr, "Listening to dns for domain %s\n", topdomain);
+	ui_log("Listening to dns for domain %s\n", topdomain);
 
 	if (pidfile != NULL)
 		do_pidfile(pidfile);

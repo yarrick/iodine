@@ -109,8 +109,8 @@ static inline void usage(void)
 
 static void version(void)
 {
-	fprintf(stderr, "iodine IP over DNS tunneling client\n"
-			"Version: %s\n", IODINE_VERSION);
+	ui_log("iodine IP over DNS tunneling client\n"
+	       "Version: %s\n", IODINE_VERSION);
 
 	exit(0);
 }
@@ -344,7 +344,7 @@ int main(int argc, char **argv)
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
 
-	fprintf(stderr, "Sending DNS queries for %s to %s\n",
+	ui_log("Sending DNS queries for %s to %s\n",
 		topdomain, format_addr(&nameservaddr, nameservaddr_len));
 
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
@@ -353,13 +353,13 @@ int main(int argc, char **argv)
 	}
 
 	if (client_get_conn() == CONN_RAW_UDP) {
-		fprintf(stderr, "Sending raw traffic directly to %s\n", client_get_raw_addr());
+		ui_log("Sending raw traffic directly to %s\n", client_get_raw_addr());
 	}
 
 	/* Drop any tun packets received so far (MDNS etc) during possibly slow handshake. */
 	tun_flush_rx(tun_fd);
 
-	fprintf(stderr, "Connection setup complete, transmitting data.\n");
+	ui_log("Connection setup complete, transmitting data.\n");
 
 	if (pidfile != NULL)
 		do_pidfile(pidfile);
