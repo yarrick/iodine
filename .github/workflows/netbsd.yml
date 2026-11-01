@@ -26,5 +26,5 @@ jobs:
           cd build
           ninja
           ninja test
-          pip install ping3 --break-system-packages
+          python3.14 -m pip install ping3 --break-system-packages
           ninja tun_bench
