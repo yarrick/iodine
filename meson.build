@@ -262,7 +262,7 @@ tun_ping = executable('tun_ping',
   link_with: libcommon,
 )
 
-py3 = import('python').find_installation('python3')
+py3 = import('python').find_installation('python3', required: false)
 if py3.found()
   run_target('tun_bench',
     command: [
