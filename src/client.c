@@ -15,7 +15,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <ctype.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -1305,7 +1304,7 @@ static void
 send_downenctest(int fd, char downenc, int variant)
 {
 	char prefix[4] = "y__";
-	prefix[1] = tolower(downenc);
+	prefix[1] = ascii_tolower(downenc);
 	prefix[2] = b32_5to8(variant);
 
 	/* Use send_query directly if we ever send more data here. */
@@ -2031,7 +2030,7 @@ codec_revert:
 static void
 handshake_switch_downenc(int dns_fd)
 {
-	char sw_downenc[] = { 'o', b32_5to8(userid), tolower(downenc), 0 };
+	char sw_downenc[] = { 'o', b32_5to8(userid), ascii_tolower(downenc), 0 };
 	char in[4096];
 	int i;
 	int read;

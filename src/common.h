@@ -108,11 +108,13 @@ int query_datalen(const char *qname, const char *topdomain);
 
 int recent_seqno(int , int);
 
+void fd_set_close_on_exec(int fd);
+
 /* Fill buf with len bytes of cryptographically-secure random data
  * (getrandom/arc4random//dev/urandom/CryptoAPI; see common.c).
  * Used for protocol-seed and nonce generation instead of rand(). */
 void secure_random(void *buf, size_t len);
 
-void fd_set_close_on_exec(int fd);
+char ascii_tolower(char c);
 
 #endif
