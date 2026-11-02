@@ -763,12 +763,65 @@ static void process_downstream_ack(int userid, int down_seq, int down_frag)
 }
 
 static void
-handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
+handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
 {
 	struct in_addr tempip;
-	char in[512];
 	char logindata[16];
+	char unpacked[64*1024];
 	char out[64*1024];
+	int read;
+	unsigned int userid;
+
+	read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
+	if (read < 17) {
+		write_dns(dns_fd, q, "BADLEN", 6, 'T');
+		return;
+	}
+
+	/* Login phase, handle auth */
+	userid = unpacked[0];
+
+	if (check_user_and_ip(userid, q) != 0) {
+		write_dns(dns_fd, q, "BADIP", 5, 'T');
+		syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
+			userid, format_addr(&q->from, q->fromlen));
+		return;
+	}
+
+	users[userid].last_pkt = time(NULL);
+	login_calculate(logindata, 16, password, users[userid].seed);
+
+	if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
+		char *tmp[2];
+		/* Store login ok */
+		users[userid].authenticated = 1;
+
+		/* Send ip/mtu/netmask info */
+		tempip.s_addr = my_ip;
+		tmp[0] = strdup(format_inaddr(&tempip));
+		tempip.s_addr = users[userid].tun_ip;
+		tmp[1] = strdup(format_inaddr(&tempip));
+
+		read = snprintf(out, sizeof(out), "%s-%s-%d-%d",
+				tmp[0], tmp[1], my_mtu, netmask);
+
+		write_dns(dns_fd, q, out, read, users[userid].downenc);
+		q->id = 0;
+		syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
+
+		free(tmp[1]);
+		free(tmp[0]);
+	} else {
+		write_dns(dns_fd, q, "LNAK", 4, 'T');
+		syslog(LOG_WARNING, "rejected login request from user #%d from %s, bad password",
+			userid, format_addr(&q->from, q->fromlen));
+	}
+}
+
+static void
+handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
+{
+	char in[512];
 	char unpacked[64*1024];
 	unsigned int userid;
 	int read;
@@ -784,51 +837,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	if (in[0] == 'V' || in[0] == 'v') {
 		handle_version_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'L' || in[0] == 'l') {
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
-		if (read < 17) {
-			write_dns(dns_fd, q, "BADLEN", 6, 'T');
-			return;
-		}
-
-		/* Login phase, handle auth */
-		userid = unpacked[0];
-
-		if (check_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
-				userid, format_addr(&q->from, q->fromlen));
-			return;
-		} else {
-			users[userid].last_pkt = time(NULL);
-			login_calculate(logindata, 16, password, users[userid].seed);
-
-			if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
-				char *tmp[2];
-				/* Store login ok */
-				users[userid].authenticated = 1;
-
-				/* Send ip/mtu/netmask info */
-				tempip.s_addr = my_ip;
-				tmp[0] = strdup(format_inaddr(&tempip));
-				tempip.s_addr = users[userid].tun_ip;
-				tmp[1] = strdup(format_inaddr(&tempip));
-
-				read = snprintf(out, sizeof(out), "%s-%s-%d-%d",
-						tmp[0], tmp[1], my_mtu, netmask);
-
-				write_dns(dns_fd, q, out, read, users[userid].downenc);
-				q->id = 0;
-				syslog(LOG_NOTICE, "accepted password from user #%d, given IP %s", userid, tmp[1]);
-
-				free(tmp[1]);
-				free(tmp[0]);
-			} else {
-				write_dns(dns_fd, q, "LNAK", 4, 'T');
-				syslog(LOG_WARNING, "rejected login request from user #%d from %s, bad password",
-					userid, format_addr(&q->from, q->fromlen));
-			}
-		}
-		return;
+		handle_login_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'I' || in[0] == 'i') {
 		/* Request for IP number */
 		char reply[17];
