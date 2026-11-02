@@ -865,6 +865,46 @@ handle_upstream_codec_check_request(int dns_fd, char *in, int domain_len, struct
 }
 
 static void
+handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struct query *q)
+{
+	unsigned int userid;
+	int codec;
+	const struct encoder *enc;
+
+	if (domain_len < 3) { /* len at least 3, example: "S15" */
+		write_dns(dns_fd, q, "BADLEN", 6, 'T');
+		return;
+	}
+
+	userid = b32_8to5(in[1]);
+	if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
+		write_dns(dns_fd, q, "BADIP", 5, 'T');
+		return; /* illegal id */
+	}
+
+	codec = b32_8to5(in[2]);
+	switch (codec) {
+	case 5: /* 5 bits per byte = base32 */
+		enc = &base32_ops;
+		break;
+	case 6: /* 6 bits per byte = base64 */
+		enc = &base64_ops;
+		break;
+	case 26: /* "2nd" 6 bits per byte = base64u, with underscore */
+		enc = &base64u_ops;
+		break;
+	case 7: /* 7 bits per byte = base128 */
+		enc = &base128_ops;
+		break;
+	default:
+		write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
+		return;
+	}
+	user_switch_codec(userid, enc);
+	write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
+}
+
+static void
 handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
 {
 	char in[512];
@@ -889,49 +929,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	} else if (in[0] == 'Z' || in[0] == 'z') {
 		handle_upstream_codec_check_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'S' || in[0] == 's') {
-		int codec;
-		const struct encoder *enc;
-
-		if (domain_len < 3) { /* len at least 3, example: "S15" */
-			write_dns(dns_fd, q, "BADLEN", 6, 'T');
-			return;
-		}
-
-		userid = b32_8to5(in[1]);
-
-		if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
-		}
-
-		codec = b32_8to5(in[2]);
-
-		switch (codec) {
-		case 5: /* 5 bits per byte = base32 */
-			enc = &base32_ops;
-			user_switch_codec(userid, enc);
-			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
-			break;
-		case 6: /* 6 bits per byte = base64 */
-			enc = &base64_ops;
-			user_switch_codec(userid, enc);
-			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
-			break;
-		case 26: /* "2nd" 6 bits per byte = base64u, with underscore */
-			enc = &base64u_ops;
-			user_switch_codec(userid, enc);
-			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
-			break;
-		case 7: /* 7 bits per byte = base128 */
-			enc = &base128_ops;
-			user_switch_codec(userid, enc);
-			write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
-			break;
-		default:
-			write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
-			break;
-		}
-		return;
+		handle_upstream_codec_switch_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'O' || in[0] == 'o') {
 		if (domain_len < 3) { /* len at least 3, example: "O1T" */
 			write_dns(dns_fd, q, "BADLEN", 6, 'T');
