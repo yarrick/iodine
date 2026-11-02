@@ -965,6 +965,119 @@ handle_options_request(int dns_fd, char *in, int domain_len, struct query *q)
 }
 
 static void
+handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, struct query *q)
+{
+	int i;
+	char *datap;
+	int datalen;
+
+	if (domain_len < 6) { /* len at least 6, example: "YTxCMC" */
+		write_dns(dns_fd, q, "BADLEN", 6, 'T');
+		return;
+	}
+
+	i = b32_8to5(in[2]);	/* check variant */
+
+	switch (i) {
+	case 1:
+		datap = DOWNCODECCHECK1;
+		datalen = DOWNCODECCHECK1_LEN;
+		break;
+	default:
+		write_dns(dns_fd, q, "BADLEN", 6, 'T');
+		return;
+	}
+
+	switch (in[1]) {
+	case 'T':
+	case 't':
+		if (q->type == T_TXT ||
+			q->type == T_SRV || q->type == T_MX ||
+			q->type == T_CNAME || q->type == T_A) {
+			write_dns(dns_fd, q, datap, datalen, 'T');
+			return;
+		}
+		break;
+	case 'S':
+	case 's':
+		if (q->type == T_TXT ||
+			q->type == T_SRV || q->type == T_MX ||
+			q->type == T_CNAME || q->type == T_A) {
+			write_dns(dns_fd, q, datap, datalen, 'S');
+			return;
+		}
+		break;
+	case 'U':
+	case 'u':
+		if (q->type == T_TXT ||
+			q->type == T_SRV || q->type == T_MX ||
+			q->type == T_CNAME || q->type == T_A) {
+			write_dns(dns_fd, q, datap, datalen, 'U');
+			return;
+		}
+		break;
+	case 'V':
+	case 'v':
+		if (q->type == T_TXT ||
+			q->type == T_SRV || q->type == T_MX ||
+			q->type == T_CNAME || q->type == T_A) {
+			write_dns(dns_fd, q, datap, datalen, 'V');
+			return;
+		}
+		break;
+	case 'R':
+	case 'r':
+		if (q->type == T_NULL || q->type == T_TXT) {
+			write_dns(dns_fd, q, datap, datalen, 'R');
+			return;
+		}
+		break;
+	}
+
+	/* if still here, then codec not available */
+	write_dns(dns_fd, q, "BADCODEC", 8, 'T');
+}
+
+static void
+handle_downstream_fragsize_probe_request(int dns_fd, char *in, int domain_len, struct query *q)
+{
+	unsigned int userid;
+	int req_frag_size;
+
+	if (domain_len < 16) {  /* we'd better have some chars for data... */
+		write_dns(dns_fd, q, "BADLEN", 6, 'T');
+		return;
+	}
+
+	/* Downstream fragsize probe packet */
+	userid = (b32_8to5(in[1]) >> 1) & 15;
+	if (check_authenticated_user_and_ip(userid, q) != 0) {
+		write_dns(dns_fd, q, "BADIP", 5, 'T');
+		return; /* illegal id */
+	}
+
+	req_frag_size = ((b32_8to5(in[1]) & 1) << 10) | ((b32_8to5(in[2]) & 31) << 5) | (b32_8to5(in[3]) & 31);
+	if (req_frag_size < 2 || req_frag_size > 2047) {
+		write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
+	} else {
+		char buf[2048];
+		int i;
+		unsigned int v;
+		secure_random(&v, sizeof(v));
+		v &= 0xff;
+
+		memset(buf, 0, sizeof(buf));
+		buf[0] = (req_frag_size >> 8) & 0xff;
+		buf[1] = req_frag_size & 0xff;
+		/* make checkable pseudo-random sequence */
+		buf[2] = 107;
+		for (i = 3; i < 2048; i++, v = (v + 107) & 0xff)
+			buf[i] = v;
+		write_dns(dns_fd, q, buf, req_frag_size, users[userid].downenc);
+	}
+}
+
+static void
 handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
 {
 	char in[512];
@@ -993,112 +1106,9 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	} else if (in[0] == 'O' || in[0] == 'o') {
 		handle_options_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'Y' || in[0] == 'y') {
-		int i;
-		char *datap;
-		int datalen;
-
-		if (domain_len < 6) { /* len at least 6, example: "YTxCMC" */
-			write_dns(dns_fd, q, "BADLEN", 6, 'T');
-			return;
-		}
-
-		i = b32_8to5(in[2]);	/* check variant */
-
-		switch (i) {
-		case 1:
-			datap = DOWNCODECCHECK1;
-			datalen = DOWNCODECCHECK1_LEN;
-			break;
-		default:
-			write_dns(dns_fd, q, "BADLEN", 6, 'T');
-			return;
-		}
-
-		switch (in[1]) {
-		case 'T':
-		case 't':
-			if (q->type == T_TXT ||
-			    q->type == T_SRV || q->type == T_MX ||
-			    q->type == T_CNAME || q->type == T_A) {
-				write_dns(dns_fd, q, datap, datalen, 'T');
-				return;
-			}
-			break;
-		case 'S':
-		case 's':
-			if (q->type == T_TXT ||
-			    q->type == T_SRV || q->type == T_MX ||
-			    q->type == T_CNAME || q->type == T_A) {
-				write_dns(dns_fd, q, datap, datalen, 'S');
-				return;
-			}
-			break;
-		case 'U':
-		case 'u':
-			if (q->type == T_TXT ||
-			    q->type == T_SRV || q->type == T_MX ||
-			    q->type == T_CNAME || q->type == T_A) {
-				write_dns(dns_fd, q, datap, datalen, 'U');
-				return;
-			}
-			break;
-		case 'V':
-		case 'v':
-			if (q->type == T_TXT ||
-			    q->type == T_SRV || q->type == T_MX ||
-			    q->type == T_CNAME || q->type == T_A) {
-				write_dns(dns_fd, q, datap, datalen, 'V');
-				return;
-			}
-			break;
-		case 'R':
-		case 'r':
-			if (q->type == T_NULL || q->type == T_TXT) {
-				write_dns(dns_fd, q, datap, datalen, 'R');
-				return;
-			}
-			break;
-		}
-
-		/* if still here, then codec not available */
-		write_dns(dns_fd, q, "BADCODEC", 8, 'T');
-		return;
-
+		handle_downstream_codec_check_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'R' || in[0] == 'r') {
-		int req_frag_size;
-
-		if (domain_len < 16) {  /* we'd better have some chars for data... */
-			write_dns(dns_fd, q, "BADLEN", 6, 'T');
-			return;
-		}
-
-		/* Downstream fragsize probe packet */
-		userid = (b32_8to5(in[1]) >> 1) & 15;
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
-		}
-
-		req_frag_size = ((b32_8to5(in[1]) & 1) << 10) | ((b32_8to5(in[2]) & 31) << 5) | (b32_8to5(in[3]) & 31);
-		if (req_frag_size < 2 || req_frag_size > 2047) {
-			write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
-		} else {
-			char buf[2048];
-			int i;
-			unsigned int v;
-			secure_random(&v, sizeof(v));
-			v &= 0xff;
-
-			memset(buf, 0, sizeof(buf));
-			buf[0] = (req_frag_size >> 8) & 0xff;
-			buf[1] = req_frag_size & 0xff;
-			/* make checkable pseudo-random sequence */
-			buf[2] = 107;
-			for (i = 3; i < 2048; i++, v = (v + 107) & 0xff)
-				buf[i] = v;
-			write_dns(dns_fd, q, buf, req_frag_size, users[userid].downenc);
-		}
-		return;
+		handle_downstream_fragsize_probe_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'N' || in[0] == 'n') {
 		unsigned int max_frag_size;
 
