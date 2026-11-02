@@ -1116,8 +1116,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	char unpacked[64*1024];
 	unsigned int userid;
 	int read;
-
-	userid = -1;
+	char command;
 
 	/* Everything here needs at least two chars in the name */
 	if (domain_len < 2)
@@ -1125,25 +1124,26 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 	memcpy(in, q->name, MIN((unsigned int)domain_len, sizeof(in)));
 
-	if (in[0] == 'V' || in[0] == 'v') {
+	command = ascii_tolower(in[0]);
+	if (command == 'v') {
 		handle_version_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'L' || in[0] == 'l') {
+	} else if (command == 'l') {
 		handle_login_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'I' || in[0] == 'i') {
+	} else if (command == 'i') {
 		handle_ip_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'Z' || in[0] == 'z') {
+	} else if (command == 'z') {
 		handle_upstream_codec_check_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'S' || in[0] == 's') {
+	} else if (command == 's') {
 		handle_upstream_codec_switch_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'O' || in[0] == 'o') {
+	} else if (command == 'o') {
 		handle_options_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'Y' || in[0] == 'y') {
+	} else if (command == 'y') {
 		handle_downstream_codec_check_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'R' || in[0] == 'r') {
+	} else if (command == 'r') {
 		handle_downstream_fragsize_probe_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'N' || in[0] == 'n') {
+	} else if (command == 'n') {
 		handle_downstream_fragsize_set_request(dns_fd, in, domain_len, q);
-	} else if (in[0] == 'P' || in[0] == 'p') {
+	} else if (command == 'p') {
 		int dn_seq;
 		int dn_frag;
 		int didsend = 0;
@@ -1255,9 +1255,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		    !users[userid].lazy)
 			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
 
-	} else if ((in[0] >= '0' && in[0] <= '9')
-			|| (in[0] >= 'a' && in[0] <= 'f')
-			|| (in[0] >= 'A' && in[0] <= 'F')) {
+	} else if ((command >= '0' && command <= '9')
+			|| (command >= 'a' && command <= 'f')) {
 		int up_seq, up_frag, dn_seq, dn_frag, lastfrag;
 		int upstream_ok = 1;
 		int didsend = 0;
