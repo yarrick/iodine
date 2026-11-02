@@ -1078,6 +1078,38 @@ handle_downstream_fragsize_probe_request(int dns_fd, char *in, int domain_len, s
 }
 
 static void
+handle_downstream_fragsize_set_request(int dns_fd, char *in, int domain_len, struct query *q)
+{
+	char unpacked[64*1024];
+	unsigned int userid;
+	unsigned int max_frag_size;
+	int read;
+
+	read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
+	if (read < 3) {
+		write_dns(dns_fd, q, "BADLEN", 6, 'T');
+		return;
+	}
+
+	/* Downstream fragsize packet */
+	userid = unpacked[0];
+	if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
+		write_dns(dns_fd, q, "BADIP", 5, 'T');
+		return; /* illegal id */
+	}
+
+	max_frag_size = ((unpacked[1] & 0xff) << 8) | (unpacked[2] & 0xff);
+	if (max_frag_size < 2) {
+		write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
+	} else {
+		users[userid].fragsize = max_frag_size;
+		users[userid].options_locked = 1;
+		write_dns(dns_fd, q, &unpacked[1], 2, users[userid].downenc);
+	}
+	return;
+}
+
+static void
 handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
 {
 	char in[512];
@@ -1110,31 +1142,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	} else if (in[0] == 'R' || in[0] == 'r') {
 		handle_downstream_fragsize_probe_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'N' || in[0] == 'n') {
-		unsigned int max_frag_size;
-
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
-
-		if (read < 3) {
-			write_dns(dns_fd, q, "BADLEN", 6, 'T');
-			return;
-		}
-
-		/* Downstream fragsize packet */
-		userid = unpacked[0];
-		if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
-		}
-
-		max_frag_size = ((unpacked[1] & 0xff) << 8) | (unpacked[2] & 0xff);
-		if (max_frag_size < 2) {
-			write_dns(dns_fd, q, "BADFRAG", 7, users[userid].downenc);
-		} else {
-			users[userid].fragsize = max_frag_size;
-			users[userid].options_locked = 1;
-			write_dns(dns_fd, q, &unpacked[1], 2, users[userid].downenc);
-		}
-		return;
+		handle_downstream_fragsize_set_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'P' || in[0] == 'p') {
 		int dn_seq;
 		int dn_frag;
