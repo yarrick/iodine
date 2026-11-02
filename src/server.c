@@ -905,6 +905,66 @@ handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struc
 }
 
 static void
+handle_options_request(int dns_fd, char *in, int domain_len, struct query *q)
+{
+	unsigned int userid;
+
+	if (domain_len < 3) { /* len at least 3, example: "O1T" */
+		write_dns(dns_fd, q, "BADLEN", 6, 'T');
+		return;
+	}
+
+	userid = b32_8to5(in[1]);
+	if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
+		write_dns(dns_fd, q, "BADIP", 5, 'T');
+		return; /* illegal id */
+	}
+
+	switch (in[2]) {
+	/* Downstream encoding change */
+	case 'T':
+	case 't':
+		users[userid].downenc = 'T';
+		write_dns(dns_fd, q, "Base32", 6, users[userid].downenc);
+		break;
+	case 'S':
+	case 's':
+		users[userid].downenc = 'S';
+		write_dns(dns_fd, q, "Base64", 6, users[userid].downenc);
+		break;
+	case 'U':
+	case 'u':
+		users[userid].downenc = 'U';
+		write_dns(dns_fd, q, "Base64u", 7, users[userid].downenc);
+		break;
+	case 'V':
+	case 'v':
+		users[userid].downenc = 'V';
+		write_dns(dns_fd, q, "Base128", 7, users[userid].downenc);
+		break;
+	case 'R':
+	case 'r':
+		users[userid].downenc = 'R';
+		write_dns(dns_fd, q, "Raw", 3, users[userid].downenc);
+		break;
+	/* Other options */
+	case 'L':
+	case 'l':
+		users[userid].lazy = 1;
+		write_dns(dns_fd, q, "Lazy", 4, users[userid].downenc);
+		break;
+	case 'I':
+	case 'i':
+		users[userid].lazy = 0;
+		write_dns(dns_fd, q, "Immediate", 9, users[userid].downenc);
+		break;
+	default:
+		write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
+		break;
+	}
+}
+
+static void
 handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
 {
 	char in[512];
@@ -931,59 +991,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	} else if (in[0] == 'S' || in[0] == 's') {
 		handle_upstream_codec_switch_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'O' || in[0] == 'o') {
-		if (domain_len < 3) { /* len at least 3, example: "O1T" */
-			write_dns(dns_fd, q, "BADLEN", 6, 'T');
-			return;
-		}
-
-		userid = b32_8to5(in[1]);
-
-		if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
-		}
-
-		switch (in[2]) {
-		case 'T':
-		case 't':
-			users[userid].downenc = 'T';
-			write_dns(dns_fd, q, "Base32", 6, users[userid].downenc);
-			break;
-		case 'S':
-		case 's':
-			users[userid].downenc = 'S';
-			write_dns(dns_fd, q, "Base64", 6, users[userid].downenc);
-			break;
-		case 'U':
-		case 'u':
-			users[userid].downenc = 'U';
-			write_dns(dns_fd, q, "Base64u", 7, users[userid].downenc);
-			break;
-		case 'V':
-		case 'v':
-			users[userid].downenc = 'V';
-			write_dns(dns_fd, q, "Base128", 7, users[userid].downenc);
-			break;
-		case 'R':
-		case 'r':
-			users[userid].downenc = 'R';
-			write_dns(dns_fd, q, "Raw", 3, users[userid].downenc);
-			break;
-		case 'L':
-		case 'l':
-			users[userid].lazy = 1;
-			write_dns(dns_fd, q, "Lazy", 4, users[userid].downenc);
-			break;
-		case 'I':
-		case 'i':
-			users[userid].lazy = 0;
-			write_dns(dns_fd, q, "Immediate", 9, users[userid].downenc);
-			break;
-		default:
-			write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
-			break;
-		}
-		return;
+		handle_options_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'Y' || in[0] == 'y') {
 		int i;
 		char *datap;
