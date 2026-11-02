@@ -820,6 +820,51 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
 }
 
 static void
+handle_ip_request(int dns_fd, char *in, int domain_len, struct query *q)
+{
+	unsigned int userid;
+	/* Request for IP number */
+	char reply[17];
+	int length;
+	(void)domain_len;
+
+	userid = b32_8to5(in[1]);
+	if (check_authenticated_user_and_ip(userid, q) != 0) {
+		write_dns(dns_fd, q, "BADIP", 5, 'T');
+		return; /* illegal id */
+	}
+
+	reply[0] = 'I';
+	if (q->from.ss_family == AF_INET) {
+		if (ns_ip != INADDR_ANY) {
+			/* If set, use assigned external ip (-n option) */
+			memcpy(&reply[1], &ns_ip, sizeof(ns_ip));
+		} else {
+			/* otherwise return destination ip from packet */
+			struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+			memcpy(&reply[1], &addr->sin_addr, sizeof(struct in_addr));
+		}
+		length = 1 + sizeof(struct in_addr);
+	} else {
+		struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->destination;
+		memcpy(&reply[1], &addr->sin6_addr, sizeof(struct in6_addr));
+		length = 1 + sizeof(struct in6_addr);
+	}
+
+	write_dns(dns_fd, q, reply, length, 'T');
+}
+
+static void
+handle_upstream_codec_check_request(int dns_fd, char *in, int domain_len, struct query *q)
+{
+	/* Check for case conservation and chars not allowed according to RFC */
+
+	/* Reply with received hostname as data */
+	/* No userid here, reply with lowest-grade downenc */
+	write_dns(dns_fd, q, in, domain_len, 'T');
+}
+
+static void
 handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
 {
 	char in[512];
@@ -840,41 +885,9 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	} else if (in[0] == 'L' || in[0] == 'l') {
 		handle_login_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'I' || in[0] == 'i') {
-		/* Request for IP number */
-		char reply[17];
-		int length;
-
-		userid = b32_8to5(in[1]);
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
-			write_dns(dns_fd, q, "BADIP", 5, 'T');
-			return; /* illegal id */
-		}
-
-		reply[0] = 'I';
-		if (q->from.ss_family == AF_INET) {
-			if (ns_ip != INADDR_ANY) {
-				/* If set, use assigned external ip (-n option) */
-				memcpy(&reply[1], &ns_ip, sizeof(ns_ip));
-			} else {
-				/* otherwise return destination ip from packet */
-				struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
-				memcpy(&reply[1], &addr->sin_addr, sizeof(struct in_addr));
-			}
-			length = 1 + sizeof(struct in_addr);
-		} else {
-			struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->destination;
-			memcpy(&reply[1], &addr->sin6_addr, sizeof(struct in6_addr));
-			length = 1 + sizeof(struct in6_addr);
-		}
-
-		write_dns(dns_fd, q, reply, length, 'T');
+		handle_ip_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'Z' || in[0] == 'z') {
-		/* Check for case conservation and chars not allowed according to RFC */
-
-		/* Reply with received hostname as data */
-		/* No userid here, reply with lowest-grade downenc */
-		write_dns(dns_fd, q, in, domain_len, 'T');
-		return;
+		handle_upstream_codec_check_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'S' || in[0] == 's') {
 		int codec;
 		const struct encoder *enc;
