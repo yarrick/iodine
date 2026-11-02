@@ -651,6 +651,7 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 	int read;
 	int version = 0;
 	unsigned int userid;
+	int i;
 
 	read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
 	/* Version greeting, compare and send ack/nak */
@@ -662,67 +663,67 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 			   ((unpacked[3] & 0xff)));
 	}
 
-	if (version == PROTOCOL_VERSION) {
-		if (find_available_user(&userid)) {
-			int i;
-
-			secure_random(&users[userid].seed, sizeof(users[userid].seed));
-			/* Store remote IP number */
-			memcpy(&(users[userid].host), &(q->from), q->fromlen);
-			users[userid].hostlen = q->fromlen;
-
-			memcpy(&(users[userid].q), q, sizeof(struct query));
-			users[userid].encoder = &base32_ops;
-			users[userid].downenc = 'T';
-			send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
-			syslog(LOG_INFO, "accepted version for user #%d from %s",
-				userid, format_addr(&q->from, q->fromlen));
-			users[userid].q.id = 0;
-			users[userid].q.id2 = 0;
-			users[userid].q_sendrealsoon.id = 0;
-			users[userid].q_sendrealsoon.id2 = 0;
-			users[userid].q_sendrealsoon_new = 0;
-			users[userid].outpacket.len = 0;
-			users[userid].outpacket.offset = 0;
-			users[userid].outpacket.sentlen = 0;
-			users[userid].outpacket.seqno = 0;
-			users[userid].outpacket.fragment = 0;
-			users[userid].outfragresent = 0;
-			users[userid].inpacket.len = 0;
-			users[userid].inpacket.offset = 0;
-			users[userid].inpacket.seqno = 0;
-			users[userid].inpacket.fragment = 0;
-			users[userid].fragsize = 100; /* very safe */
-			users[userid].conn = CONN_DNS_NULL;
-			users[userid].lazy = 0;
-#ifdef OUTPACKETQ_LEN
-			users[userid].outpacketq_nexttouse = 0;
-			users[userid].outpacketq_filled = 0;
-#endif
-#ifdef DNSCACHE_LEN
-			for (i = 0; i < DNSCACHE_LEN; i++) {
-				users[userid].dnscache_q[i].id = 0;
-				users[userid].dnscache_answerlen[i] = 0;
-			}
-			users[userid].dnscache_lastfilled = 0;
-#endif
-			for (i = 0; i < QMEMPING_LEN; i++)
-				users[userid].qmemping_type[i] = T_UNSET;
-			users[userid].qmemping_lastfilled = 0;
-			for (i = 0; i < QMEMDATA_LEN; i++)
-				users[userid].qmemdata_type[i] = T_UNSET;
-			users[userid].qmemdata_lastfilled = 0;
-		} else {
-			/* No space for another user */
-			send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
-			syslog(LOG_INFO, "dropped user from %s, server full",
-				format_addr(&q->from, q->fromlen));
-		}
-	} else {
+	if (version != PROTOCOL_VERSION) {
 		send_version_response(dns_fd, VERSION_NACK, PROTOCOL_VERSION, 0, q);
 		syslog(LOG_INFO, "dropped user from %s, sent bad version %08X",
 			format_addr(&q->from, q->fromlen), version);
+		return;
 	}
+
+	if (find_available_user(&userid) == 0) {
+		/* No space for another user */
+		send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
+		syslog(LOG_INFO, "dropped user from %s, server full",
+			format_addr(&q->from, q->fromlen));
+		return;
+	}
+
+	secure_random(&users[userid].seed, sizeof(users[userid].seed));
+	/* Store remote IP number */
+	memcpy(&(users[userid].host), &(q->from), q->fromlen);
+	users[userid].hostlen = q->fromlen;
+
+	memcpy(&(users[userid].q), q, sizeof(struct query));
+	users[userid].encoder = &base32_ops;
+	users[userid].downenc = 'T';
+	send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
+	syslog(LOG_INFO, "accepted version for user #%d from %s",
+		userid, format_addr(&q->from, q->fromlen));
+	users[userid].q.id = 0;
+	users[userid].q.id2 = 0;
+	users[userid].q_sendrealsoon.id = 0;
+	users[userid].q_sendrealsoon.id2 = 0;
+	users[userid].q_sendrealsoon_new = 0;
+	users[userid].outpacket.len = 0;
+	users[userid].outpacket.offset = 0;
+	users[userid].outpacket.sentlen = 0;
+	users[userid].outpacket.seqno = 0;
+	users[userid].outpacket.fragment = 0;
+	users[userid].outfragresent = 0;
+	users[userid].inpacket.len = 0;
+	users[userid].inpacket.offset = 0;
+	users[userid].inpacket.seqno = 0;
+	users[userid].inpacket.fragment = 0;
+	users[userid].fragsize = 100; /* very safe */
+	users[userid].conn = CONN_DNS_NULL;
+	users[userid].lazy = 0;
+#ifdef OUTPACKETQ_LEN
+	users[userid].outpacketq_nexttouse = 0;
+	users[userid].outpacketq_filled = 0;
+#endif
+#ifdef DNSCACHE_LEN
+	for (i = 0; i < DNSCACHE_LEN; i++) {
+		users[userid].dnscache_q[i].id = 0;
+		users[userid].dnscache_answerlen[i] = 0;
+	}
+	users[userid].dnscache_lastfilled = 0;
+#endif
+	for (i = 0; i < QMEMPING_LEN; i++)
+		users[userid].qmemping_type[i] = T_UNSET;
+	users[userid].qmemping_lastfilled = 0;
+	for (i = 0; i < QMEMDATA_LEN; i++)
+		users[userid].qmemdata_type[i] = T_UNSET;
+	users[userid].qmemdata_lastfilled = 0;
 }
 
 /* Process acks from downstream fragments.
