@@ -1275,12 +1275,10 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		if (q->id == 0)
 			return;
 
-		if ((in[0] >= '0' && in[0] <= '9'))
-			code = in[0] - '0';
-		if ((in[0] >= 'a' && in[0] <= 'f'))
-			code = in[0] - 'a' + 10;
-		if ((in[0] >= 'A' && in[0] <= 'F'))
-			code = in[0] - 'A' + 10;
+		if ((command >= '0' && command <= '9'))
+			code = command - '0';
+		if ((command >= 'a' && command <= 'f'))
+			code = command - 'a' + 10;
 
 		userid = code;
 		/* Check user and sending ip number */
