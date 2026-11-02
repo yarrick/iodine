@@ -644,6 +644,87 @@ static void send_version_response(int fd, version_ack_t ack, uint32_t payload,
 	write_dns(fd, q, out, sizeof(out), users[userid].downenc);
 }
 
+static void
+handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
+{
+	char unpacked[64*1024];
+	int read;
+	int version = 0;
+	unsigned int userid;
+
+	read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
+	/* Version greeting, compare and send ack/nak */
+	if (read > 4) {
+		/* Received V + 32bits version */
+		version = (((unpacked[0] & 0xff) << 24) |
+			   ((unpacked[1] & 0xff) << 16) |
+			   ((unpacked[2] & 0xff) << 8) |
+			   ((unpacked[3] & 0xff)));
+	}
+
+	if (version == PROTOCOL_VERSION) {
+		if (find_available_user(&userid)) {
+			int i;
+
+			secure_random(&users[userid].seed, sizeof(users[userid].seed));
+			/* Store remote IP number */
+			memcpy(&(users[userid].host), &(q->from), q->fromlen);
+			users[userid].hostlen = q->fromlen;
+
+			memcpy(&(users[userid].q), q, sizeof(struct query));
+			users[userid].encoder = &base32_ops;
+			users[userid].downenc = 'T';
+			send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
+			syslog(LOG_INFO, "accepted version for user #%d from %s",
+				userid, format_addr(&q->from, q->fromlen));
+			users[userid].q.id = 0;
+			users[userid].q.id2 = 0;
+			users[userid].q_sendrealsoon.id = 0;
+			users[userid].q_sendrealsoon.id2 = 0;
+			users[userid].q_sendrealsoon_new = 0;
+			users[userid].outpacket.len = 0;
+			users[userid].outpacket.offset = 0;
+			users[userid].outpacket.sentlen = 0;
+			users[userid].outpacket.seqno = 0;
+			users[userid].outpacket.fragment = 0;
+			users[userid].outfragresent = 0;
+			users[userid].inpacket.len = 0;
+			users[userid].inpacket.offset = 0;
+			users[userid].inpacket.seqno = 0;
+			users[userid].inpacket.fragment = 0;
+			users[userid].fragsize = 100; /* very safe */
+			users[userid].conn = CONN_DNS_NULL;
+			users[userid].lazy = 0;
+#ifdef OUTPACKETQ_LEN
+			users[userid].outpacketq_nexttouse = 0;
+			users[userid].outpacketq_filled = 0;
+#endif
+#ifdef DNSCACHE_LEN
+			for (i = 0; i < DNSCACHE_LEN; i++) {
+				users[userid].dnscache_q[i].id = 0;
+				users[userid].dnscache_answerlen[i] = 0;
+			}
+			users[userid].dnscache_lastfilled = 0;
+#endif
+			for (i = 0; i < QMEMPING_LEN; i++)
+				users[userid].qmemping_type[i] = T_UNSET;
+			users[userid].qmemping_lastfilled = 0;
+			for (i = 0; i < QMEMDATA_LEN; i++)
+				users[userid].qmemdata_type[i] = T_UNSET;
+			users[userid].qmemdata_lastfilled = 0;
+		} else {
+			/* No space for another user */
+			send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
+			syslog(LOG_INFO, "dropped user from %s, server full",
+				format_addr(&q->from, q->fromlen));
+		}
+	} else {
+		send_version_response(dns_fd, VERSION_NACK, PROTOCOL_VERSION, 0, q);
+		syslog(LOG_INFO, "dropped user from %s, sent bad version %08X",
+			format_addr(&q->from, q->fromlen), version);
+	}
+}
+
 /* Process acks from downstream fragments.
    After this, .offset and .fragment are updated (if ack correct),
    or .len is set to zero when all is done.
@@ -701,82 +782,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 	memcpy(in, q->name, MIN((unsigned int)domain_len, sizeof(in)));
 
 	if (in[0] == 'V' || in[0] == 'v') {
-		int version = 0;
-
-		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
-		/* Version greeting, compare and send ack/nak */
-		if (read > 4) {
-			/* Received V + 32bits version */
-			version = (((unpacked[0] & 0xff) << 24) |
-					   ((unpacked[1] & 0xff) << 16) |
-					   ((unpacked[2] & 0xff) << 8) |
-					   ((unpacked[3] & 0xff)));
-		}
-
-		if (version == PROTOCOL_VERSION) {
-			if (find_available_user(&userid)) {
-				int i;
-
-				secure_random(&users[userid].seed, sizeof(users[userid].seed));
-				/* Store remote IP number */
-				memcpy(&(users[userid].host), &(q->from), q->fromlen);
-				users[userid].hostlen = q->fromlen;
-
-				memcpy(&(users[userid].q), q, sizeof(struct query));
-				users[userid].encoder = &base32_ops;
-				users[userid].downenc = 'T';
-				send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
-				syslog(LOG_INFO, "accepted version for user #%d from %s",
-					userid, format_addr(&q->from, q->fromlen));
-				users[userid].q.id = 0;
-				users[userid].q.id2 = 0;
-				users[userid].q_sendrealsoon.id = 0;
-				users[userid].q_sendrealsoon.id2 = 0;
-				users[userid].q_sendrealsoon_new = 0;
-				users[userid].outpacket.len = 0;
-				users[userid].outpacket.offset = 0;
-				users[userid].outpacket.sentlen = 0;
-				users[userid].outpacket.seqno = 0;
-				users[userid].outpacket.fragment = 0;
-				users[userid].outfragresent = 0;
-				users[userid].inpacket.len = 0;
-				users[userid].inpacket.offset = 0;
-				users[userid].inpacket.seqno = 0;
-				users[userid].inpacket.fragment = 0;
-				users[userid].fragsize = 100; /* very safe */
-				users[userid].conn = CONN_DNS_NULL;
-				users[userid].lazy = 0;
-#ifdef OUTPACKETQ_LEN
-				users[userid].outpacketq_nexttouse = 0;
-				users[userid].outpacketq_filled = 0;
-#endif
-#ifdef DNSCACHE_LEN
-				{
-					for (i = 0; i < DNSCACHE_LEN; i++) {
-						users[userid].dnscache_q[i].id = 0;
-						users[userid].dnscache_answerlen[i] = 0;
-					}
-				}
-				users[userid].dnscache_lastfilled = 0;
-#endif
-				for (i = 0; i < QMEMPING_LEN; i++)
-					users[userid].qmemping_type[i] = T_UNSET;
-				users[userid].qmemping_lastfilled = 0;
-				for (i = 0; i < QMEMDATA_LEN; i++)
-					users[userid].qmemdata_type[i] = T_UNSET;
-				users[userid].qmemdata_lastfilled = 0;
-			} else {
-				/* No space for another user */
-				send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
-				syslog(LOG_INFO, "dropped user from %s, server full",
-					format_addr(&q->from, q->fromlen));
-			}
-		} else {
-			send_version_response(dns_fd, VERSION_NACK, PROTOCOL_VERSION, 0, q);
-			syslog(LOG_INFO, "dropped user from %s, sent bad version %08X",
-				format_addr(&q->from, q->fromlen), version);
-		}
-		return;
+		handle_version_request(dns_fd, in, domain_len, q);
 	} else if (in[0] == 'L' || in[0] == 'l') {
 		read = unpack_data(unpacked, sizeof(unpacked), &(in[1]), domain_len - 1, &base32_ops);
 		if (read < 17) {
