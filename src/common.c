@@ -318,7 +318,7 @@ query_datalen(const char *qname, const char *topdomain)
 				return qpos;
 			}
 			qpos--;
-		} else if (tolower(qname[qpos]) == tolower(topdomain[tpos])) {
+		} else if (ascii_tolower(qname[qpos]) == ascii_tolower(topdomain[tpos])) {
 			/* Matching char, exclude wildcard in query name */
 			if (tpos == 0) {
 				/* Fully matched domain */
@@ -457,8 +457,8 @@ secure_random(void *buf, size_t len)
 
 char
 ascii_tolower(char c) {
-    if (c >= 'A' && c <= 'Z') {
-        return c | 0x20;
-    }
-    return c;
+	if (c >= 'A' && c <= 'Z') {
+		return c | 0x20;
+	}
+	return c;
 }
