@@ -93,6 +93,8 @@ jobs:
       run: pip install ping3
     - name: meson setup
       run: meson setup build
+    - name: env
+      run: env
     - name: run bench
       working-directory: build
-      run: sudo -E ninja tun_bench
+      run: sudo --preserve-env=PYTHONPATH ninja tun_bench
