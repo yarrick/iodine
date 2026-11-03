@@ -352,8 +352,7 @@ static int answer_from_dnscache(int dns_fd, int userid, struct query *q)
 static inline void save_to_qmem(unsigned char *qmem_cmc,
 				unsigned short *qmem_type, int qmem_len,
 				int *qmem_lastfilled,
-				unsigned char *cmc_to_add,
-				unsigned short type_to_add)
+				struct qmem_entry *entry)
 /* Remember query to check for duplicates */
 {
 	int fill;
@@ -362,8 +361,8 @@ static inline void save_to_qmem(unsigned char *qmem_cmc,
 	if (fill >= qmem_len)
 		fill = 0;
 
-	memcpy(qmem_cmc + fill * 4, cmc_to_add, 4);
-	qmem_type[fill] = type_to_add;
+	memcpy(qmem_cmc + fill * 4, entry->cmc, QMEM_CMCLEN);
+	qmem_type[fill] = entry->type;
 	*qmem_lastfilled = fill;
 }
 
@@ -376,13 +375,14 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 	   + 1 char CMC; that last char is non-Base32.
 	 */
 
-	char cmc[8];
+	struct qmem_entry entry;
 	int i;
 
+	entry.type = q->type;
 	if (q->name[0] == 'P' || q->name[0] == 'p') {
 		/* Ping packet */
-
-		size_t cmcsize = sizeof(cmc);
+		char decoded[8];
+		size_t cmcsize = sizeof(decoded);
 		char *cp = strchr(q->name, '.');
 
 		if (cp == NULL)
@@ -390,15 +390,16 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 
 		/* We already unpacked in handle_null_request(), but that's
 		   lost now... Note: b32 directly, we want no undotify here! */
-		i = base32_ops.decode(cmc, &cmcsize, q->name + 1, (cp - q->name) - 1);
+		i = base32_ops.decode(decoded, &cmcsize, q->name + 1, (cp - q->name) - 1);
 
 		if (i < 4)
 			return;	 /* illegal ping; shouldn't happen */
 
+		memcpy(entry.cmc, decoded, sizeof(entry.cmc));
 		save_to_qmem(users[userid].qmemping_cmc,
 			     users[userid].qmemping_type, QMEMPING_LEN,
 			     &users[userid].qmemping_lastfilled,
-			     (void *) cmc, q->type);
+			     &entry);
 	} else {
 		/* Data packet, hopefully not illegal */
 		if (strlen(q->name) < 5)
@@ -410,12 +411,12 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 		   Data-header is always base32, so case-swap won't hurt.
 		 */
 		for (i = 0; i < 4; i++)
-			cmc[i] = ascii_tolower(q->name[i+1]);
+			entry.cmc[i] = ascii_tolower(q->name[i+1]);
 
 		save_to_qmem(users[userid].qmemdata_cmc,
 			     users[userid].qmemdata_type, QMEMDATA_LEN,
 			     &users[userid].qmemdata_lastfilled,
-			     (void *) cmc, q->type);
+			     &entry);
 	}
 }
 

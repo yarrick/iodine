@@ -34,6 +34,13 @@
 #define QMEMDATA_LEN 15
 /* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 6 bytes */
 
+#define QMEM_CMCLEN  4
+/* For matching a query already responded to. */
+struct qmem_entry {
+	unsigned char cmc[QMEM_CMCLEN];
+	uint16_t type;
+};
+
 struct tun_user {
 	char id;
 	int active;
