@@ -21,6 +21,8 @@
 #include "test_main.h"
 
 #include <check.h>
+#include <ctype.h>
+#include <locale.h>
 #include <unistd.h>
 #include <stdio.h>
 #ifdef WINDOWS
@@ -383,6 +385,16 @@ START_TEST(test_secure_random)
 }
 END_TEST
 
+START_TEST(test_ascii_tolower)
+{
+    char *locale = setlocale(LC_CTYPE, "C");
+    ck_assert_ptr_nonnull(locale);
+    for (int c = 0; c < 256; c++) {
+        ck_assert_uint_eq(ascii_tolower(c), tolower(c));
+    }
+}
+END_TEST
+
 TCase *
 test_create(void)
 {
@@ -402,6 +414,7 @@ test_create(void)
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
 	tcase_add_test(tc, test_get_addr_err);
 	tcase_add_test(tc, test_secure_random);
+	tcase_add_test(tc, test_ascii_tolower);
 
 	/* Tests require IPv6 support */
 	sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);

@@ -455,8 +455,8 @@ secure_random(void *buf, size_t len)
 #endif
 }
 
-char
-ascii_tolower(char c) {
+unsigned char
+ascii_tolower(unsigned char c) {
 	if (c >= 'A' && c <= 'Z') {
 		return c | 0x20;
 	}

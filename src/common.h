@@ -115,6 +115,6 @@ void fd_set_close_on_exec(int fd);
  * Used for protocol-seed and nonce generation instead of rand(). */
 void secure_random(void *buf, size_t len);
 
-char ascii_tolower(char c);
+unsigned char ascii_tolower(unsigned char c);
 
 #endif
