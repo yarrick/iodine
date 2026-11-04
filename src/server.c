@@ -349,32 +349,6 @@ static int answer_from_dnscache(int dns_fd, int userid, struct query *q)
 
 #endif /* DNSCACHE_LEN */
 
-static inline void save_to_qmem(int userid, enum qmem_id qmid,
-				struct qmem_entry *entry)
-/* Remember query to check for duplicates */
-{
-	int fill;
-	struct qmem_cache *cache;
-
-	if (qmid == QMEM_PING) {
-		cache = (struct qmem_cache *)
-			&users[userid].qmem_ping;
-	} else if (qmid == QMEM_DATA) {
-		cache = (struct qmem_cache *)
-			&users[userid].qmem_data;
-	} else {
-		return;
-	}
-
-	fill = cache->lastfilled + 1;
-	if (fill >= cache->capacity)
-		fill = 0;
-
-	memcpy(&cache->entries[fill].cmc, entry->cmc, QMEM_CMCLEN);
-	cache->entries[fill].type = entry->type;
-	cache->lastfilled = fill;
-}
-
 static inline void save_to_qmem_pingordata(int userid, struct query *q)
 {
 	/* Our CMC is a bit more than the "official" CMC; we store 4 bytes
@@ -405,7 +379,7 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 			return;	 /* illegal ping; shouldn't happen */
 
 		memcpy(entry.cmc, decoded, sizeof(entry.cmc));
-		save_to_qmem(userid, QMEM_PING, &entry);
+		user_qmem_write(userid, QMEM_PING, &entry);
 	} else {
 		/* Data packet, hopefully not illegal */
 		if (strlen(q->name) < 5)
@@ -418,7 +392,7 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 		 */
 		for (i = 0; i < 4; i++)
 			entry.cmc[i] = ascii_tolower(q->name[i+1]);
-		save_to_qmem(userid, QMEM_DATA, &entry);
+		user_qmem_write(userid, QMEM_DATA, &entry);
 	}
 }
 

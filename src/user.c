@@ -192,3 +192,28 @@ void user_set_conn_type(unsigned int userid, enum connection c)
 	users[userid].conn = c;
 }
 
+void
+user_qmem_write(int userid, enum qmem_id qmid, struct qmem_entry *entry)
+/* Remember query to check for duplicates */
+{
+	int fill;
+	struct qmem_cache *cache;
+
+	if (qmid == QMEM_PING) {
+		cache = (struct qmem_cache *)
+			&users[userid].qmem_ping;
+	} else if (qmid == QMEM_DATA) {
+		cache = (struct qmem_cache *)
+			&users[userid].qmem_data;
+	} else {
+		return;
+	}
+
+	fill = cache->lastfilled + 1;
+	if (fill >= cache->capacity)
+		fill = 0;
+
+	memcpy(&cache->entries[fill].cmc, entry->cmc, QMEM_CMCLEN);
+	cache->entries[fill].type = entry->type;
+	cache->lastfilled = fill;
+}
