@@ -41,6 +41,24 @@ struct qmem_entry {
 	uint16_t type;
 };
 
+struct qmem_cache {
+	uint16_t lastfilled;
+	uint16_t capacity;
+	struct qmem_entry entries[];
+};
+
+struct qmem_ping_cache {
+	uint16_t lastfilled;
+	uint16_t capacity;
+	struct qmem_entry entries[QMEMPING_LEN];
+};
+
+struct qmem_data_cache {
+	uint16_t lastfilled;
+	uint16_t capacity;
+	struct qmem_entry entries[QMEMDATA_LEN];
+};
+
 struct tun_user {
 	char id;
 	int active;
@@ -66,12 +84,8 @@ struct tun_user {
 	unsigned int fragsize;
 	enum connection conn;
 	int lazy;
-	unsigned char qmemping_cmc[QMEMPING_LEN * 4];
-	unsigned short qmemping_type[QMEMPING_LEN];
-	int qmemping_lastfilled;
-	unsigned char qmemdata_cmc[QMEMDATA_LEN * 4];
-	unsigned short qmemdata_type[QMEMDATA_LEN];
-	int qmemdata_lastfilled;
+	struct qmem_ping_cache qmem_ping;
+	struct qmem_data_cache qmem_data;
 #ifdef OUTPACKETQ_LEN
 	struct packet outpacketq[OUTPACKETQ_LEN];
 	int outpacketq_nexttouse;

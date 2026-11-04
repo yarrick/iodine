@@ -158,6 +158,14 @@ int find_available_user(unsigned int *user)
 			users[i].last_pkt = time(NULL);
 			users[i].fragsize = 4096;
 			users[i].conn = CONN_DNS_NULL;
+			for (int q = 0; q < QMEMPING_LEN; q++)
+				users[i].qmem_ping.entries[q].type = T_UNSET;
+			users[i].qmem_ping.lastfilled = QMEMPING_LEN - 1;
+			users[i].qmem_ping.capacity = QMEMPING_LEN;
+			for (int q = 0; q < QMEMDATA_LEN; q++)
+				users[i].qmem_data.entries[q].type = T_UNSET;
+			users[i].qmem_data.lastfilled = QMEMDATA_LEN - 1;
+			users[i].qmem_data.capacity = QMEMDATA_LEN;
 			*user = i;
 			return 1;
 		}
