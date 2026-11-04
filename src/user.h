@@ -29,10 +29,10 @@
 
 
 #define QMEMPING_LEN 30
-/* Max advisable: 64k/2 = 32000. Total mem usage: QMEMPING_LEN * USERS * 6 bytes */
+/* Max advisable: 64k/2 = 32000. Total mem usage: QMEMPING_LEN * USERS * 8 bytes */
 
 #define QMEMDATA_LEN 15
-/* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 6 bytes */
+/* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 8 bytes */
 
 #define QMEM_CMCLEN  4
 /* For matching a query already responded to. */
