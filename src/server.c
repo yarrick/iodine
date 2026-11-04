@@ -403,28 +403,10 @@ static int answer_from_qmem(int dns_fd, struct query *q,
    Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
    not a duplicate. */
 {
-	int i;
-	struct qmem_cache *cache;
-
-	if (qmid == QMEM_PING) {
-		cache = (struct qmem_cache *)
-			&users[userid].qmem_ping;
-	} else if (qmid == QMEM_DATA) {
-		cache = (struct qmem_cache *)
-			&users[userid].qmem_data;
-	} else {
-		return 0;
-	}
-
-	for (i = 0; i < cache->capacity ; i++) {
-
-		if (cache->entries[i].type == T_UNSET)
-			continue;
-		if (cache->entries[i].type != q->type)
-			continue;
-		if (memcmp(cache->entries[i].cmc, cmc_to_check, 4))
-			continue;
-
+	struct qmem_entry entry;
+	memcpy(entry.cmc, cmc_to_check, QMEM_CMCLEN);
+	entry.type = q->type;
+	if (user_qmem_matching(userid, qmid, &entry)) {
 		/* okay, match */
 		ui_debug(1, "OUT  from qmem for %s == duplicate, sending illegal reply\n",
 			 q->name);

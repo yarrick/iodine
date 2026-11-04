@@ -217,3 +217,31 @@ user_qmem_write(int userid, enum qmem_id qmid, struct qmem_entry *entry)
 	cache->entries[fill].type = entry->type;
 	cache->lastfilled = fill;
 }
+
+int
+user_qmem_matching(int userid, enum qmem_id qmid, struct qmem_entry *entry)
+{
+	int i;
+	struct qmem_cache *cache;
+
+	if (qmid == QMEM_PING) {
+		cache = (struct qmem_cache *)
+			&users[userid].qmem_ping;
+	} else if (qmid == QMEM_DATA) {
+		cache = (struct qmem_cache *)
+			&users[userid].qmem_data;
+	} else {
+		return 0;
+	}
+
+	for (i = 0; i < cache->capacity ; i++) {
+		if (cache->entries[i].type == T_UNSET)
+			continue;
+		if (cache->entries[i].type != entry->type)
+			continue;
+		if (memcmp(cache->entries[i].cmc, entry->cmc, QMEM_CMCLEN))
+			continue;
+		return 1;
+	}
+	return 0;
+}

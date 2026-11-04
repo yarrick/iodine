@@ -115,5 +115,6 @@ void user_switch_codec(unsigned int userid, const struct encoder *enc);
 void user_set_conn_type(unsigned int userid, enum connection c);
 
 void user_qmem_write(int userid, enum qmem_id qmid, struct qmem_entry *entry);
+int user_qmem_matching(int userid, enum qmem_id qmid, struct qmem_entry *entry);
 
 #endif
