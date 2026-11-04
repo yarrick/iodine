@@ -55,6 +55,8 @@ int init_users(in_addr_t my_ip, int netbits)
 	for (n = 0; n < netbits; n++) {
 		netmask = (netmask << 1) | 1;
 	}
+	if (netbits > 30)
+		return -1;
 	netmask <<= (32 - netbits);
 	net.s_addr = htonl(netmask);
 	ipstart.s_addr = my_ip & net.s_addr;
