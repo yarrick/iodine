@@ -59,6 +59,11 @@ struct qmem_data_cache {
 	struct qmem_entry entries[QMEMDATA_LEN];
 };
 
+enum qmem_id {
+	QMEM_PING = 1,
+	QMEM_DATA,
+};
+
 struct tun_user {
 	char id;
 	int active;

@@ -349,11 +349,22 @@ static int answer_from_dnscache(int dns_fd, int userid, struct query *q)
 
 #endif /* DNSCACHE_LEN */
 
-static inline void save_to_qmem(struct qmem_cache *cache,
+static inline void save_to_qmem(int userid, enum qmem_id qmid,
 				struct qmem_entry *entry)
 /* Remember query to check for duplicates */
 {
 	int fill;
+	struct qmem_cache *cache;
+
+	if (qmid == QMEM_PING) {
+		cache = (struct qmem_cache *)
+			&users[userid].qmem_ping;
+	} else if (qmid == QMEM_DATA) {
+		cache = (struct qmem_cache *)
+			&users[userid].qmem_data;
+	} else {
+		return;
+	}
 
 	fill = cache->lastfilled + 1;
 	if (fill >= cache->capacity)
@@ -379,7 +390,7 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 	entry.type = q->type;
 	if (q->name[0] == 'P' || q->name[0] == 'p') {
 		/* Ping packet */
-		char decoded[8];
+		char decoded[8]; /* Separate buf needed since decode writes \0 after. */
 		size_t cmcsize = sizeof(decoded);
 		char *cp = strchr(q->name, '.');
 
@@ -394,7 +405,7 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 			return;	 /* illegal ping; shouldn't happen */
 
 		memcpy(entry.cmc, decoded, sizeof(entry.cmc));
-		save_to_qmem((struct qmem_cache *) &users[userid].qmem_ping, &entry);
+		save_to_qmem(userid, QMEM_PING, &entry);
 	} else {
 		/* Data packet, hopefully not illegal */
 		if (strlen(q->name) < 5)
@@ -407,19 +418,29 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 		 */
 		for (i = 0; i < 4; i++)
 			entry.cmc[i] = ascii_tolower(q->name[i+1]);
-
-		save_to_qmem((struct qmem_cache *) &users[userid].qmem_data, &entry);
+		save_to_qmem(userid, QMEM_DATA, &entry);
 	}
 }
 
 static int answer_from_qmem(int dns_fd, struct query *q,
-			    struct qmem_cache *cache,
+			    int userid, enum qmem_id qmid,
 			    unsigned char *cmc_to_check)
 /* Checks query memory and sends an (illegal) answer if this is a duplicate.
    Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
    not a duplicate. */
 {
 	int i;
+	struct qmem_cache *cache;
+
+	if (qmid == QMEM_PING) {
+		cache = (struct qmem_cache *)
+			&users[userid].qmem_ping;
+	} else if (qmid == QMEM_DATA) {
+		cache = (struct qmem_cache *)
+			&users[userid].qmem_data;
+	} else {
+		return 0;
+	}
 
 	for (i = 0; i < cache->capacity ; i++) {
 
@@ -454,7 +475,7 @@ static inline int answer_from_qmem_data(int dns_fd, int userid,
 	for (i = 0; i < 4; i++)
 		cmc[i] = ascii_tolower(q->name[i+1]);
 
-	return answer_from_qmem(dns_fd, q, (struct qmem_cache *) &users[userid].qmem_data,
+	return answer_from_qmem(dns_fd, q, userid, QMEM_DATA,
 				(void *) cmc);
 }
 
@@ -1155,7 +1176,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 #endif
 
 		/* Check if duplicate (and not in full dnscache any more) */
-		if (answer_from_qmem(dns_fd, q, (struct qmem_cache *) &users[userid].qmem_ping,
+		if (answer_from_qmem(dns_fd, q, userid, QMEM_PING,
 				     (void *) unpacked))
 			return;
 
