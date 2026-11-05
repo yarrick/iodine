@@ -1052,6 +1052,57 @@ handle_downstream_fragsize_set_request(int dns_fd, char *in, int domain_len, str
 	return;
 }
 
+static int
+check_duplicate_query(int dns_fd, int userid, struct query *q,
+		      enum qmem_id qmid, char *cmc, char *log_prefix)
+{
+#ifdef DNSCACHE_LEN
+	/* Check if cached */
+	if (answer_from_dnscache(dns_fd, userid, q))
+		return 1;
+#endif
+
+	/* Check if duplicate (and not in full dnscache any more) */
+	if (answer_from_qmem(dns_fd, q, userid, qmid, cmc))
+		return 1;
+
+	/* Check if duplicate of waiting queries; impatient DNS relays
+		like to re-try early and often (with _different_ .id!)  */
+	if (users[userid].q.id != 0 &&
+		q->type == users[userid].q.type &&
+		!strcmp(q->name, users[userid].q.name) &&
+		users[userid].lazy) {
+		/* We have this packet/ping already, and it's waiting to be
+			answered. Always keep the last duplicate, since the
+			relay may have forgotten its first version already.
+			Our answer will go to both.
+			(If we already sent an answer, qmem/cache will
+			have triggered.) */
+		ui_debug(2, "%-4s pkt from user %d = dupe from impatient DNS server, remembering\n",
+			 log_prefix, userid);
+		users[userid].q.id2 = q->id;
+		users[userid].q.fromlen2 = q->fromlen;
+		memcpy(&(users[userid].q.from2), &(q->from), q->fromlen);
+		return 1;
+	}
+
+	if (users[userid].q_sendrealsoon.id != 0 &&
+		q->type == users[userid].q_sendrealsoon.type &&
+		!strcmp(q->name, users[userid].q_sendrealsoon.name)) {
+		/* Outer select loop will send answer immediately,
+			to both queries. */
+		ui_debug(2, "%-4s pkt from user %d = dupe from impatient DNS server, remembering\n",
+			 log_prefix, userid);
+		users[userid].q_sendrealsoon.id2 = q->id;
+		users[userid].q_sendrealsoon.fromlen2 = q->fromlen;
+		memcpy(&(users[userid].q_sendrealsoon.from2),
+			&(q->from), q->fromlen);
+		return 1;
+	}
+
+	return 0;
+}
+
 static void
 handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
 {
@@ -1111,49 +1162,8 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return; /* illegal id */
 		}
 
-#ifdef DNSCACHE_LEN
-		/* Check if cached */
-		if (answer_from_dnscache(dns_fd, userid, q))
+		if (check_duplicate_query(dns_fd, userid, q, QMEM_PING, unpacked, "PING"))
 			return;
-#endif
-
-		/* Check if duplicate (and not in full dnscache any more) */
-		if (answer_from_qmem(dns_fd, q, userid, QMEM_PING, unpacked))
-			return;
-
-		/* Check if duplicate of waiting queries; impatient DNS relays
-		   like to re-try early and often (with _different_ .id!)  */
-		if (users[userid].q.id != 0 &&
-		    q->type == users[userid].q.type &&
-		    !strcmp(q->name, users[userid].q.name) &&
-		    users[userid].lazy) {
-			/* We have this ping already, and it's waiting to be
-			   answered. Always keep the last duplicate, since the
-			   relay may have forgotten its first version already.
-			   Our answer will go to both.
-			   (If we already sent an answer, qmem/cache will
-			   have triggered.) */
-			ui_debug(2, "PING pkt from user %d = dupe from impatient DNS server, remembering\n",
-				 userid);
-			users[userid].q.id2 = q->id;
-			users[userid].q.fromlen2 = q->fromlen;
-			memcpy(&(users[userid].q.from2), &(q->from), q->fromlen);
-			return;
-		}
-
-		if (users[userid].q_sendrealsoon.id != 0 &&
-		    q->type == users[userid].q_sendrealsoon.type &&
-		    !strcmp(q->name, users[userid].q_sendrealsoon.name)) {
-			/* Outer select loop will send answer immediately,
-			   to both queries. */
-			ui_debug(2, "PING pkt from user %d = dupe from impatient DNS server, remembering\n",
-				 userid);
-			users[userid].q_sendrealsoon.id2 = q->id;
-			users[userid].q_sendrealsoon.fromlen2 = q->fromlen;
-			memcpy(&(users[userid].q_sendrealsoon.from2),
-			       &(q->from), q->fromlen);
-			return;
-		}
 
 		dn_seq = unpacked[1] >> 4;
 		dn_frag = unpacked[1] & 15;
@@ -1229,52 +1239,11 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return; /* illegal id */
 		}
 
-#ifdef DNSCACHE_LEN
-		/* Check if cached */
-		if (answer_from_dnscache(dns_fd, userid, q))
-			return;
-#endif
-
 		for (int i = 0; i < 4; i++)
 			cmc[i] = ascii_tolower(q->name[i+1]);
-		/* Check if duplicate (and not in full dnscache any more) */
-		if (answer_from_qmem(dns_fd, q, userid, QMEM_DATA, cmc))
-			return;
 
-		/* Check if duplicate of waiting queries; impatient DNS relays
-		   like to re-try early and often (with _different_ .id!)  */
-		if (users[userid].q.id != 0 &&
-		    q->type == users[userid].q.type &&
-		    !strcmp(q->name, users[userid].q.name) &&
-		    users[userid].lazy) {
-			/* We have this packet already, and it's waiting to be
-			   answered. Always keep the last duplicate, since the
-			   relay may have forgotten its first version already.
-			   Our answer will go to both.
-			   (If we already sent an answer, qmem/cache will
-			   have triggered.) */
-			ui_debug(2, "IN   pkt from user %d = dupe from impatient DNS server, remembering\n",
-				 userid);
-			users[userid].q.id2 = q->id;
-			users[userid].q.fromlen2 = q->fromlen;
-			memcpy(&(users[userid].q.from2), &(q->from), q->fromlen);
+		if (check_duplicate_query(dns_fd, userid, q, QMEM_DATA, cmc, "IN"))
 			return;
-		}
-
-		if (users[userid].q_sendrealsoon.id != 0 &&
-		    q->type == users[userid].q_sendrealsoon.type &&
-		    !strcmp(q->name, users[userid].q_sendrealsoon.name)) {
-			/* Outer select loop will send answer immediately,
-			   to both queries. */
-			ui_debug(2, "IN   pkt from user %d = dupe from impatient DNS server, remembering\n",
-				 userid);
-			users[userid].q_sendrealsoon.id2 = q->id;
-			users[userid].q_sendrealsoon.fromlen2 = q->fromlen;
-			memcpy(&(users[userid].q_sendrealsoon.from2),
-			       &(q->from), q->fromlen);
-			return;
-		}
-
 
 		/* Decode data header */
 		up_seq = (b32_8to5(in[1]) >> 2) & 7;
