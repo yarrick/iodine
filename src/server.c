@@ -1570,8 +1570,8 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		/* Handle A-type query for ns.topdomain, possibly caused
 		   by our proper response to any NS request */
 		if (domain_len == 3 && q.type == T_A &&
-		    (q.name[0] == 'n' || q.name[0] == 'N') &&
-		    (q.name[1] == 's' || q.name[1] == 'S') &&
+		    (ascii_tolower(q.name[0]) == 'n') &&
+		    (ascii_tolower(q.name[1]) == 's') &&
 		     q.name[2] == '.') {
 			handle_a_request(dns_fd, &q, 0);
 			return 0;
@@ -1580,9 +1580,9 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		/* Handle A-type query for www.topdomain, for anyone that's
 		   poking around */
 		if (domain_len == 4 && q.type == T_A &&
-		    (q.name[0] == 'w' || q.name[0] == 'W') &&
-		    (q.name[1] == 'w' || q.name[1] == 'W') &&
-		    (q.name[2] == 'w' || q.name[2] == 'W') &&
+		    (ascii_tolower(q.name[0]) == 'w') &&
+		    (ascii_tolower(q.name[1]) == 'w') &&
+		    (ascii_tolower(q.name[2]) == 'w') &&
 		     q.name[3] == '.') {
 			handle_a_request(dns_fd, &q, 1);
 			return 0;
