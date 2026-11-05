@@ -398,7 +398,7 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 
 static int answer_from_qmem(int dns_fd, struct query *q,
 			    int userid, enum qmem_id qmid,
-			    unsigned char *cmc_to_check)
+			    char *cmc_to_check)
 /* Checks query memory and sends an (illegal) answer if this is a duplicate.
    Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
    not a duplicate. */
@@ -419,20 +419,6 @@ static int answer_from_qmem(int dns_fd, struct query *q,
 
 	/* here only when no match found */
 	return 0;
-}
-
-/* Quick helper function to keep handle_null_request() clean */
-static inline int answer_from_qmem_data(int dns_fd, int userid,
-					struct query *q)
-{
-	char cmc[4];
-	int i;
-
-	for (i = 0; i < 4; i++)
-		cmc[i] = ascii_tolower(q->name[i+1]);
-
-	return answer_from_qmem(dns_fd, q, userid, QMEM_DATA,
-				(void *) cmc);
 }
 
 /* Sends current fragment to user, or dataless packet if there is no
@@ -1132,8 +1118,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 #endif
 
 		/* Check if duplicate (and not in full dnscache any more) */
-		if (answer_from_qmem(dns_fd, q, userid, QMEM_PING,
-				     (void *) unpacked))
+		if (answer_from_qmem(dns_fd, q, userid, QMEM_PING, unpacked))
 			return;
 
 		/* Check if duplicate of waiting queries; impatient DNS relays
@@ -1213,6 +1198,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 	} else if ((command >= '0' && command <= '9')
 			|| (command >= 'a' && command <= 'f')) {
+		char cmc[4];
 		int up_seq, up_frag, dn_seq, dn_frag, lastfrag;
 		int upstream_ok = 1;
 		int didsend = 0;
@@ -1249,8 +1235,10 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			return;
 #endif
 
+		for (int i = 0; i < 4; i++)
+			cmc[i] = ascii_tolower(q->name[i+1]);
 		/* Check if duplicate (and not in full dnscache any more) */
-		if (answer_from_qmem_data(dns_fd, userid, q))
+		if (answer_from_qmem(dns_fd, q, userid, QMEM_DATA, cmc))
 			return;
 
 		/* Check if duplicate of waiting queries; impatient DNS relays
