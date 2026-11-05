@@ -205,6 +205,75 @@ START_TEST(test_user_count_from_netmask)
 }
 END_TEST
 
+static void
+make_entry(struct qmem_entry *q, char *cmc, int type)
+{
+	memcpy(q->cmc, cmc, QMEM_CMCLEN);
+	q->type = type;
+}
+
+START_TEST(test_qmem)
+{
+	struct in_addr ip;
+	unsigned int user;
+	struct qmem_entry p, q, r;
+
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	ck_assert_int_eq(init_users(ip.s_addr, 27), USERS);
+	ck_assert_int_ne(find_available_user(&user), 0);
+
+	make_entry(&p, "ABCD", 11);
+	make_entry(&q, "ABCD", 12);
+	make_entry(&r, "MNOP", 12);
+	user_qmem_write(user, QMEM_PING, &p);
+	user_qmem_write(user, QMEM_DATA, &r);
+	ck_assert_int_eq(user_qmem_matching(user, QMEM_PING, &q), 0);
+	ck_assert_int_eq(user_qmem_matching(user, QMEM_DATA, &q), 0);
+
+	user_qmem_write(user, QMEM_PING, &q);
+	ck_assert_int_ne(user_qmem_matching(user, QMEM_PING, &q), 0);
+	ck_assert_int_eq(user_qmem_matching(user, QMEM_DATA, &q), 0);
+
+	user_qmem_write(user, QMEM_DATA, &q);
+	ck_assert_int_ne(user_qmem_matching(user, QMEM_PING, &q), 0);
+	ck_assert_int_ne(user_qmem_matching(user, QMEM_DATA, &q), 0);
+}
+END_TEST
+
+START_TEST(test_qmem_wrap)
+{
+	struct in_addr ip;
+	unsigned int user;
+	struct qmem_entry oldp, oldd, q;
+
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	ck_assert_int_eq(init_users(ip.s_addr, 27), USERS);
+	ck_assert_int_ne(find_available_user(&user), 0);
+
+	make_entry(&oldp, "INIT", 11);
+	user_qmem_write(user, QMEM_PING, &oldp);
+	make_entry(&oldd, "INIT", 15);
+	user_qmem_write(user, QMEM_DATA, &oldd);
+	for (int i = 0; i < (QMEMPING_LEN + QMEMDATA_LEN); i++) {
+		char cmc[5];
+		snprintf(cmc, sizeof(cmc), "P%03d", i);
+		make_entry(&q, cmc, 12);
+		user_qmem_write(user, QMEM_PING, &q);
+		user_qmem_write(user, QMEM_DATA, &q);
+		if (i + 1 < QMEMPING_LEN) {
+			ck_assert_int_ne(user_qmem_matching(user, QMEM_PING, &oldp), 0);
+		} else {
+			ck_assert_int_eq(user_qmem_matching(user, QMEM_PING, &oldp), 0);
+		}
+		if (i + 1 < QMEMDATA_LEN) {
+			ck_assert_int_ne(user_qmem_matching(user, QMEM_DATA, &oldd), 0);
+		} else {
+			ck_assert_int_eq(user_qmem_matching(user, QMEM_DATA, &oldd), 0);
+		}
+	}
+}
+END_TEST
+
 TCase *
 test_create(void)
 {
@@ -217,6 +286,8 @@ test_create(void)
 	tcase_add_test(tc, test_find_available_user);
 	tcase_add_test(tc, test_find_available_user_small_net);
 	tcase_add_test(tc, test_user_count_from_netmask);
+	tcase_add_test(tc, test_qmem);
+	tcase_add_test(tc, test_qmem_wrap);
 
 	return tc;
 }
