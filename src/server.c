@@ -77,8 +77,8 @@ static int netmask;
 
 static in_addr_t ns_ip;
 
-static int bind_port;
-
+static struct sockaddr *bind_addr;
+static socklen_t bind_addrlen = 0;
 
 static int read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q);
 static void write_dns(int fd, struct query *q, const char *data, size_t datalen, char downenc);
@@ -101,7 +101,8 @@ server_init(struct server_params *params)
 	my_ip = params->server_ip;
 	netmask = params->netmask;
 	ns_ip = params->nameserver_ip;
-	bind_port = params->bind_port;
+	bind_addr = params->bind_addr;
+	bind_addrlen = params->bind_addrlen;
 }
 
 static int
@@ -1482,8 +1483,6 @@ forward_query(int bind_fd, struct query *q)
 	char buf[64*1024];
 	int len;
 	struct fw_query fwq;
-	struct sockaddr_in *myaddr;
-	in_addr_t newaddr;
 
 	len = dns_encode(buf, sizeof(buf), q, QR_QUERY, q->name, strlen(q->name));
 	if (len < 1) {
@@ -1497,10 +1496,8 @@ forward_query(int bind_fd, struct query *q)
 	fwq.id = q->id;
 	fw_query_put(&fwq);
 
-	newaddr = inet_addr("127.0.0.1");
-	myaddr = (struct sockaddr_in *) &(q->from);
-	memcpy(&(myaddr->sin_addr), &newaddr, sizeof(in_addr_t));
-	myaddr->sin_port = htons(bind_port);
+	memcpy(&q->from, bind_addr, bind_addrlen);
+	q->fromlen = bind_addrlen;
 
 	ui_debug(2, "TX: NS reply \n");
 
@@ -1619,7 +1616,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		}
 	} else {
 		/* Forward query to other port ? */
-		if (bind_fd) {
+		if (bind_fd >= 0) {
 			forward_query(bind_fd, &q);
 		}
 	}
@@ -1670,7 +1667,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			maxfd = MAX(dns_fds->v6fd, maxfd);
 		}
 
-		if (bind_fd) {
+		if (bind_fd >= 0) {
 			/* wait for replies from real DNS */
 			FD_SET(bind_fd, &fds);
 			maxfd = MAX(bind_fd, maxfd);
@@ -1716,7 +1713,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			if (dns_fds->v6fd >= 0 && FD_ISSET(dns_fds->v6fd, &fds)) {
 				tunnel_dns(tun_fd, dns_fds->v6fd, dns_fds, bind_fd);
 			}
-			if (FD_ISSET(bind_fd, &fds)) {
+			if (bind_fd >= 0 && FD_ISSET(bind_fd, &fds)) {
 				tunnel_bind(bind_fd, dns_fds);
 			}
 		}

@@ -44,7 +44,8 @@ struct server_params {
 	in_addr_t server_ip;
 	int netmask;
 	in_addr_t nameserver_ip;
-	int bind_port;
+	struct sockaddr *bind_addr;
+	socklen_t bind_addrlen;
 };
 
 void server_init(struct server_params *params);

@@ -243,6 +243,8 @@ main(int argc, char **argv)
 	int bind_fd;
 	int bind_enable;
 	int bind_port;
+	struct sockaddr_storage bind_addr;
+	socklen_t bind_addrlen;
 
 	int created_users;
 	struct in_addr my_ip;
@@ -278,7 +280,8 @@ main(int argc, char **argv)
 	foreground = 0;
 	bind_enable = 0;
 	bind_port = 0;
-	bind_fd = 0;
+	bind_fd = -1;
+	bind_addrlen = 0;
 	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
 			   higher for NULL; tun/zlib adds ~17 bytes. */
 	listen_ip4 = NULL;
@@ -592,6 +595,10 @@ main(int argc, char **argv)
 		prepare_dns_fd(dns_fds.v6fd);
 
 	if (bind_enable) {
+		if (get_addr("127.0.0.1", bind_port, AF_INET, 0, &bind_addr, &bind_addrlen) < 0) {
+			retval = 1;
+			goto cleanup;
+		}
 		if ((bind_fd = open_dns_from_host(NULL, 0, AF_INET, 0)) < 0) {
 			retval = 1;
 			goto cleanup;
@@ -643,14 +650,16 @@ main(int argc, char **argv)
 	params.server_ip = my_ip.s_addr;
 	params.netmask = netmask;
 	params.nameserver_ip = ns_ip.s_addr;
-	params.bind_port = bind_port;
+	params.bind_addr = (struct sockaddr *) &bind_addr;
+	params.bind_addrlen = bind_addrlen;
 
 	server_init(&params);
 
 	server_tunnel(tun_fd, &dns_fds, bind_fd, max_idle_time);
 
 	syslog(LOG_INFO, "stopping");
-	close_dns(bind_fd);
+	if (bind_fd >= 0)
+		close_dns(bind_fd);
 cleanup:
 	if (dns_fds.v6fd >= 0)
 		close_dns(dns_fds.v6fd);
