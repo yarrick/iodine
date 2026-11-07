@@ -32,6 +32,7 @@
 #include "common.h"
 #include "compat.h"
 #include "process.h"
+#include "read.h"
 #include "server.h"
 #include "ui.h"
 
@@ -572,6 +573,7 @@ static void send_version_response(int fd, version_ack_t ack, uint32_t payload,
 				  int userid, struct query *q)
 {
 	char out[9];
+	char *writer;
 
 	switch (ack) {
 	case VERSION_ACK:
@@ -585,11 +587,9 @@ static void send_version_response(int fd, version_ack_t ack, uint32_t payload,
 		break;
 	}
 
-	out[4] = ((payload >> 24) & 0xff);
-	out[5] = ((payload >> 16) & 0xff);
-	out[6] = ((payload >> 8) & 0xff);
-	out[7] = ((payload) & 0xff);
-	out[8] = userid & 0xff;
+	writer = &out[4];
+	putlong(&writer, payload);
+	putbyte(&writer, userid);
 
 	write_dns(fd, q, out, sizeof(out), users[userid].downenc);
 }
@@ -599,7 +599,7 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 {
 	char unpacked[64*1024];
 	int read;
-	int version = 0;
+	uint32_t version = 0;
 	unsigned int userid;
 	int i;
 
@@ -607,10 +607,8 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 	/* Version greeting, compare and send ack/nak */
 	if (read > 4) {
 		/* Received V + 32bits version */
-		version = (((unpacked[0] & 0xff) << 24) |
-			   ((unpacked[1] & 0xff) << 16) |
-			   ((unpacked[2] & 0xff) << 8) |
-			   ((unpacked[3] & 0xff)));
+		char *reader = unpacked;
+		readlong(unpacked, &reader, &version);
 	}
 
 	if (version != PROTOCOL_VERSION) {
