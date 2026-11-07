@@ -467,7 +467,7 @@ static inline void save_to_qmem_pingordata(int userid, struct query *q)
 	if (q->name[0] == 'P' || q->name[0] == 'p') {
 		/* Ping packet */
 
-		size_t cmcsize = sizeof(cmc);
+		size_t cmcsize = sizeof(cmc) - 1;
 		char *cp = strchr(q->name, '.');
 
 		if (cp == NULL)

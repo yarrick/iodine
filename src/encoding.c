@@ -86,6 +86,9 @@ int build_hostname(char *buf, size_t buflen, const char *data,
 int unpack_data(char *buf, size_t buflen, char *data, size_t datalen,
 		const struct encoder *enc)
 {
+	if (buflen == 0)
+		return 0;
+	buflen--;
 	if (!enc->eats_dots)
 		datalen = inline_undotify(data, datalen);
 	return enc->decode(buf, &buflen, data, datalen);
