@@ -127,6 +127,7 @@ get_v4_dstaddr(struct cmsghdr *cmsg)
 #endif
 }
 
+#ifdef SRCADDR_SOCKOPT
 static socklen_t
 set_v4_srcaddr(struct cmsghdr *cmsg, struct in_addr addr)
 {
@@ -144,9 +145,9 @@ set_v4_srcaddr(struct cmsghdr *cmsg, struct in_addr addr)
 	return CMSG_SPACE(sizeof(addr));
 #endif
 }
-
 #endif
 
+#endif
 
 int
 read_udp(int fd, char *packet, size_t packetlen, struct query *q)
@@ -238,10 +239,13 @@ send_udp(int fd, const char *packet, size_t packetlen, struct query *q)
 	msg.msg_controllen = sizeof(control);
 
 	cmsg = CMSG_FIRSTHDR(&msg);
+#ifdef SRCADDR_SOCKOPT
 	if (q->local.ss_family == AF_INET) {
 		struct sockaddr_in *addr = (struct sockaddr_in *) &q->local;
 		msg.msg_controllen = set_v4_srcaddr(cmsg, addr->sin_addr);
-	} else if (q->local.ss_family == AF_INET6) {
+	} else
+#endif
+	if (q->local.ss_family == AF_INET6) {
 		struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->local;
 		struct in6_pktinfo *pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
 		cmsg->cmsg_level = IPPROTO_IPV6;
