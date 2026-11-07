@@ -172,8 +172,10 @@ open_tun(const char *tun_device)
 	}
 
 	data.session = session_handle;
-	memcpy(&(data.addr), &localsock, localsock_len);
-	data.addrlen = localsock_len;
+	data.addrlen = sizeof(data.addr);
+	if (getsockname(tunfd, (struct sockaddr *)&data.addr, &data.addrlen) < 0) {
+		return -1;
+	}
 	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)tun_reader, &data, 0, NULL);
 
 	return tunfd;
