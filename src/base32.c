@@ -58,7 +58,7 @@ int b32_5to8(int in)
 int b32_8to5(int in)
 {
 	base32_reverse_init();
-	return rev32[in];
+	return rev32[(unsigned char) in];
 }
 
 /*
@@ -150,7 +150,7 @@ static unsigned int base32_encode(char *buf, size_t *buflen,
 	return iout;
 }
 
-#define REV32(x) rev32[(int) (x)]
+#define REV32(x) rev32[(unsigned char) (x)]
 
 /*
  * Fills *buf with max. *buflen bytes, decoded from slen chars in *str.

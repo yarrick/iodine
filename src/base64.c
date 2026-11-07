@@ -122,7 +122,7 @@ static unsigned int base64_gen_encode(struct alphabet *a, char *buf, size_t *buf
 	return iout;
 }
 
-#define REV64(x) rev64[(int) (x)]
+#define REV64(x) rev64[(unsigned char) (x)]
 
 /*
  * Fills *buf with max. *buflen bytes, decoded from slen chars in *str.
