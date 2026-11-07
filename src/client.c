@@ -1389,7 +1389,7 @@ handshake_login(int dns_fd, int seed)
 			struct in_addr clientaddr;
 			char server[65];
 			char client[65];
-			int netmask;
+			int netbits;
 
 			if (strncmp("LNAK", in, 4) == 0) {
 				ui_log("Bad password\n");
@@ -1398,28 +1398,17 @@ handshake_login(int dns_fd, int seed)
 				warnx("BADIP: Server rejected sender IP address (maybe iodined -c will help)");
 				return 1;
 			} else if (sscanf(in, "%64[^-]-%64[^-]-%d-%d",
-				   server, client, &mtu, &netmask) == 4) {
+				   server, client, &mtu, &netbits) == 4) {
 				server[64] = 0;
 				client[64] = 0;
-				/* The netmask prefix length comes from the server's reply.
-				   Validate it: tun_setip() computes the mask with
-				   "netmask <<= (32 - netbits)", which is undefined
-				   behavior for netbits < 1 or > 32 (an on-path
-				   attacker can supply the reply - see the lack of
-				   channel authentication). Reject like a malformed
-				   handshake and retry login. */
-				if (netmask < 1 || netmask > 32) {
-					ui_log("Received bad handshake (netmask %d)\n",
-						netmask);
+				if (netbits < 1 || netbits > 32) {
+					ui_log("Received bad handshake (netbits %d)\n", netbits);
 				} else if (inet_pton(AF_INET, client, &clientaddr) <= 0) {
-					ui_log("Received bad client IP (%s)\n",
-						client);
+					ui_log("Received bad client IP (%s)\n", client);
 				} else if (inet_pton(AF_INET, server, &serveraddr) <= 0) {
-					ui_log("Received bad server IP (%s)\n",
-						server);
+					ui_log("Received bad server IP (%s)\n", server);
 				} else if (tun_setip(&clientaddr.s_addr,
-						     &serveraddr.s_addr,
-						     netmask) == 0 &&
+						     &serveraddr.s_addr, netbits) == 0 &&
 					   tun_setmtu(mtu) == 0) {
 					ui_log("Server tunnel IP is %s\n", server);
 					return 0;
@@ -1427,7 +1416,7 @@ handshake_login(int dns_fd, int seed)
 					errx(4, "Failed to set IP and MTU");
 				}
 			} else {
-				ui_log("Received bad handshake\n");
+				ui_log("Received malformed handshake\n");
 			}
 		}
 
