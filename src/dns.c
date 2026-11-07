@@ -322,19 +322,19 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 	return len;
 }
 
-/* Only used when iodined gets an A type query for ns.topdomain or
+/* Only used when iodined gets an A/AAAA type query for ns.topdomain or
  * www.topdomain . Mostly same as dns_encode_ns_response() above */
-int dns_encode_a_response(char *buf, size_t buflen, struct query *q)
+int dns_encode_standard_response(char *buf, size_t buflen, struct query *q)
 {
-	struct sockaddr_in *dest = (struct sockaddr_in *) &q->destination;
 	HEADER *header;
 	int len;
 	short name;
 	char *ipp;
 	char *p;
 
-	/* Check if we have an IPv4 address to send */
-	if (q->destination.ss_family != AF_INET)
+	/* Check if we have an suitable address to send */
+	if ((q->type == T_A && q->destination.ss_family != AF_INET) ||
+	    (q->type == T_AAAA && q->destination.ss_family != AF_INET6))
 		return -1;
 
 	if (buflen < sizeof(HEADER))
@@ -372,12 +372,22 @@ int dns_encode_a_response(char *buf, size_t buflen, struct query *q)
 	putshort(&p, q->type);	/* Type */
 	putshort(&p, C_IN);	/* Class */
 	putlong(&p, 3600);	/* TTL */
-	putshort(&p, 4);	/* Data length */
 
-	/* IPv4 address */
-	ipp = (char *) &dest->sin_addr.s_addr;
-	CHECKLEN(4);
-	putdata(&p, ipp, sizeof(dest->sin_addr.s_addr));
+	if (q->type == T_A) {
+		putshort(&p, 4);	/* Data length */
+		/* IPv4 address */
+		struct sockaddr_in *dest = (struct sockaddr_in *) &q->destination;
+		ipp = (char *) &dest->sin_addr.s_addr;
+		CHECKLEN(4);
+		putdata(&p, ipp, sizeof(dest->sin_addr.s_addr));
+	} else if (q->type == T_AAAA) {
+		putshort(&p, 16);	/* Data length */
+		/* IPv6 address */
+		struct sockaddr_in6 *dest = (struct sockaddr_in6 *) &q->destination;
+		ipp = (char *) &dest->sin6_addr;
+		CHECKLEN(16);
+		putdata(&p, ipp, sizeof(dest->sin6_addr));
+	}
 
 	len = p - buf;
 	return len;

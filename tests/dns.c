@@ -343,7 +343,7 @@ START_TEST(test_encode_a_response)
 
 	/* Non-IPv4 destination should fail with -1 */
 	q.destination.ss_family = AF_INET6;
-	ck_assert_int_eq(dns_encode_a_response(buf, sizeof(buf), &q), -1);
+	ck_assert_int_eq(dns_encode_standard_response(buf, sizeof(buf), &q), -1);
 
 	/* Valid IPv4 destination (1.2.3.4) */
 	dest = (struct sockaddr_in *) &q.destination;
@@ -352,10 +352,51 @@ START_TEST(test_encode_a_response)
 
 	for (size_t len = 0; len < expected_len; len++) {
 		/* Return 0 when encoded response does not fit */
-		ck_assert_int_eq(dns_encode_a_response(buf, len, &q), 0);
+		ck_assert_int_eq(dns_encode_standard_response(buf, len, &q), 0);
 	}
 
-	ret = dns_encode_a_response(buf, sizeof(buf), &q);
+	ret = dns_encode_standard_response(buf, sizeof(buf), &q);
+	ck_assert_int_eq(ret, expected_len);
+	ck_assert_mem_eq(buf, expected, expected_len);
+}
+END_TEST
+
+START_TEST(test_encode_aaaa_response)
+{
+	/* Expected response for AAAA query "ns.t.iodine.tun", answer 2001:db8::1:f2:f03:f004 */
+	const char expected[] =
+		"\x05\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x00" /* Header (qr=1, aa=1, qd=1, an=1) */
+		"\x02\x6E\x73\x01\x74\x06\x69\x6F\x64\x69\x6E\x65" /* QUERY: "ns.t.iodine" */
+		"\x03\x74\x75\x6E\x00"				   /*   ".tun" */
+		"\x00\x1C\x00\x01"                                 /*   TYPE: AAAA, CLASS: IN */
+		"\xC0\x0C\x00\x1C\x00\x01"                         /* ANSWER ptr 0x0C, TYPE: AAAA, CLASS: IN */
+		"\x00\x00\x0E\x10\x00\x10"                         /*   TTL: 3600, RDLENGTH: 16 */
+		"\x20\x01\x0D\xB8\x00\x00\x00\x00\x00\x01\x00\xF2\x0F\x03\xF0\x04";   /*   RDATA: 2001:db8::1:f2:f03:f004 */
+	char buf[512];
+	struct query q;
+	struct sockaddr_in6 *dest;
+	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
+	int ret;
+
+	memset(&q, 0, sizeof(q));
+	strlcpy(q.name, "ns.t.iodine.tun", sizeof(q.name));
+	q.type = T_AAAA;
+	q.id = 1337;
+
+	/* Non-IPv6 destination should fail with -1 */
+	q.destination.ss_family = AF_INET;
+	ck_assert_int_eq(dns_encode_standard_response(buf, sizeof(buf), &q), -1);
+
+	dest = (struct sockaddr_in6 *) &q.destination;
+	dest->sin6_family = AF_INET6;
+	inet_pton(AF_INET6, "2001:db8::1:f2:f03:f004", &dest->sin6_addr);
+
+	for (size_t len = 0; len < expected_len; len++) {
+		/* Return 0 when encoded response does not fit */
+		ck_assert_int_eq(dns_encode_standard_response(buf, len, &q), 0);
+	}
+
+	ret = dns_encode_standard_response(buf, sizeof(buf), &q);
 	ck_assert_int_eq(ret, expected_len);
 	ck_assert_mem_eq(buf, expected, expected_len);
 }
@@ -436,6 +477,7 @@ test_create(void)
 	tcase_add_test(tc, test_get_id_low);
 	tcase_add_test(tc, test_get_id_high);
 	tcase_add_test(tc, test_encode_a_response);
+	tcase_add_test(tc, test_encode_aaaa_response);
 	tcase_add_test(tc, test_encode_ns_response);
 
 	return tc;

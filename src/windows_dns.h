@@ -35,6 +35,7 @@ typedef unsigned long in_addr_t;
 #endif
 
 #define T_A DNS_TYPE_A
+#define T_AAAA DNS_TYPE_AAAA
 #define T_NS DNS_TYPE_NS
 #define T_NULL DNS_TYPE_NULL
 #define T_CNAME DNS_TYPE_CNAME
@@ -45,6 +46,7 @@ typedef unsigned long in_addr_t;
 
 #define C_IN 1
 
+#define NOERROR 0
 #define FORMERR 1
 #define SERVFAIL 2
 #define NXDOMAIN 3

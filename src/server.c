@@ -1441,9 +1441,9 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	if (q->destination.ss_family != AF_INET)
 		return;
 
-	len = dns_encode_a_response(buf, sizeof(buf), q);
+	len = dns_encode_standard_response(buf, sizeof(buf), q);
 	if (len < 1) {
-		warnx("dns_encode_a_response doesn't fit");
+		warnx("dns_encode_standard_response doesn't fit");
 		return;
 	}
 
@@ -1453,6 +1453,40 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 		warn("a reply send error");
 	}
 }
+
+static void
+handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fakeip)
+{
+	char buf[64*1024];
+	int len;
+
+	if (fakeip) {
+		get_addr("::1", DNS_PORT, AF_INET6, 0, &q->destination, &q->dest_len);
+	}
+
+	/* Send NOERROR if no IPv6 address known (when AAAA request received over IPv4
+	 * and destination was not overwritten above) */
+	if (q->destination.ss_family != AF_INET6) {
+		len = dns_encode_soa(buf, sizeof(buf), q, topdomain, NOERROR);
+		if (len < 1) {
+            warnx("dns_encode_soa doesn't fit");
+            return;
+        }
+	} else {
+		len = dns_encode_standard_response(buf, sizeof(buf), q);
+		if (len < 1) {
+			warnx("dns_encode_standard_response doesn't fit");
+			return;
+		}
+	}
+
+	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes AAAA reply\n",
+		 format_addr(&q->from, q->fromlen), q->type, q->name, len);
+	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->from, q->fromlen) <= 0) {
+		warn("aaaa reply send error");
+	}
+}
+
 
 static void
 handle_underscore_request(int dns_fd, struct query *q, const char *topdomain)
@@ -1562,23 +1596,35 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 
 		/* Handle A-type query for ns.topdomain, possibly caused
 		   by our proper response to any NS request */
-		if (domain_len == 3 && q.type == T_A &&
+		if (domain_len == 3 &&
 		    (ascii_tolower(q.name[0]) == 'n') &&
 		    (ascii_tolower(q.name[1]) == 's') &&
 		     q.name[2] == '.') {
-			handle_a_request(dns_fd, &q, 0);
-			return 0;
+			if (q.type == T_A) {
+				handle_a_request(dns_fd, &q, 0);
+				return 0;
+			}
+			if (q.type == T_AAAA) {
+				handle_aaaa_request(dns_fd, &q, topdomain, 0);
+				return 0;
+			}
 		}
 
 		/* Handle A-type query for www.topdomain, for anyone that's
 		   poking around */
-		if (domain_len == 4 && q.type == T_A &&
+		if (domain_len == 4 &&
 		    (ascii_tolower(q.name[0]) == 'w') &&
 		    (ascii_tolower(q.name[1]) == 'w') &&
 		    (ascii_tolower(q.name[2]) == 'w') &&
 		     q.name[3] == '.') {
-			handle_a_request(dns_fd, &q, 1);
-			return 0;
+			if (q.type == T_A) {
+				handle_a_request(dns_fd, &q, 1);
+				return 0;
+			}
+			if (q.type == T_AAAA) {
+				handle_aaaa_request(dns_fd, &q, topdomain, 1);
+				return 0;
+			}
 		}
 
 		/* Handle A-type query for _.***.topdomain. It happens when
