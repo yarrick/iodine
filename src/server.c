@@ -81,9 +81,10 @@ static in_addr_t ns_ip;
 static struct sockaddr *bind_addr;
 static socklen_t bind_addrlen = 0;
 
-static int read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q);
+static int read_dns(int fd, char *packet, size_t packetlen, struct query *q);
 static void write_dns(int fd, struct query *q, const char *data, size_t datalen, char downenc);
 static void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid);
+static int raw_decode(char *packet, int len, struct query *q, int dns_fd, struct dnsfd *dns_fds, int tun_fd);
 
 void
 server_stop(void)
@@ -1584,12 +1585,22 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 static int
 tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 {
+	char packet[64*1024];
 	struct query q;
 	int read;
 	int domain_len;
 
-	if ((read = read_dns(dns_fd, dns_fds, tun_fd, &q)) <= 0)
+	/* Only fills q->from and q->destination, not q->name */
+	if ((read = read_dns(dns_fd, packet, sizeof(packet), &q)) <= 0)
 		return 0;
+
+	if (raw_decode(packet, read, &q, dns_fd, dns_fds, tun_fd)) {
+		return 0;
+	}
+
+	if (dns_decode(NULL, 0, &q, QR_QUERY, packet, read) <= 0) {
+		return 0;
+	}
 
 	ui_debug(2, "RX: client %s, type %d, name %s\n",
 		 format_addr(&q.from, q.fromlen), q.type, q.name);
@@ -1945,12 +1956,9 @@ raw_decode(char *packet, int len, struct query *q, int dns_fd, struct dnsfd *dns
 }
 
 static int
-read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
-/* FIXME: dns_fds and tun_fd are because of raw_decode() below */
+read_dns(int fd, char *packet, size_t packetlen, struct query *q)
 {
-	struct sockaddr_storage from;
 	socklen_t addrlen;
-	char packet[64*1024];
 	int r;
 #ifndef WINDOWS
 	char control[CMSG_SPACE(sizeof (struct in6_pktinfo))];
@@ -1960,9 +1968,9 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 
 	addrlen = sizeof(struct sockaddr_storage);
 	iov.iov_base = packet;
-	iov.iov_len = sizeof(packet);
+	iov.iov_len = packetlen;
 
-	msg.msg_name = (caddr_t) &from;
+	msg.msg_name = (caddr_t) &q->from;
 	msg.msg_namelen = (unsigned) addrlen;
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
@@ -1974,20 +1982,11 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 	addrlen = msg.msg_namelen;
 #else
 	addrlen = sizeof(struct sockaddr_storage);
-	r = recvfrom(fd, packet, sizeof(packet), 0, (struct sockaddr*)&from, &addrlen);
+	r = recvfrom(fd, packet, packetlen, 0, (struct sockaddr *)&q->from, &addrlen);
 #endif /* !WINDOWS */
 
 	if (r > 0) {
-		memcpy((struct sockaddr*)&q->from, (struct sockaddr*)&from, addrlen);
 		q->fromlen = addrlen;
-
-		/* TODO do not handle raw packets here! */
-		if (raw_decode(packet, r, q, fd, dns_fds, tun_fd)) {
-			return 0;
-		}
-		if (dns_decode(NULL, 0, q, QR_QUERY, packet, r) <= 0) {
-			return 0;
-		}
 
 		memset(&q->destination, 0, sizeof(struct sockaddr_storage));
 		q->dest_len = sizeof(struct sockaddr_storage);
@@ -2019,7 +2018,7 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 		}
 #endif
 
-		return strlen(q->name);
+		return r;
 	} else if (r < 0) {
 		/* Error */
 		warn("read dns");
