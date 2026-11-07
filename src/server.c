@@ -1496,7 +1496,7 @@ handle_soa_request(int dns_fd, struct query *q, const char *topdomain, int rcode
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes rcode %d SOA reply\n",
-		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
+		 format_addr(&q->remote, q->remotelen), q->type, q->name, len, rcode);
 	send_udp(dns_fd, buf, len, q);
 }
 
