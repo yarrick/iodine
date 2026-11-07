@@ -1484,18 +1484,18 @@ handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fake
 
 
 static void
-handle_underscore_request(int dns_fd, struct query *q, const char *topdomain)
+handle_soa_request(int dns_fd, struct query *q, const char *topdomain, int rcode)
 {
 	char buf[64*1024];
 	int len;
 
-	len = dns_encode_soa(buf, sizeof(buf), q, topdomain, NXDOMAIN);
+	len = dns_encode_soa(buf, sizeof(buf), q, topdomain, rcode);
 	if (len < 1) {
 		warnx("dns_encode_soa doesn't fit");
 		return;
 	}
 
-	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes NXDOMAIN reply\n",
+	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes rcode %d SOA reply\n",
 		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
 	send_udp(dns_fd, buf, len, q);
 }
@@ -1635,7 +1635,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		if (q.type == T_A &&
 		    (q.name[0] == '_') &&
 		     q.name[1] == '.') {
-			handle_underscore_request(dns_fd, &q, topdomain);
+			handle_soa_request(dns_fd, &q, topdomain, NXDOMAIN);
 			return 0;
 		}
 
