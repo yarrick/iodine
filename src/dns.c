@@ -312,13 +312,10 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 		putlong(&p, 3600);		/* TTL */
 		putshort(&p, 4);		/* Data length */
 
-		/* ugly hack to output IP address */
+		/* IPv4 address */
 		ipp = (char *) &dest->sin_addr.s_addr;
 		CHECKLEN(4);
-		putbyte(&p, *(ipp++));
-		putbyte(&p, *(ipp++));
-		putbyte(&p, *(ipp++));
-		putbyte(&p, *ipp);
+		putdata(&p, ipp, sizeof(dest->sin_addr.s_addr));
 	}
 
 	len = p - buf;
