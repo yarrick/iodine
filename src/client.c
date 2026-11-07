@@ -456,7 +456,11 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
  * Returns #bytes usefully filled in outdata.
  */
 {
-	size_t outdatalenu = outdatalen;
+	size_t outdatalenu;
+
+	if (outdatalen <= 0)
+		return 0;
+	outdatalenu = outdatalen - 1;
 
 	switch (buf[0]) {
 	case 'h': /* Hostname with base32 */

@@ -94,6 +94,19 @@ START_TEST(test_build_hostname)
 }
 END_TEST
 
+START_TEST(test_unpack_data_bounds)
+{
+	char data[] = "nfxwi0lomv0gk21unfxgo3dfon0gs1th";
+	char buf[8];
+	int len;
+
+	len = unpack_data(buf, sizeof(buf), data, strlen(data), &base32_ops);
+	ck_assert_int_eq(len, sizeof(buf) - 1);
+	ck_assert_int_eq(buf[sizeof(buf) - 1], '\0');
+	ck_assert_int_eq(unpack_data(buf, 0, data, strlen(data), &base32_ops), 0);
+}
+END_TEST
+
 TCase *
 test_create(void)
 {
@@ -103,6 +116,7 @@ test_create(void)
 	tcase_add_loop_test(tc, test_inline_dotify, 0, TUPLES);
 	tcase_add_loop_test(tc, test_inline_undotify, 0, TUPLES);
 	tcase_add_test(tc, test_build_hostname);
+	tcase_add_test(tc, test_unpack_data_bounds);
 
 	return tc;
 }
