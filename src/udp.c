@@ -26,6 +26,7 @@
 #include <wincrypt.h>
 #else
 #include <err.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -125,6 +126,25 @@ get_v4_dstaddr(struct cmsghdr *cmsg)
 	return *(struct in_addr *) CMSG_DATA(cmsg);
 #endif
 }
+
+static socklen_t
+set_v4_srcaddr(struct cmsghdr *cmsg, struct in_addr addr)
+{
+	cmsg->cmsg_level = IPPROTO_IP;
+	cmsg->cmsg_type = SRCADDR_SOCKOPT;
+#ifdef IP_PKTINFO
+	struct in_pktinfo *pktinfo = (struct in_pktinfo *) CMSG_DATA(cmsg);
+	cmsg->cmsg_len = CMSG_LEN(sizeof(*pktinfo));
+	pktinfo->ipi_spec_dst = addr;
+	pktinfo->ipi_addr = addr;
+	return CMSG_SPACE(sizeof(*pktinfo));
+#else
+	cmsg->cmsg_len = CMSG_LEN(sizeof(addr));
+	*(struct in_addr *) CMSG_DATA(cmsg) = addr;
+	return CMSG_SPACE(sizeof(addr));
+#endif
+}
+
 #endif
 
 
@@ -191,6 +211,62 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 	}
 #endif
 
+	return r;
+}
+
+/* Send data to q->remote, using q->local as source address */
+int
+send_udp(int fd, const char *packet, size_t packetlen, struct query *q)
+{
+	int r;
+#ifndef WINDOWS
+	char control[CMSG_SPACE(sizeof (struct in6_pktinfo))];
+	struct msghdr msg;
+	struct iovec iov;
+	struct cmsghdr *cmsg;
+
+	iov.iov_base = (void *) packet;
+	iov.iov_len = packetlen;
+
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_name = (caddr_t) &q->remote;
+	msg.msg_namelen = q->remotelen;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	memset(control, 0, sizeof(control));
+	msg.msg_control = control;
+	msg.msg_controllen = sizeof(control);
+
+	cmsg = CMSG_FIRSTHDR(&msg);
+	if (q->local.ss_family == AF_INET) {
+		struct sockaddr_in *addr = (struct sockaddr_in *) &q->local;
+		msg.msg_controllen = set_v4_srcaddr(cmsg, addr->sin_addr);
+	} else if (q->local.ss_family == AF_INET6) {
+		struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->local;
+		struct in6_pktinfo *pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
+		cmsg->cmsg_level = IPPROTO_IPV6;
+		cmsg->cmsg_type = IPV6_PKTINFO;
+		cmsg->cmsg_len = CMSG_LEN(sizeof(*pktinfo));
+		memcpy(&pktinfo->ipi6_addr, &addr->sin6_addr, sizeof(struct in6_addr));
+		msg.msg_controllen = CMSG_SPACE(sizeof(*pktinfo));
+	} else {
+		msg.msg_control = NULL;
+		msg.msg_controllen = 0;
+	}
+
+	r = sendmsg(fd, &msg, 0);
+	if (r < 0 && msg.msg_controllen && (errno == EINVAL || errno == EADDRNOTAVAIL)) {
+		/* Retry without setting source address */
+		msg.msg_control = NULL;
+		msg.msg_controllen = 0;
+		r = sendmsg(fd, &msg, 0);
+	}
+#else
+	r = sendto(fd, packet, packetlen, 0, (struct sockaddr *) &q->remote, q->remotelen);
+#endif /* !WINDOWS */
+	if (r < 0) {
+		warn("send_udp");
+	}
 	return r;
 }
 

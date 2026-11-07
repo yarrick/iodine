@@ -1408,9 +1408,7 @@ handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes NS reply\n",
 		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
-	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->remote, q->remotelen) <= 0) {
-		warn("ns reply send error");
-	}
+	send_udp(dns_fd, buf, len, q);
 }
 
 static void
@@ -1446,9 +1444,7 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes A reply\n",
 		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
-	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->remote, q->remotelen) <= 0) {
-		warn("a reply send error");
-	}
+	send_udp(dns_fd, buf, len, q);
 }
 
 static void
@@ -1483,9 +1479,7 @@ handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fake
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes AAAA reply\n",
 		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
-	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->remote, q->remotelen) <= 0) {
-		warn("aaaa reply send error");
-	}
+	send_udp(dns_fd, buf, len, q);
 }
 
 
@@ -1503,9 +1497,7 @@ handle_underscore_request(int dns_fd, struct query *q, const char *topdomain)
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes NXDOMAIN reply\n",
 		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
-	if (sendto(dns_fd, buf, len, 0, (struct sockaddr*)&q->remote, q->remotelen) <= 0) {
-		warn("nxdomain reply send error");
-	}
+	send_udp(dns_fd, buf, len, q);
 }
 
 static void

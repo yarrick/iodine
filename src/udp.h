@@ -34,4 +34,5 @@ int open_udp_from_host(char *host, int port, int addr_family, int flags);
 void close_udp(int);
 
 int read_udp(int fd, char *packet, size_t packetlen, struct query *q);
+int send_udp(int fd, const char *packet, size_t packetlen, struct query *q);
 #endif

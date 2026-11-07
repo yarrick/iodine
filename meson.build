@@ -126,8 +126,10 @@ endif
 
 if cc.has_header_symbol('netinet/in.h', 'IP_PKTINFO')
   cdata.set('DSTADDR_SOCKOPT', 'IP_PKTINFO')
+  cdata.set('SRCADDR_SOCKOPT', 'IP_PKTINFO')
 elif cc.has_header_symbol('netinet/in.h', 'IP_RECVDSTADDR')
   cdata.set('DSTADDR_SOCKOPT', 'IP_RECVDSTADDR')
+  cdata.set('SRCADDR_SOCKOPT', 'IP_SENDSRCADDR')
 endif
 
 # For md5
