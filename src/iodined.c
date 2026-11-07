@@ -88,7 +88,7 @@ get_external_ip(struct in_addr *ip)
 	memset(&query, 0, sizeof(query));
 
 	query.type = T_A;
-	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &query.destination, &query.dest_len))
+	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &query.remote, &query.remotelen))
 		return 1;
 
 	fd = open_udp_from_host(NULL, 0, AF_INET, AI_PASSIVE);
@@ -107,7 +107,7 @@ get_external_ip(struct in_addr *ip)
 		buflen = dns_encode(buf, buflen, &query, QR_QUERY, target, strlen(target));
 		if (buflen < 0) continue;
 
-		sendto(fd, buf, buflen, 0, (struct sockaddr*)&query.destination, query.dest_len);
+		sendto(fd, buf, buflen, 0, (struct sockaddr*)&query.remote, query.remotelen);
 
 		tv.tv_sec = 1 + attempt;
 		tv.tv_usec = 0;

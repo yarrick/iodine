@@ -76,13 +76,13 @@ struct query {
 	unsigned short type;
 	unsigned short rcode;
 	unsigned short id;
-	struct sockaddr_storage destination;
-	socklen_t dest_len;
-	struct sockaddr_storage from;
-	socklen_t fromlen;
+	struct sockaddr_storage local;
+	socklen_t locallen;
+	struct sockaddr_storage remote;
+	socklen_t remotelen;
 	unsigned short id2;
-	struct sockaddr_storage from2;
-	socklen_t fromlen2;
+	struct sockaddr_storage remote2;
+	socklen_t remotelen2;
 };
 
 enum connection {

@@ -129,7 +129,7 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 	iov.iov_base = packet;
 	iov.iov_len = packetlen;
 
-	msg.msg_name = (caddr_t) &q->from;
+	msg.msg_name = (caddr_t) &q->remote;
 	msg.msg_namelen = (unsigned) addrlen;
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
@@ -141,16 +141,16 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 	addrlen = msg.msg_namelen;
 #else
 	addrlen = sizeof(struct sockaddr_storage);
-	r = recvfrom(fd, packet, packetlen, 0, (struct sockaddr *)&q->from, &addrlen);
+	r = recvfrom(fd, packet, packetlen, 0, (struct sockaddr *)&q->remote, &addrlen);
 #endif /* !WINDOWS */
 	if (r < 0) {
 		warn("read_udp");
 		return r;
 	}
-	q->fromlen = addrlen;
+	q->remotelen = addrlen;
 
-	memset(&q->destination, 0, sizeof(struct sockaddr_storage));
-	q->dest_len = sizeof(struct sockaddr_storage);
+	memset(&q->local, 0, sizeof(struct sockaddr_storage));
+	q->locallen = sizeof(struct sockaddr_storage);
 #ifndef WINDOWS
 	/* Read destination IP address */
 	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
@@ -159,21 +159,21 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 		if (cmsg->cmsg_level == IPPROTO_IP &&
 			cmsg->cmsg_type == DSTADDR_SOCKOPT) {
 
-			struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+			struct sockaddr_in *addr = (struct sockaddr_in *) &q->local;
 			addr->sin_family = AF_INET;
 			addr->sin_addr = *dstaddr(cmsg);
-			q->dest_len = sizeof(*addr);
+			q->locallen = sizeof(*addr);
 			break;
 		}
 		if (cmsg->cmsg_level == IPPROTO_IPV6 &&
 			cmsg->cmsg_type == IPV6_PKTINFO) {
 
 			struct in6_pktinfo *pktinfo;
-			struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->destination;
+			struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->local;
 			pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
 			addr->sin6_family = AF_INET6;
 			memcpy(&addr->sin6_addr, &pktinfo->ipi6_addr, sizeof(struct in6_addr));
-			q->dest_len = sizeof(*addr);
+			q->locallen = sizeof(*addr);
 			break;
 		}
 	}
