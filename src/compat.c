@@ -137,7 +137,7 @@ syslog(int priority, const char *fmt, ...)
 	va_list list;
 
 	va_start(list, fmt);
-	vwarn(fmt, list);
+	vwarnx(fmt, list);
 	va_end(list);
 }
 #endif
