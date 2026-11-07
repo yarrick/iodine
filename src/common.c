@@ -135,68 +135,6 @@ get_addr(char *host, int port, int addr_family, int flags,
 }
 
 int
-open_dns(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
-{
-	return open_dns_opt(sockaddr, sockaddr_len, -1);
-}
-
-int
-open_dns_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6only)
-{
-	int flag;
-	int fd;
-
-	if ((fd = socket(sockaddr->ss_family, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
-		err(1, "socket");
-	}
-
-	flag = 1;
-#ifdef SO_REUSEPORT
-	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (const void*) &flag, sizeof(flag));
-#endif
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
-
-	fd_set_close_on_exec(fd);
-
-	if (sockaddr->ss_family == AF_INET6 && v6only >= 0) {
-		setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (const void*) &v6only, sizeof(v6only));
-	}
-
-#ifdef IP_OPT_DONT_FRAG
-	/* Set dont-fragment ip header flag */
-	flag = DONT_FRAG_VALUE;
-	setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
-#endif
-
-	if (bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
-		err(1, "bind() to %s", format_addr(sockaddr, sockaddr_len));
-
-	ui_log("Opened IPv%d UDP socket\n", sockaddr->ss_family == AF_INET6 ? 6 : 4);
-
-	return fd;
-}
-
-int
-open_dns_from_host(char *host, int port, int addr_family, int flags)
-{
-	struct sockaddr_storage addr;
-	socklen_t addrlen;
-	int res;
-
-	res = get_addr(host, port, addr_family, flags, &addr, &addrlen);
-	if (res)
-		return res;
-
-	return open_dns(&addr, addrlen);
-}
-
-void
-close_dns(int fd)
-{
-	close(fd);
-}
-
-int
 build_netmask(int netbits, struct in_addr *addr)
 {
 	uint32_t netmask;

@@ -25,6 +25,7 @@
 #include "common.h"
 #include "compat.h"
 #include "tun.h"
+#include "udp.h"
 #include "ui.h"
 #include "wintun.h"
 
@@ -94,7 +95,7 @@ wintun_init(void)
 DWORD WINAPI tun_reader(LPVOID arg)
 {
 	struct tun_data *tun = arg;
-	int sock = open_dns_from_host("127.0.0.1", 0, AF_INET, 0);
+	int sock = open_udp_from_host("127.0.0.1", 0, AF_INET, 0);
 	HANDLE read_event = WintunGetReadWaitEvent(tun->session);
 
 	while(TRUE) {
@@ -162,7 +163,7 @@ open_tun(const char *tun_device)
 	 * sends data as udp to this socket */
 	if (get_addr("127.0.0.1", 55353, AF_INET, 0, &localsock, &localsock_len))
 		return -1;
-	tunfd = open_dns(&localsock, localsock_len);
+	tunfd = open_udp(&localsock, localsock_len);
 
 	/* Enable non-blocking mode for socket */
 	mode = 1;

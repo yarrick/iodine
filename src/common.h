@@ -95,10 +95,6 @@ char *format_inaddr(struct in_addr *addr);
 char *format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len);
 int get_addr(char *host, int port, int addr_family, int flags,
              struct sockaddr_storage *out, socklen_t *outlen);
-int open_dns(struct sockaddr_storage *, socklen_t);
-int open_dns_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6only);
-int open_dns_from_host(char *host, int port, int addr_family, int flags);
-void close_dns(int);
 
 int build_netmask(int netbits, struct in_addr *addr);
 

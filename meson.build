@@ -140,6 +140,7 @@ common_sources = files(
   'src/process.c',
   'src/read.c',
   'src/run_as.c',
+  'src/udp.c',
   'src/ui.c',
   'src/util.c',
 )

@@ -43,6 +43,7 @@
 #include "process.h"
 #include "run_as.h"
 #include "tun.h"
+#include "udp.h"
 #include "ui.h"
 #include "util.h"
 
@@ -334,7 +335,7 @@ int main(int argc, char **argv)
 		retval = 1;
 		goto cleanup1;
 	}
-	if ((dns_fd = open_dns_from_host(NULL, 0, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
+	if ((dns_fd = open_udp_from_host(NULL, 0, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
 		retval = 1;
 		goto cleanup2;
 	}
@@ -384,7 +385,7 @@ int main(int argc, char **argv)
 	client_tunnel(tun_fd, dns_fd);
 
 cleanup2:
-	close_dns(dns_fd);
+	close_udp(dns_fd);
 	close_tun(tun_fd);
 cleanup1:
 

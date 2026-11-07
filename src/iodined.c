@@ -59,6 +59,7 @@
 #include "login.h"
 #include "run_as.h"
 #include "tun.h"
+#include "udp.h"
 #include "ui.h"
 #include "user.h"
 #include "version.h"
@@ -90,7 +91,7 @@ get_external_ip(struct in_addr *ip)
 	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &query.destination, &query.dest_len))
 		return 1;
 
-	fd = open_dns_from_host(NULL, 0, AF_INET, AI_PASSIVE);
+	fd = open_udp_from_host(NULL, 0, AF_INET, AI_PASSIVE);
 	if (fd < 0) return 2;
 
 	for (attempt = 0; attempt < 3; attempt++) {
@@ -124,7 +125,7 @@ get_external_ip(struct in_addr *ip)
 		}
 	}
 
-	close_dns(fd);
+	close_udp(fd);
 	return (out_len != sizeof(struct in_addr));
 }
 
@@ -553,14 +554,14 @@ main(int argc, char **argv)
 	} else if (nb_fds == 0) {
 #endif
 		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET) &&
-			(dns_fds.v4fd = open_dns(&dns4addr, dns4addr_len)) < 0) {
+			(dns_fds.v4fd = open_udp(&dns4addr, dns4addr_len)) < 0) {
 
 			retval = 1;
 			goto cleanup;
 		}
 		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET6) &&
 			/* Set IPv6 socket to V6ONLY */
-			(dns_fds.v6fd = open_dns_opt(&dns6addr, dns6addr_len, 1)) < 0) {
+			(dns_fds.v6fd = open_udp_opt(&dns6addr, dns6addr_len, 1)) < 0) {
 
 			retval = 1;
 			goto cleanup;
@@ -599,7 +600,7 @@ main(int argc, char **argv)
 			retval = 1;
 			goto cleanup;
 		}
-		if ((bind_fd = open_dns_from_host(NULL, 0, AF_INET, 0)) < 0) {
+		if ((bind_fd = open_udp_from_host(NULL, 0, AF_INET, 0)) < 0) {
 			retval = 1;
 			goto cleanup;
 		}
@@ -659,12 +660,12 @@ main(int argc, char **argv)
 
 	syslog(LOG_INFO, "stopping");
 	if (bind_fd >= 0)
-		close_dns(bind_fd);
+		close_udp(bind_fd);
 cleanup:
 	if (dns_fds.v6fd >= 0)
-		close_dns(dns_fds.v6fd);
+		close_udp(dns_fds.v6fd);
 	if (dns_fds.v4fd >= 0)
-		close_dns(dns_fds.v4fd);
+		close_udp(dns_fds.v4fd);
 	close_tun(tun_fd);
 
 	return retval;
