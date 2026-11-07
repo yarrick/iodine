@@ -22,8 +22,11 @@
 
 #ifdef WINDOWS
 #include <winsock2.h>
+#include <mswsock.h>
 #include <windows.h>
-#include <wincrypt.h>
+#undef CMSG_DATA
+#define CMSG_DATA WSA_CMSG_DATA
+static LPFN_WSARECVMSG wsa_recvmsg = NULL;
 #else
 #include <err.h>
 #include <errno.h>
@@ -87,6 +90,16 @@ open_udp_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6on
 #endif
 	}
 
+#ifdef WINDOWS
+	if (wsa_recvmsg == NULL) {
+		GUID guid = WSAID_WSARECVMSG;
+		DWORD bytes = 0;
+		WSAIoctl(fd, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid),
+			 &wsa_recvmsg, sizeof(wsa_recvmsg), &bytes, NULL, NULL);
+	}
+#endif
+
+
 	if (bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
 		err(1, "bind() to %s", format_addr(sockaddr, sockaddr_len));
 
@@ -115,7 +128,6 @@ close_udp(int fd)
 	close(fd);
 }
 
-#ifndef WINDOWS
 static struct in_addr
 get_v4_dstaddr(struct cmsghdr *cmsg)
 {
@@ -147,20 +159,17 @@ set_v4_srcaddr(struct cmsghdr *cmsg, struct in_addr addr)
 }
 #endif
 
-#endif
-
 int
 read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 {
-	socklen_t addrlen;
+	socklen_t addrlen = sizeof(struct sockaddr_storage);
 	int r;
-#ifndef WINDOWS
 	char control[CMSG_SPACE(sizeof (struct in6_pktinfo))];
+	struct cmsghdr *cmsg;
+#ifndef WINDOWS
 	struct msghdr msg;
 	struct iovec iov;
-	struct cmsghdr *cmsg;
 
-	addrlen = sizeof(struct sockaddr_storage);
 	iov.iov_base = packet;
 	iov.iov_len = packetlen;
 
@@ -175,8 +184,28 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 	r = recvmsg(fd, &msg, 0);
 	addrlen = msg.msg_namelen;
 #else
-	addrlen = sizeof(struct sockaddr_storage);
-	r = recvfrom(fd, packet, packetlen, 0, (struct sockaddr *)&q->remote, &addrlen);
+	WSAMSG msg;
+	WSABUF iov;
+	DWORD recvd = 0;
+
+	iov.buf = packet;
+	iov.len = packetlen;
+
+	memset(&msg, 0, sizeof(msg));
+	msg.name = (LPSOCKADDR) &q->remote;
+	msg.namelen = addrlen;
+	msg.lpBuffers = &iov;
+	msg.dwBufferCount = 1;
+	msg.Control.buf = control;
+	msg.Control.len = sizeof(control);
+
+	if (wsa_recvmsg != NULL &&
+	    wsa_recvmsg(fd, &msg, &recvd, NULL, NULL) == 0) {
+		r = recvd;
+		addrlen = msg.namelen;
+	} else {
+		r = -1;
+	}
 #endif /* !WINDOWS */
 	if (r < 0) {
 		warn("read_udp");
@@ -186,7 +215,6 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 
 	memset(&q->local, 0, sizeof(struct sockaddr_storage));
 	q->locallen = sizeof(struct sockaddr_storage);
-#ifndef WINDOWS
 	/* Read destination IP address */
 	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 		cmsg = CMSG_NXTHDR(&msg, cmsg)) {
@@ -210,7 +238,6 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 			break;
 		}
 	}
-#endif
 
 	return r;
 }

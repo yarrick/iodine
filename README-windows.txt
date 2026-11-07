@@ -40,9 +40,6 @@ compiler setup when calling meson. An example for non-UCRT mingw is
 included in the file .github/mingw-windows-x86_64.ini
 
 == Results of crappy Win32 API:
-The following fixable limitations apply:
-- Server cannot read packet destination address
-
 The following (probably) un-fixable limitations apply:
 - A password entered as -P argument can be shown in process list
 - Priviligies cannot be dropped
