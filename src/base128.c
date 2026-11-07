@@ -159,7 +159,7 @@ static unsigned int base128_encode(char *buf, size_t *buflen,
 	return iout;
 }
 
-#define REV128(x) rev128[(int) (x)]
+#define REV128(x) rev128[(unsigned char) (x)]
 
 /*
  * Fills *buf with max. *buflen bytes, decoded from slen chars in *str.

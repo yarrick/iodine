@@ -133,6 +133,22 @@ START_TEST(test_base64_blksize)
 }
 END_TEST
 
+START_TEST(test_base64_decode_illegal_as_zero)
+{
+	const char invalid[] = "\x80\x97\xa3\xc1\xff\x81\x95\xaa";
+	char buf[32];
+	size_t len = sizeof(buf);
+	int val;
+
+	memset(buf, 0x55, sizeof(buf));
+	val = base64_ops.decode(buf, &len, invalid, sizeof(invalid) - 1);
+	ck_assert_int_eq(val, 6);
+	for (int i = 0; i < val; i++) {
+		ck_assert_int_eq(buf[i], 0);
+	}
+}
+END_TEST
+
 TCase *
 test_create(void)
 {
@@ -141,6 +157,7 @@ test_create(void)
 	tc = tcase_create("Base64");
 	tcase_add_loop_test(tc, test_base64_encode, 0, TUPLES);
 	tcase_add_loop_test(tc, test_base64_decode, 0, TUPLES);
+	tcase_add_test(tc, test_base64_decode_illegal_as_zero);
 	tcase_add_test(tc, test_base64_blksize);
 
 	return tc;
