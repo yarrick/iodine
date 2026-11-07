@@ -151,6 +151,7 @@ common_sources = files(
   'src/login.c',
   'src/md5.c',
   'src/process.c',
+  'src/random.c',
   'src/read.c',
   'src/run_as.c',
   'src/udp.c',
@@ -242,7 +243,7 @@ libcheck = dependency('check', required: false)
 if libcheck.found()
   suites = [
     'base32', 'base64', 'base64u', 'base128', 'common', 'compat', 'dns',
-    'encoding', 'fw_query', 'login', 'process', 'read', 'ui', 'user'
+    'encoding', 'fw_query', 'login', 'process', 'random', 'read', 'ui', 'user'
   ]
 
   # Silence warning from check.h

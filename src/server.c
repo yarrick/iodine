@@ -32,6 +32,7 @@
 #include "common.h"
 #include "compat.h"
 #include "process.h"
+#include "random.h"
 #include "read.h"
 #include "server.h"
 #include "ui.h"

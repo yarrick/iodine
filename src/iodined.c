@@ -29,6 +29,7 @@
 #include "common.h"
 #include "compat.h"
 #include "process.h"
+#include "random.h"
 #include "server.h"
 
 #ifdef WINDOWS

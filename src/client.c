@@ -50,6 +50,7 @@
 #include "encoding.h"
 #include "dns.h"
 #include "login.h"
+#include "random.h"
 #include "tun.h"
 #include "version.h"
 #include "client.h"
