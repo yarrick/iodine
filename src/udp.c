@@ -143,46 +143,42 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 	addrlen = sizeof(struct sockaddr_storage);
 	r = recvfrom(fd, packet, packetlen, 0, (struct sockaddr *)&q->from, &addrlen);
 #endif /* !WINDOWS */
+	if (r < 0) {
+		warn("read_udp");
+		return r;
+	}
+	q->fromlen = addrlen;
 
-	if (r > 0) {
-		q->fromlen = addrlen;
-
-		memset(&q->destination, 0, sizeof(struct sockaddr_storage));
-		q->dest_len = sizeof(struct sockaddr_storage);
+	memset(&q->destination, 0, sizeof(struct sockaddr_storage));
+	q->dest_len = sizeof(struct sockaddr_storage);
 #ifndef WINDOWS
-		/* Read destination IP address */
-		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
-			cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+	/* Read destination IP address */
+	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
+		cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 
-			if (cmsg->cmsg_level == IPPROTO_IP &&
-				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
+		if (cmsg->cmsg_level == IPPROTO_IP &&
+			cmsg->cmsg_type == DSTADDR_SOCKOPT) {
 
-				struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
-				addr->sin_family = AF_INET;
-				addr->sin_addr = *dstaddr(cmsg);
-				q->dest_len = sizeof(*addr);
-				break;
-			}
-			if (cmsg->cmsg_level == IPPROTO_IPV6 &&
-				cmsg->cmsg_type == IPV6_PKTINFO) {
-
-				struct in6_pktinfo *pktinfo;
-				struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->destination;
-				pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
-				addr->sin6_family = AF_INET6;
-				memcpy(&addr->sin6_addr, &pktinfo->ipi6_addr, sizeof(struct in6_addr));
-				q->dest_len = sizeof(*addr);
-				break;
-			}
+			struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+			addr->sin_family = AF_INET;
+			addr->sin_addr = *dstaddr(cmsg);
+			q->dest_len = sizeof(*addr);
+			break;
 		}
+		if (cmsg->cmsg_level == IPPROTO_IPV6 &&
+			cmsg->cmsg_type == IPV6_PKTINFO) {
+
+			struct in6_pktinfo *pktinfo;
+			struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->destination;
+			pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
+			addr->sin6_family = AF_INET6;
+			memcpy(&addr->sin6_addr, &pktinfo->ipi6_addr, sizeof(struct in6_addr));
+			q->dest_len = sizeof(*addr);
+			break;
+		}
+	}
 #endif
 
-		return r;
-	} else if (r < 0) {
-		/* Error */
-		warn("read_udp");
-	}
-
-	return 0;
+	return r;
 }
 

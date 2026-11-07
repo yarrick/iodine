@@ -53,6 +53,7 @@
 #include "tun.h"
 #include "version.h"
 #include "client.h"
+#include "udp.h"
 #include "ui.h"
 
 static void handshake_lazyoff(int dns_fd);
@@ -552,15 +553,11 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
    Returns >0 on correct replies; value is #valid bytes in *buf.
 */
 {
-	struct sockaddr_storage from;
 	char data[64*1024];
-	socklen_t addrlen;
 	int r;
 
-	addrlen = sizeof(from);
-	if ((r = recvfrom(dns_fd, data, sizeof(data), 0,
-			  (struct sockaddr*)&from, &addrlen)) < 0) {
-		warn("recvfrom");
+	r = read_udp(dns_fd, data, sizeof(data), q);
+	if (r < 0) {
 		return -1;
 	}
 
