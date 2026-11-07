@@ -161,7 +161,7 @@ open_tun(const char *tun_device)
 	 * so we can still use select() in main code.
 	 * A thread does blocking reads on the tun device and
 	 * sends data as udp to this socket */
-	if (get_addr("127.0.0.1", 55353, AF_INET, 0, &localsock, &localsock_len))
+	if (get_addr("127.0.0.1", 0, AF_INET, 0, &localsock, &localsock_len))
 		return -1;
 	tunfd = open_udp(&localsock, localsock_len);
 
