@@ -332,6 +332,7 @@ START_TEST(test_encode_a_response)
 		"\x00\x04\x01\x02\x03\x04";                        /*   RDLENGTH: 4, RDATA: 1.2.3.4 */
 	char buf[512];
 	struct query q;
+	struct sockaddr_storage address;
 	struct sockaddr_in *dest;
 	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
 	int ret;
@@ -342,20 +343,22 @@ START_TEST(test_encode_a_response)
 	q.id = 1337;
 
 	/* Non-IPv4 destination should fail with -1 */
-	q.destination.ss_family = AF_INET6;
-	ck_assert_int_eq(dns_encode_standard_response(buf, sizeof(buf), &q), -1);
+	address.ss_family = AF_INET6;
+	ret = dns_encode_standard_response(buf, sizeof(buf), &q, (struct sockaddr *) &address);
+	ck_assert_int_eq(ret, -1);
 
 	/* Valid IPv4 destination (1.2.3.4) */
-	dest = (struct sockaddr_in *) &q.destination;
+	dest = (struct sockaddr_in *) &address;
 	dest->sin_family = AF_INET;
 	dest->sin_addr.s_addr = htonl(0x01020304);
 
 	for (size_t len = 0; len < expected_len; len++) {
 		/* Return 0 when encoded response does not fit */
-		ck_assert_int_eq(dns_encode_standard_response(buf, len, &q), 0);
+		ret = dns_encode_standard_response(buf, len, &q, (struct sockaddr *) &address);
+		ck_assert_int_eq(ret, 0);
 	}
 
-	ret = dns_encode_standard_response(buf, sizeof(buf), &q);
+	ret = dns_encode_standard_response(buf, sizeof(buf), &q, (struct sockaddr *) &address);
 	ck_assert_int_eq(ret, expected_len);
 	ck_assert_mem_eq(buf, expected, expected_len);
 }
@@ -374,6 +377,7 @@ START_TEST(test_encode_aaaa_response)
 		"\x20\x01\x0D\xB8\x00\x00\x00\x00\x00\x01\x00\xF2\x0F\x03\xF0\x04";   /*   RDATA: 2001:db8::1:f2:f03:f004 */
 	char buf[512];
 	struct query q;
+	struct sockaddr_storage address;
 	struct sockaddr_in6 *dest;
 	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
 	int ret;
@@ -384,19 +388,21 @@ START_TEST(test_encode_aaaa_response)
 	q.id = 1337;
 
 	/* Non-IPv6 destination should fail with -1 */
-	q.destination.ss_family = AF_INET;
-	ck_assert_int_eq(dns_encode_standard_response(buf, sizeof(buf), &q), -1);
+	address.ss_family = AF_INET;
+	ret = dns_encode_standard_response(buf, sizeof(buf), &q, (struct sockaddr *) &address);
+	ck_assert_int_eq(ret, -1);
 
-	dest = (struct sockaddr_in6 *) &q.destination;
+	dest = (struct sockaddr_in6 *) &address;
 	dest->sin6_family = AF_INET6;
 	inet_pton(AF_INET6, "2001:db8::1:f2:f03:f004", &dest->sin6_addr);
 
 	for (size_t len = 0; len < expected_len; len++) {
 		/* Return 0 when encoded response does not fit */
-		ck_assert_int_eq(dns_encode_standard_response(buf, len, &q), 0);
+		ret = dns_encode_standard_response(buf, len, &q, (struct sockaddr *) &address);
+		ck_assert_int_eq(ret, 0);
 	}
 
-	ret = dns_encode_standard_response(buf, sizeof(buf), &q);
+	ret = dns_encode_standard_response(buf, sizeof(buf), &q, (struct sockaddr *) &address);
 	ck_assert_int_eq(ret, expected_len);
 	ck_assert_mem_eq(buf, expected, expected_len);
 }
@@ -419,6 +425,7 @@ START_TEST(test_encode_ns_response)
 		"\x00\x04\x01\x02\x03\x04";                        /*   RDLENGTH: 4, RDATA: 1.2.3.4 */
 	char buf[512];
 	struct query q;
+	struct sockaddr_storage address;
 	struct sockaddr_in *dest;
 	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
 	int ret;
@@ -428,13 +435,14 @@ START_TEST(test_encode_ns_response)
 	q.id = 1337;
 
 	strlcpy(q.name, "abc.t.iodine.tun", sizeof(q.name));
-	dest = (struct sockaddr_in *) &q.destination;
+	dest = (struct sockaddr_in *) &address;
 	dest->sin_family = AF_INET;
 	dest->sin_addr.s_addr = htonl(0x01020304);
 
 	for (size_t len = 0; len < expected_len; len++) {
 		/* Return 0 when encoded response does not fit */
-		ck_assert_int_eq(dns_encode_ns_response(buf, len, &q, 4), 0);
+		ret = dns_encode_ns_response(buf, len, &q, 4, (struct sockaddr *) &address);
+		ck_assert_int_eq(ret, 0);
 	}
 
 	for (int offset = -1; offset < 50; offset++) {
@@ -443,17 +451,18 @@ START_TEST(test_encode_ns_response)
 		if (offset == 6) continue;  /* iodine.tun */
 		if (offset == 13) continue; /* tun */
 		/* Return -1 when topdomain offset in incorrect */
-		ck_assert_int_eq(dns_encode_ns_response(buf, sizeof(buf), &q, offset), -1);
+		ret = dns_encode_ns_response(buf, sizeof(buf), &q, offset, (struct sockaddr *) &address);
+		ck_assert_int_eq(ret, -1);
 	}
 
-	ret = dns_encode_ns_response(buf, sizeof(buf), &q, 4);
+	ret = dns_encode_ns_response(buf, sizeof(buf), &q, 4, (struct sockaddr *) &address);
 	ck_assert_int_eq(ret, expected_len);
 	ck_assert_mem_eq(buf, expected, expected_len);
 
 	/* Non-IPv4 destination omits the 16-byte additional A record */
-	q.destination.ss_family = AF_INET6;
+	address.ss_family = AF_INET6;
 	expected[11] = 0; /* Expect arcount == 0 */
-	ret = dns_encode_ns_response(buf, sizeof(buf), &q, 4);
+	ret = dns_encode_ns_response(buf, sizeof(buf), &q, 4, (struct sockaddr *) &address);
 	ck_assert_int_eq(ret, expected_len - 16);
 	ck_assert_mem_eq(buf, expected, expected_len - 16);
 }

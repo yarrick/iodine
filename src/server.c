@@ -1389,19 +1389,21 @@ static void
 handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 /* Mostly identical to handle_a_request() below */
 {
+	struct sockaddr_storage address;
 	char buf[64*1024];
 	int len;
 
+	memcpy(&address, &q->destination, q->dest_len);
 	if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
-		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+		struct sockaddr_in *addr = (struct sockaddr_in *) &address;
 		addr->sin_family = AF_INET;
 		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
-		q->dest_len = sizeof(*addr);
 	}
 
-	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain_offset);
+	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain_offset,
+				     (struct sockaddr *) &address);
 	if (len < 1) {
 		warnx("dns_encode_ns_response doesn't fit");
 		return;
@@ -1418,30 +1420,28 @@ static void
 handle_a_request(int dns_fd, struct query *q, int fakeip)
 /* Mostly identical to handle_ns_request() above */
 {
+	struct sockaddr_storage address;
+	struct sockaddr_in *addr = (struct sockaddr_in *) &address;
 	char buf[64*1024];
 	int len;
 
+	memcpy(&address, &q->destination, q->dest_len);
 	if (fakeip) {
-		in_addr_t ip = inet_addr("127.0.0.1");
-		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
 		addr->sin_family = AF_INET;
-		memcpy(&addr->sin_addr, &ip, sizeof(ip));
-		q->dest_len = sizeof(*addr);
+		inet_pton(AF_INET, "127.0.0.1", &addr->sin_addr);
 	} else if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
-		struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
 		addr->sin_family = AF_INET;
 		memcpy(&addr->sin_addr, &ns_ip, sizeof(ns_ip));
-		q->dest_len = sizeof(*addr);
 	}
 
 	/* Give up if no IPv4 address known (when A request received over IPv6
 	 * and destination was not overwritten above) */
-	if (q->destination.ss_family != AF_INET)
+	if (address.ss_family != AF_INET)
 		return;
 
-	len = dns_encode_standard_response(buf, sizeof(buf), q);
+	len = dns_encode_standard_response(buf, sizeof(buf), q, (struct sockaddr *) &address);
 	if (len < 1) {
 		warnx("dns_encode_standard_response doesn't fit");
 		return;
@@ -1457,23 +1457,27 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 static void
 handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fakeip)
 {
+	struct sockaddr_storage address;
+	struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &address;
 	char buf[64*1024];
 	int len;
 
+	memcpy(&address, &q->destination, q->dest_len);
 	if (fakeip) {
-		get_addr("::1", DNS_PORT, AF_INET6, 0, &q->destination, &q->dest_len);
+		addr->sin6_family = AF_INET6;
+		inet_pton(AF_INET6, "::1", &addr->sin6_addr);
 	}
 
 	/* Send NOERROR if no IPv6 address known (when AAAA request received over IPv4
 	 * and destination was not overwritten above) */
-	if (q->destination.ss_family != AF_INET6) {
+	if (address.ss_family != AF_INET6) {
 		len = dns_encode_soa(buf, sizeof(buf), q, topdomain, NOERROR);
 		if (len < 1) {
-            warnx("dns_encode_soa doesn't fit");
-            return;
-        }
+			warnx("dns_encode_soa doesn't fit");
+			return;
+		}
 	} else {
-		len = dns_encode_standard_response(buf, sizeof(buf), q);
+		len = dns_encode_standard_response(buf, sizeof(buf), q, (struct sockaddr *) &address);
 		if (len < 1) {
 			warnx("dns_encode_standard_response doesn't fit");
 			return;
@@ -1985,8 +1989,9 @@ read_dns(int fd, struct dnsfd *dns_fds, int tun_fd, struct query *q)
 			return 0;
 		}
 
-#ifndef WINDOWS
 		memset(&q->destination, 0, sizeof(struct sockaddr_storage));
+		q->dest_len = sizeof(struct sockaddr_storage);
+#ifndef WINDOWS
 		/* Read destination IP address */
 		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 			cmsg = CMSG_NXTHDR(&msg, cmsg)) {
