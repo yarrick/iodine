@@ -1608,6 +1608,8 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 				handle_a_request(dns_fd, &q, 0);
 			} else if (q.type == T_AAAA) {
 				handle_aaaa_request(dns_fd, &q, topdomain, 0);
+			} else {
+				handle_soa_request(dns_fd, &q, topdomain, NOERROR);
 			}
 			return 0;
 		}
@@ -1623,6 +1625,8 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 				handle_a_request(dns_fd, &q, 1);
 			} else if (q.type == T_AAAA) {
 				handle_aaaa_request(dns_fd, &q, topdomain, 1);
+			} else {
+				handle_soa_request(dns_fd, &q, topdomain, NOERROR);
 			}
 			return 0;
 		}
