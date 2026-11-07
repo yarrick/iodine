@@ -30,7 +30,7 @@ extern int dnsc_use_edns0;
 
 int dns_encode(char *, size_t, struct query *, qr_t, const char *, size_t);
 int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
-			   char *topdomain);
+			   int topdomain_offset);
 int dns_encode_a_response(char *buf, size_t buflen, struct query *q);
 int dns_encode_nxdomain(char *buf, size_t buflen, struct query *q, const char *zone);
 unsigned short dns_get_id(char *packet, size_t packetlen);

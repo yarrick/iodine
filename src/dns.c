@@ -231,7 +231,7 @@ int dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr,
 /* Only used when iodined gets an NS type query */
 /* Mostly same as dns_encode_a_response() below */
 int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
-			   char *topdomain)
+			   int topdomain_offset)
 {
 	HEADER *header;
 	int len;
@@ -239,7 +239,6 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 	short topname;
 	short nsname;
 	char *ipp;
-	int domain_len;
 	char *p;
 
 	if (buflen < sizeof(HEADER))
@@ -265,17 +264,16 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 	/* pointer to start of name */
 	name = 0xc000 | ((p - buf) & 0x3fff);
 
-	domain_len = strlen(q->name) - strlen(topdomain);
-	if (domain_len < 0 || domain_len == 1)
+	if (topdomain_offset < 0 || topdomain_offset == 1)
 		return -1;
-	if (strcasecmp(q->name + domain_len, topdomain))
+	if ((size_t)topdomain_offset >= strlen(q->name))
 		return -1;
-	if (domain_len >= 1 && q->name[domain_len - 1] != '.')
+	if (topdomain_offset >= 1 && q->name[topdomain_offset - 1] != '.')
 		return -1;
 
 	/* pointer to start of topdomain; instead of dots at the end
 	   we have length-bytes in front, so total length is the same */
-	topname = 0xc000 | ((p - buf + domain_len) & 0x3fff);
+	topname = 0xc000 | ((p - buf + topdomain_offset) & 0x3fff);
 
 	/* Query section */
 	putname(&p, buflen - (p - buf), q->name);	/* Name */

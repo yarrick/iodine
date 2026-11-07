@@ -1391,8 +1391,6 @@ handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 {
 	char buf[64*1024];
 	int len;
-	/* Use possibly dynamic top domain in reply */
-	char *resp_domain = q->name + topdomain_offset;
 
 	if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
@@ -1403,7 +1401,7 @@ handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 		q->dest_len = sizeof(*addr);
 	}
 
-	len = dns_encode_ns_response(buf, sizeof(buf), q, resp_domain);
+	len = dns_encode_ns_response(buf, sizeof(buf), q, topdomain_offset);
 	if (len < 1) {
 		warnx("dns_encode_ns_response doesn't fit");
 		return;

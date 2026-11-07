@@ -361,6 +361,64 @@ START_TEST(test_encode_a_response)
 }
 END_TEST
 
+START_TEST(test_encode_ns_response)
+{
+	/* Expected response for NS query "abc.t.iodine.tun" in "t.iodine.tun", NS 1.2.3.4 */
+	char expected[] =
+		"\x05\x39\x84\x00\x00\x01\x00\x01\x00\x00\x00\x01" /* Header (id=1337, qr=1, aa=1, qd=1, an=1, ar=1) */
+		"\x03\x61\x62\x63"                                 /* QUERY (0x0C): "abc" */
+		"\x01\x74\x06\x69\x6F\x64\x69\x6E\x65"             /*       (0x10): ".t.iodine" */
+		"\x03\x74\x75\x6E\x00"                             /*               ".tun" */
+		"\x00\x02\x00\x01"                                 /*   TYPE: NS, CLASS: IN */
+		"\xC0\x0C\x00\x02\x00\x01"                         /* ANSWER ptr 0x0C, TYPE: NS, CLASS: IN */
+		"\x00\x00\x0E\x10"                                 /*   TTL: 3600 */
+		"\x00\x05\x02\x6E\x73\xC0\x10"                     /*   RDLENGTH: 5, RDATA (0x2E): "ns" + ptr 0x10 */
+		"\xC0\x2E\x00\x01\x00\x01"                         /* ADDITIONAL ptr 0x2E, TYPE: A, CLASS: IN */
+		"\x00\x00\x0E\x10"                                 /*   TTL: 3600 */
+		"\x00\x04\x01\x02\x03\x04";                        /*   RDLENGTH: 4, RDATA: 1.2.3.4 */
+	char buf[512];
+	struct query q;
+	struct sockaddr_in *dest;
+	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
+	int ret;
+
+	memset(&q, 0, sizeof(q));
+	q.type = T_NS;
+	q.id = 1337;
+
+	strlcpy(q.name, "abc.t.iodine.tun", sizeof(q.name));
+	dest = (struct sockaddr_in *) &q.destination;
+	dest->sin_family = AF_INET;
+	dest->sin_addr.s_addr = htonl(0x01020304);
+
+	for (size_t len = 0; len < expected_len; len++) {
+		/* Return 0 when encoded response does not fit */
+		ck_assert_int_eq(dns_encode_ns_response(buf, len, &q, 4), 0);
+	}
+
+	for (int offset = -1; offset < 50; offset++) {
+		if (offset == 0) continue;  /* abc.t.iodine.tun */
+		if (offset == 4) continue;  /* t.iodine.tun */
+		if (offset == 6) continue;  /* iodine.tun */
+		if (offset == 13) continue; /* tun */
+		/* Return -1 when topdomain offset in incorrect */
+		ck_assert_int_eq(dns_encode_ns_response(buf, sizeof(buf), &q, offset), -1);
+	}
+
+	ret = dns_encode_ns_response(buf, sizeof(buf), &q, 4);
+	ck_assert_int_eq(ret, expected_len);
+	ck_assert_mem_eq(buf, expected, expected_len);
+
+	/* Non-IPv4 destination omits the 16-byte additional A record */
+	q.destination.ss_family = AF_INET6;
+	expected[11] = 0; /* Expect arcount == 0 */
+	ret = dns_encode_ns_response(buf, sizeof(buf), &q, 4);
+	ck_assert_int_eq(ret, expected_len - 16);
+	ck_assert_mem_eq(buf, expected, expected_len - 16);
+}
+END_TEST
+
+
 TCase *
 test_create(void)
 {
@@ -378,6 +436,7 @@ test_create(void)
 	tcase_add_test(tc, test_get_id_low);
 	tcase_add_test(tc, test_get_id_high);
 	tcase_add_test(tc, test_encode_a_response);
+	tcase_add_test(tc, test_encode_ns_response);
 
 	return tc;
 }
