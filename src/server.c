@@ -1594,23 +1594,22 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	if (domain_len >= 0) {
 		/* This is a query we can handle */
 
-		/* Handle A-type query for ns.topdomain, possibly caused
-		   by our proper response to any NS request */
+		/* Handle A/AAAA-type query for ns.topdomain, possibly caused
+		   by our proper response to any NS request.
+		   Drop other types (MX would generate BADIP otherwise) */
 		if (domain_len == 3 &&
 		    (ascii_tolower(q.name[0]) == 'n') &&
 		    (ascii_tolower(q.name[1]) == 's') &&
 		     q.name[2] == '.') {
 			if (q.type == T_A) {
 				handle_a_request(dns_fd, &q, 0);
-				return 0;
-			}
-			if (q.type == T_AAAA) {
+			} else if (q.type == T_AAAA) {
 				handle_aaaa_request(dns_fd, &q, topdomain, 0);
-				return 0;
 			}
+			return 0;
 		}
 
-		/* Handle A-type query for www.topdomain, for anyone that's
+		/* Handle A/AAAA-type query for www.topdomain, for anyone that's
 		   poking around */
 		if (domain_len == 4 &&
 		    (ascii_tolower(q.name[0]) == 'w') &&
@@ -1619,12 +1618,10 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		     q.name[3] == '.') {
 			if (q.type == T_A) {
 				handle_a_request(dns_fd, &q, 1);
-				return 0;
-			}
-			if (q.type == T_AAAA) {
+			} else if (q.type == T_AAAA) {
 				handle_aaaa_request(dns_fd, &q, topdomain, 1);
-				return 0;
 			}
+			return 0;
 		}
 
 		/* Handle A-type query for _.***.topdomain. It happens when
