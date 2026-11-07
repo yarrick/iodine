@@ -43,7 +43,6 @@ int init_users(in_addr_t my_ip, int netbits)
 {
 	unsigned int i;
 	int skip = 0;
-	char newip[32];
 
 	int maxusers;
 
@@ -68,13 +67,11 @@ int init_users(in_addr_t my_ip, int netbits)
 	for (i = 0; i < usercount; i++) {
 		in_addr_t ip;
 		users[i].id = i;
-		snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
-		ip = ipstart.s_addr + inet_addr(newip);
+		ip = ipstart.s_addr + htonl(i + skip + 1);
 		if (ip == my_ip && skip == 0) {
 			/* This IP was taken by iodined */
 			skip++;
-			snprintf(newip, sizeof(newip), "0.0.0.%d", i + skip + 1);
-			ip = ipstart.s_addr + inet_addr(newip);
+			ip = ipstart.s_addr + htonl(i + skip + 1);
 		}
 		users[i].tun_ip = ip;
 		net.s_addr = ip;

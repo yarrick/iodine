@@ -58,6 +58,29 @@ START_TEST(test_init_users)
 }
 END_TEST
 
+START_TEST(test_init_users_skip_ip)
+{
+	struct in_addr ip;
+	struct in_addr uip;
+	char givenip[32];
+	int i;
+	int count;
+
+	inet_pton(AF_INET, "127.0.0.3", &ip);
+	count = init_users(ip.s_addr, 27);
+	ck_assert_int_eq(count, USERS);
+	for (i = 0; i < count; i++) {
+		int skip = 0;
+		if (i >= 2) skip = 1;
+		snprintf(givenip, sizeof(givenip), "127.0.0.%d", i + 1 + skip);
+		inet_pton(AF_INET, givenip, &uip);
+		ck_assert_uint_eq(users[i].tun_ip, uip.s_addr);
+		ck_assert_uint_ne(ip.s_addr, uip.s_addr);
+	}
+	free(users);
+}
+END_TEST
+
 START_TEST(test_find_user_by_ip)
 {
 	struct in_addr ip;
@@ -281,6 +304,7 @@ test_create(void)
 
 	tc = tcase_create("User");
 	tcase_add_test(tc, test_init_users);
+	tcase_add_test(tc, test_init_users_skip_ip);
 	tcase_add_test(tc, test_find_user_by_ip);
 	tcase_add_test(tc, test_all_users_waiting_to_send);
 	tcase_add_test(tc, test_find_available_user);
