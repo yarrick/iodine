@@ -17,7 +17,9 @@
 
 #include "config.h"
 
+#include <string.h>
 #include <unistd.h>
+
 #ifdef WINDOWS
 #include <winsock2.h>
 #include <windows.h>
@@ -110,5 +112,77 @@ void
 close_udp(int fd)
 {
 	close(fd);
+}
+
+int
+read_udp(int fd, char *packet, size_t packetlen, struct query *q)
+{
+	socklen_t addrlen;
+	int r;
+#ifndef WINDOWS
+	char control[CMSG_SPACE(sizeof (struct in6_pktinfo))];
+	struct msghdr msg;
+	struct iovec iov;
+	struct cmsghdr *cmsg;
+
+	addrlen = sizeof(struct sockaddr_storage);
+	iov.iov_base = packet;
+	iov.iov_len = packetlen;
+
+	msg.msg_name = (caddr_t) &q->from;
+	msg.msg_namelen = (unsigned) addrlen;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = control;
+	msg.msg_controllen = sizeof(control);
+	msg.msg_flags = 0;
+
+	r = recvmsg(fd, &msg, 0);
+	addrlen = msg.msg_namelen;
+#else
+	addrlen = sizeof(struct sockaddr_storage);
+	r = recvfrom(fd, packet, packetlen, 0, (struct sockaddr *)&q->from, &addrlen);
+#endif /* !WINDOWS */
+
+	if (r > 0) {
+		q->fromlen = addrlen;
+
+		memset(&q->destination, 0, sizeof(struct sockaddr_storage));
+		q->dest_len = sizeof(struct sockaddr_storage);
+#ifndef WINDOWS
+		/* Read destination IP address */
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
+			cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+
+			if (cmsg->cmsg_level == IPPROTO_IP &&
+				cmsg->cmsg_type == DSTADDR_SOCKOPT) {
+
+				struct sockaddr_in *addr = (struct sockaddr_in *) &q->destination;
+				addr->sin_family = AF_INET;
+				addr->sin_addr = *dstaddr(cmsg);
+				q->dest_len = sizeof(*addr);
+				break;
+			}
+			if (cmsg->cmsg_level == IPPROTO_IPV6 &&
+				cmsg->cmsg_type == IPV6_PKTINFO) {
+
+				struct in6_pktinfo *pktinfo;
+				struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->destination;
+				pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
+				addr->sin6_family = AF_INET6;
+				memcpy(&addr->sin6_addr, &pktinfo->ipi6_addr, sizeof(struct in6_addr));
+				q->dest_len = sizeof(*addr);
+				break;
+			}
+		}
+#endif
+
+		return r;
+	} else if (r < 0) {
+		/* Error */
+		warn("read_udp");
+	}
+
+	return 0;
 }
 

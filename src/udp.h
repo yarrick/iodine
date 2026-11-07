@@ -19,6 +19,7 @@
 #define __UDP_H__
 
 #include "config.h"
+#include "common.h"
 
 #ifdef WINDOWS
 #include "windows_dns.h"
@@ -41,4 +42,5 @@ int open_udp_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int 
 int open_udp_from_host(char *host, int port, int addr_family, int flags);
 void close_udp(int);
 
+int read_udp(int fd, char *packet, size_t packetlen, struct query *q);
 #endif
