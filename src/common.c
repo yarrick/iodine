@@ -72,6 +72,9 @@ char *
 format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 {
 	static char dst[INET6_ADDRSTRLEN + 1];
+#ifdef WINDOWS
+	int wsa_error = WSAGetLastError();
+#endif
 
 	memset(dst, 0, sizeof(dst));
 	if (sockaddr->ss_family == AF_INET &&
@@ -93,6 +96,11 @@ format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 	} else {
 		dst[0] = '?';
 	}
+#ifdef WINDOWS
+	if (WSAGetLastError() == 0) {
+		WSASetLastError(wsa_error);
+	}
+#endif
 	return dst;
 }
 
