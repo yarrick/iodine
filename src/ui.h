@@ -18,12 +18,24 @@
 #ifndef __UI_H__
 #define __UI_H__
 
-void ui_set_debuglevel(int level);
-void ui_debug(int level, const char *fmt, ...);
+#include "config.h"
 
-void ui_log(const char *fmt, ...);
+#if HAVE_FORMAT_ATTR
+#ifdef __MINGW_PRINTF_FORMAT
+#define PRINTF_ATTR(a, b) __attribute__((format(__MINGW_PRINTF_FORMAT, a, b)))
+#else
+#define PRINTF_ATTR(a, b) __attribute__((format(printf, a, b)))
+#endif
+#else
+#define PRINTF_ATTR(a, b)
+#endif
+
+void ui_set_debuglevel(int level);
+void ui_debug(int level, const char *fmt, ...) PRINTF_ATTR(2,3);
+
+void ui_log(const char *fmt, ...) PRINTF_ATTR(1,2);
 /* For logs not ending with newline, will flush. */
-void ui_log_partial(const char *fmt, ...);
+void ui_log_partial(const char *fmt, ...) PRINTF_ATTR(1,2);
 
 void ui_read_password(char*, size_t);
 #ifdef WINDOWS

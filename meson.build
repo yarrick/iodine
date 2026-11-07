@@ -103,6 +103,7 @@ endforeach
 
 cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
 cdata.set10('HAVE_NORETURN_ATTR', cc.has_function_attribute('noreturn'))
+cdata.set10('HAVE_FORMAT_ATTR', cc.has_function_attribute('format'))
 
 cdata.set10('HAVE_PROGNAME', cc.links('''
   #include <stdio.h>
