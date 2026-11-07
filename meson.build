@@ -124,6 +124,12 @@ elif cc.has_header_symbol('ws2tcpip.h', 'IP_DONTFRAGMENT')
   cdata.set('DONT_FRAG_VALUE', 1)
 endif
 
+if cc.has_header_symbol('netinet/in.h', 'IP_PKTINFO')
+  cdata.set('DSTADDR_SOCKOPT', 'IP_PKTINFO')
+elif cc.has_header_symbol('netinet/in.h', 'IP_RECVDSTADDR')
+  cdata.set('DSTADDR_SOCKOPT', 'IP_RECVDSTADDR')
+endif
+
 # For md5
 cdata.set10('ARCH_IS_BIG_ENDIAN', host_machine.endian() == 'big')
 

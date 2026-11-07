@@ -114,6 +114,20 @@ close_udp(int fd)
 	close(fd);
 }
 
+#ifndef WINDOWS
+static struct in_addr
+get_v4_dstaddr(struct cmsghdr *cmsg)
+{
+#ifdef IP_PKTINFO
+	struct in_pktinfo *pktinfo = (struct in_pktinfo *) CMSG_DATA(cmsg);
+	return pktinfo->ipi_addr;
+#else
+	return *(struct in_addr *) CMSG_DATA(cmsg);
+#endif
+}
+#endif
+
+
 int
 read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 {
@@ -157,17 +171,15 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 		cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 
 		if (cmsg->cmsg_level == IPPROTO_IP &&
-			cmsg->cmsg_type == DSTADDR_SOCKOPT) {
-
+		    cmsg->cmsg_type == DSTADDR_SOCKOPT) {
 			struct sockaddr_in *addr = (struct sockaddr_in *) &q->local;
 			addr->sin_family = AF_INET;
-			addr->sin_addr = *dstaddr(cmsg);
+			addr->sin_addr = get_v4_dstaddr(cmsg);
 			q->locallen = sizeof(*addr);
 			break;
 		}
 		if (cmsg->cmsg_level == IPPROTO_IPV6 &&
-			cmsg->cmsg_type == IPV6_PKTINFO) {
-
+		    cmsg->cmsg_type == IPV6_PKTINFO) {
 			struct in6_pktinfo *pktinfo;
 			struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->local;
 			pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
