@@ -59,12 +59,9 @@
 #include "login.h"
 #include "run_as.h"
 #include "tun.h"
+#include "udp.h"
 #include "user.h"
 #include "version.h"
-
-#ifndef IPV6_RECVPKTINFO
-#define IPV6_RECVPKTINFO IPV6_PKTINFO
-#endif
 
 static int running = 1;
 static const char *topdomain;

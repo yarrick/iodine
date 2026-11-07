@@ -63,11 +63,26 @@ open_udp_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6on
 		setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (const void*) &v6only, sizeof(v6only));
 	}
 
-#ifdef IP_OPT_DONT_FRAG
-	/* Set dont-fragment ip header flag */
-	flag = DONT_FRAG_VALUE;
-	setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
+	if (sockaddr->ss_family == AF_INET6) {
+#ifdef IPV6_RECVPKTINFO
+		setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const void*) &flag, sizeof(flag));
 #endif
+#ifdef IPV6_PKTINFO
+		setsockopt(fd, IPPROTO_IPV6, IPV6_PKTINFO, (const void*) &flag, sizeof(flag));
+#endif
+	}
+	if (sockaddr->ss_family == AF_INET) {
+#ifdef DSTADDR_SOCKOPT
+		/* To get destination address from each UDP datagram, see read_dns() */
+		setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
+#endif
+
+#ifdef IP_OPT_DONT_FRAG
+		/* Set dont-fragment ip header flag */
+		flag = DONT_FRAG_VALUE;
+		setsockopt(fd, IPPROTO_IP, IP_OPT_DONT_FRAG, (const void*) &flag, sizeof(flag));
+#endif
+	}
 
 	if (bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
 		err(1, "bind() to %s", format_addr(sockaddr, sockaddr_len));

@@ -18,14 +18,6 @@
 #ifndef __SERVER_H__
 #define __SERVER_H__
 
-#if defined IP_RECVDSTADDR
-# define DSTADDR_SOCKOPT IP_RECVDSTADDR
-# define dstaddr(x) ((struct in_addr *) CMSG_DATA(x))
-#elif defined IP_PKTINFO
-# define DSTADDR_SOCKOPT IP_PKTINFO
-# define dstaddr(x) (&(((struct in_pktinfo *)(CMSG_DATA(x)))->ipi_addr))
-#endif
-
 /* Struct with IPv4 and IPv6 file descriptors.
  * Need to be passed on down to tunneling code since we can get a
  * packet on one fd meant for a user on the other.

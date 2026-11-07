@@ -201,24 +201,6 @@ static void version(void)
 	exit(0);
 }
 
-static void prepare_dns_fd(int fd)
-{
-#ifndef WINDOWS
-	int flag = 1;
-
-	/* To get destination address from each UDP datagram, see read_dns() */
-	setsockopt(fd, IPPROTO_IP, DSTADDR_SOCKOPT, (const void*) &flag, sizeof(flag));
-#ifdef IPV6_RECVPKTINFO
-	setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const void*) &flag, sizeof(flag));
-#endif
-#ifdef IPV6_PKTINFO
-	setsockopt(fd, IPPROTO_IPV6, IPV6_PKTINFO, (const void*) &flag, sizeof(flag));
-#endif
-
-#endif
-	(void)fd;
-}
-
 int
 main(int argc, char **argv)
 {
@@ -588,12 +570,6 @@ main(int argc, char **argv)
 		goto cleanup;
 	}
 #endif
-
-	/* Setup dns file descriptors to get destination IP address */
-	if (dns_fds.v4fd >= 0)
-		prepare_dns_fd(dns_fds.v4fd);
-	if (dns_fds.v6fd >= 0)
-		prepare_dns_fd(dns_fds.v6fd);
 
 	if (bind_enable) {
 		if (get_addr("127.0.0.1", bind_port, AF_INET, 0, &bind_addr, &bind_addrlen) < 0) {
