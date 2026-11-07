@@ -32,7 +32,8 @@ int dns_encode(char *, size_t, struct query *, qr_t, const char *, size_t);
 int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 			   int topdomain_offset);
 int dns_encode_a_response(char *buf, size_t buflen, struct query *q);
-int dns_encode_nxdomain(char *buf, size_t buflen, struct query *q, const char *zone);
+int dns_encode_soa(char *buf, size_t buflen, struct query *q,
+		   const char *zone, int rcode);
 unsigned short dns_get_id(char *packet, size_t packetlen);
 int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);
 

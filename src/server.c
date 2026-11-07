@@ -1460,9 +1460,9 @@ handle_underscore_request(int dns_fd, struct query *q, const char *topdomain)
 	char buf[64*1024];
 	int len;
 
-	len = dns_encode_nxdomain(buf, sizeof(buf), q, topdomain);
+	len = dns_encode_soa(buf, sizeof(buf), q, topdomain, NXDOMAIN);
 	if (len < 1) {
-		warnx("dns_encode_nxdomain doesn't fit");
+		warnx("dns_encode_soa doesn't fit");
 		return;
 	}
 

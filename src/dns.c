@@ -383,7 +383,7 @@ int dns_encode_a_response(char *buf, size_t buflen, struct query *q)
 	return len;
 }
 
-int dns_encode_nxdomain(char *buf, size_t buflen, struct query *q, const char *zone)
+int dns_encode_soa(char *buf, size_t buflen, struct query *q, const char *zone, int rcode)
 {
 	char rnamebuf[256];
 	char nsbuf[256];
@@ -404,7 +404,7 @@ int dns_encode_nxdomain(char *buf, size_t buflen, struct query *q, const char *z
 	header->tc = 0;
 	header->rd = 0;
 	header->ra = 0;
-	header->rcode = 3;	// NXDOMAIN
+	header->rcode = rcode;
 
 	header->qdcount = htons(1);
 	header->ancount = htons(0);
