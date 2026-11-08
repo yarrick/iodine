@@ -124,11 +124,11 @@ main(int argc, char **argv)
 				ui_log("Failed to get external IP\n");
 				return 1;
 			}
-			ui_log("Using %s as external IP\n", format_inaddr(&ns_ip));
 		} else if (inet_pton(AF_INET, argv[1], &ns_ip) != 1) {
 			ui_log("Invalid nameserver IP: %s\n", argv[1]);
 			return 1;
 		}
+		ui_log("NSADDR %s\n", format_inaddr(&ns_ip));
 	}
 
 	memset(&params, 0, sizeof(params));

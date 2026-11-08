@@ -44,6 +44,7 @@ def query_dns(ip, port, qname, rdtype):
 class ThinServer:
     def __init__(self, ns_ip=None):
         self.ns_ip = ns_ip
+        self.ns_addr = None
         self.topdomain = ""
         self.ports = {}
         self.ips = []
@@ -66,7 +67,9 @@ class ThinServer:
             if not line:
                 break
             print(f"[serv ns={self.ns_ip}] {line.strip()}", flush=True)
-            if line.startswith("ADDR "):
+            if line.startswith("NSADDR "):
+                self.ns_addr = str(ipaddress.IPv4Address(line.split()[1]))
+            elif line.startswith("ADDR "):
                 ip = ipaddress.ip_address(line.split()[1])
                 if ip not in self.ips:
                     self.ips.append(ip)
@@ -125,12 +128,6 @@ class ServerTestCase(unittest.TestCase):
         ns_tag = f", ns={self.srv.ns_ip}" if self.srv.ns_ip else ""
         return f"{self._testMethodName} ({self.ip}:{self.port}{ns_tag})"
 
-    def check_ns_a(self, actual):
-        if self.srv.ns_ip == "auto":
-            ipaddress.IPv4Address(actual)
-        else:
-            self.assertEqual(actual, self.srv.ns_ip or str(self.ip))
-
 
 class StandardDnsTest(ServerTestCase):
 
@@ -139,17 +136,14 @@ class StandardDnsTest(ServerTestCase):
             ("www", rr.A, "127.0.0.1"),
             ("www", rr.AAAA, "::1"),
         ]
+        if self.srv.ns_addr or (self.is_v4 and target_os != "haiku"):
+            addr_checks.append(("ns", rr.A, self.srv.ns_addr or str(self.ip)))
         if not self.is_v4 and target_os != "haiku":
             addr_checks.append(("ns", rr.AAAA, str(self.ip)))
         for sub, rdtype, expected in addr_checks:
             resp = query_dns(self.ip, self.port, f"{sub}.{self.topdomain}", rdtype)
             self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
             self.assertEqual(resp.answer[0][0].address, expected)
-
-        if self.srv.ns_ip or (self.is_v4 and target_os != "haiku"):
-            resp = query_dns(self.ip, self.port, f"ns.{self.topdomain}", rr.A)
-            self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
-            self.check_ns_a(resp.answer[0][0].address)
 
     def test_soa_records(self):
         for sub in ("ns", "www"):
@@ -166,8 +160,8 @@ class StandardDnsTest(ServerTestCase):
         resp = query_dns(self.ip, self.port, self.topdomain, rr.NS)
         self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
         self.assertEqual(resp.answer[0][0].target.to_text(), f"ns.{self.topdomain}.")
-        if self.srv.ns_ip or (self.is_v4 and target_os != "haiku"):
-            self.check_ns_a(resp.additional[0][0].address)
+        if self.srv.ns_addr or (self.is_v4 and target_os != "haiku"):
+            self.assertEqual(resp.additional[0][0].address, self.srv.ns_addr or str(self.ip))
         else:
             self.assertEqual(len(resp.additional), 0)
 
@@ -242,8 +236,8 @@ class HandshakeTest(ServerTestCase):
         actual_ip = str(ipaddress.ip_address(ip_reply[1:]))
         if not self.is_v4:
             self.assertEqual(actual_ip, str(self.ip))
-        elif self.srv.ns_ip or target_os != "haiku":
-            self.check_ns_a(actual_ip)
+        elif self.srv.ns_addr or target_os != "haiku":
+            self.assertEqual(actual_ip, self.srv.ns_addr or str(self.ip))
 
     def test_login_wrong_password(self):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)
