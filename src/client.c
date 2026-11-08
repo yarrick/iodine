@@ -522,7 +522,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 		if (buflen < 2)
 			return 0;
 
-		return base64_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
+		return base64u_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
 
 	case 'v': /* plain base128 from TXT */
 	case 'V':
