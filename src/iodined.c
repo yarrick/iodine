@@ -39,10 +39,6 @@
 #ifdef DARWIN
 #include <arpa/nameser_compat.h>
 #endif
-#define _XPG4_2
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <sys/uio.h>
 #include <netdb.h>
 #endif
 
@@ -55,15 +51,12 @@
 #endif
 
 #include "dns.h"
-#include "encoding.h"
 #include "fw_query.h"
-#include "login.h"
 #include "run_as.h"
 #include "tun.h"
 #include "udp.h"
 #include "ui.h"
 #include "user.h"
-#include "version.h"
 
 #define PASSWORD_ENV_VAR "IODINED_PASS"
 

@@ -15,21 +15,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdio.h>
 #include <stdint.h>
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 #include "config.h"
 
 #ifdef WINDOWS
 #include <winsock2.h>
-#else
-#include <netdb.h>
 #endif
 
 #include "common.h"

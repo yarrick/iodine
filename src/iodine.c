@@ -22,10 +22,6 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/time.h>
-#include <fcntl.h>
 #include <time.h>
 
 #include "config.h"

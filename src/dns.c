@@ -19,10 +19,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
-#include <strings.h>
-#include <ctype.h>
 
 #include "config.h"
 
@@ -34,7 +31,6 @@
 #include <arpa/nameser_compat.h>
 #endif
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <err.h>
 #ifdef ANDROID
 #include "android_dns.h"
@@ -43,7 +39,6 @@
 
 #include "compat.h"
 #include "dns.h"
-#include "encoding.h"
 #include "read.h"
 
 int dnsc_use_edns0 = 1;

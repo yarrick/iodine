@@ -41,6 +41,8 @@ void err(int eval, const char *fmt, ...);
 void vwarnx(const char *fmt, va_list list);
 void warnx(const char *fmt, ...);
 void errx(int eval, const char *fmt, ...);
+#else
+#include <err.h>
 #endif
 
 #if !HAVE_SYSLOG

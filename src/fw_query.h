@@ -19,7 +19,6 @@
 
 #include "config.h"
 
-#include <sys/types.h>
 #ifdef WINDOWS
 #include "windows_dns.h"
 #include <winsock2.h>

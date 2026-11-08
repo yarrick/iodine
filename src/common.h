@@ -40,7 +40,6 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <err.h>
 #include <arpa/inet.h>
 #endif
 

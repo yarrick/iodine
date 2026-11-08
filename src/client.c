@@ -20,11 +20,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <signal.h>
 #include <unistd.h>
-#include <sys/param.h>
 #include <sys/time.h>
-#include <fcntl.h>
 #include <zlib.h>
 #include <time.h>
 
@@ -40,9 +37,6 @@
 #ifdef DARWIN
 #include <arpa/nameser_compat.h>
 #endif
-#include <grp.h>
-#include <pwd.h>
-#include <netdb.h>
 #endif
 
 #include "common.h"

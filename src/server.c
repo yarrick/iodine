@@ -19,11 +19,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <unistd.h>
-#include <sys/param.h>
 #include <sys/time.h>
-#include <fcntl.h>
 #include <time.h>
 #include <zlib.h>
 
@@ -31,7 +28,6 @@
 
 #include "common.h"
 #include "compat.h"
-#include "process.h"
 #include "random.h"
 #include "read.h"
 #include "server.h"
@@ -44,11 +40,8 @@
 #ifdef DARWIN
 #include <arpa/nameser_compat.h>
 #endif
-#define _XPG4_2
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <sys/uio.h>
-#include <netdb.h>
 #endif
 #if HAVE_SYSLOG
 #include <syslog.h>
@@ -58,7 +51,6 @@
 #include "encoding.h"
 #include "fw_query.h"
 #include "login.h"
-#include "run_as.h"
 #include "tun.h"
 #include "udp.h"
 #include "user.h"

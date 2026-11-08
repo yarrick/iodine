@@ -33,7 +33,6 @@ static LPFN_WSARECVMSG wsa_recvmsg = NULL;
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <netdb.h>
 #endif
 
 #include "common.h"

@@ -16,9 +16,6 @@
  */
 
 #include <time.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -26,7 +23,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <errno.h>
 
 #include "config.h"
 
@@ -34,11 +30,6 @@
 #include <winsock2.h>
 #include <windows.h>
 #else
-#include <arpa/nameser.h>
-#ifdef DARWIN
-#include <arpa/nameser_compat.h>
-#endif
-#include <err.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -47,7 +38,6 @@
 
 #include "common.h"
 #include "compat.h"
-#include "ui.h"
 
 /* The raw header used when not using DNS protocol */
 const unsigned char raw_header[RAW_HDR_LEN] = { 0x10, 0xd1, 0x9e, 0x00 };
