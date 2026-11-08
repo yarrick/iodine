@@ -1,4 +1,7 @@
+import base64
+import hashlib
 import ipaddress
+import struct
 import subprocess
 import sys
 import threading
@@ -8,6 +11,12 @@ import dns.query
 import dns.rcode
 import dns.rdatatype as rr
 
+PROTOCOL_VERSION = 0x00000502
+_B32_TRANS = str.maketrans(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
+    "abcdefghijklmnopqrstuvwxyz012345",
+)
+
 if len(sys.argv) < 3:
     sys.stderr.write(f"Usage: {sys.argv[0]} <thin_server> <os>\n")
     sys.exit(1)
@@ -16,12 +25,16 @@ binary, target_os = sys.argv[1], sys.argv[2].lower()
 dns_log = []
 
 
+def b32_encode(data):
+    return base64.b32encode(data).decode("ascii").rstrip("=").translate(_B32_TRANS)
+
+
 def query_dns(ip, port, qname, rdtype):
     q = dns.message.make_query(qname, rdtype)
     return dns.query.udp(q, str(ip), port=port, timeout=2.0)
 
 
-class DnsPingTest(unittest.TestCase):
+class ServerTestCase(unittest.TestCase):
     def __init__(self, methodName, ip, port):
         super().__init__(methodName)
         self.ip = ip
@@ -30,6 +43,9 @@ class DnsPingTest(unittest.TestCase):
 
     def __str__(self):
         return f"{self._testMethodName} ({self.ip}:{self.port})"
+
+
+class StandardDnsTest(ServerTestCase):
 
     def test_addr_records(self):
         addr_checks = [
@@ -67,6 +83,55 @@ class DnsPingTest(unittest.TestCase):
         resp = query_dns(self.ip, self.port, f"_.sub.{topdomain}", rr.A)
         self.assertEqual(resp.rcode(), dns.rcode.NXDOMAIN)
         self.assertEqual(resp.authority[0].rdtype, rr.SOA)
+
+
+def login_hash(password, seed):
+    padded = password.encode("ascii").ljust(32, b"\x00")[:32]
+    words = struct.unpack("!8I", padded)
+    xored = struct.pack("!8I", *(w ^ (seed & 0xFFFFFFFF) for w in words))
+    return hashlib.md5(xored).digest()
+
+
+class HandshakeTest(ServerTestCase):
+    def send_version(self, version, cmc=1):
+        payload = struct.pack("!IH", version, cmc)
+        qname = f"v{b32_encode(payload)}.{topdomain}"
+        resp = query_dns(self.ip, self.port, qname, rr.NULL)
+        self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
+        rdata = resp.answer[0][0].data
+        self.assertEqual(len(rdata), 9)
+        return struct.unpack("!4sIB", rdata)
+
+    def send_login(self, userid, password, seed, cmc=2):
+        payload = struct.pack("!B16sH", userid, login_hash(password, seed), cmc)
+        qname = f"l{b32_encode(payload)}.{topdomain}"
+        resp = query_dns(self.ip, self.port, qname, rr.NULL)
+        self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
+        return resp.answer[0][0].data
+
+    def test_login(self):
+        status, seed, userid = self.send_version(PROTOCOL_VERSION)
+        self.assertEqual(status, b"VACK")
+        self.assertLess(userid, 16)
+        reply = self.send_login(userid, "testpass", seed).decode("ascii")
+        server_ip, client_ip, mtu, netmask = reply.split("-")
+        self.assertEqual(server_ip, "10.0.0.1")
+        self.assertNotEqual(ipaddress.ip_address(client_ip), ipaddress.ip_address(server_ip))
+        self.assertEqual(mtu, "1130")
+        self.assertEqual(netmask, "27")
+
+    def test_login_wrong_password(self):
+        status, seed, userid = self.send_version(PROTOCOL_VERSION)
+        self.assertEqual(status, b"VACK")
+        self.assertLess(userid, 16)
+        reply = self.send_login(userid, "wrongpass", seed)
+        self.assertEqual(reply, b"LNAK")
+
+    def test_version_nack(self):
+        status, expected_ver, userid = self.send_version(PROTOCOL_VERSION - 1)
+        self.assertEqual(status, b"VNAK")
+        self.assertEqual(expected_ver, PROTOCOL_VERSION)
+        self.assertEqual(userid, 0)
 
 
 cmd = [binary]
@@ -125,11 +190,19 @@ try:
 
     print(f"[test] Testing addresses " + ", ".join([str(ip) for ip in ips]), flush=True)
     suite = unittest.TestSuite()
-    names = unittest.defaultTestLoader.getTestCaseNames(DnsPingTest)
+    std_names = unittest.defaultTestLoader.getTestCaseNames(StandardDnsTest)
+    handshake_target = None
     for ip in ips:
         port = ports.get(ip.version)
         if port and not (ip.version == 6 and target_os == "haiku"):
-            suite.addTests(DnsPingTest(name, ip, port) for name in names)
+            suite.addTests(StandardDnsTest(name, ip, port) for name in std_names)
+            if handshake_target is None:
+                handshake_target = (ip, port)
+
+    if handshake_target is not None:
+        hs_ip, hs_port = handshake_target
+        hs_names = unittest.defaultTestLoader.getTestCaseNames(HandshakeTest)
+        suite.addTests(HandshakeTest(name, hs_ip, hs_port) for name in hs_names)
 
     if suite.countTestCases() == 0:
         print("[test] No local IP addresses found")

@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include <signal.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -23,6 +24,7 @@
 #include "server.h"
 #include "udp.h"
 #include "ui.h"
+#include "user.h"
 
 static int running = 1;
 
@@ -100,6 +102,7 @@ main(int argc, char **argv)
 	struct dnsfd dns_fds = { -1, -1 };
 	struct server_params params;
 	const char *topdomain = "test.iodine.code";
+	char password[33] = "testpass";
 
 	(void)argc;
 	progname_init(argv[0]);
@@ -116,6 +119,12 @@ main(int argc, char **argv)
 
 	memset(&params, 0, sizeof(params));
 	params.topdomain = topdomain;
+	params.password = password;
+	params.server_ip = inet_addr("10.0.0.1");
+	params.netmask = 27;
+	params.users = init_users(params.server_ip, params.netmask);
+	params.check_ip = 1;
+	params.tunnel_mtu = 1130;
 	params.nameserver_ip = INADDR_ANY;
 	server_init(&params);
 
