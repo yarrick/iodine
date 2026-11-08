@@ -31,6 +31,11 @@ jobs:
     - name: run bench
       working-directory: build
       run: sudo -E ninja tun_bench
+    - name: install dnspython
+      run: /opt/homebrew/bin/python3 -m pip install dnspython --break-system-packages
+    - name: run test_server
+      working-directory: build
+      run: ninja test_server
 
   build-android:
 

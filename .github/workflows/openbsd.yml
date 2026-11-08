@@ -23,7 +23,8 @@ jobs:
             check \
             git \
             meson \
-            py3-pip
+            py3-pip \
+            py3-dnspython
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
@@ -32,3 +33,4 @@ jobs:
           ninja test
           pip install ping3 --break-system-packages
           ninja tun_bench
+          ninja test_server

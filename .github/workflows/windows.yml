@@ -52,6 +52,7 @@ jobs:
           ${{ matrix.pkg_prefix }}-meson
           ${{ matrix.pkg_prefix }}-check
           ${{ matrix.pkg_prefix }}-python-pip
+          ${{ matrix.pkg_prefix }}-python-dnspython
     - name: meson setup
       run: meson setup build
     - name: build
@@ -67,6 +68,9 @@ jobs:
       if: matrix.bench
       working-directory: build
       run: ninja tun_bench
+    - name: run bench
+      working-directory: build
+      run: ninja test_server
 
   build-android:
 

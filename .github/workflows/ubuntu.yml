@@ -34,6 +34,7 @@ jobs:
         sudo apt install -y
         meson ninja-build
         check
+        python3-dnspython
         ${{ matrix.selinux }}
         ${{ matrix.systemd }}
         ${{ matrix.capng }}
@@ -45,6 +46,9 @@ jobs:
     - name: run tests
       working-directory: build
       run: ninja test
+    - name: run test_server
+      working-directory: build
+      run: ninja test_server
 
   build-android:
 
