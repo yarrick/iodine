@@ -52,15 +52,13 @@ int build_hostname(char *buf, size_t buflen, const char *data,
 		space = cap - need;
 	}
 
-	if (!encoder->places_dots)
-		space -= (space / 57); /* space for dots */
+	space -= (space / 57); /* space for dots */
 
 	memset(buf, 0, buflen);
 
 	encoder->encode(buf, &space, data, datalen);
 
-	if (!encoder->places_dots)
-		inline_dotify(buf, buflen);
+	inline_dotify(buf, buflen);
 
 	b = buf + strlen(buf);
 
@@ -89,8 +87,7 @@ int unpack_data(char *buf, size_t buflen, char *data, size_t datalen,
 	if (buflen == 0)
 		return 0;
 	buflen--;
-	if (!enc->eats_dots)
-		datalen = inline_undotify(data, datalen);
+	datalen = inline_undotify(data, datalen);
 	return enc->decode(buf, &buflen, data, datalen);
 }
 

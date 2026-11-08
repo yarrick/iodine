@@ -254,9 +254,6 @@ const struct encoder base128_ops = {
 	.encode = base128_encode,
 	.decode = base128_decode,
 
-	.places_dots = false,
-	.eats_dots = false,
-
 	.blocksize_raw = BASE128_BLKSIZE_RAW,
 	.blocksize_encoded = BASE128_BLKSIZE_ENC,
 };

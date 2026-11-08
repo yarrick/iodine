@@ -199,9 +199,6 @@ const struct encoder base64_ops = {
 	.encode = base64_encode,
 	.decode = base64_decode,
 
-	.places_dots = false,
-	.eats_dots = false,
-
 	.blocksize_raw = BASE64_BLKSIZE_RAW,
 	.blocksize_encoded = BASE64_BLKSIZE_ENC,
 };
@@ -223,9 +220,6 @@ const struct encoder base64u_ops = {
 
 	.encode = base64u_encode,
 	.decode = base64u_decode,
-
-	.places_dots = false,
-	.eats_dots = false,
 
 	.blocksize_raw = BASE64_BLKSIZE_RAW,
 	.blocksize_encoded = BASE64_BLKSIZE_ENC,

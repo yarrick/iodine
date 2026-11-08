@@ -1971,36 +1971,22 @@ write_dns_nameenc(char *buf, size_t buflen, const char *data, size_t datalen, ch
 	/* -1 encoding type, -3 ".xy", -2 for safety */
 
 	memset(buf, 0, buflen);
+	space -= (space / 57);	/* space for dots */
 
 	if (downenc == 'S') {
 		buf[0] = 'i';
-		if (!base64_ops.places_dots)
-			space -= (space / 57);	/* space for dots */
 		base64_ops.encode(buf+1, &space, data, datalen);
-		if (!base64_ops.places_dots)
-			inline_dotify(buf, buflen);
 	} else if (downenc == 'U') {
 		buf[0] = 'j';
-		if (!base64u_ops.places_dots)
-			space -= (space / 57);	/* space for dots */
 		base64u_ops.encode(buf+1, &space, data, datalen);
-		if (!base64u_ops.places_dots)
-			inline_dotify(buf, buflen);
 	} else if (downenc == 'V') {
 		buf[0] = 'k';
-		if (!base128_ops.places_dots)
-			space -= (space / 57);	/* space for dots */
 		base128_ops.encode(buf+1, &space, data, datalen);
-		if (!base128_ops.places_dots)
-			inline_dotify(buf, buflen);
 	} else {
 		buf[0] = 'h';
-		if (!base32_ops.places_dots)
-			space -= (space / 57);	/* space for dots */
 		base32_ops.encode(buf+1, &space, data, datalen);
-		if (!base32_ops.places_dots)
-			inline_dotify(buf, buflen);
 	}
+	inline_dotify(buf, buflen);
 
 	/* Add dot (if it wasn't there already) and topdomain */
 	b = buf;
