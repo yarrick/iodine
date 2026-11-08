@@ -295,11 +295,7 @@ send_udp(int fd, const char *packet, size_t packetlen, struct query *q)
 	r = sendto(fd, packet, packetlen, 0, (struct sockaddr *) &q->remote, q->remotelen);
 #endif /* !WINDOWS */
 	if (r < 0) {
-		/* Don't log if requested size exceeds MTU (since don't fragment is set).
-		 * The client will probe to find the maximum usable size. */
-		if (errno != EMSGSIZE) {
-			warn("send_udp");
-		}
+		warn("send_udp");
 	}
 	return r;
 }
