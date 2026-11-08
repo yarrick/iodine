@@ -19,7 +19,7 @@ jobs:
         systemd: [libsystemd-dev, ""]
         capng: [libcap-ng-dev, ""]
         include:
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-26.04-arm
             selinux: libselinux1-dev
             systemd: libsystemd-dev
             capng: libcap-ng-dev
