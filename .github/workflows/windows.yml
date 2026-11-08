@@ -68,7 +68,7 @@ jobs:
       if: matrix.bench
       working-directory: build
       run: ninja tun_bench
-    - name: run bench
+    - name: run test_server
       working-directory: build
       run: ninja test_server
 

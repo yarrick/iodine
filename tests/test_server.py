@@ -12,10 +12,19 @@ import dns.rcode
 import dns.rdatatype as rr
 
 PROTOCOL_VERSION = 0x00000502
-_B32_TRANS = str.maketrans(
+PRIVATE = 65399
+HANDSHAKE_TYPES = [
+    (rr.NULL, "NULL"),
+    (PRIVATE, "PRIVATE"),
+    (rr.CNAME, "CNAME"),
+    (rr.A, "A"),
+    (rr.MX, "MX"),
+]
+_B32_ENC_TRANS = str.maketrans(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
     "abcdefghijklmnopqrstuvwxyz012345",
 )
+_B32_DEC_TRANS = {v: k for k, v in _B32_ENC_TRANS.items()}
 
 if len(sys.argv) < 3:
     sys.stderr.write(f"Usage: {sys.argv[0]} <thin_server> <os>\n")
@@ -26,7 +35,12 @@ dns_log = []
 
 
 def b32_encode(data):
-    return base64.b32encode(data).decode("ascii").rstrip("=").translate(_B32_TRANS)
+    return base64.b32encode(data).decode("ascii").rstrip("=").translate(_B32_ENC_TRANS)
+
+
+def b32_decode(s):
+    s = s.translate(_B32_DEC_TRANS)
+    return base64.b32decode(s + "=" * ((-len(s)) % 8))
 
 
 def query_dns(ip, port, qname, rdtype):
@@ -93,21 +107,41 @@ def login_hash(password, seed):
 
 
 class HandshakeTest(ServerTestCase):
+    def __init__(self, methodName, ip, port, rdtype, rdtype_name):
+        super().__init__(methodName, ip, port)
+        self.rdtype = rdtype
+        self.rdtype_name = rdtype_name
+
+    def __str__(self):
+        return f"{self._testMethodName} ({self.ip}:{self.port}, {self.rdtype_name})"
+
+    def query_payload(self, qname):
+        resp = query_dns(self.ip, self.port, qname, self.rdtype)
+        self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
+        rrset = resp.answer[0]
+        expected_rdtype = rr.CNAME if self.rdtype == rr.A else self.rdtype
+        self.assertEqual(rrset.rdtype, expected_rdtype)
+        if self.rdtype in (rr.NULL, PRIVATE):
+            return rrset[0].data
+        if self.rdtype in (rr.CNAME, rr.A):
+            name = rrset[0].target.to_text()
+        else:
+            name = rrset[0].exchange.to_text()
+        encoded = name.replace(".", "")
+        self.assertTrue(encoded.startswith("h"))
+        return b32_decode(encoded[1:-2])
+
     def send_version(self, version, cmc=1):
         payload = struct.pack("!IH", version, cmc)
         qname = f"v{b32_encode(payload)}.{topdomain}"
-        resp = query_dns(self.ip, self.port, qname, rr.NULL)
-        self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
-        rdata = resp.answer[0][0].data
+        rdata = self.query_payload(qname)
         self.assertEqual(len(rdata), 9)
         return struct.unpack("!4sIB", rdata)
 
     def send_login(self, userid, password, seed, cmc=2):
         payload = struct.pack("!B16sH", userid, login_hash(password, seed), cmc)
         qname = f"l{b32_encode(payload)}.{topdomain}"
-        resp = query_dns(self.ip, self.port, qname, rr.NULL)
-        self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
-        return resp.answer[0][0].data
+        return self.query_payload(qname)
 
     def test_login(self):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)
@@ -202,7 +236,11 @@ try:
     if handshake_target is not None:
         hs_ip, hs_port = handshake_target
         hs_names = unittest.defaultTestLoader.getTestCaseNames(HandshakeTest)
-        suite.addTests(HandshakeTest(name, hs_ip, hs_port) for name in hs_names)
+        for rdtype, rdtype_name in HANDSHAKE_TYPES:
+            suite.addTests(
+                HandshakeTest(name, hs_ip, hs_port, rdtype, rdtype_name)
+                for name in hs_names
+            )
 
     if suite.countTestCases() == 0:
         print("[test] No local IP addresses found")
