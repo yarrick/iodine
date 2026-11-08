@@ -922,7 +922,7 @@ handle_options_request(int dns_fd, char *in, int domain_len, struct query *q)
 		return; /* illegal id */
 	}
 
-	switch (ascii_lower(in[2])) {
+	switch (ascii_tolower(in[2])) {
 	/* Downstream encoding change */
 	case 't':
 		users[userid].downenc = 'T';
