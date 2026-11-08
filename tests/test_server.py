@@ -1,4 +1,5 @@
 import base64
+import contextlib
 import hashlib
 import ipaddress
 import struct
@@ -31,7 +32,6 @@ if len(sys.argv) < 3:
     sys.exit(1)
 
 binary, target_os = sys.argv[1], sys.argv[2].lower()
-dns_log = []
 
 
 def b32_encode(data):
@@ -48,30 +48,115 @@ def query_dns(ip, port, qname, rdtype):
     return dns.query.udp(q, str(ip), port=port, timeout=2.0)
 
 
+class ThinServer:
+    def __init__(self, ns_ip=None):
+        self.ns_ip = ns_ip
+        self.topdomain = ""
+        self.ports = {}
+        self.ips = []
+        self.dns_log = []
+        self.success = True
+
+        cmd = [binary]
+        if self.ns_ip is not None:
+            cmd.append(self.ns_ip)
+        print(f"[test ns={ns_ip}] Launching {' '.join(cmd)}", flush=True)
+        self.process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        while True:
+            line = self.process.stdout.readline()
+            if not line:
+                break
+            print(f"[serv ns={self.ns_ip}] {line.strip()}", flush=True)
+            if line.startswith("ADDR "):
+                ip = ipaddress.ip_address(line.split()[1])
+                if ip not in self.ips:
+                    self.ips.append(ip)
+            elif line.startswith("OPEN"):
+                parts = line.split()
+                self.topdomain = parts[1]
+                for part in parts[2:]:
+                    if part.startswith("v4="):
+                        self.ports[4] = int(part.split("=", 1)[1])
+                    elif part.startswith("v6="):
+                        self.ports[6] = int(part.split("=", 1)[1])
+                break
+
+        if self.process.poll() is not None:
+            print("[test] Failed to open")
+            sys.exit(1)
+
+        self.output_thread = threading.Thread(
+            target=self._log_output,
+            args=(self.process.stdout,),
+            daemon=True,
+        )
+        self.output_thread.start()
+
+    def _log_output(self, stream):
+        for line in iter(stream.readline, ""):
+            self.dns_log.append(f"[serv ns={self.ns_ip}] {line}")
+        stream.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+        self.output_thread.join(timeout=1)
+        if not self.success:
+            sys.stdout.writelines(self.dns_log)
+
+
 class ServerTestCase(unittest.TestCase):
-    def __init__(self, methodName, ip, port):
+    def __init__(self, methodName, srv, ip):
         super().__init__(methodName)
+        self.srv = srv
+        self.topdomain = srv.topdomain
         self.ip = ip
-        self.port = port
+        self.port = srv.ports[ip.version]
         self.is_v4 = ip.version == 4
 
     def __str__(self):
-        return f"{self._testMethodName} ({self.ip}:{self.port})"
+        ns_tag = f", ns={self.srv.ns_ip}" if self.srv.ns_ip else ""
+        return f"{self._testMethodName} ({self.ip}:{self.port}{ns_tag})"
 
 
 class StandardDnsTest(ServerTestCase):
+
+    def check_ns_a(self, actual):
+        if self.srv.ns_ip == "auto":
+            ipaddress.IPv4Address(actual)
+        else:
+            self.assertEqual(actual, self.srv.ns_ip or str(self.ip))
 
     def test_addr_records(self):
         addr_checks = [
             ("www", rr.A, "127.0.0.1"),
             ("www", rr.AAAA, "::1"),
         ]
-        if target_os != "haiku":
-            addr_checks.append(("ns", rr.A if self.is_v4 else rr.AAAA, str(self.ip)))
+        if not self.is_v4 and target_os != "haiku":
+            addr_checks.append(("ns", rr.AAAA, str(self.ip)))
         for sub, rdtype, expected in addr_checks:
-            resp = query_dns(self.ip, self.port, f"{sub}.{topdomain}", rdtype)
+            resp = query_dns(self.ip, self.port, f"{sub}.{self.topdomain}", rdtype)
             self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
             self.assertEqual(resp.answer[0][0].address, expected)
+
+        if self.srv.ns_ip or (self.is_v4 and target_os != "haiku"):
+            resp = query_dns(self.ip, self.port, f"ns.{self.topdomain}", rr.A)
+            self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
+            self.check_ns_a(resp.answer[0][0].address)
 
     def test_soa_records(self):
         for sub in ("ns", "www"):
@@ -79,22 +164,22 @@ class StandardDnsTest(ServerTestCase):
             if sub == "ns" and self.is_v4:
                 soa_types.append(rr.AAAA)
             for rdtype in soa_types:
-                resp = query_dns(self.ip, self.port, f"{sub}.{topdomain}", rdtype)
+                resp = query_dns(self.ip, self.port, f"{sub}.{self.topdomain}", rdtype)
                 self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
                 self.assertEqual(len(resp.answer), 0)
                 self.assertEqual(resp.authority[0].rdtype, rr.SOA)
 
     def test_ns_record(self):
-        resp = query_dns(self.ip, self.port, topdomain, rr.NS)
+        resp = query_dns(self.ip, self.port, self.topdomain, rr.NS)
         self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
-        self.assertEqual(resp.answer[0][0].target.to_text(), f"ns.{topdomain}.")
-        if self.is_v4 and target_os != "haiku":
-            self.assertEqual(resp.additional[0][0].address, str(self.ip))
+        self.assertEqual(resp.answer[0][0].target.to_text(), f"ns.{self.topdomain}.")
+        if self.srv.ns_ip or (self.is_v4 and target_os != "haiku"):
+            self.check_ns_a(resp.additional[0][0].address)
         else:
             self.assertEqual(len(resp.additional), 0)
 
     def test_qname_minimisation(self):
-        resp = query_dns(self.ip, self.port, f"_.sub.{topdomain}", rr.A)
+        resp = query_dns(self.ip, self.port, f"_.sub.{self.topdomain}", rr.A)
         self.assertEqual(resp.rcode(), dns.rcode.NXDOMAIN)
         self.assertEqual(resp.authority[0].rdtype, rr.SOA)
 
@@ -107,13 +192,14 @@ def login_hash(password, seed):
 
 
 class HandshakeTest(ServerTestCase):
-    def __init__(self, methodName, ip, port, rdtype, rdtype_name):
-        super().__init__(methodName, ip, port)
+    def __init__(self, methodName, srv, ip, rdtype, rdtype_name):
+        super().__init__(methodName, srv, ip)
         self.rdtype = rdtype
         self.rdtype_name = rdtype_name
 
     def __str__(self):
-        return f"{self._testMethodName} ({self.ip}:{self.port}, {self.rdtype_name})"
+        ns_tag = f", ns={self.srv.ns_ip}" if self.srv.ns_ip else ""
+        return f"{self._testMethodName} ({self.ip}:{self.port}, {self.rdtype_name}{ns_tag})"
 
     def query_payload(self, qname):
         resp = query_dns(self.ip, self.port, qname, self.rdtype)
@@ -133,14 +219,14 @@ class HandshakeTest(ServerTestCase):
 
     def send_version(self, version, cmc=1):
         payload = struct.pack("!IH", version, cmc)
-        qname = f"v{b32_encode(payload)}.{topdomain}"
+        qname = f"v{b32_encode(payload)}.{self.topdomain}"
         rdata = self.query_payload(qname)
         self.assertEqual(len(rdata), 9)
         return struct.unpack("!4sIB", rdata)
 
     def send_login(self, userid, password, seed, cmc=2):
         payload = struct.pack("!B16sH", userid, login_hash(password, seed), cmc)
-        qname = f"l{b32_encode(payload)}.{topdomain}"
+        qname = f"l{b32_encode(payload)}.{self.topdomain}"
         return self.query_payload(qname)
 
     def test_login(self):
@@ -168,100 +254,39 @@ class HandshakeTest(ServerTestCase):
         self.assertEqual(userid, 0)
 
 
-cmd = [binary]
-print(f"[test] Launching {' '.join(cmd)}", flush=True)
-
-process = subprocess.Popen(
-    cmd,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.STDOUT,
-    text=True,
-    bufsize=1,
-)
-
-
-def log_dns_bench(stream):
-    for line in iter(stream.readline, ""):
-        dns_log.append(f"[dns] {line}")
-    stream.close()
-
-
-output_thread = None
-success = False
-try:
-    topdomain = ""
-    ports = {}
-    ips = []
-    while True:
-        line = process.stdout.readline()
-        if not line:
-            break
-        print(f"[dns] {line.strip()}", flush=True)
-        if line.startswith("ADDR "):
-            ip = ipaddress.ip_address(line.split()[1])
-            if ip not in ips:
-                ips.append(ip)
-        elif line.startswith("OPEN"):
-            parts = line.split()
-            topdomain = parts[1]
-            for part in parts[2:]:
-                if part.startswith("v4="):
-                    ports[4] = int(part.split("=", 1)[1])
-                elif part.startswith("v6="):
-                    ports[6] = int(part.split("=", 1)[1])
-            break
-
-    if process.poll() is not None:
-        print("[test] Failed to open")
-        sys.exit(1)
-
-    output_thread = threading.Thread(
-        target=log_dns_bench,
-        args=(process.stdout,),
-        daemon=True,
-    )
-    output_thread.start()
-
-    print(f"[test] Testing addresses " + ", ".join([str(ip) for ip in ips]), flush=True)
+def build_suite(srv):
     suite = unittest.TestSuite()
     std_names = unittest.defaultTestLoader.getTestCaseNames(StandardDnsTest)
-    handshake_target = None
-    for ip in ips:
-        port = ports.get(ip.version)
-        if port and not (ip.version == 6 and target_os == "haiku"):
-            suite.addTests(StandardDnsTest(name, ip, port) for name in std_names)
-            if handshake_target is None:
-                handshake_target = (ip, port)
+    handshake_ip = None
+    for ip in srv.ips:
+        if ip.version in srv.ports and not (ip.version == 6 and target_os == "haiku"):
+            suite.addTests(StandardDnsTest(name, srv, ip) for name in std_names)
+            if handshake_ip is None:
+                handshake_ip = ip
 
-    if handshake_target is not None:
-        hs_ip, hs_port = handshake_target
+    if handshake_ip is not None:
         hs_names = unittest.defaultTestLoader.getTestCaseNames(HandshakeTest)
         for rdtype, rdtype_name in HANDSHAKE_TYPES:
             suite.addTests(
-                HandshakeTest(name, hs_ip, hs_port, rdtype, rdtype_name)
+                HandshakeTest(name, srv, handshake_ip, rdtype, rdtype_name)
                 for name in hs_names
             )
+    return suite
 
-    if suite.countTestCases() == 0:
-        print("[test] No local IP addresses found")
-        sys.exit(1)
-    success = unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful()
-    if not success:
-        sys.exit(1)
 
+try:
+    with contextlib.ExitStack() as stack:
+        srvs = [stack.enter_context(ThinServer(ns_ip)) for ns_ip in (None, "1.2.3.4", "auto")]
+        print(f"[test] Testing addresses " + ", ".join([str(ip) for ip in srvs[0].ips]), flush=True)
+        suite = unittest.TestSuite(build_suite(srv) for srv in srvs)
+        if suite.countTestCases() == 0:
+            print("[test] No local IP addresses found")
+            sys.exit(1)
+        result = unittest.TextTestRunner(verbosity=2).run(suite)
+        for srv in {test.srv for test, _ in result.errors + result.failures}:
+            srv.success = False
+        if not result.wasSuccessful():
+            sys.exit(1)
 except KeyboardInterrupt:
     print("\n[test] Interrupted.")
     sys.exit(1)
-finally:
-    if process.poll() is None:
-        process.terminate()
-        try:
-            process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-    if output_thread is not None:
-        output_thread.join(timeout=1)
-    if not success:
-        sys.stdout.writelines(dns_log)
-    print("[test] Exited\n")

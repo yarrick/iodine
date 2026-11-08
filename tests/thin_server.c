@@ -103,8 +103,8 @@ main(int argc, char **argv)
 	struct server_params params;
 	const char *topdomain = "test.iodine.code";
 	char password[33] = "testpass";
+	struct in_addr ns_ip;
 
-	(void)argc;
 	progname_init(argv[0]);
 	network_init();
 	ui_set_debuglevel(2);
@@ -117,15 +117,29 @@ main(int argc, char **argv)
 		return 1;
 	}
 
+	ns_ip.s_addr = INADDR_ANY;
+	if (argc > 1) {
+		if (strcmp(argv[1], "auto") == 0) {
+			if (get_external_ip(&ns_ip) != 0) {
+				ui_log("Failed to get external IP\n");
+				return 1;
+			}
+			ui_log("Using %s as external IP\n", format_inaddr(&ns_ip));
+		} else if (inet_pton(AF_INET, argv[1], &ns_ip) != 1) {
+			ui_log("Invalid nameserver IP: %s\n", argv[1]);
+			return 1;
+		}
+	}
+
 	memset(&params, 0, sizeof(params));
 	params.topdomain = topdomain;
 	params.password = password;
-	params.server_ip = inet_addr("10.0.0.1");
+	inet_pton(AF_INET, "10.0.0.1", &params.server_ip);
 	params.netmask = 27;
 	params.users = init_users(params.server_ip, params.netmask);
 	params.check_ip = 1;
 	params.tunnel_mtu = 1130;
-	params.nameserver_ip = INADDR_ANY;
+	params.nameserver_ip = ns_ip.s_addr;
 	server_init(&params);
 
 	signal(SIGINT, sighandler);
