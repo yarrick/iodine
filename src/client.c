@@ -1340,10 +1340,10 @@ handshake_version(int dns_fd, int *seed)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'v', 'V', i+1);
 
 		if (read >= 9) {
-			payload =  (((in[4] & 0xff) << 24) |
-					((in[5] & 0xff) << 16) |
-					((in[6] & 0xff) << 8) |
-					((in[7] & 0xff)));
+			payload = (((in[4] & 0xffU) << 24) |
+					((in[5] & 0xffU) << 16) |
+					((in[6] & 0xffU) << 8) |
+					((in[7] & 0xffU)));
 
 			if (strncmp("VACK", in, 4) == 0) {
 				*seed = payload;
