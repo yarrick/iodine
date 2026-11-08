@@ -198,7 +198,7 @@ static void send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct
 	ui_debug(2, "TX-raw: client %s, cmd %d, %zu bytes\n",
 		 format_addr(&q->remote, q->remotelen), cmd, len);
 
-	sendto(fd, packet, len, 0, (struct sockaddr *) &q->remote, q->remotelen);
+	send_udp(fd, packet, len, q);
 }
 
 
@@ -2100,6 +2100,6 @@ write_dns(int fd, struct query *q, const char *data, size_t datalen, char downen
 	ui_debug(2, "TX: client %s, type %d, name %s, %zu bytes data\n",
 		 format_addr(&q->remote, q->remotelen), q->type, q->name, datalen);
 
-	sendto(fd, buf, len, 0, (struct sockaddr*)&q->remote, q->remotelen);
+	send_udp(fd, buf, len, q);
 }
 
