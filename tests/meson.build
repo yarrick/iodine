@@ -43,6 +43,10 @@ foreach py_name : ['python3', 'python3.14', 'python3.13', 'python3.12']
   endif
 endforeach
 if py3.found()
+  bench_deps = [tun_ping]
+  if host_machine.system() == 'windows'
+    bench_deps += fs.copyfile(wintun_dll)
+  endif
   run_target('tun_bench',
     command: [
       py3,
@@ -50,6 +54,6 @@ if py3.found()
       tun_ping.full_path(),
       host_machine.system(),
     ],
-    depends: tun_ping,
+    depends: bench_deps,
   )
 endif

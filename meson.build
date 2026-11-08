@@ -161,8 +161,9 @@ common_sources = files(
 
 if host_machine.system() == 'windows'
   common_sources += files('src/tun_windows.c')
+  wintun_dll = files('wintun/bin' / host_machine.cpu_family() / 'wintun.dll')
   fs.copyfile(
-    'wintun/bin' / host_machine.cpu_family() / 'wintun.dll',
+    wintun_dll,
     install: true,
     install_dir: target_dir,
     install_tag: 'runtime',

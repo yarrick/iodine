@@ -119,6 +119,7 @@ main(int argc, char **argv)
 		ui_log("Missing device name as argument\n");
 		return 1;
 	}
+	progname_init(argv[0]);
 	check_privileges(NULL, 0);
 	network_init();
 	fd = open_tun(argv[1]);
