@@ -2216,8 +2216,8 @@ handshake_autoprobe_fragsize(int dns_fd)
 	char in[4096];
 	int i;
 	int read;
-	int proposed_fragsize = 768;
-	int range = 768;
+	int proposed_fragsize = 592;
+	int range = 592;
 	int max_fragsize;
 
 	max_fragsize = 0;
