@@ -187,7 +187,8 @@ class HandshakeTest(ServerTestCase):
         ns_tag = f", ns={self.srv.ns_ip}" if self.srv.ns_ip else ""
         return f"{self._testMethodName} ({self.ip}:{self.port}, {self.rdtype.name}{ns_tag})"
 
-    def query_payload(self, qname):
+    def query_payload(self, startchar, payload):
+        qname = f"{startchar}{b32_encode(payload)}.{self.topdomain}"
         resp = query_dns(self.ip, self.port, qname, self.rdtype)
         self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
         rrset = resp.answer[0]
@@ -204,20 +205,17 @@ class HandshakeTest(ServerTestCase):
 
     def send_version(self, version, cmc=1):
         payload = struct.pack("!IH", version, cmc)
-        qname = f"V{b32_encode(payload)}.{self.topdomain}"
-        rdata = self.query_payload(qname)
+        rdata = self.query_payload('V', payload)
         self.assertEqual(len(rdata), 9)
         return struct.unpack("!4sIB", rdata)
 
     def send_login(self, userid, password, seed, cmc=2):
         payload = struct.pack("!B16sH", userid, login_hash(password, seed), cmc)
-        qname = f"L{b32_encode(payload)}.{self.topdomain}"
-        return self.query_payload(qname)
+        return self.query_payload('L', payload)
 
     def send_ip_request(self, userid, cmc=3):
         payload = struct.pack("!BH", userid << 3, cmc)
-        qname = f"I{b32_encode(payload)}.{self.topdomain}"
-        return self.query_payload(qname)
+        return self.query_payload('I', payload)
 
     def test_login(self):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)
