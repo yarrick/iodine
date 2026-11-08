@@ -907,40 +907,33 @@ handle_options_request(int dns_fd, char *in, int domain_len, struct query *q)
 		return; /* illegal id */
 	}
 
-	switch (in[2]) {
+	switch (ascii_lower(in[2])) {
 	/* Downstream encoding change */
-	case 'T':
 	case 't':
 		users[userid].downenc = 'T';
 		write_dns(dns_fd, q, "Base32", 6, users[userid].downenc);
 		break;
-	case 'S':
 	case 's':
 		users[userid].downenc = 'S';
 		write_dns(dns_fd, q, "Base64", 6, users[userid].downenc);
 		break;
-	case 'U':
 	case 'u':
 		users[userid].downenc = 'U';
 		write_dns(dns_fd, q, "Base64u", 7, users[userid].downenc);
 		break;
-	case 'V':
 	case 'v':
 		users[userid].downenc = 'V';
 		write_dns(dns_fd, q, "Base128", 7, users[userid].downenc);
 		break;
-	case 'R':
 	case 'r':
 		users[userid].downenc = 'R';
 		write_dns(dns_fd, q, "Raw", 3, users[userid].downenc);
 		break;
 	/* Other options */
-	case 'L':
 	case 'l':
 		users[userid].lazy = 1;
 		write_dns(dns_fd, q, "Lazy", 4, users[userid].downenc);
 		break;
-	case 'I':
 	case 'i':
 		users[userid].lazy = 0;
 		write_dns(dns_fd, q, "Immediate", 9, users[userid].downenc);
