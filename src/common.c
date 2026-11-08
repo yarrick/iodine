@@ -269,7 +269,8 @@ query_datalen(const char *qname, const char *topdomain)
 	return -1;
 }
 
-int recent_seqno(int ourseqno, int gotseqno)
+int
+recent_seqno(int ourseqno, int gotseqno)
 /* Return 1 if we've seen gotseqno recently (current or up to 3 back).
    Return 0 if gotseqno is new (or very old).
 */

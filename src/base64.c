@@ -48,7 +48,8 @@ static struct alphabet underscore = {
 	.reverse_init = 0,
 };
 
-inline static void base64_reverse_init(struct alphabet *a)
+inline static void
+base64_reverse_init(struct alphabet *a)
 {
 	int i;
 	unsigned char c;
@@ -71,8 +72,9 @@ inline static void base64_reverse_init(struct alphabet *a)
  * return value    : #bytes filled in buf   (excluding \0)
  * sets *buflen to : #bytes encoded from data
  */
-static unsigned int base64_gen_encode(struct alphabet *a, char *buf, size_t *buflen,
-				      const void *data, size_t size)
+static unsigned int
+base64_gen_encode(struct alphabet *a, char *buf, size_t *buflen,
+		  const void *data, size_t size)
 {
 	unsigned char *cb64 = a->forward;
 	unsigned char *udata = (unsigned char *) data;
@@ -135,8 +137,9 @@ static unsigned int base64_gen_encode(struct alphabet *a, char *buf, size_t *buf
  *
  * return value    : #bytes filled in buf   (excluding \0)
  */
-static unsigned int base64_gen_decode(struct alphabet *a, void *buf, size_t *buflen,
-				      const char *str, size_t slen)
+static unsigned int
+base64_gen_decode(struct alphabet *a, void *buf, size_t *buflen,
+		  const char *str, size_t slen)
 {
 	unsigned char *rev64 = a->reverse;
 	unsigned char *ubuf = (unsigned char *) buf;
@@ -181,14 +184,14 @@ static unsigned int base64_gen_decode(struct alphabet *a, void *buf, size_t *buf
 
 #undef REV64
 
-static unsigned int base64_encode(char *buf, size_t *buflen, const void *data,
-			 size_t size)
+static unsigned int
+base64_encode(char *buf, size_t *buflen, const void *data, size_t size)
 {
 	return base64_gen_encode(&standard, buf, buflen, data, size);
 }
 
-static unsigned int base64_decode(void *buf, size_t *buflen, const char *str,
-			 size_t slen)
+static unsigned int
+base64_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 {
 	return base64_gen_decode(&standard, buf, buflen, str, slen);
 }
@@ -203,14 +206,14 @@ const struct encoder base64_ops = {
 	.blocksize_encoded = BASE64_BLKSIZE_ENC,
 };
 
-static unsigned int base64u_encode(char *buf, size_t *buflen, const void *data,
-			  size_t size)
+static unsigned int
+base64u_encode(char *buf, size_t *buflen, const void *data, size_t size)
 {
 	return base64_gen_encode(&underscore, buf, buflen, data, size);
 }
 
-static unsigned int base64u_decode(void *buf, size_t *buflen, const char *str,
-			  size_t slen)
+static unsigned int
+base64u_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 {
 	return base64_gen_decode(&underscore, buf, buflen, str, slen);
 }

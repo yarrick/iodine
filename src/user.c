@@ -34,7 +34,8 @@
 struct tun_user *users;
 static unsigned int usercount;
 
-int init_users(in_addr_t my_ip, int netbits)
+int
+init_users(in_addr_t my_ip, int netbits)
 {
 	unsigned int i;
 	int skip = 0;
@@ -81,12 +82,14 @@ int init_users(in_addr_t my_ip, int netbits)
 	return usercount;
 }
 
-const in_addr_t *users_get_first_ip(void)
+const in_addr_t *
+users_get_first_ip(void)
 {
 	return &users[0].tun_ip;
 }
 
-int find_user_by_ip(uint32_t ip)
+int
+find_user_by_ip(uint32_t ip)
 {
 	int ret;
 	unsigned int i;
@@ -110,7 +113,8 @@ int find_user_by_ip(uint32_t ip)
    the outpacket-queue, so that sending back-to-back is possible
    without going through another select loop.
 */
-int all_users_waiting_to_send(void)
+int
+all_users_waiting_to_send(void)
 {
 	time_t now;
 	int ret;
@@ -137,7 +141,8 @@ int all_users_waiting_to_send(void)
 	return ret;
 }
 
-int find_available_user(unsigned int *user)
+int
+find_available_user(unsigned int *user)
 {
 	unsigned int i;
 	for (i = 0; i < usercount; i++) {
@@ -165,7 +170,8 @@ int find_available_user(unsigned int *user)
 	return 0;
 }
 
-void user_switch_codec(unsigned int userid, const struct encoder *enc)
+void
+user_switch_codec(unsigned int userid, const struct encoder *enc)
 {
 	if (userid >= usercount)
 		return;
@@ -173,7 +179,8 @@ void user_switch_codec(unsigned int userid, const struct encoder *enc)
 	users[userid].encoder = enc;
 }
 
-void user_set_conn_type(unsigned int userid, enum connection c)
+void
+user_set_conn_type(unsigned int userid, enum connection c)
 {
 	if (userid >= usercount)
 		return;

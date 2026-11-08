@@ -40,7 +40,8 @@
 #endif
 
 #if HAVE_CHECKTOKENMEMBERSHIP
-bool is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
+bool
+is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
 	BOOL is_member = FALSE;
 	byte sid_buffer[SECURITY_MAX_SID_SIZE];
 	PSID sid = (PSID)sid_buffer;
@@ -238,7 +239,8 @@ do_pidfile(char *pidfile)
 
 /* Provide daemon(3) if required and not available */
 #if CAN_DETACH && !HAVE_DAEMON
-static int daemon(int nochdir, int noclose)
+static int
+daemon(int nochdir, int noclose)
 {
 	int fd, i;
 

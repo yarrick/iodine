@@ -143,7 +143,8 @@ syslog(int priority, const char *fmt, ...)
 #endif
 
 #if !HAVE_STRLCPY
-size_t strlcpy(char *dst, const char *src, size_t dsize) {
+size_t
+strlcpy(char *dst, const char *src, size_t dsize) {
 	size_t srclen = strlen(src);
 
 	if (dsize > 0) {

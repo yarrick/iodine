@@ -92,7 +92,8 @@ wintun_init(void)
 	return 0;
 }
 
-DWORD WINAPI tun_reader(LPVOID arg)
+DWORD WINAPI
+tun_reader(LPVOID arg)
 {
 	struct tun_data *tun = arg;
 	int sock = open_udp_from_host("127.0.0.1", 0, AF_INET, 0);

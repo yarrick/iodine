@@ -45,8 +45,9 @@ int dnsc_use_edns0 = 1;
 
 #define CHECKLEN(x) if (buflen < (x) + (size_t)(p-buf))  return 0
 
-int dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr,
-	       const char *data, size_t datalen)
+int
+dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr,
+	   const char *data, size_t datalen)
 {
 	HEADER *header;
 	short name;
@@ -225,8 +226,9 @@ int dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr,
 
 /* Only used when iodined gets an NS type query */
 /* Mostly same as dns_encode_a_response() below */
-int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
-			   int topdomain_offset, struct sockaddr *address)
+int
+dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
+		       int topdomain_offset, struct sockaddr *address)
 {
 	HEADER *header;
 	int len;
@@ -319,8 +321,9 @@ int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 
 /* Only used when iodined gets an A/AAAA type query for ns.topdomain or
  * www.topdomain . Mostly same as dns_encode_ns_response() above */
-int dns_encode_standard_response(char *buf, size_t buflen, struct query *q,
-				 struct sockaddr *address)
+int
+dns_encode_standard_response(char *buf, size_t buflen, struct query *q,
+			     struct sockaddr *address)
 {
 	HEADER *header;
 	int len;
@@ -389,7 +392,8 @@ int dns_encode_standard_response(char *buf, size_t buflen, struct query *q,
 	return len;
 }
 
-int dns_encode_soa(char *buf, size_t buflen, struct query *q, const char *zone, int rcode)
+int
+dns_encode_soa(char *buf, size_t buflen, struct query *q, const char *zone, int rcode)
 {
 	char rnamebuf[256];
 	char nsbuf[256];
@@ -456,7 +460,8 @@ int dns_encode_soa(char *buf, size_t buflen, struct query *q, const char *zone, 
 
 #undef CHECKLEN
 
-unsigned short dns_get_id(char *packet, size_t packetlen)
+unsigned short
+dns_get_id(char *packet, size_t packetlen)
 {
 	HEADER *header;
 	header = (HEADER*)packet;
@@ -471,8 +476,9 @@ unsigned short dns_get_id(char *packet, size_t packetlen)
 
 #define SRV_MX_NAMES (250)
 
-int dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
-	       size_t packetlen)
+int
+dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
+	   size_t packetlen)
 {
 	char name[QUERY_NAME_SIZE];
 	char rdata[4*1024];

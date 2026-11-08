@@ -21,7 +21,8 @@
 #include "ui.h"
 #include "util.h"
 
-char *get_resolvconf_addr(void)
+char *
+get_resolvconf_addr(void)
 {
 	static char addr[257];
 	char *rv = NULL;

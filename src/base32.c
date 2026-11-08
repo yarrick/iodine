@@ -33,7 +33,8 @@ static const char cb32_ucase[] =
 static unsigned char rev32[256];
 static int reverse_init = 0;
 
-inline static void base32_reverse_init(void)
+inline static void
+base32_reverse_init(void)
 {
 	int i;
 	unsigned char c;
@@ -50,12 +51,14 @@ inline static void base32_reverse_init(void)
 	}
 }
 
-int b32_5to8(int in)
+int
+b32_5to8(int in)
 {
 	return cb32[in & 31];
 }
 
-int b32_8to5(int in)
+int
+b32_8to5(int in)
 {
 	base32_reverse_init();
 	return rev32[(unsigned char) in];
@@ -70,8 +73,8 @@ int b32_8to5(int in)
  * return value    : #bytes filled in buf   (excluding \0)
  * sets *buflen to : #bytes encoded from data
  */
-static unsigned int base32_encode(char *buf, size_t *buflen,
-				  const void *data, size_t size)
+static unsigned int
+base32_encode(char *buf, size_t *buflen, const void *data, size_t size)
 {
 	unsigned char *udata = (unsigned char *) data;
 	unsigned int iout = 0;	/* to-be-filled output char */
@@ -163,8 +166,8 @@ static unsigned int base32_encode(char *buf, size_t *buflen,
  *
  * return value    : #bytes filled in buf   (excluding \0)
  */
-static unsigned int base32_decode(void *buf, size_t *buflen,
-				  const char *str, size_t slen)
+static unsigned int
+base32_decode(void *buf, size_t *buflen, const char *str, size_t slen)
 {
 	unsigned char *ubuf = (unsigned char *) buf;
 	unsigned int iout = 0;	/* to-be-filled output byte */

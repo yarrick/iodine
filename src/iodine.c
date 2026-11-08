@@ -59,7 +59,8 @@ static inline void usage(void) __attribute__((noreturn));
 static inline void help(FILE * stream, bool verbose) __attribute__((noreturn));
 #endif
 
-static void help(FILE *stream, bool verbose)
+static void
+help(FILE *stream, bool verbose)
 {
 	fprintf(stream,
 		"iodine IP over DNS tunneling client\n\n"
@@ -99,12 +100,14 @@ static void help(FILE *stream, bool verbose)
 	exit(0);
 }
 
-static inline void usage(void)
+static inline void
+usage(void)
 {
 	help(stderr, false);
 }
 
-static void version(void)
+static void
+version(void)
 {
 	ui_log("iodine IP over DNS tunneling client\n"
 	       "Version: %s\n", IODINE_VERSION);
@@ -112,7 +115,8 @@ static void version(void)
 	exit(0);
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
 	char *nameserv_host;
 	char *topdomain;

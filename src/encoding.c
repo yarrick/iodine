@@ -21,15 +21,17 @@
 #include "compat.h"
 #include "encoding.h"
 
-size_t hostname_need(const char *topdomain)
+size_t
+hostname_need(const char *topdomain)
 {
 	/* 8 = 5 max header length + 1 dot before topdomain + 2 safety */
 	return strlen(topdomain) + 8;
 }
 
-int build_hostname(char *buf, size_t buflen, const char *data,
-		   const size_t datalen, const char *topdomain,
-		   const struct encoder *encoder, int maxlen)
+int
+build_hostname(char *buf, size_t buflen, const char *data,
+	       const size_t datalen, const char *topdomain,
+	       const struct encoder *encoder, int maxlen)
 {
 	size_t space;
 	char *b;
@@ -81,8 +83,9 @@ int build_hostname(char *buf, size_t buflen, const char *data,
 	return space;
 }
 
-int unpack_data(char *buf, size_t buflen, char *data, size_t datalen,
-		const struct encoder *enc)
+int
+unpack_data(char *buf, size_t buflen, char *data, size_t datalen,
+	    const struct encoder *enc)
 {
 	if (buflen == 0)
 		return 0;
@@ -91,7 +94,8 @@ int unpack_data(char *buf, size_t buflen, char *data, size_t datalen,
 	return enc->decode(buf, &buflen, data, datalen);
 }
 
-int inline_dotify(char *buf, size_t buflen)
+int
+inline_dotify(char *buf, size_t buflen)
 {
 	unsigned dots;
 	unsigned pos;
@@ -128,7 +132,8 @@ int inline_dotify(char *buf, size_t buflen)
 	return total;
 }
 
-int inline_undotify(char *buf, size_t len)
+int
+inline_undotify(char *buf, size_t len)
 {
 	unsigned pos;
 	unsigned dots;

@@ -69,7 +69,8 @@ sigint(int sig)
 	server_stop();
 }
 
-static void print_usage(FILE *stream)
+static void
+print_usage(FILE *stream)
 {
 	fprintf(stream,
 		"Usage: %s [-46cDfsv] [-u user] [-t chrootdir] [-d device] [-m mtu]\n"
@@ -79,13 +80,15 @@ static void print_usage(FILE *stream)
 		__progname);
 }
 
-static void usage(void)
+static void
+usage(void)
 {
 	print_usage(stderr);
 	exit(2);
 }
 
-static void help(FILE *stream)
+static void
+help(FILE *stream)
 {
 	fprintf(stream, "iodine IP over DNS tunneling server\n\n");
 	print_usage(stream);
@@ -126,7 +129,8 @@ static void help(FILE *stream)
 	exit(0);
 }
 
-static void version(void)
+static void
+version(void)
 {
 	ui_log("iodine IP over DNS tunneling server\n"
 	       "Version: %s\n", IODINE_VERSION);
