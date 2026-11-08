@@ -52,10 +52,12 @@ static void
 inject_console_keys(const char *keys)
 {
 	int pipefd[2];
+	int ret;
 
 	ck_assert_int_eq(pipe(pipefd), 0);
 
-	write(pipefd[1], keys, strlen(keys));
+	ret = write(pipefd[1], keys, strlen(keys));
+	ck_assert_int_gt(ret, 0);
 	close(pipefd[1]);
 
 	dup2(pipefd[0], STDIN_FILENO);
