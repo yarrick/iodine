@@ -13,14 +13,7 @@ import dns.rcode
 import dns.rdatatype as rr
 
 PROTOCOL_VERSION = 0x00000502
-PRIVATE = 65399
-HANDSHAKE_TYPES = [
-    (rr.NULL, "NULL"),
-    (PRIVATE, "PRIVATE"),
-    (rr.CNAME, "CNAME"),
-    (rr.A, "A"),
-    (rr.MX, "MX"),
-]
+HANDSHAKE_TYPES = [rr.NULL, rr.CNAME, rr.MX]
 _B32_ENC_TRANS = str.maketrans(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
     "abcdefghijklmnopqrstuvwxyz012345",
@@ -192,24 +185,22 @@ def login_hash(password, seed):
 
 
 class HandshakeTest(ServerTestCase):
-    def __init__(self, methodName, srv, ip, rdtype, rdtype_name):
+    def __init__(self, methodName, srv, ip, rdtype):
         super().__init__(methodName, srv, ip)
         self.rdtype = rdtype
-        self.rdtype_name = rdtype_name
 
     def __str__(self):
         ns_tag = f", ns={self.srv.ns_ip}" if self.srv.ns_ip else ""
-        return f"{self._testMethodName} ({self.ip}:{self.port}, {self.rdtype_name}{ns_tag})"
+        return f"{self._testMethodName} ({self.ip}:{self.port}, {self.rdtype.name}{ns_tag})"
 
     def query_payload(self, qname):
         resp = query_dns(self.ip, self.port, qname, self.rdtype)
         self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
         rrset = resp.answer[0]
-        expected_rdtype = rr.CNAME if self.rdtype == rr.A else self.rdtype
-        self.assertEqual(rrset.rdtype, expected_rdtype)
-        if self.rdtype in (rr.NULL, PRIVATE):
+        self.assertEqual(rrset.rdtype, self.rdtype)
+        if self.rdtype == rr.NULL:
             return rrset[0].data
-        if self.rdtype in (rr.CNAME, rr.A):
+        if self.rdtype == rr.CNAME:
             name = rrset[0].target.to_text()
         else:
             name = rrset[0].exchange.to_text()
@@ -238,16 +229,21 @@ class HandshakeTest(ServerTestCase):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)
         self.assertEqual(status, b"VACK")
         self.assertLess(userid, 16)
-        reply = self.send_login(userid, "testpass", seed).decode("ascii")
-        server_ip, client_ip, mtu, netmask = reply.split("-")
+
+        login_reply = self.send_login(userid, "testpass", seed).decode("ascii")
+        server_ip, client_ip, mtu, netmask = login_reply.split("-")
         self.assertEqual(server_ip, "10.0.0.1")
         self.assertNotEqual(ipaddress.ip_address(client_ip), ipaddress.ip_address(server_ip))
         self.assertEqual(mtu, "1130")
         self.assertEqual(netmask, "27")
+
         ip_reply = self.send_ip_request(userid)
         self.assertEqual(ip_reply[:1], b"I")
-        if self.srv.ns_ip or target_os != "haiku":
-            self.check_ns_a(str(ipaddress.ip_address(ip_reply[1:])))
+        actual_ip = str(ipaddress.ip_address(ip_reply[1:]))
+        if not self.is_v4:
+            self.assertEqual(actual_ip, str(self.ip))
+        elif self.srv.ns_ip or target_os != "haiku":
+            self.check_ns_a(actual_ip)
 
     def test_login_wrong_password(self):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)
@@ -266,18 +262,17 @@ class HandshakeTest(ServerTestCase):
 def build_suite(srv):
     suite = unittest.TestSuite()
     std_names = unittest.defaultTestLoader.getTestCaseNames(StandardDnsTest)
-    handshake_ip = None
+    handshake_ips = {}
     for ip in srv.ips:
         if ip.version in srv.ports and not (ip.version == 6 and target_os == "haiku"):
             suite.addTests(StandardDnsTest(name, srv, ip) for name in std_names)
-            if handshake_ip is None:
-                handshake_ip = ip
+            handshake_ips.setdefault(ip.version, ip)
 
-    if handshake_ip is not None:
-        hs_names = unittest.defaultTestLoader.getTestCaseNames(HandshakeTest)
-        for rdtype, rdtype_name in HANDSHAKE_TYPES:
+    hs_names = unittest.defaultTestLoader.getTestCaseNames(HandshakeTest)
+    for hs_ip in handshake_ips.values():
+        for rdtype in HANDSHAKE_TYPES:
             suite.addTests(
-                HandshakeTest(name, srv, handshake_ip, rdtype, rdtype_name)
+                HandshakeTest(name, srv, hs_ip, rdtype)
                 for name in hs_names
             )
     return suite
