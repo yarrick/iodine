@@ -601,7 +601,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 			int thispartlen, dataspace, datanew;
 
 			while (1) {
-				thispartlen = strlen(buf);
+				thispartlen = strlen(buf + bufoffset);
 				thispartlen = MIN(thispartlen, buftotal-bufoffset);
 				dataspace = sizeof(data) - dataoffset;
 				if (thispartlen <= 0 || dataspace <= 0)
