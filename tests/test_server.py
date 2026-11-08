@@ -204,19 +204,19 @@ class HandshakeTest(ServerTestCase):
 
     def send_version(self, version, cmc=1):
         payload = struct.pack("!IH", version, cmc)
-        qname = f"v{b32_encode(payload)}.{self.topdomain}"
+        qname = f"V{b32_encode(payload)}.{self.topdomain}"
         rdata = self.query_payload(qname)
         self.assertEqual(len(rdata), 9)
         return struct.unpack("!4sIB", rdata)
 
     def send_login(self, userid, password, seed, cmc=2):
         payload = struct.pack("!B16sH", userid, login_hash(password, seed), cmc)
-        qname = f"l{b32_encode(payload)}.{self.topdomain}"
+        qname = f"L{b32_encode(payload)}.{self.topdomain}"
         return self.query_payload(qname)
 
     def send_ip_request(self, userid, cmc=3):
         payload = struct.pack("!BH", userid << 3, cmc)
-        qname = f"i{b32_encode(payload)}.{self.topdomain}"
+        qname = f"I{b32_encode(payload)}.{self.topdomain}"
         return self.query_payload(qname)
 
     def test_login(self):
