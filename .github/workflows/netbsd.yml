@@ -19,7 +19,7 @@ jobs:
       uses: vmactions/netbsd-vm@v1.5.2
       with:
         prepare: |
-          pkg_add -u check git pkgconf meson python314 py314-pip
+          pkg_add -u check git pkgconf meson python314 py314-pip py314-dns
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
@@ -28,3 +28,4 @@ jobs:
           ninja test
           python3.14 -m pip install ping3 --break-system-packages
           ninja tun_bench
+          ninja test_server

@@ -25,7 +25,8 @@ jobs:
             devel/pkgconf \
             devel/meson \
             lang/python3 \
-            devel/py-pip
+            devel/py-pip \
+            dns/py-dnspython
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
           meson setup build
@@ -34,3 +35,4 @@ jobs:
           ninja test
           python3 -m pip install ping3
           ninja tun_bench
+          ninja test_server

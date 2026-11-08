@@ -29,3 +29,5 @@ jobs:
           python3 -m pip install ping3
           ifconfig tun/0 up
           ninja tun_bench
+          python3 -m pip install dnspython
+          ninja test_server
