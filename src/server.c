@@ -1563,7 +1563,7 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 	return 0;
 }
 
-static int
+int
 tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 {
 	char packet[64*1024];

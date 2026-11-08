@@ -36,6 +36,14 @@ tun_ping = executable('tun_ping',
   link_with: libcommon,
 )
 
+thin_server = executable('thin_server',
+  sources: files('thin_server.c', '../src/server.c'),
+  build_by_default: false,
+  include_directories: includes,
+  dependencies: serverdeps + zlib,
+  link_with: [libcommon, libserver],
+)
+
 py3 = disabler()
 foreach py_name : ['python3', 'python3.14', 'python3.13', 'python3.12']
   if not py3.found()
@@ -55,5 +63,18 @@ if py3.found()
       host_machine.system(),
     ],
     depends: bench_deps,
+  )
+  test_server_deps = [thin_server]
+  if host_machine.system() == 'windows' and fs.exists(zlib_dll)
+    test_server_deps += fs.copyfile(zlib_dll)
+  endif
+  run_target('test_server',
+    command: [
+      py3,
+      files('test_server.py'),
+      thin_server.full_path(),
+      host_machine.system(),
+    ],
+    depends: test_server_deps,
   )
 endif

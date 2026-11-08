@@ -43,5 +43,6 @@ struct server_params {
 void server_init(struct server_params *params);
 int server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time);
 void server_stop(void);
+int tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd);
 
 #endif
