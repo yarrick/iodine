@@ -132,14 +132,14 @@ class ServerTestCase(unittest.TestCase):
         ns_tag = f", ns={self.srv.ns_ip}" if self.srv.ns_ip else ""
         return f"{self._testMethodName} ({self.ip}:{self.port}{ns_tag})"
 
-
-class StandardDnsTest(ServerTestCase):
-
     def check_ns_a(self, actual):
         if self.srv.ns_ip == "auto":
             ipaddress.IPv4Address(actual)
         else:
             self.assertEqual(actual, self.srv.ns_ip or str(self.ip))
+
+
+class StandardDnsTest(ServerTestCase):
 
     def test_addr_records(self):
         addr_checks = [
@@ -229,6 +229,11 @@ class HandshakeTest(ServerTestCase):
         qname = f"l{b32_encode(payload)}.{self.topdomain}"
         return self.query_payload(qname)
 
+    def send_ip_request(self, userid, cmc=3):
+        payload = struct.pack("!BH", userid << 3, cmc)
+        qname = f"i{b32_encode(payload)}.{self.topdomain}"
+        return self.query_payload(qname)
+
     def test_login(self):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)
         self.assertEqual(status, b"VACK")
@@ -239,6 +244,10 @@ class HandshakeTest(ServerTestCase):
         self.assertNotEqual(ipaddress.ip_address(client_ip), ipaddress.ip_address(server_ip))
         self.assertEqual(mtu, "1130")
         self.assertEqual(netmask, "27")
+        ip_reply = self.send_ip_request(userid)
+        self.assertEqual(ip_reply[:1], b"I")
+        if self.srv.ns_ip or target_os != "haiku":
+            self.check_ns_a(str(ipaddress.ip_address(ip_reply[1:])))
 
     def test_login_wrong_password(self):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)
