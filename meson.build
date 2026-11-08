@@ -17,7 +17,7 @@ cc = meson.get_compiler('c')
 cdata = configuration_data()
 cdata.set_quoted('IODINE_VERSION', meson.project_version())
 
-includes = include_directories('src', 'wintun/include')
+includes = include_directories('.', 'src', 'wintun/include')
 target_dir = get_option('sbindir')
 docdir = get_option('docdir')
 if docdir == ''
@@ -175,15 +175,15 @@ else
     ['netbsd', 'freebsd', 'openbsd', 'darwin'].contains(host_machine.system()))
 endif
 
+configure_file(output: 'config.h',
+  configuration: cdata)
+
 libcommon = static_library(
   'common',
   common_sources,
   include_directories: includes,
   dependencies: commondeps,
 )
-
-configure_file(output: 'config.h',
-  configuration: cdata)
 
 executable('iodine',
   sources: files('src/client.c', 'src/iodine.c'),
@@ -239,58 +239,4 @@ if fs.exists(os_readme)
   )
 endif
 
-libcheck = dependency('check', required: false)
-if libcheck.found()
-  suites = [
-    'base32', 'base64', 'base64u', 'base128', 'common', 'compat', 'dns',
-    'encoding', 'fw_query', 'login', 'process', 'random', 'read', 'ui', 'user'
-  ]
-
-  # Silence warning from check.h
-  # ('warning: token pasting of ',' and __VA_ARGS__ is a GNU extension')
-  testargs = []
-  if cc.get_id() == 'clang'
-    testargs += '-Wno-gnu-zero-variadic-macro-arguments'
-  endif
-  testargs += '-DPROGNAME_SUFFIX=@0@'.format(
-    host_machine.system() == 'windows' ? '".exe"' : '""')
-
-  foreach suite : suites
-    test(suite, executable(
-      'test_@0@'.format(suite),
-      files(
-        'tests/@0@.c'.format(suite),
-      ),
-      link_with: [libcommon, libserver],
-      include_directories: includes,
-      dependencies: [libcheck],
-      build_by_default: false,
-      c_args: testargs + '-DSUITE_NAME="@0@"'.format(suite),
-    ))
-  endforeach
-endif
-
-tun_ping = executable('tun_ping',
-  sources: files('tests/tun_ping.c'),
-  build_by_default: false,
-  include_directories: includes,
-  link_with: libcommon,
-)
-
-py3 = disabler()
-foreach py_name : ['python3', 'python3.14', 'python3.13', 'python3.12']
-  if not py3.found()
-    py3 = import('python').find_installation(py_name, required: false)
-  endif
-endforeach
-if py3.found()
-  run_target('tun_bench',
-    command: [
-      py3,
-      files('tests/tun_bench.py'),
-      tun_ping.full_path(),
-      host_machine.system(),
-    ],
-    depends: tun_ping,
-  )
-endif
+subdir('tests')
