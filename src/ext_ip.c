@@ -15,6 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
 
@@ -23,7 +24,11 @@
 #ifdef WINDOWS
 #include "windows_dns.h"
 #else
+#include <sys/types.h>
 #include <arpa/nameser.h>
+#ifdef ANDROID
+#include "android_dns.h"
+#endif
 #ifdef DARWIN
 #include <arpa/nameser_compat.h>
 #endif
