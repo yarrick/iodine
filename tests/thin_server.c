@@ -22,6 +22,7 @@
 #include "common.h"
 #include "compat.h"
 #include "ext_ip.h"
+#include "fw_query.h"
 #include "server.h"
 #include "udp.h"
 #include "ui.h"
@@ -115,10 +116,17 @@ main(int argc, char **argv)
 	const char *topdomain = "test.iodine.code";
 	char password[33] = "testpass";
 	struct in_addr ns_ip;
+	int bind_fd = -1;
+	int bind_port = 0;
 
 	progname_init(argv[0]);
 	network_init();
+	fw_query_init();
 	ui_set_debuglevel(2);
+
+	if (argc > 1) {
+		bind_port = atoi(argv[1]);
+	}
 
 	dns_fds.v4fd = open_udp_from_host(NULL, 0, AF_INET, AI_PASSIVE);
 	dns_fds.v6fd = open_udp_from_host(NULL, 0, AF_INET6, AI_PASSIVE);
@@ -129,20 +137,31 @@ main(int argc, char **argv)
 	}
 
 	ns_ip.s_addr = INADDR_ANY;
-	if (argc > 1) {
-		if (strcmp(argv[1], "auto") == 0) {
+	if (argc > 2) {
+		if (strcmp(argv[2], "auto") == 0) {
 			if (get_external_ip(&ns_ip) != 0) {
 				ui_log("Failed to get external IP\n");
 				return 1;
 			}
-		} else if (inet_pton(AF_INET, argv[1], &ns_ip) != 1) {
-			ui_log("Invalid nameserver IP: %s\n", argv[1]);
+		} else if (inet_pton(AF_INET, argv[2], &ns_ip) != 1) {
+			ui_log("Invalid nameserver IP: %s\n", argv[2]);
 			return 1;
 		}
 		ui_log("NSADDR %s\n", format_inaddr(&ns_ip));
 	}
 
 	memset(&params, 0, sizeof(params));
+	if (bind_port > 0) {
+		if (get_addr("127.0.0.1", bind_port, AF_INET, 0, &params.bind_addr) < 0) {
+			ui_log("Failed to resolve bind address\n");
+			return 1;
+		}
+		bind_fd = open_udp_from_host(NULL, 0, AF_INET, 0);
+		if (bind_fd < 0) {
+			ui_log("Failed to open bind UDP socket\n");
+			return 1;
+		}
+	}
 	params.topdomain = topdomain;
 	params.password = password;
 	inet_pton(AF_INET, "10.0.0.1", &params.server_ip);
@@ -179,6 +198,10 @@ main(int argc, char **argv)
 			FD_SET(dns_fds.v6fd, &fds);
 			maxfd = MAX(maxfd, dns_fds.v6fd);
 		}
+		if (bind_fd >= 0) {
+			FD_SET(bind_fd, &fds);
+			maxfd = MAX(maxfd, bind_fd);
+		}
 
 		tv.tv_sec = 0;
 		tv.tv_usec = 500000;
@@ -191,10 +214,13 @@ main(int argc, char **argv)
 		}
 		if (res > 0) {
 			if (dns_fds.v4fd >= 0 && FD_ISSET(dns_fds.v4fd, &fds)) {
-				tunnel_dns(-1, dns_fds.v4fd, &dns_fds, -1);
+				tunnel_dns(-1, dns_fds.v4fd, &dns_fds, bind_fd);
 			}
 			if (dns_fds.v6fd >= 0 && FD_ISSET(dns_fds.v6fd, &fds)) {
-				tunnel_dns(-1, dns_fds.v6fd, &dns_fds, -1);
+				tunnel_dns(-1, dns_fds.v6fd, &dns_fds, bind_fd);
+			}
+			if (bind_fd >= 0 && FD_ISSET(bind_fd, &fds)) {
+				tunnel_bind(bind_fd, &dns_fds);
 			}
 		}
 	}
@@ -203,6 +229,8 @@ main(int argc, char **argv)
 		close_udp(dns_fds.v4fd);
 	if (dns_fds.v6fd >= 0)
 		close_udp(dns_fds.v6fd);
+	if (bind_fd >= 0)
+		close_udp(bind_fd);
 
 	ui_log("END\n");
 	return 0;

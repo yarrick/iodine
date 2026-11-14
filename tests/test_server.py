@@ -2,6 +2,7 @@ import base64
 import contextlib
 import hashlib
 import ipaddress
+import socket
 import struct
 import subprocess
 import sys
@@ -11,6 +12,7 @@ import dns.message
 import dns.query
 import dns.rcode
 import dns.rdatatype as rr
+import dns.rrset
 
 PROTOCOL_VERSION = 0x00000502
 HANDSHAKE_TYPES = [rr.NULL, rr.CNAME, rr.MX]
@@ -51,7 +53,12 @@ class ThinServer:
         self.dns_log = []
         self.success = True
 
-        cmd = [binary]
+        self.fwd_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.fwd_sock.bind(("127.0.0.1", 0))
+        self.fwd_sock.settimeout(2.0)
+        bind_port = self.fwd_sock.getsockname()[1]
+
+        cmd = [binary, str(bind_port)]
         if self.ns_ip is not None:
             cmd.append(self.ns_ip)
         print(f"[test ns={ns_ip}] Launching {' '.join(cmd)}", flush=True)
@@ -84,6 +91,7 @@ class ThinServer:
                 break
 
         if self.process.poll() is not None:
+            self.fwd_sock.close()
             print("[test] Failed to open")
             sys.exit(1)
 
@@ -103,6 +111,7 @@ class ThinServer:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.fwd_sock.close()
         if self.process.poll() is None:
             self.process.terminate()
             try:
@@ -169,6 +178,35 @@ class StandardDnsTest(ServerTestCase):
         resp = query_dns(self.ip, self.port, f"_.sub.{self.topdomain}", rr.A)
         self.assertEqual(resp.rcode(), dns.rcode.NXDOMAIN)
         self.assertEqual(resp.authority[0].rdtype, rr.SOA)
+
+    def test_forwarded_query(self):
+        qname = "forwarded.example.com."
+        expected_ip = "172.23.53.53"
+        q = dns.message.make_query(qname, rr.A)
+        af = socket.AF_INET if self.is_v4 else socket.AF_INET6
+        with socket.socket(af, socket.SOCK_DGRAM) as client_sock:
+            client_sock.settimeout(2.0)
+            client_sock.sendto(q.to_wire(), (str(self.ip), self.port))
+
+            fwd_data, fwd_addr = self.srv.fwd_sock.recvfrom(4096)
+            fwd_q = dns.message.from_wire(fwd_data)
+            self.assertEqual(fwd_q.id, q.id)
+            self.assertEqual(fwd_q.question, q.question)
+
+            fwd_resp = dns.message.make_response(fwd_q)
+            fwd_resp.answer.append(
+                dns.rrset.from_text(qname, 60, "IN", "A", expected_ip)
+            )
+            self.srv.fwd_sock.sendto(fwd_resp.to_wire(), fwd_addr)
+
+            reply_data, reply_addr = client_sock.recvfrom(4096)
+            self.assertEqual(ipaddress.ip_address(reply_addr[0]), self.ip)
+            self.assertEqual(reply_addr[1], self.port)
+
+            reply = dns.message.from_wire(reply_data)
+            self.assertTrue(q.is_response(reply))
+            self.assertEqual(reply.rcode(), dns.rcode.NOERROR)
+            self.assertEqual(reply.answer[0][0].address, expected_ip)
 
 
 def login_hash(password, seed):

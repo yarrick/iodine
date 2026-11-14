@@ -1522,7 +1522,7 @@ forward_query(int bind_fd, struct query *q)
 	}
 }
 
-static int
+int
 tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 {
 	char packet[64*1024];
