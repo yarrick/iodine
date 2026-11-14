@@ -31,7 +31,7 @@
 #define FW_QUERY_CACHE_SIZE 16
 
 struct fw_query {
-	struct net_addr addr;
+	struct udp_addr addr;
 	unsigned short id;
 };
 

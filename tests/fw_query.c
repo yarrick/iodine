@@ -24,7 +24,7 @@ START_TEST(test_fw_query_simple)
 	struct fw_query q;
 	struct fw_query *qp;
 
-	q.addr.addrlen = 33;
+	q.addr.remote.addrlen = 33;
 	q.id = 0x848A;
 
 	fw_query_init();
@@ -37,7 +37,7 @@ START_TEST(test_fw_query_simple)
 
 	/* Test cache with one entry */
 	fw_query_get(0x848A, &qp);
-	ck_assert_int_eq(qp->addr.addrlen, q.addr.addrlen);
+	ck_assert_int_eq(qp->addr.remote.addrlen, q.addr.remote.addrlen);
 	ck_assert_int_eq(qp->id, q.id);
 }
 END_TEST
@@ -50,22 +50,22 @@ START_TEST(test_fw_query_edge)
 
 	fw_query_init();
 
-	q.addr.addrlen = 33;
+	q.addr.remote.addrlen = 33;
 	q.id = 0x848A;
 	fw_query_put(&q);
 
 	for (i = 1; i < FW_QUERY_CACHE_SIZE; i++) {
-		q.addr.addrlen++;
+		q.addr.remote.addrlen++;
 		q.id++;
 		fw_query_put(&q);
 	}
 
 	/* The query should still be cached */
 	fw_query_get(0x848A, &qp);
-	ck_assert_int_eq(qp->addr.addrlen, 33);
+	ck_assert_int_eq(qp->addr.remote.addrlen, 33);
 	ck_assert_int_eq(qp->id, 0x848A);
 
-	q.addr.addrlen++;
+	q.addr.remote.addrlen++;
 	q.id++;
 	fw_query_put(&q);
 

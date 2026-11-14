@@ -1511,7 +1511,7 @@ forward_query(int bind_fd, struct query *q)
 	}
 
 	/* Store sockaddr for q->id */
-	fwq.addr = q->address.remote;
+	fwq.addr = q->address;
 	fwq.id = q->id;
 	fw_query_put(&fwq);
 
@@ -1552,13 +1552,10 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 	}
 
 	ui_debug(2, "TX: client %s id %u, %d bytes\n",
-		 format_addr(&query->addr), (id & 0xffff), r);
+		 format_addr(&query->addr.remote), (id & 0xffff), r);
 
-	dns_fd = get_dns_fd(dns_fds, &query->addr);
-	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr.addr),
-		query->addr.addrlen) <= 0) {
-		warn("forward reply error");
-	}
+	dns_fd = get_dns_fd(dns_fds, &query->addr.remote);
+	send_udp(dns_fd, packet, r, &query->addr);
 
 	return 0;
 }
