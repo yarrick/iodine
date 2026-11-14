@@ -30,6 +30,7 @@
 #endif
 
 #include "common.h"
+#include "compat.h"
 #include "encoding.h"
 #include "user.h"
 #include "test_main.h"
@@ -303,10 +304,111 @@ START_TEST(test_qmem_wrap)
 }
 END_TEST
 
+START_TEST(test_check_user_and_ip)
+{
+	struct in_addr ip;
+	struct udp_addr match_v4, diff_v4, match_v6, diff_v6, unspec;
+
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	ck_assert_int_eq(init_users(5, ip.s_addr, 29), 5);
+
+	memset(&match_v4, 0, sizeof(match_v4));
+	memset(&diff_v4, 0, sizeof(diff_v4));
+	memset(&match_v6, 0, sizeof(match_v6));
+	memset(&diff_v6, 0, sizeof(diff_v6));
+	memset(&unspec, 0, sizeof(unspec));
+	ck_assert_int_eq(get_addr("192.0.2.10", 54321, AF_UNSPEC, 0, &match_v4.remote), 0);
+	ck_assert_int_eq(get_addr("192.0.2.11", 12345, AF_UNSPEC, 0, &diff_v4.remote), 0);
+	ck_assert_int_eq(get_addr("2001:db8::1", 54321, AF_UNSPEC, 0, &match_v6.remote), 0);
+	ck_assert_int_eq(get_addr("2001:db8::2", 12345, AF_UNSPEC, 0, &diff_v6.remote), 0);
+
+	/* Out-of-range user IDs */
+	ck_assert_int_ne(check_user_and_ip(-1, 0, &match_v4), 0);
+	ck_assert_int_ne(check_user_and_ip(5, 0, &match_v4), 0);
+
+	/* Inactive user */
+	ck_assert_int_ne(check_user_and_ip(0, 0, &match_v4), 0);
+
+	/* Active but timed out */
+	users[0].active = 1;
+	users[0].last_pkt = time(NULL) - 61;
+	ck_assert_int_ne(check_user_and_ip(0, 0, &match_v4), 0);
+
+	/* Fresh packet, disabled vs enabled */
+	users[0].last_pkt = time(NULL);
+	ck_assert_int_eq(get_addr("192.0.2.10", 12345, AF_UNSPEC, 0, &users[0].host), 0);
+	users[0].disabled = 1;
+	ck_assert_int_ne(check_user_and_ip(0, 0, &match_v4), 0);
+	users[0].disabled = 0;
+
+	/* IPv4 matching (ignores port), mismatch, and family mismatch */
+	ck_assert_int_eq(check_user_and_ip(0, 1, &match_v4), 0);
+	ck_assert_int_ne(check_user_and_ip(0, 1, &diff_v4), 0);
+	ck_assert_int_eq(check_user_and_ip(0, 0, &diff_v4), 0);
+	ck_assert_int_ne(check_user_and_ip(0, 1, &match_v6), 0);
+	ck_assert_int_eq(check_user_and_ip(0, 0, &match_v6), 0);
+
+	/* IPv6 matching (ignores port), mismatch, and family mismatch */
+	ck_assert_int_eq(get_addr("2001:db8::1", 12345, AF_UNSPEC, 0, &users[0].host), 0);
+	ck_assert_int_eq(check_user_and_ip(0, 1, &match_v6), 0);
+	ck_assert_int_ne(check_user_and_ip(0, 1, &diff_v6), 0);
+	ck_assert_int_ne(check_user_and_ip(0, 1, &match_v4), 0);
+
+	/* Unknown address family */
+	memset(&users[0].host, 0, sizeof(users[0].host));
+	ck_assert_int_ne(check_user_and_ip(0, 1, &unspec), 0);
+
+	free(users);
+}
+END_TEST
+
+START_TEST(test_check_authenticated_user_and_options)
+{
+	struct in_addr ip;
+	struct udp_addr match_v4, diff_v4;
+
+	inet_pton(AF_INET, "127.0.0.1", &ip);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 27), TEST_USERS);
+
+	memset(&match_v4, 0, sizeof(match_v4));
+	memset(&diff_v4, 0, sizeof(diff_v4));
+	ck_assert_int_eq(get_addr("192.0.2.10", 1000, AF_UNSPEC, 0, &users[0].host), 0);
+	ck_assert_int_eq(get_addr("192.0.2.10", 2000, AF_UNSPEC, 0, &match_v4.remote), 0);
+	ck_assert_int_eq(get_addr("192.0.2.99", 2000, AF_UNSPEC, 0, &diff_v4.remote), 0);
+
+	users[0].active = 1;
+	users[0].last_pkt = time(NULL);
+
+	/* Unauthenticated user rejected even with valid state and IP */
+	ck_assert_int_ne(check_authenticated_user_and_ip(0, 1, &match_v4), 0);
+	ck_assert_int_ne(check_authenticated_user_and_ip(0, 0, &match_v4), 0);
+	ck_assert_int_ne(check_authenticated_user_and_ip_and_options(0, 0, &match_v4), 0);
+
+	/* Authenticated user */
+	users[0].authenticated = 1;
+	ck_assert_int_eq(check_authenticated_user_and_ip(0, 1, &match_v4), 0);
+	ck_assert_int_ne(check_authenticated_user_and_ip(0, 1, &diff_v4), 0);
+	ck_assert_int_eq(check_authenticated_user_and_ip(0, 0, &diff_v4), 0);
+
+	/* Options unlocked */
+	ck_assert_int_eq(check_authenticated_user_and_ip_and_options(0, 0, &diff_v4), 0);
+	ck_assert_int_eq(check_authenticated_user_and_ip_and_options(0, 1, &match_v4), 0);
+
+	/* Options locked: blocks when check_ip == 0, ignored when check_ip == 1 */
+	users[0].options_locked = 1;
+	ck_assert_int_ne(check_authenticated_user_and_ip_and_options(0, 0, &match_v4), 0);
+	ck_assert_int_eq(check_authenticated_user_and_ip_and_options(0, 1, &match_v4), 0);
+	ck_assert_int_ne(check_authenticated_user_and_ip_and_options(0, 1, &diff_v4), 0);
+
+	free(users);
+}
+END_TEST
+
 TCase *
 test_create(void)
 {
 	TCase *tc;
+	network_init();
 
 	tc = tcase_create("User");
 	tcase_add_test(tc, test_init_users);
@@ -318,6 +420,8 @@ test_create(void)
 	tcase_add_test(tc, test_user_count_from_netmask);
 	tcase_add_test(tc, test_qmem);
 	tcase_add_test(tc, test_qmem_wrap);
+	tcase_add_test(tc, test_check_user_and_ip);
+	tcase_add_test(tc, test_check_authenticated_user_and_options);
 
 	return tc;
 }
