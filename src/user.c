@@ -25,6 +25,8 @@
 
 #ifdef WINDOWS
 #include <winsock2.h>
+#else
+#include <netinet/in.h>
 #endif
 
 #include "common.h"
@@ -240,5 +242,74 @@ user_qmem_matching(int userid, enum qmem_id qmid, struct qmem_entry *entry)
 			continue;
 		return 1;
 	}
+	return 0;
+}
+
+/* This will not check that user has passed login challenge */
+int
+check_user_and_ip(int userid, int check_ip, struct udp_addr *addr)
+{
+	if (userid < 0 || (unsigned int) userid >= usercount) {
+		return 1;
+	}
+	if (!users[userid].active || users[userid].disabled) {
+		return 1;
+	}
+	if (users[userid].last_pkt + 60 < time(NULL)) {
+		return 1;
+	}
+
+	/* return early if IP checking is disabled */
+	if (!check_ip) {
+		return 0;
+	}
+
+	if (addr->remote.addr.ss_family != users[userid].host.addr.ss_family) {
+		return 1;
+	}
+	/* Check IPv4 */
+	if (addr->remote.addr.ss_family == AF_INET) {
+		struct sockaddr_in *expected, *received;
+
+		expected = (struct sockaddr_in *) &(users[userid].host.addr);
+		received = (struct sockaddr_in *) &addr->remote.addr;
+		return memcmp(&(expected->sin_addr), &(received->sin_addr), sizeof(struct in_addr));
+	}
+	/* Check IPv6 */
+	if (addr->remote.addr.ss_family == AF_INET6) {
+		struct sockaddr_in6 *expected, *received;
+
+		expected = (struct sockaddr_in6 *) &(users[userid].host.addr);
+		received = (struct sockaddr_in6 *) &addr->remote.addr;
+		return memcmp(&(expected->sin6_addr), &(received->sin6_addr), sizeof(struct in6_addr));
+	}
+	/* Unknown address family */
+	return 1;
+}
+
+/* This checks that user has passed normal (non-raw) login challenge */
+int
+check_authenticated_user_and_ip(int userid, int check_ip, struct udp_addr *addr)
+{
+	int res = check_user_and_ip(userid, check_ip, addr);
+	if (res)
+		return res;
+
+	if (!users[userid].authenticated)
+		return 1;
+
+	return 0;
+}
+
+int
+check_authenticated_user_and_ip_and_options(int userid, int check_ip, struct udp_addr *addr)
+{
+	int res = check_authenticated_user_and_ip(userid, check_ip, addr);
+	if (res || check_ip)
+		return res;
+
+	if (users[userid].options_locked)
+		return 1;
+
 	return 0;
 }

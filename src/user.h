@@ -113,4 +113,8 @@ void user_set_conn_type(unsigned int userid, enum connection c);
 void user_qmem_write(int userid, enum qmem_id qmid, struct qmem_entry *entry);
 int user_qmem_matching(int userid, enum qmem_id qmid, struct qmem_entry *entry);
 
+int check_user_and_ip(int userid, int check_ip, struct udp_addr *addr);
+int check_authenticated_user_and_ip(int userid, int check_ip, struct udp_addr *addr);
+int check_authenticated_user_and_ip_and_options(int userid, int check_ip, struct udp_addr *addr);
+
 #endif

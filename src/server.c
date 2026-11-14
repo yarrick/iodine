@@ -104,79 +104,6 @@ get_dns_fd(struct dnsfd *fds, struct net_addr *addr)
 	return fds->v4fd;
 }
 
-/* This will not check that user has passed login challenge */
-static int
-check_user_and_ip(int userid, struct query *q)
-{
-	struct sockaddr_storage *remote;
-	/* Note: duplicate in handle_raw_login() except IP-address check */
-
-	if (userid < 0 || userid >= created_users) {
-		return 1;
-	}
-	if (!users[userid].active || users[userid].disabled) {
-		return 1;
-	}
-	if (users[userid].last_pkt + 60 < time(NULL)) {
-		return 1;
-	}
-
-	/* return early if IP checking is disabled */
-	if (!check_ip) {
-		return 0;
-	}
-
-	remote = &q->address.remote.addr;
-	if (remote->ss_family != users[userid].host.addr.ss_family) {
-		return 1;
-	}
-	/* Check IPv4 */
-	if (remote->ss_family == AF_INET) {
-		struct sockaddr_in *expected, *received;
-
-		expected = (struct sockaddr_in *) &(users[userid].host.addr);
-		received = (struct sockaddr_in *) remote;
-		return memcmp(&(expected->sin_addr), &(received->sin_addr), sizeof(struct in_addr));
-	}
-	/* Check IPv6 */
-	if (remote->ss_family == AF_INET6) {
-		struct sockaddr_in6 *expected, *received;
-
-		expected = (struct sockaddr_in6 *) &(users[userid].host.addr);
-		received = (struct sockaddr_in6 *) remote;
-		return memcmp(&(expected->sin6_addr), &(received->sin6_addr), sizeof(struct in6_addr));
-	}
-	/* Unknown address family */
-	return 1;
-}
-
-/* This checks that user has passed normal (non-raw) login challenge */
-static int
-check_authenticated_user_and_ip(int userid, struct query *q)
-{
-	int res = check_user_and_ip(userid, q);
-	if (res)
-		return res;
-
-	if (!users[userid].authenticated)
-		return 1;
-
-	return 0;
-}
-
-static int
-check_authenticated_user_and_ip_and_options(int userid, struct query *q)
-{
-	int res = check_authenticated_user_and_ip(userid, q);
-	if (res || check_ip)
-		return res;
-
-	if (users[userid].options_locked)
-		return 1;
-
-	return 0;
-}
-
 static void
 send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct query *q)
 {
@@ -728,7 +655,7 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
 	/* Login phase, handle auth */
 	userid = unpacked[0];
 
-	if (check_user_and_ip(userid, q) != 0) {
+	if (check_user_and_ip(userid, check_ip, &q->address) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
 			userid, format_addr(&q->address.remote));
@@ -775,7 +702,7 @@ handle_ip_request(int dns_fd, char *in, int domain_len, struct query *q)
 	(void)domain_len;
 
 	userid = b32_8to5(in[1]);
-	if (check_authenticated_user_and_ip(userid, q) != 0) {
+	if (check_authenticated_user_and_ip(userid, check_ip, &q->address) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		return; /* illegal id */
 	}
@@ -823,7 +750,7 @@ handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struc
 	}
 
 	userid = b32_8to5(in[1]);
-	if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
+	if (check_authenticated_user_and_ip_and_options(userid, check_ip, &q->address) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		return; /* illegal id */
 	}
@@ -861,7 +788,7 @@ handle_options_request(int dns_fd, char *in, int domain_len, struct query *q)
 	}
 
 	userid = b32_8to5(in[1]);
-	if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
+	if (check_authenticated_user_and_ip_and_options(userid, check_ip, &q->address) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		return; /* illegal id */
 	}
@@ -990,7 +917,7 @@ handle_downstream_fragsize_probe_request(int dns_fd, char *in, int domain_len, s
 
 	/* Downstream fragsize probe packet */
 	userid = (b32_8to5(in[1]) >> 1) & 15;
-	if (check_authenticated_user_and_ip(userid, q) != 0) {
+	if (check_authenticated_user_and_ip(userid, check_ip, &q->address) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		return; /* illegal id */
 	}
@@ -1032,7 +959,7 @@ handle_downstream_fragsize_set_request(int dns_fd, char *in, int domain_len, str
 
 	/* Downstream fragsize packet */
 	userid = unpacked[0];
-	if (check_authenticated_user_and_ip_and_options(userid, q) != 0) {
+	if (check_authenticated_user_and_ip_and_options(userid, check_ip, &q->address) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		return; /* illegal id */
 	}
@@ -1150,7 +1077,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 		/* Ping packet, store userid */
 		userid = unpacked[0];
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, check_ip, &q->address) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1227,7 +1154,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 
 		userid = code;
 		/* Check user and sending ip number */
-		if (check_authenticated_user_and_ip(userid, q) != 0) {
+		if (check_authenticated_user_and_ip(userid, check_ip, &q->address) != 0) {
 			write_dns(dns_fd, q, "BADIP", 5, 'T');
 			return; /* illegal id */
 		}
@@ -1835,12 +1762,9 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 
 	if (len < 16) return;
 
-	/* can't use check_authenticated_user_and_ip() since IP address will be different,
-	   so duplicate here except IP address */
-	if (userid < 0 || userid >= created_users) return;
-	if (!users[userid].active || users[userid].disabled) return;
-	if (!users[userid].authenticated) return;
-	if (users[userid].last_pkt + 60 < time(NULL)) return;
+	/* Skip ip check since this is expected to come directly from client */
+	if (check_authenticated_user_and_ip(userid, /*check_ip=*/0, &q->address))
+		return;
 
 	ui_debug(1, "IN   login raw, len %d, from user %d\n", len, userid);
 
@@ -1866,7 +1790,7 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 static void
 handle_raw_data(char *packet, int len, struct query *q, struct dnsfd *dns_fds, int tun_fd, int userid)
 {
-	if (check_authenticated_user_and_ip(userid, q) != 0) {
+	if (check_authenticated_user_and_ip(userid, check_ip, &q->address) != 0) {
 		return;
 	}
 	if (!users[userid].authenticated_raw) return;
@@ -1889,7 +1813,7 @@ handle_raw_data(char *packet, int len, struct query *q, struct dnsfd *dns_fds, i
 static void
 handle_raw_ping(struct query *q, int dns_fd, int userid)
 {
-	if (check_authenticated_user_and_ip(userid, q) != 0) {
+	if (check_authenticated_user_and_ip(userid, check_ip, &q->address) != 0) {
 		return;
 	}
 	if (!users[userid].authenticated_raw) return;
