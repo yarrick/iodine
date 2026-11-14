@@ -16,6 +16,7 @@ cc = meson.get_compiler('c')
 # config.h contents
 cdata = configuration_data()
 cdata.set_quoted('IODINE_VERSION', meson.project_version())
+cdata.set('MAX_USERS', get_option('max_users'))
 
 includes = include_directories('.', 'src', 'wintun/include')
 target_dir = get_option('sbindir')

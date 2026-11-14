@@ -34,6 +34,8 @@
 #include "user.h"
 #include "test_main.h"
 
+#define TEST_USERS 16
+
 START_TEST(test_init_users)
 {
 	struct in_addr ip;
@@ -43,8 +45,10 @@ START_TEST(test_init_users)
 	int count;
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
-	count = init_users(ip.s_addr, 27);
-	ck_assert_int_eq(count, USERS);
+	ck_assert_int_eq(init_users(0, ip.s_addr, 27), -1);
+	ck_assert_int_eq(init_users(17, ip.s_addr, 27), -1);
+	count = init_users(TEST_USERS, ip.s_addr, 27);
+	ck_assert_int_eq(count, TEST_USERS);
 	for (i = 0; i < count; i++) {
 		ck_assert_int_eq(users[i].id, i);
 		ck_assert_int_eq(users[i].q.id, 0);
@@ -67,8 +71,8 @@ START_TEST(test_init_users_skip_ip)
 	int count;
 
 	inet_pton(AF_INET, "127.0.0.3", &ip);
-	count = init_users(ip.s_addr, 27);
-	ck_assert_int_eq(count, USERS);
+	count = init_users(TEST_USERS, ip.s_addr, 27);
+	ck_assert_int_eq(count, TEST_USERS);
 	for (i = 0; i < count; i++) {
 		int skip = 0;
 		if (i >= 2) skip = 1;
@@ -87,7 +91,7 @@ START_TEST(test_find_user_by_ip)
 	struct in_addr testip;
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
-	ck_assert_int_eq(init_users(ip.s_addr, 27), USERS);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 27), TEST_USERS);
 	users[0].conn = CONN_DNS_NULL;
 
 	inet_pton(AF_INET, "10.0.0.1", &testip);
@@ -113,7 +117,7 @@ START_TEST(test_all_users_waiting_to_send)
 	struct in_addr ip;
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
-	ck_assert_int_eq(init_users(ip.s_addr, 27), USERS);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 27), TEST_USERS);
 
 	ck_assert_int_eq(all_users_waiting_to_send(), 1);
 
@@ -145,9 +149,9 @@ START_TEST(test_find_available_user)
 	unsigned int user;
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
-	ck_assert_int_eq(init_users(ip.s_addr, 27), USERS);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 27), TEST_USERS);
 
-	for (i = 0; i < USERS; i++) {
+	for (i = 0; i < TEST_USERS; i++) {
 		users[i].authenticated = 1;
 		users[i].authenticated_raw = 1;
 		ck_assert_int_ne(find_available_user(&user), 0);
@@ -156,7 +160,7 @@ START_TEST(test_find_available_user)
 		ck_assert_int_eq(users[i].authenticated_raw, 0);
 	}
 
-	for (i = 0; i < USERS; i++) {
+	for (i = 0; i < TEST_USERS; i++) {
 		ck_assert_int_eq(find_available_user(&user), 0);
 	}
 
@@ -182,14 +186,14 @@ START_TEST(test_find_available_user_small_net)
 	unsigned int user;
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
-	ck_assert_int_eq(init_users(ip.s_addr, 29), 5);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 29), 5);
 
 	for (i = 0; i < 5; i++) {
 		ck_assert_int_ne(find_available_user(&user), 0);
 		ck_assert_uint_eq(user, i);
 	}
 
-	for (i = 0; i < USERS; i++) {
+	for (i = 0; i < TEST_USERS; i++) {
 		ck_assert_int_eq(find_available_user(&user), 0);
 	}
 
@@ -214,17 +218,19 @@ START_TEST(test_user_count_from_netmask)
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
 	for (int i = 8; i < 28; i++) {
-		ck_assert_int_eq(init_users(ip.s_addr, i), USERS);
+		ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, i), TEST_USERS);
 		free(users);
 	}
-	ck_assert_int_eq(init_users(ip.s_addr, 28), 13);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 28), 13);
 	free(users);
-	ck_assert_int_eq(init_users(ip.s_addr, 29), 5);
+	ck_assert_int_eq(init_users(8, ip.s_addr, 28), 8);
 	free(users);
-	ck_assert_int_eq(init_users(ip.s_addr, 30), 1);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 29), 5);
 	free(users);
-	ck_assert_int_eq(init_users(ip.s_addr, 31), -1);
-	ck_assert_int_eq(init_users(ip.s_addr, 32), -1);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 30), 1);
+	free(users);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 31), -1);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 32), -1);
 }
 END_TEST
 
@@ -242,7 +248,7 @@ START_TEST(test_qmem)
 	struct qmem_entry p, q, r;
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
-	ck_assert_int_eq(init_users(ip.s_addr, 27), USERS);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 27), TEST_USERS);
 	ck_assert_int_ne(find_available_user(&user), 0);
 
 	make_entry(&p, "ABCD", 11);
@@ -270,7 +276,7 @@ START_TEST(test_qmem_wrap)
 	struct qmem_entry oldp, oldd, q;
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
-	ck_assert_int_eq(init_users(ip.s_addr, 27), USERS);
+	ck_assert_int_eq(init_users(TEST_USERS, ip.s_addr, 27), TEST_USERS);
 	ck_assert_int_ne(find_available_user(&user), 0);
 
 	make_entry(&oldp, "INIT", 11);

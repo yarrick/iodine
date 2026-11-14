@@ -26,6 +26,9 @@
 #include "ui.h"
 #include "user.h"
 
+/* Needs to be at least 12 since 6 tests are done for each of IPv4 and IPv6 */
+#define USERS 13
+
 static int running = 1;
 
 static void
@@ -136,7 +139,7 @@ main(int argc, char **argv)
 	params.password = password;
 	inet_pton(AF_INET, "10.0.0.1", &params.server_ip);
 	params.netmask = 27;
-	params.users = init_users(params.server_ip, params.netmask);
+	params.users = init_users(USERS, params.server_ip, params.netmask);
 	params.check_ip = 1;
 	params.tunnel_mtu = 1130;
 	params.nameserver_ip = ns_ip.s_addr;

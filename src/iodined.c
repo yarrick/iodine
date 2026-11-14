@@ -450,7 +450,7 @@ main(int argc, char **argv)
 	dns_fds.v4fd = -1;
 	dns_fds.v6fd = -1;
 
-	created_users = init_users(my_ip.s_addr, netmask);
+	created_users = init_users(MAX_USERS, my_ip.s_addr, netmask);
 
 	if ((tun_fd = open_tun(device)) == -1) {
 		/* nothing to clean up, just return */
@@ -519,7 +519,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (created_users < USERS) {
+	if (created_users < MAX_USERS) {
 		ui_log("Limiting to %d simultaneous users because of netmask /%d\n",
 			created_users, netmask);
 	}

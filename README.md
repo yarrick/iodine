@@ -293,10 +293,10 @@ off before the outage.
 With the introduction of the downstream packet queue in the server, its memory
 usage has increased with several megabytes in the default configuration.
 For use in low-memory environments (e.g. running on your DSL router), you can
-decrease USERS and undefine OUTPACKETQ_LEN in user.h without any ill conse-
-quence, assuming at most one client will be connected at any time. A small
-DNSCACHE_LEN is still advised, preferably 2 or higher, however you can also
-undefine it to save a few more kilobytes.
+set a lower max_users with a meson option and undefine OUTPACKETQ_LEN in user.h
+without any ill consequence, assuming at most one client will be connected at
+any time. A small DNSCACHE_LEN is still advised, preferably 2 or higher, however
+you can also undefine it to save a few more kilobytes.
 
 One iodine server can handle multiple domains. Set up different NS records
 on the same domain all pointing to the same host, and use a wildcard

@@ -18,8 +18,6 @@
 #ifndef __USER_H__
 #define __USER_H__
 
-#define USERS 16
-
 #define OUTPACKETQ_LEN 4		/* Note: 16 users * 1 packet = 1MB */
 /* Undefine to have no queue for packets coming in from tun device, which may
    lead to massive dropping in multi-user situations with high traffic. */
@@ -27,12 +25,11 @@
 #define DNSCACHE_LEN 4
 /* Undefine to disable. Should be less than 18; also see comments in iodined.c */
 
-
 #define QMEMPING_LEN 30
-/* Max advisable: 64k/2 = 32000. Total mem usage: QMEMPING_LEN * USERS * 8 bytes */
+/* Max advisable: 64k/2 = 32000. Total mem usage: QMEMPING_LEN * users * 8 bytes */
 
 #define QMEMDATA_LEN 15
-/* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * USERS * 8 bytes */
+/* Max advisable: 36/2 = 18. Total mem usage: QMEMDATA_LEN * users * 8 bytes */
 
 #define QMEM_CMCLEN  4
 /* For matching a query already responded to. */
@@ -106,7 +103,7 @@ struct tun_user {
 
 extern struct tun_user *users;
 
-int init_users(in_addr_t, int);
+int init_users(unsigned int, in_addr_t, int);
 const in_addr_t* users_get_first_ip(void);
 int find_user_by_ip(uint32_t);
 int all_users_waiting_to_send(void);
