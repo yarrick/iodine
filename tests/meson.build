@@ -77,4 +77,7 @@ if py3.found()
     ],
     depends: test_server_deps,
   )
+  message('Extra test targets:\n',
+          '- tun_bench (requires privileges + ping3 python module)\n',
+          '- test_server (requires internet access + dnspython python module)')
 endif

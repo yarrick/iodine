@@ -12,6 +12,11 @@ master:
 	- Downstream fragment autoprobe target size lowered from 1536
 	  to 1184. This is faster since it avoids packets that will
 	  always exceed 1500 bytes in size.
+	- Extra test targets added:
+	  * tun_bench which needs privileges and exercises tun device setup
+	    and packet read/write (needs ping3 python module).
+	  * test_server which tests the external IP lookup, standard DNS
+	    response and version/login checks (needs dnspython module).
 
 2026-10-25: 0.9.0 "20 years"
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
