@@ -58,7 +58,7 @@ get_external_ip(struct in_addr *ip)
 	memset(&query, 0, sizeof(query));
 
 	query.type = T_A;
-	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &addr.addr, &addr.addrlen))
+	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &addr))
 		return 1;
 
 	fd = open_udp_from_host(NULL, 0, AF_INET, AI_PASSIVE);

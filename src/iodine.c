@@ -140,8 +140,7 @@ main(int argc, char **argv)
 	int selecttimeout;
 	int hostname_maxlen;
 	int rtable = 0;
-	struct sockaddr_storage nameservaddr;
-	socklen_t nameservaddr_len;
+	struct net_addr nameservaddr;
 	int nameserv_family;
 
 	nameserv_host = NULL;
@@ -280,10 +279,10 @@ main(int argc, char **argv)
 
 	if (nameserv_host) {
 		if (get_addr(nameserv_host, DNS_PORT, nameserv_family, 0,
-			     &nameservaddr, &nameservaddr_len)) {
+			     &nameservaddr)) {
 			errx(1, "Cannot lookup nameserver '%s'", nameserv_host);
 		}
-		client_set_nameserver(&nameservaddr, nameservaddr_len);
+		client_set_nameserver(&nameservaddr);
 	} else {
 		warnx("No nameserver found - not connected to any network?\n");
 		usage();
@@ -335,7 +334,7 @@ main(int argc, char **argv)
 		retval = 1;
 		goto cleanup1;
 	}
-	if ((dns_fd = open_udp_from_host(NULL, 0, nameservaddr.ss_family, AI_PASSIVE)) < 0) {
+	if ((dns_fd = open_udp_from_host(NULL, 0, nameservaddr.addr.ss_family, AI_PASSIVE)) < 0) {
 		retval = 1;
 		goto cleanup2;
 	}
@@ -346,7 +345,7 @@ main(int argc, char **argv)
 	signal(SIGTERM, sighandler);
 
 	ui_log("Sending DNS queries for %s to %s\n",
-		topdomain, format_addr(&nameservaddr, nameservaddr_len));
+		topdomain, format_addr(&nameservaddr));
 
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
 		retval = 1;

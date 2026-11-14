@@ -41,14 +41,15 @@ static LPFN_WSARECVMSG wsa_recvmsg = NULL;
 #include "udp.h"
 
 int
-open_udp(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
+open_udp(struct net_addr *addr)
 {
-	return open_udp_opt(sockaddr, sockaddr_len, -1);
+	return open_udp_opt(addr, -1);
 }
 
 int
-open_udp_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6only)
+open_udp_opt(struct net_addr *addr, int v6only)
 {
+	struct sockaddr_storage *sockaddr = &addr->addr;
 	int flag;
 	int fd;
 
@@ -99,8 +100,8 @@ open_udp_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6on
 #endif
 
 
-	if (bind(fd, (struct sockaddr*) sockaddr, sockaddr_len) < 0)
-		err(1, "bind() to %s", format_addr(sockaddr, sockaddr_len));
+	if (bind(fd, (struct sockaddr*) sockaddr, addr->addrlen) < 0)
+		err(1, "bind() to %s", format_addr(addr));
 
 	ui_log("Opened IPv%d UDP socket\n", sockaddr->ss_family == AF_INET6 ? 6 : 4);
 
@@ -110,15 +111,14 @@ open_udp_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6on
 int
 open_udp_from_host(char *host, int port, int addr_family, int flags)
 {
-	struct sockaddr_storage addr;
-	socklen_t addrlen;
+	struct net_addr addr;
 	int res;
 
-	res = get_addr(host, port, addr_family, flags, &addr, &addrlen);
+	res = get_addr(host, port, addr_family, flags, &addr);
 	if (res)
 		return res;
 
-	return open_udp(&addr, addrlen);
+	return open_udp(&addr);
 }
 
 void

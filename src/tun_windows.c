@@ -123,8 +123,7 @@ open_tun(const char *tun_device)
 {
 	wchar_t wname[250];
 	int tunfd;
-	struct sockaddr_storage localsock;
-	socklen_t localsock_len;
+	struct net_addr localsock;
 	u_long mode;
 
 	if(wintun_init()) {
@@ -162,9 +161,9 @@ open_tun(const char *tun_device)
 	 * so we can still use select() in main code.
 	 * A thread does blocking reads on the tun device and
 	 * sends data as udp to this socket */
-	if (get_addr("127.0.0.1", 0, AF_INET, 0, &localsock, &localsock_len))
+	if (get_addr("127.0.0.1", 0, AF_INET, 0, &localsock))
 		return -1;
-	tunfd = open_udp(&localsock, localsock_len);
+	tunfd = open_udp(&localsock);
 
 	/* Enable non-blocking mode for socket */
 	mode = 1;

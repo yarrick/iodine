@@ -164,8 +164,7 @@ main(int argc, char **argv)
 	int bind_fd;
 	int bind_enable;
 	int bind_port;
-	struct sockaddr_storage bind_addr;
-	socklen_t bind_addrlen;
+	struct net_addr bind_addr;
 
 	int created_users;
 	struct in_addr my_ip;
@@ -182,10 +181,8 @@ main(int argc, char **argv)
 	struct in_addr resolved_external_ip;
 	int retval;
 	int max_idle_time = 0;
-	struct sockaddr_storage dns4addr;
-	socklen_t dns4addr_len;
-	struct sockaddr_storage dns6addr;
-	socklen_t dns6addr_len;
+	struct net_addr dns4addr;
+	struct net_addr dns6addr;
 #if HAVE_SYSTEMD
 	int nb_fds;
 #endif
@@ -202,7 +199,7 @@ main(int argc, char **argv)
 	bind_enable = 0;
 	bind_port = 0;
 	bind_fd = -1;
-	bind_addrlen = 0;
+	memset(&bind_addr, 0, sizeof(bind_addr));
 	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
 			   higher for NULL; tun/zlib adds ~17 bytes. */
 	listen_ip4 = NULL;
@@ -217,8 +214,8 @@ main(int argc, char **argv)
 	debug = 0;
 	netmask = 27;
 	pidfile = NULL;
-	dns4addr_len = 0;
-	dns6addr_len = 0;
+	memset(&dns4addr, 0, sizeof(dns4addr));
+	memset(&dns6addr, 0, sizeof(dns6addr));
 
 	retval = 0;
 
@@ -373,7 +370,7 @@ main(int argc, char **argv)
 			listen_ip4 = format_inaddr(&resolved_external_ip);
 			ui_log("Will listen on external IP %s\n", listen_ip4);
 		}
-		if (get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr, &dns4addr_len)) {
+		if (get_addr(listen_ip4, port, AF_INET, AI_PASSIVE, &dns4addr)) {
 			warnx("Bad IPv4 address to listen on: '%s'", listen_ip4);
 			usage();
 		}
@@ -381,7 +378,7 @@ main(int argc, char **argv)
 		listen_ip4 = NULL;
 	}
 	if (addrfamily == AF_UNSPEC || addrfamily == AF_INET6) {
-		if (get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr, &dns6addr_len)) {
+		if (get_addr(listen_ip6, port, AF_INET6, AI_PASSIVE, &dns6addr)) {
 			if (listen_ip6 == NULL) {
 				if (addrfamily == AF_INET6) {
 					errx(3, "IPv6 not supported");
@@ -401,7 +398,7 @@ main(int argc, char **argv)
 	}
 
 	if (bind_enable) {
-		in_addr_t dns_ip = ((struct sockaddr_in *) &dns4addr)->sin_addr.s_addr;
+		in_addr_t dns_ip = ((struct sockaddr_in *) &dns4addr.addr)->sin_addr.s_addr;
 		if (bind_port < 1 || bind_port > 65535) {
 			warnx("Bad DNS server port number given.");
 			usage();
@@ -474,14 +471,14 @@ main(int argc, char **argv)
 	} else if (nb_fds == 0) {
 #endif
 		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET) &&
-			(dns_fds.v4fd = open_udp(&dns4addr, dns4addr_len)) < 0) {
+			(dns_fds.v4fd = open_udp(&dns4addr)) < 0) {
 
 			retval = 1;
 			goto cleanup;
 		}
 		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET6) &&
 			/* Set IPv6 socket to V6ONLY */
-			(dns_fds.v6fd = open_udp_opt(&dns6addr, dns6addr_len, 1)) < 0) {
+			(dns_fds.v6fd = open_udp_opt(&dns6addr, 1)) < 0) {
 
 			retval = 1;
 			goto cleanup;
@@ -510,7 +507,7 @@ main(int argc, char **argv)
 #endif
 
 	if (bind_enable) {
-		if (get_addr("127.0.0.1", bind_port, AF_INET, 0, &bind_addr, &bind_addrlen) < 0) {
+		if (get_addr("127.0.0.1", bind_port, AF_INET, 0, &bind_addr) < 0) {
 			retval = 1;
 			goto cleanup;
 		}
@@ -565,8 +562,7 @@ main(int argc, char **argv)
 	params.server_ip = my_ip.s_addr;
 	params.netmask = netmask;
 	params.nameserver_ip = ns_ip.s_addr;
-	params.bind_addr = (struct sockaddr *) &bind_addr;
-	params.bind_addrlen = bind_addrlen;
+	params.bind_addr = bind_addr;
 
 	server_init(&params);
 

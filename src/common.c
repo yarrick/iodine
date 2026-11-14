@@ -54,9 +54,11 @@ format_inaddr(struct in_addr *addr)
 }
 
 char *
-format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
+format_addr(struct net_addr *addr)
 {
 	static char dst[INET6_ADDRSTRLEN + 1];
+	struct sockaddr_storage *sockaddr = &addr->addr;
+	socklen_t sockaddr_len = addr->addrlen;
 #ifdef WINDOWS
 	int wsa_error = WSAGetLastError();
 #endif
@@ -68,11 +70,11 @@ format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 			    dst, sizeof(dst) - 1, NULL, 0, NI_NUMERICHOST);
 	} else if (sockaddr->ss_family == AF_INET6 &&
 		   (size_t) sockaddr_len >= sizeof(struct sockaddr_in6)) {
-		struct sockaddr_in6 *addr = (struct sockaddr_in6 *) sockaddr;
-		if (IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr)) {
+		struct sockaddr_in6 *in6addr = (struct sockaddr_in6 *) sockaddr;
+		if (IN6_IS_ADDR_V4MAPPED(&in6addr->sin6_addr)) {
 			struct in_addr ia;
 			/* Get mapped v4 addr from last 32bit field */
-			memcpy(&ia.s_addr, &addr->sin6_addr.s6_addr[12], sizeof(ia));
+			memcpy(&ia.s_addr, &in6addr->sin6_addr.s6_addr[12], sizeof(ia));
 			return format_inaddr(&ia);
 		} else {
 			getnameinfo((struct sockaddr *)sockaddr, sockaddr_len,
@@ -89,15 +91,9 @@ format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 	return dst;
 }
 
-char *
-format_net_addr(struct net_addr *addr)
-{
-	return format_addr(&addr->addr, addr->addrlen);
-}
-
 int
 get_addr(char *host, int port, int addr_family, int flags,
-	 struct sockaddr_storage *out, socklen_t *outlen)
+	 struct net_addr *out)
 {
 	struct addrinfo hints, *addr;
 	int res;
@@ -127,8 +123,8 @@ get_addr(char *host, int port, int addr_family, int flags,
 	}
 
 	/* Grab first result */
-	memcpy(out, addr->ai_addr, addr->ai_addrlen);
-	if (outlen) *outlen = addr->ai_addrlen;
+	memcpy(&out->addr, addr->ai_addr, addr->ai_addrlen);
+	out->addrlen = addr->ai_addrlen;
 	freeaddrinfo(addr);
 	return 0;
 }

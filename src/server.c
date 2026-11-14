@@ -69,8 +69,7 @@ static int netmask;
 
 static in_addr_t ns_ip;
 
-static struct sockaddr *bind_addr;
-static socklen_t bind_addrlen = 0;
+static struct net_addr bind_addr;
 
 static void write_dns(int fd, struct query *q, const char *data, size_t datalen, char downenc);
 static void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid);
@@ -94,7 +93,6 @@ server_init(struct server_params *params)
 	netmask = params->netmask;
 	ns_ip = params->nameserver_ip;
 	bind_addr = params->bind_addr;
-	bind_addrlen = params->bind_addrlen;
 }
 
 static int
@@ -196,7 +194,7 @@ send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct query *q)
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
 	ui_debug(2, "TX-raw: client %s, cmd %d, %zu bytes\n",
-		 format_net_addr(&q->address.remote), cmd, len);
+		 format_addr(&q->address.remote), cmd, len);
 
 	send_udp(fd, packet, len, &q->address);
 }
@@ -620,7 +618,7 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 	if (version != PROTOCOL_VERSION) {
 		send_version_response(dns_fd, VERSION_NACK, PROTOCOL_VERSION, 0, q);
 		syslog(LOG_INFO, "dropped user from %s, sent bad version %08X",
-			format_net_addr(&q->address.remote), version);
+			format_addr(&q->address.remote), version);
 		return;
 	}
 
@@ -628,7 +626,7 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 		/* No space for another user */
 		send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
 		syslog(LOG_INFO, "dropped user from %s, server full",
-			format_net_addr(&q->address.remote));
+			format_addr(&q->address.remote));
 		return;
 	}
 
@@ -641,7 +639,7 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 	users[userid].downenc = 'T';
 	send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
 	syslog(LOG_INFO, "accepted version for user #%d from %s",
-		userid, format_net_addr(&q->address.remote));
+		userid, format_addr(&q->address.remote));
 	users[userid].q.id = 0;
 	users[userid].q.id2 = 0;
 	users[userid].q_sendrealsoon.id = 0;
@@ -733,7 +731,7 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
 	if (check_user_and_ip(userid, q) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
-			userid, format_net_addr(&q->address.remote));
+			userid, format_addr(&q->address.remote));
 		return;
 	}
 
@@ -763,7 +761,7 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
 	} else {
 		write_dns(dns_fd, q, "LNAK", 4, 'T');
 		syslog(LOG_WARNING, "rejected login request from user #%d from %s, bad password",
-			userid, format_net_addr(&q->address.remote));
+			userid, format_addr(&q->address.remote));
 	}
 }
 
@@ -1406,7 +1404,7 @@ handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes NS reply\n",
-		 format_net_addr(&q->address.remote), q->type, q->name, len);
+		 format_addr(&q->address.remote), q->type, q->name, len);
 	send_udp(dns_fd, buf, len, &q->address);
 }
 
@@ -1442,7 +1440,7 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes A reply\n",
-		 format_net_addr(&q->address.remote), q->type, q->name, len);
+		 format_addr(&q->address.remote), q->type, q->name, len);
 	send_udp(dns_fd, buf, len, &q->address);
 }
 
@@ -1477,7 +1475,7 @@ handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fake
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes AAAA reply\n",
-		 format_net_addr(&q->address.remote), q->type, q->name, len);
+		 format_addr(&q->address.remote), q->type, q->name, len);
 	send_udp(dns_fd, buf, len, &q->address);
 }
 
@@ -1495,7 +1493,7 @@ handle_soa_request(int dns_fd, struct query *q, const char *topdomain, int rcode
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes rcode %d SOA reply\n",
-		 format_net_addr(&q->address.remote), q->type, q->name, len, rcode);
+		 format_addr(&q->address.remote), q->type, q->name, len, rcode);
 	send_udp(dns_fd, buf, len, &q->address);
 }
 
@@ -1519,7 +1517,7 @@ forward_query(int bind_fd, struct query *q)
 
 	ui_debug(2, "TX: NS reply \n");
 
-	if (sendto(bind_fd, buf, len, 0, bind_addr, bind_addrlen) <= 0) {
+	if (sendto(bind_fd, buf, len, 0, (struct sockaddr *) &bind_addr.addr, bind_addr.addrlen) <= 0) {
 		warn("forward query error");
 	}
 }
@@ -1554,7 +1552,7 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 	}
 
 	ui_debug(2, "TX: client %s id %u, %d bytes\n",
-		 format_net_addr(&query->addr), (id & 0xffff), r);
+		 format_addr(&query->addr), (id & 0xffff), r);
 
 	dns_fd = get_dns_fd(dns_fds, &query->addr);
 	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr.addr),
@@ -1585,7 +1583,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	}
 
 	ui_debug(2, "RX: client %s, type %d, name %s\n",
-		 format_net_addr(&q.address.remote), q.type, q.name);
+		 format_addr(&q.address.remote), q.type, q.name);
 
 	domain_len = query_datalen(q.name, topdomain);
 	if (domain_len >= 0) {
@@ -2077,7 +2075,7 @@ write_dns(int fd, struct query *q, const char *data, size_t datalen, char downen
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %zu bytes data\n",
-		 format_net_addr(&q->address.remote), q->type, q->name, datalen);
+		 format_addr(&q->address.remote), q->type, q->name, datalen);
 
 	send_udp(fd, buf, len, &q->address);
 }

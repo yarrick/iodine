@@ -42,14 +42,21 @@ sighandler(int sig)
 static void
 print_sockaddr(struct sockaddr *sa)
 {
+	struct net_addr addr;
+
 	if (sa == NULL)
 		return;
+	memset(&addr, 0, sizeof(addr));
 	if (sa->sa_family == AF_INET) {
-		ui_log("ADDR %s\n", format_addr((struct sockaddr_storage *)sa, sizeof(struct sockaddr_in)));
+		addr.addrlen = sizeof(struct sockaddr_in);
+		memcpy(&addr.addr, sa, addr.addrlen);
+		ui_log("ADDR %s\n", format_addr(&addr));
 	} else if (sa->sa_family == AF_INET6) {
 		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)sa;
 		if (s6->sin6_scope_id == 0 && !IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
-			ui_log("ADDR %s\n", format_addr((struct sockaddr_storage *)sa, sizeof(struct sockaddr_in6)));
+			addr.addrlen = sizeof(struct sockaddr_in6);
+			memcpy(&addr.addr, sa, addr.addrlen);
+			ui_log("ADDR %s\n", format_addr(&addr));
 		}
 	}
 }

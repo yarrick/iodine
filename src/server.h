@@ -18,6 +18,8 @@
 #ifndef __SERVER_H__
 #define __SERVER_H__
 
+#include "common.h"
+
 /* Struct with IPv4 and IPv6 file descriptors.
  * Need to be passed on down to tunneling code since we can get a
  * packet on one fd meant for a user on the other.
@@ -36,8 +38,7 @@ struct server_params {
 	in_addr_t server_ip;
 	int netmask;
 	in_addr_t nameserver_ip;
-	struct sockaddr *bind_addr;
-	socklen_t bind_addrlen;
+	struct net_addr bind_addr;
 };
 
 void server_init(struct server_params *params);

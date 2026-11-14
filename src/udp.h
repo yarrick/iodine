@@ -28,8 +28,8 @@
 #include <sys/socket.h>
 #endif
 
-int open_udp(struct sockaddr_storage *, socklen_t);
-int open_udp_opt(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len, int v6only);
+int open_udp(struct net_addr *addr);
+int open_udp_opt(struct net_addr *addr, int v6only);
 int open_udp_from_host(char *host, int port, int addr_family, int flags);
 void close_udp(int);
 
