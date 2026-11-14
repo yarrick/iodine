@@ -244,10 +244,10 @@ send_query(int fd, char *hostname)
 
 	q.id = chunkid;
 	q.type = do_qtype;
-	memset(&q.local, 0, sizeof(q.local));
-	q.locallen = 0;
-	memcpy(&q.remote, &nameserv, nameserv_len);
-	q.remotelen = nameserv_len;
+	memset(&q.address.local.addr, 0, sizeof(q.address.local.addr));
+	q.address.local.addrlen = 0;
+	memcpy(&q.address.remote.addr, &nameserv, nameserv_len);
+	q.address.remote.addrlen = nameserv_len;
 
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
 	if (len < 1) {
@@ -259,7 +259,7 @@ send_query(int fd, char *hostname)
 	ui_log("  Sendquery: id %5d name[0] '%c'\n", q.id, hostname[0]);
 #endif
 
-	send_udp(fd, packet, len, &q);
+	send_udp(fd, packet, len, &q.address);
 
 	/* There are DNS relays that time out quickly but don't send anything
 	   back on timeout.
@@ -560,7 +560,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 	char data[64*1024];
 	int r;
 
-	r = read_udp(dns_fd, data, sizeof(data), q);
+	r = read_udp(dns_fd, data, sizeof(data), &q->address);
 	if (r < 0) {
 		return -1;
 	}

@@ -89,6 +89,12 @@ format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len)
 	return dst;
 }
 
+char *
+format_net_addr(struct net_addr *addr)
+{
+	return format_addr(&addr->addr, addr->addrlen);
+}
+
 int
 get_addr(char *host, int port, int addr_family, int flags,
 	 struct sockaddr_storage *out, socklen_t *outlen)

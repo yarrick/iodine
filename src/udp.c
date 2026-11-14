@@ -159,7 +159,7 @@ set_v4_srcaddr(struct cmsghdr *cmsg, struct in_addr addr)
 #endif
 
 int
-read_udp(int fd, char *packet, size_t packetlen, struct query *q)
+read_udp(int fd, char *packet, size_t packetlen, struct udp_addr *addr)
 {
 	socklen_t addrlen = sizeof(struct sockaddr_storage);
 	int r;
@@ -172,7 +172,7 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 	iov.iov_base = packet;
 	iov.iov_len = packetlen;
 
-	msg.msg_name = (caddr_t) &q->remote;
+	msg.msg_name = (caddr_t) &addr->remote.addr;
 	msg.msg_namelen = (unsigned) addrlen;
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
@@ -191,7 +191,7 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 	iov.len = packetlen;
 
 	memset(&msg, 0, sizeof(msg));
-	msg.name = (LPSOCKADDR) &q->remote;
+	msg.name = (LPSOCKADDR) &addr->remote.addr;
 	msg.namelen = addrlen;
 	msg.lpBuffers = &iov;
 	msg.dwBufferCount = 1;
@@ -210,30 +210,30 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 		warn("read_udp");
 		return r;
 	}
-	q->remotelen = addrlen;
+	addr->remote.addrlen = addrlen;
 
-	memset(&q->local, 0, sizeof(struct sockaddr_storage));
-	q->locallen = sizeof(struct sockaddr_storage);
+	memset(&addr->local.addr, 0, sizeof(struct sockaddr_storage));
+	addr->local.addrlen = sizeof(struct sockaddr_storage);
 	/* Read destination IP address */
 	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 		cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 
 		if (cmsg->cmsg_level == IPPROTO_IP &&
 		    cmsg->cmsg_type == DSTADDR_SOCKOPT) {
-			struct sockaddr_in *addr = (struct sockaddr_in *) &q->local;
-			addr->sin_family = AF_INET;
-			addr->sin_addr = get_v4_dstaddr(cmsg);
-			q->locallen = sizeof(*addr);
+			struct sockaddr_in *inaddr = (struct sockaddr_in *) &addr->local.addr;
+			inaddr->sin_family = AF_INET;
+			inaddr->sin_addr = get_v4_dstaddr(cmsg);
+			addr->local.addrlen = sizeof(*inaddr);
 			break;
 		}
 		if (cmsg->cmsg_level == IPPROTO_IPV6 &&
 		    cmsg->cmsg_type == IPV6_PKTINFO) {
 			struct in6_pktinfo *pktinfo;
-			struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->local;
+			struct sockaddr_in6 *in6addr = (struct sockaddr_in6 *) &addr->local.addr;
 			pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
-			addr->sin6_family = AF_INET6;
-			memcpy(&addr->sin6_addr, &pktinfo->ipi6_addr, sizeof(struct in6_addr));
-			q->locallen = sizeof(*addr);
+			in6addr->sin6_family = AF_INET6;
+			memcpy(&in6addr->sin6_addr, &pktinfo->ipi6_addr, sizeof(struct in6_addr));
+			addr->local.addrlen = sizeof(*in6addr);
 			break;
 		}
 	}
@@ -241,9 +241,9 @@ read_udp(int fd, char *packet, size_t packetlen, struct query *q)
 	return r;
 }
 
-/* Send data to q->remote, using q->local as source address */
+/* Send data to addr->remote, using addr->local as source address */
 int
-send_udp(int fd, const char *packet, size_t packetlen, struct query *q)
+send_udp(int fd, const char *packet, size_t packetlen, struct udp_addr *addr)
 {
 	int r;
 #ifndef WINDOWS
@@ -256,8 +256,8 @@ send_udp(int fd, const char *packet, size_t packetlen, struct query *q)
 	iov.iov_len = packetlen;
 
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = (caddr_t) &q->remote;
-	msg.msg_namelen = q->remotelen;
+	msg.msg_name = (caddr_t) &addr->remote.addr;
+	msg.msg_namelen = addr->remote.addrlen;
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
 	memset(control, 0, sizeof(control));
@@ -266,18 +266,18 @@ send_udp(int fd, const char *packet, size_t packetlen, struct query *q)
 
 	cmsg = CMSG_FIRSTHDR(&msg);
 #ifdef SRCADDR_SOCKOPT
-	if (q->local.ss_family == AF_INET) {
-		struct sockaddr_in *addr = (struct sockaddr_in *) &q->local;
-		msg.msg_controllen = set_v4_srcaddr(cmsg, addr->sin_addr);
+	if (addr->local.addr.ss_family == AF_INET) {
+		struct sockaddr_in *inaddr = (struct sockaddr_in *) &addr->local.addr;
+		msg.msg_controllen = set_v4_srcaddr(cmsg, inaddr->sin_addr);
 	} else
 #endif
-	if (q->local.ss_family == AF_INET6) {
-		struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->local;
+	if (addr->local.addr.ss_family == AF_INET6) {
+		struct sockaddr_in6 *in6addr = (struct sockaddr_in6 *) &addr->local.addr;
 		struct in6_pktinfo *pktinfo = (struct in6_pktinfo *) CMSG_DATA(cmsg);
 		cmsg->cmsg_level = IPPROTO_IPV6;
 		cmsg->cmsg_type = IPV6_PKTINFO;
 		cmsg->cmsg_len = CMSG_LEN(sizeof(*pktinfo));
-		memcpy(&pktinfo->ipi6_addr, &addr->sin6_addr, sizeof(struct in6_addr));
+		memcpy(&pktinfo->ipi6_addr, &in6addr->sin6_addr, sizeof(struct in6_addr));
 		msg.msg_controllen = CMSG_SPACE(sizeof(*pktinfo));
 	} else {
 		msg.msg_control = NULL;
@@ -292,7 +292,7 @@ send_udp(int fd, const char *packet, size_t packetlen, struct query *q)
 		r = sendmsg(fd, &msg, 0);
 	}
 #else
-	r = sendto(fd, packet, packetlen, 0, (struct sockaddr *) &q->remote, q->remotelen);
+	r = sendto(fd, packet, packetlen, 0, (struct sockaddr *) &addr->remote.addr, addr->remote.addrlen);
 #endif /* !WINDOWS */
 	if (r < 0) {
 		warn("send_udp");

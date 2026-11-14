@@ -19,6 +19,8 @@
 
 #include "config.h"
 
+#include "common.h"
+
 #ifdef WINDOWS
 #include "windows_dns.h"
 #include <winsock2.h>
@@ -29,8 +31,7 @@
 #define FW_QUERY_CACHE_SIZE 16
 
 struct fw_query {
-	struct sockaddr_storage addr;
-	int addrlen;
+	struct net_addr addr;
 	unsigned short id;
 };
 

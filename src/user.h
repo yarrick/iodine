@@ -71,8 +71,7 @@ struct tun_user {
 	time_t last_pkt;
 	int seed;
 	in_addr_t tun_ip;
-	struct sockaddr_storage host;
-	socklen_t hostlen;
+	struct net_addr host;
 	struct query q;
 	struct query q_sendrealsoon;
 	int q_sendrealsoon_new;

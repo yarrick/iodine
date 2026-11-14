@@ -50,6 +50,7 @@ get_external_ip(struct in_addr *ip)
 {
 	static const char target[] = "myip.opendns.com";
 	struct query query;
+	struct net_addr addr;
 	int attempt;
 	int res;
 	int fd;
@@ -57,7 +58,7 @@ get_external_ip(struct in_addr *ip)
 	memset(&query, 0, sizeof(query));
 
 	query.type = T_A;
-	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &query.remote, &query.remotelen))
+	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &addr.addr, &addr.addrlen))
 		return 1;
 
 	fd = open_udp_from_host(NULL, 0, AF_INET, AI_PASSIVE);
@@ -76,7 +77,7 @@ get_external_ip(struct in_addr *ip)
 		buflen = dns_encode(buf, buflen, &query, QR_QUERY, target, strlen(target));
 		if (buflen < 0) continue;
 
-		sendto(fd, buf, buflen, 0, (struct sockaddr*)&query.remote, query.remotelen);
+		sendto(fd, buf, buflen, 0, (struct sockaddr*) &addr.addr, addr.addrlen);
 
 		tv.tv_sec = 1 + attempt;
 		tv.tv_usec = 0;

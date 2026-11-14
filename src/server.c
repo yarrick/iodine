@@ -98,9 +98,9 @@ server_init(struct server_params *params)
 }
 
 static int
-get_dns_fd(struct dnsfd *fds, struct sockaddr_storage *addr)
+get_dns_fd(struct dnsfd *fds, struct net_addr *addr)
 {
-	if (addr->ss_family == AF_INET6) {
+	if (addr->addr.ss_family == AF_INET6) {
 		return fds->v6fd;
 	}
 	return fds->v4fd;
@@ -110,6 +110,7 @@ get_dns_fd(struct dnsfd *fds, struct sockaddr_storage *addr)
 static int
 check_user_and_ip(int userid, struct query *q)
 {
+	struct sockaddr_storage *remote;
 	/* Note: duplicate in handle_raw_login() except IP-address check */
 
 	if (userid < 0 || userid >= created_users) {
@@ -127,23 +128,24 @@ check_user_and_ip(int userid, struct query *q)
 		return 0;
 	}
 
-	if (q->remote.ss_family != users[userid].host.ss_family) {
+	remote = &q->address.remote.addr;
+	if (remote->ss_family != users[userid].host.addr.ss_family) {
 		return 1;
 	}
 	/* Check IPv4 */
-	if (q->remote.ss_family == AF_INET) {
+	if (remote->ss_family == AF_INET) {
 		struct sockaddr_in *expected, *received;
 
-		expected = (struct sockaddr_in *) &(users[userid].host);
-		received = (struct sockaddr_in *) &(q->remote);
+		expected = (struct sockaddr_in *) &(users[userid].host.addr);
+		received = (struct sockaddr_in *) remote;
 		return memcmp(&(expected->sin_addr), &(received->sin_addr), sizeof(struct in_addr));
 	}
 	/* Check IPv6 */
-	if (q->remote.ss_family == AF_INET6) {
+	if (remote->ss_family == AF_INET6) {
 		struct sockaddr_in6 *expected, *received;
 
-		expected = (struct sockaddr_in6 *) &(users[userid].host);
-		received = (struct sockaddr_in6 *) &(q->remote);
+		expected = (struct sockaddr_in6 *) &(users[userid].host.addr);
+		received = (struct sockaddr_in6 *) remote;
 		return memcmp(&(expected->sin6_addr), &(received->sin6_addr), sizeof(struct in6_addr));
 	}
 	/* Unknown address family */
@@ -194,9 +196,9 @@ send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct query *q)
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
 	ui_debug(2, "TX-raw: client %s, cmd %d, %zu bytes\n",
-		 format_addr(&q->remote, q->remotelen), cmd, len);
+		 format_net_addr(&q->address.remote), cmd, len);
 
-	send_udp(fd, packet, len, q);
+	send_udp(fd, packet, len, &q->address);
 }
 
 
@@ -482,8 +484,7 @@ send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 
 	if (q->id2 != 0) {
 		q->id = q->id2;
-		q->remotelen = q->remotelen2;
-		memcpy(&(q->remote), &(q->remote2), q->remotelen2);
+		q->address = q->address2;
 		ui_debug(1, "OUT  again to last duplicate\n");
 		write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
 	}
@@ -552,16 +553,16 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 
 		/* Start sending immediately if query is waiting */
 		if (users[userid].q_sendrealsoon.id != 0) {
-			int dns_fd = get_dns_fd(dns_fds, &users[userid].q_sendrealsoon.remote);
+			int dns_fd = get_dns_fd(dns_fds, &users[userid].q_sendrealsoon.address.remote);
 			send_chunk_or_dataless(dns_fd, userid, &users[userid].q_sendrealsoon);
 		} else if (users[userid].q.id != 0) {
-			int dns_fd = get_dns_fd(dns_fds, &users[userid].q.remote);
+			int dns_fd = get_dns_fd(dns_fds, &users[userid].q.address.remote);
 			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
 		}
 
 		return outlen;
 	} else { /* CONN_RAW_UDP */
-		int dns_fd = get_dns_fd(dns_fds, &users[userid].q.remote);
+		int dns_fd = get_dns_fd(dns_fds, &users[userid].q.address.remote);
 		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].q);
 		return outlen;
 	}
@@ -619,7 +620,7 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 	if (version != PROTOCOL_VERSION) {
 		send_version_response(dns_fd, VERSION_NACK, PROTOCOL_VERSION, 0, q);
 		syslog(LOG_INFO, "dropped user from %s, sent bad version %08X",
-			format_addr(&q->remote, q->remotelen), version);
+			format_net_addr(&q->address.remote), version);
 		return;
 	}
 
@@ -627,21 +628,20 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 		/* No space for another user */
 		send_version_response(dns_fd, VERSION_FULL, created_users, 0, q);
 		syslog(LOG_INFO, "dropped user from %s, server full",
-			format_addr(&q->remote, q->remotelen));
+			format_net_addr(&q->address.remote));
 		return;
 	}
 
 	secure_random(&users[userid].seed, sizeof(users[userid].seed));
 	/* Store remote IP number */
-	memcpy(&(users[userid].host), &(q->remote), q->remotelen);
-	users[userid].hostlen = q->remotelen;
+	users[userid].host = q->address.remote;
 
 	memcpy(&(users[userid].q), q, sizeof(struct query));
 	users[userid].encoder = &base32_ops;
 	users[userid].downenc = 'T';
 	send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
 	syslog(LOG_INFO, "accepted version for user #%d from %s",
-		userid, format_addr(&q->remote, q->remotelen));
+		userid, format_net_addr(&q->address.remote));
 	users[userid].q.id = 0;
 	users[userid].q.id2 = 0;
 	users[userid].q_sendrealsoon.id = 0;
@@ -733,7 +733,7 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
 	if (check_user_and_ip(userid, q) != 0) {
 		write_dns(dns_fd, q, "BADIP", 5, 'T');
 		syslog(LOG_WARNING, "dropped login request from user #%d from unexpected source %s",
-			userid, format_addr(&q->remote, q->remotelen));
+			userid, format_net_addr(&q->address.remote));
 		return;
 	}
 
@@ -763,7 +763,7 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
 	} else {
 		write_dns(dns_fd, q, "LNAK", 4, 'T');
 		syslog(LOG_WARNING, "rejected login request from user #%d from %s, bad password",
-			userid, format_addr(&q->remote, q->remotelen));
+			userid, format_net_addr(&q->address.remote));
 	}
 }
 
@@ -783,18 +783,18 @@ handle_ip_request(int dns_fd, char *in, int domain_len, struct query *q)
 	}
 
 	reply[0] = 'I';
-	if (q->remote.ss_family == AF_INET) {
+	if (q->address.remote.addr.ss_family == AF_INET) {
 		if (ns_ip != INADDR_ANY) {
 			/* If set, use assigned external ip (-n option) */
 			memcpy(&reply[1], &ns_ip, sizeof(ns_ip));
 		} else {
 			/* otherwise return destination ip from packet */
-			struct sockaddr_in *addr = (struct sockaddr_in *) &q->local;
+			struct sockaddr_in *addr = (struct sockaddr_in *) &q->address.local.addr;
 			memcpy(&reply[1], &addr->sin_addr, sizeof(struct in_addr));
 		}
 		length = 1 + sizeof(struct in_addr);
 	} else {
-		struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->local;
+		struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &q->address.local.addr;
 		memcpy(&reply[1], &addr->sin6_addr, sizeof(struct in6_addr));
 		length = 1 + sizeof(struct in6_addr);
 	}
@@ -1079,8 +1079,7 @@ check_duplicate_query(int dns_fd, int userid, struct query *q,
 		ui_debug(2, "%-4s pkt from user %d = dupe from impatient DNS server, remembering\n",
 			 log_prefix, userid);
 		users[userid].q.id2 = q->id;
-		users[userid].q.remotelen2 = q->remotelen;
-		memcpy(&(users[userid].q.remote2), &(q->remote), q->remotelen);
+		users[userid].q.address2 = q->address;
 		return 1;
 	}
 
@@ -1092,9 +1091,7 @@ check_duplicate_query(int dns_fd, int userid, struct query *q,
 		ui_debug(2, "%-4s pkt from user %d = dupe from impatient DNS server, remembering\n",
 			 log_prefix, userid);
 		users[userid].q_sendrealsoon.id2 = q->id;
-		users[userid].q_sendrealsoon.remotelen2 = q->remotelen;
-		memcpy(&(users[userid].q_sendrealsoon.remote2),
-			&(q->remote), q->remotelen);
+		users[userid].q_sendrealsoon.address2 = q->address;
 		return 1;
 	}
 
@@ -1392,7 +1389,7 @@ handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 	char buf[64*1024];
 	int len;
 
-	memcpy(&address, &q->local, q->locallen);
+	memcpy(&address, &q->address.local.addr, q->address.local.addrlen);
 	if (ns_ip != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
@@ -1409,8 +1406,8 @@ handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes NS reply\n",
-		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
-	send_udp(dns_fd, buf, len, q);
+		 format_net_addr(&q->address.remote), q->type, q->name, len);
+	send_udp(dns_fd, buf, len, &q->address);
 }
 
 static void
@@ -1422,7 +1419,7 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	char buf[64*1024];
 	int len;
 
-	memcpy(&address, &q->local, q->locallen);
+	memcpy(&address, &q->address.local.addr, q->address.local.addrlen);
 	if (fakeip) {
 		addr->sin_family = AF_INET;
 		inet_pton(AF_INET, "127.0.0.1", &addr->sin_addr);
@@ -1445,8 +1442,8 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes A reply\n",
-		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
-	send_udp(dns_fd, buf, len, q);
+		 format_net_addr(&q->address.remote), q->type, q->name, len);
+	send_udp(dns_fd, buf, len, &q->address);
 }
 
 static void
@@ -1457,7 +1454,7 @@ handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fake
 	char buf[64*1024];
 	int len;
 
-	memcpy(&address, &q->local, q->locallen);
+	memcpy(&address, &q->address.local.addr, q->address.local.addrlen);
 	if (fakeip) {
 		addr->sin6_family = AF_INET6;
 		inet_pton(AF_INET6, "::1", &addr->sin6_addr);
@@ -1480,8 +1477,8 @@ handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fake
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes AAAA reply\n",
-		 format_addr(&q->remote, q->remotelen), q->type, q->name, len);
-	send_udp(dns_fd, buf, len, q);
+		 format_net_addr(&q->address.remote), q->type, q->name, len);
+	send_udp(dns_fd, buf, len, &q->address);
 }
 
 
@@ -1498,8 +1495,8 @@ handle_soa_request(int dns_fd, struct query *q, const char *topdomain, int rcode
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %d bytes rcode %d SOA reply\n",
-		 format_addr(&q->remote, q->remotelen), q->type, q->name, len, rcode);
-	send_udp(dns_fd, buf, len, q);
+		 format_net_addr(&q->address.remote), q->type, q->name, len, rcode);
+	send_udp(dns_fd, buf, len, &q->address);
 }
 
 static void
@@ -1516,17 +1513,13 @@ forward_query(int bind_fd, struct query *q)
 	}
 
 	/* Store sockaddr for q->id */
-	memcpy(&(fwq.addr), &(q->remote), q->remotelen);
-	fwq.addrlen = q->remotelen;
+	fwq.addr = q->address.remote;
 	fwq.id = q->id;
 	fw_query_put(&fwq);
 
-	memcpy(&q->remote, bind_addr, bind_addrlen);
-	q->remotelen = bind_addrlen;
-
 	ui_debug(2, "TX: NS reply \n");
 
-	if (sendto(bind_fd, buf, len, 0, (struct sockaddr*)&q->remote, q->remotelen) <= 0) {
+	if (sendto(bind_fd, buf, len, 0, bind_addr, bind_addrlen) <= 0) {
 		warn("forward query error");
 	}
 }
@@ -1561,11 +1554,11 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 	}
 
 	ui_debug(2, "TX: client %s id %u, %d bytes\n",
-		 format_addr(&query->addr, query->addrlen), (id & 0xffff), r);
+		 format_net_addr(&query->addr), (id & 0xffff), r);
 
 	dns_fd = get_dns_fd(dns_fds, &query->addr);
-	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr),
-		query->addrlen) <= 0) {
+	if (sendto(dns_fd, packet, r, 0, (const struct sockaddr *) &(query->addr.addr),
+		query->addr.addrlen) <= 0) {
 		warn("forward reply error");
 	}
 
@@ -1580,8 +1573,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	int read;
 	int domain_len;
 
-	/* Only fills q->remote and q->local, not q->name */
-	if ((read = read_udp(dns_fd, packet, sizeof(packet), &q)) <= 0)
+	if ((read = read_udp(dns_fd, packet, sizeof(packet), &q.address)) <= 0)
 		return 0;
 
 	if (raw_decode(packet, read, &q, dns_fd, dns_fds, tun_fd)) {
@@ -1593,7 +1585,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	}
 
 	ui_debug(2, "RX: client %s, type %d, name %s\n",
-		 format_addr(&q.remote, q.remotelen), q.type, q.name);
+		 format_net_addr(&q.address.remote), q.type, q.name);
 
 	domain_len = query_datalen(q.name, topdomain);
 	if (domain_len >= 0) {
@@ -1773,7 +1765,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			    users[userid].q_sendrealsoon.id != 0 &&
 			    users[userid].conn == CONN_DNS_NULL &&
 			    !users[userid].q_sendrealsoon_new) {
-				int dns_fd = get_dns_fd(dns_fds, &users[userid].q_sendrealsoon.remote);
+				int dns_fd = get_dns_fd(dns_fds, &users[userid].q_sendrealsoon.address.remote);
 				send_chunk_or_dataless(dns_fd, userid, &users[userid].q_sendrealsoon);
 			}
 	}
@@ -1812,10 +1804,10 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 
 					/* Start sending immediately if query is waiting */
 					if (users[touser].q_sendrealsoon.id != 0) {
-						int dns_fd = get_dns_fd(dns_fds, &users[touser].q_sendrealsoon.remote);
+						int dns_fd = get_dns_fd(dns_fds, &users[touser].q_sendrealsoon.address.remote);
 						send_chunk_or_dataless(dns_fd, touser, &users[touser].q_sendrealsoon);
 					} else if (users[touser].q.id != 0) {
-						int dns_fd = get_dns_fd(dns_fds, &users[touser].q.remote);
+						int dns_fd = get_dns_fd(dns_fds, &users[touser].q.address.remote);
 						send_chunk_or_dataless(dns_fd, touser, &users[touser].q);
 					}
 #ifdef OUTPACKETQ_LEN
@@ -1826,7 +1818,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 #endif
 				}
 			} else{ /* CONN_RAW_UDP */
-				int dns_fd = get_dns_fd(dns_fds, &users[touser].q.remote);
+				int dns_fd = get_dns_fd(dns_fds, &users[touser].q.address.remote);
 				send_raw(dns_fd, users[userid].inpacket.data,
 					 users[userid].inpacket.len, touser,
 					 RAW_HDR_CMD_DATA, &users[touser].q);
@@ -1865,8 +1857,7 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 		memcpy(&(users[userid].q), q, sizeof(struct query));
 
 		/* Store remote IP number */
-		memcpy(&(users[userid].host), &(q->remote), q->remotelen);
-		users[userid].hostlen = q->remotelen;
+		users[userid].host = q->address.remote;
 
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
@@ -2086,8 +2077,8 @@ write_dns(int fd, struct query *q, const char *data, size_t datalen, char downen
 	}
 
 	ui_debug(2, "TX: client %s, type %d, name %s, %zu bytes data\n",
-		 format_addr(&q->remote, q->remotelen), q->type, q->name, datalen);
+		 format_net_addr(&q->address.remote), q->type, q->name, datalen);
 
-	send_udp(fd, buf, len, q);
+	send_udp(fd, buf, len, &q->address);
 }
 

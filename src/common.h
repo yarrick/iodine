@@ -70,18 +70,24 @@ struct packet
 	char fragment;		/* Fragment index */
 };
 
+struct net_addr {
+	struct sockaddr_storage addr;
+	socklen_t addrlen;
+};
+
+struct udp_addr {
+	struct net_addr local;
+	struct net_addr remote;
+};
+
 struct query {
 	char name[QUERY_NAME_SIZE];
 	unsigned short type;
 	unsigned short rcode;
 	unsigned short id;
-	struct sockaddr_storage local;
-	socklen_t locallen;
-	struct sockaddr_storage remote;
-	socklen_t remotelen;
+	struct udp_addr address;
+	struct udp_addr address2;
 	unsigned short id2;
-	struct sockaddr_storage remote2;
-	socklen_t remotelen2;
 };
 
 enum connection {
@@ -91,6 +97,7 @@ enum connection {
 };
 
 char *format_inaddr(struct in_addr *addr);
+char *format_net_addr(struct net_addr *addr);
 char *format_addr(struct sockaddr_storage *sockaddr, socklen_t sockaddr_len);
 int get_addr(char *host, int port, int addr_family, int flags,
              struct sockaddr_storage *out, socklen_t *outlen);
