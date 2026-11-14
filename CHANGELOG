@@ -19,6 +19,8 @@ master:
 	    response and version/login checks (needs dnspython module).
 	- Source IP address set to original destination address when sending
 	  replies in iodined (not yet supported on Windows).
+	- Added meson options for forcing optional Linux dependencies,
+	  setting installdir for docs and setting max number of users.
 
 2026-10-25: 0.9.0 "20 years"
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
