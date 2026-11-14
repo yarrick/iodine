@@ -76,60 +76,6 @@ static void write_dns(int fd, struct query *q, const char *data, size_t datalen,
 static void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid);
 static int raw_decode(char *packet, int len, struct query *q, int dns_fd, struct dnsfd *dns_fds, int tun_fd);
 
-/* Ask opendns.com DNS service for external ip */
-int
-get_external_ip(struct in_addr *ip)
-{
-	static const char target[] = "myip.opendns.com";
-	struct query query;
-	int attempt;
-	int res;
-	int fd;
-	int out_len = 0;
-	memset(&query, 0, sizeof(query));
-
-	query.type = T_A;
-	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &query.remote, &query.remotelen))
-		return 1;
-
-	fd = open_udp_from_host(NULL, 0, AF_INET, AI_PASSIVE);
-	if (fd < 0) return 2;
-
-	for (attempt = 0; attempt < 3; attempt++) {
-		char buf[64*1024];
-		int buflen;
-		fd_set fds;
-		struct timeval tv;
-
-		if (attempt)
-			ui_log("Retrying external IP lookup\n");
-		secure_random(&query.id, sizeof(query.id));
-		buflen = sizeof(buf);
-		buflen = dns_encode(buf, buflen, &query, QR_QUERY, target, strlen(target));
-		if (buflen < 0) continue;
-
-		sendto(fd, buf, buflen, 0, (struct sockaddr*)&query.remote, query.remotelen);
-
-		tv.tv_sec = 1 + attempt;
-		tv.tv_usec = 0;
-		FD_ZERO(&fds);
-		FD_SET(fd, &fds);
-		res = select(fd + 1, &fds, NULL, NULL, &tv);
-		if (res > 0) {
-			buflen = sizeof(buf);
-			buflen = recv(fd, buf, buflen, 0);
-			if (buflen > 0) {
-				out_len = dns_decode((char *)ip, sizeof(struct in_addr),
-						     &query, QR_ANSWER, buf, buflen);
-				if (out_len > 0) break;
-			}
-		}
-	}
-
-	close_udp(fd);
-	return (out_len != sizeof(struct in_addr));
-}
-
 void
 server_stop(void)
 {

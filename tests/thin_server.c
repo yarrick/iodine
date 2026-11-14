@@ -21,6 +21,7 @@
 
 #include "common.h"
 #include "compat.h"
+#include "ext_ip.h"
 #include "server.h"
 #include "udp.h"
 #include "ui.h"

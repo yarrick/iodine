@@ -44,6 +44,7 @@
 # include <systemd/sd-daemon.h>
 #endif
 
+#include "ext_ip.h"
 #include "fw_query.h"
 #include "run_as.h"
 #include "tun.h"

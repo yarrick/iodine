@@ -198,7 +198,7 @@ executable('iodine',
 
 libserver = static_library(
   'server',
-  files('src/fw_query.c', 'src/user.c'),
+  files('src/ext_ip.c', 'src/fw_query.c', 'src/user.c'),
   include_directories: includes,
 )
 

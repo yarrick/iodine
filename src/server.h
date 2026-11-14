@@ -40,8 +40,6 @@ struct server_params {
 	socklen_t bind_addrlen;
 };
 
-int get_external_ip(struct in_addr *ip);
-
 void server_init(struct server_params *params);
 int server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time);
 void server_stop(void);
