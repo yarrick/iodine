@@ -13,10 +13,12 @@ master:
 	  to 1184. This is faster since it avoids packets that will
 	  always exceed 1500 bytes in size.
 	- Extra test targets added:
-	  * tun_bench which needs privileges and exercises tun device setup
-	    and packet read/write (needs ping3 python module).
+	  * tun_bench which exercises tun device setup and packet I/O
+	    (needs privileges and ping3 python module).
 	  * test_server which tests the external IP lookup, standard DNS
 	    response and version/login checks (needs dnspython module).
+	- Source IP address set to original destination address when sending
+	  replies in iodined (not yet supported on Windows).
 
 2026-10-25: 0.9.0 "20 years"
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
