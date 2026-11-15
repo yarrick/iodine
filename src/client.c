@@ -647,7 +647,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
 }
 
 static int
-handshake_waitdns(int dns_fd, char *buf, int buflen, char c1, char c2, int timeout)
+handshake_waitdns(int dns_fd, char *buf, int buflen, char cmd, int timeout)
 /* Wait for DNS reply fitting to our latest query and returns it.
    Returns length of reply = #bytes used in buf.
    Returns 0 if fitting reply happens to be useless.
@@ -665,7 +665,10 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char c1, char c2, int timeo
 	fd_set fds;
 	struct timeval tv;
 
+	/* In case it was uppercase, will be compared to lowercase below */
+	cmd = ascii_tolower(cmd);
 	while (1) {
+		unsigned char command;
 		tv.tv_sec = timeout;
 		tv.tv_usec = 0;
 		FD_ZERO(&fds);
@@ -680,8 +683,9 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char c1, char c2, int timeo
 		q.id = 0;
 		q.name[0] = '\0';
 		rv = read_dns_withq(dns_fd, 0, buf, buflen, &q);
+		command = ascii_tolower(q.name[0]);
 
-		if (q.id != chunkid || (q.name[0] != c1 && q.name[0] != c2)) {
+		if (q.id != chunkid || command != cmd) {
 #if 0
 			ui_log("Ignoring unfitting reply id %d starting with '%c'\n", q.id, q.name[0]);
 #endif
@@ -697,8 +701,7 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char c1, char c2, int timeo
 		   requests (Y or V, depending if -T given).
 		 */
 		if (rv < 0 && q.rcode == NOERROR &&
-		    (q.name[0] == 'Y' || q.name[0] == 'y' ||
-		     q.name[0] == 'V' || q.name[0] == 'v')) {
+		    (command == 'y' || command == 'v')) {
 			ui_log("Got empty reply. This nameserver may not be resolving recursively, use another.\n");
 			ui_log("Try \"iodine [options] ns.%s %s\" first, it might just work.\n",
 				topdomain, topdomain);
@@ -1332,7 +1335,7 @@ handshake_version(int dns_fd, int *seed)
 
 		send_version(dns_fd, PROTOCOL_VERSION);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'v', 'V', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'v', i+1);
 
 		if (read >= 9) {
 			payload = (((in[4] & 0xffU) << 24) |
@@ -1380,7 +1383,7 @@ handshake_login(int dns_fd, int seed)
 
 		send_login(dns_fd, login, 16);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'l', 'L', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'l', i+1);
 
 		if (read > 0) {
 			struct in_addr serveraddr;
@@ -1444,7 +1447,7 @@ handshake_raw_udp(int dns_fd, int seed)
 
 		send_handshake_query(dns_fd, get_ip);
 
-		len = handshake_waitdns(dns_fd, in, sizeof(in), 'i', 'I', i+1);
+		len = handshake_waitdns(dns_fd, in, sizeof(in), 'i', i+1);
 
 		if (len == 5 && in[0] == 'I') {
 			/* Received IPv4 address */
@@ -1537,7 +1540,7 @@ handshake_upenctest(int dns_fd, const char *s)
 
 		send_upenctest(dns_fd, s);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'z', 'Z', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'z', i+1);
 
 		if (read == -2)
 			return 0;	/* hard error */
@@ -1705,7 +1708,7 @@ handshake_downenctest(int dns_fd, char trycodec)
 
 		send_downenctest(dns_fd, trycodec, 1);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', 'Y', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', i+1);
 
 		if (read == -2)
 			return 0;	/* hard error */
@@ -1805,7 +1808,7 @@ handshake_qtypetest(int dns_fd, int timeout)
 
 	send_downenctest(dns_fd, trycodec, 1);
 
-	read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', 'Y', timeout);
+	read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', timeout);
 
 	if (read != slen)
 		return 0;	/* incorrect */
@@ -1929,7 +1932,7 @@ handshake_edns0_check(int dns_fd)
 
 		send_downenctest(dns_fd, trycodec, 1);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', 'Y', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', i+1);
 
 		if (read == -2)
 			return 0;	/* hard error */
@@ -1981,7 +1984,7 @@ handshake_switch_codec(int dns_fd, int bits)
 
 		send_handshake_query(dns_fd, sw_codec);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 's', 'S', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 's', i+1);
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
@@ -2035,7 +2038,7 @@ handshake_switch_downenc(int dns_fd)
 
 		send_handshake_query(dns_fd, sw_downenc);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', i+1);
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
@@ -2076,7 +2079,7 @@ handshake_try_lazy(int dns_fd)
 
 		send_lazy_switch(dns_fd);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', i+1);
 
 		if (read > 0) {
 			if (strncmp("BADLEN", in, 6) == 0) {
@@ -2120,7 +2123,7 @@ handshake_lazyoff(int dns_fd)
 
 		send_lazy_switch(dns_fd);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 'O', 1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 1);
 
 		if (read == 9 && strncmp("Immediate", in, 9) == 0) {
 			warnx("Server switched back to legacy mode.\n");
@@ -2223,7 +2226,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 
 			send_fragsize_probe(dns_fd, proposed_fragsize);
 
-			read = handshake_waitdns(dns_fd, in, sizeof(in), 'r', 'R', 1);
+			read = handshake_waitdns(dns_fd, in, sizeof(in), 'r', 1);
 
 			if (read > 0) {
 				/* We got a reply */
@@ -2289,7 +2292,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 
 		send_set_downstream_fragsize(dns_fd, fragsize);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'n', 'N', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'n', i+1);
 
 		if (read > 0) {
 
