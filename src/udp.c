@@ -165,6 +165,8 @@ read_udp(int fd, char *packet, size_t packetlen, struct udp_addr *addr)
 	int r;
 	char control[CMSG_SPACE(sizeof (struct in6_pktinfo))];
 	struct cmsghdr *cmsg;
+
+	memset(control, 0, sizeof(control));
 #ifndef WINDOWS
 	struct msghdr msg;
 	struct iovec iov;
@@ -172,6 +174,7 @@ read_udp(int fd, char *packet, size_t packetlen, struct udp_addr *addr)
 	iov.iov_base = packet;
 	iov.iov_len = packetlen;
 
+	memset(&msg, 0, sizeof(msg));
 	msg.msg_name = (caddr_t) &addr->remote.addr;
 	msg.msg_namelen = (unsigned) addrlen;
 	msg.msg_iov = &iov;
@@ -217,6 +220,9 @@ read_udp(int fd, char *packet, size_t packetlen, struct udp_addr *addr)
 	/* Read destination IP address */
 	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 		cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+
+		if (cmsg->cmsg_len == 0)
+			break;
 
 		if (cmsg->cmsg_level == IPPROTO_IP &&
 		    cmsg->cmsg_type == DSTADDR_SOCKOPT) {
