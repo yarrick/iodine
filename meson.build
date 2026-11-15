@@ -6,7 +6,7 @@ project('iodine', 'c',
   ],
   license: 'ISC',
   meson_version: '>=0.64.0',
-  version : '0.9.0',
+  version : '0.9.1',
 )
 fs = import('fs')
 cc = meson.get_compiler('c')

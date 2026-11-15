@@ -5,6 +5,17 @@ iodine - https://code.kryo.se/iodine
 
 CHANGES:
 
+2026-11-15: 0.9.1 "Caps Lock"
+	- Fixed parsing of -z flag (SELinux context) for iodine client.
+	- Added meson options for forcing optional Linux dependencies,
+	  and setting installdir for docs.
+	- Minor fixes handling invalid inputs on the server.
+	- Added check for CAP_SYS_CHROOT capability on Linux when
+	  libcap-ng is enabled and a chroot directory is set.
+	- Fixed clearing capabilities when switching user on Linux with
+	  libcap-ng enabled (issue #137, reported by Gergely Imreh).
+	- Added listing of included libraries when printing version.
+
 2026-10-25: 0.9.0 "20 years"
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
 	  patch by Pouria Mousavizadeh Tehrani.
