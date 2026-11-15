@@ -362,11 +362,12 @@ answer_from_qmem(int dns_fd, struct query *q,
    0 = don't call us again for now.
 */
 static int
-send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
+send_chunk_or_dataless(struct dnsfd *dns_fds, int userid, struct query *q)
 {
 	char pkt[4096];
 	unsigned int datalen = 0;
 	int last = 0;
+	int dns_fd;
 
 	/* If re-sent too many times, drop entire packet */
 	if (users[userid].outpacket.len > 0 &&
@@ -405,12 +406,14 @@ send_chunk_or_dataless(int dns_fd, int userid, struct query *q)
 	ui_debug(1, "OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %u, total %d, to user %d\n",
 		 users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15,
 		 last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
+	dns_fd = get_dns_fd(dns_fds, &q->address.remote);
 	write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
 
 	if (q->id2 != 0) {
 		q->id = q->id2;
 		q->address = q->address2;
 		ui_debug(1, "OUT  again to last duplicate\n");
+		dns_fd = get_dns_fd(dns_fds, &q->address.remote);
 		write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
 	}
 
@@ -478,11 +481,9 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 
 		/* Start sending immediately if query is waiting */
 		if (users[userid].q_sendrealsoon.id != 0) {
-			int dns_fd = get_dns_fd(dns_fds, &users[userid].q_sendrealsoon.address.remote);
-			send_chunk_or_dataless(dns_fd, userid, &users[userid].q_sendrealsoon);
+			send_chunk_or_dataless(dns_fds, userid, &users[userid].q_sendrealsoon);
 		} else if (users[userid].q.id != 0) {
-			int dns_fd = get_dns_fd(dns_fds, &users[userid].q.address.remote);
-			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
+			send_chunk_or_dataless(dns_fds, userid, &users[userid].q);
 		}
 
 		return outlen;
@@ -1100,7 +1101,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		   May contain new downstream data if the ping had a new ack.
 		   Otherwise, may also be re-sending old data. */
 		if (users[userid].q_sendrealsoon.id != 0) {
-			send_chunk_or_dataless(dns_fd, userid, &users[userid].q_sendrealsoon);
+			send_chunk_or_dataless(dns_fds, userid, &users[userid].q_sendrealsoon);
 		}
 
 		/* We need to store a new query, so if there still is an
@@ -1110,7 +1111,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		   (This is duplicate data if we had q_sendrealsoon above.) */
 		if (users[userid].q.id != 0) {
 			didsend = 1;
-			if (send_chunk_or_dataless(dns_fd, userid, &users[userid].q) == 1)
+			if (send_chunk_or_dataless(dns_fds, userid, &users[userid].q) == 1)
 				/* new packet from queue, send immediately */
 				didsend = 0;
 		}
@@ -1124,7 +1125,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		   (then above won't have sent at all). */
 		if ((!didsend && users[userid].outpacket.len > 0) ||
 		    !users[userid].lazy)
-			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
+			send_chunk_or_dataless(dns_fds, userid, &users[userid].q);
 
 	} else if ((command >= '0' && command <= '9')
 			|| (command >= 'a' && command <= 'f')) {
@@ -1236,7 +1237,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		   may contain new data. */
 		if (users[userid].q_sendrealsoon.id != 0) {
 			didsend = 1;
-			if (send_chunk_or_dataless(dns_fd, userid, &users[userid].q_sendrealsoon) == 1)
+			if (send_chunk_or_dataless(dns_fds, userid, &users[userid].q_sendrealsoon) == 1)
 				/* new packet from queue, send immediately */
 				didsend = 0;
 		}
@@ -1260,7 +1261,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			    (!upstream_ok && !didsend) ||
 			    !users[userid].lazy) {
 				didsend = 1;
-				if (send_chunk_or_dataless(dns_fd, userid, &users[userid].q) == 1)
+				if (send_chunk_or_dataless(dns_fds, userid, &users[userid].q) == 1)
 					/* new packet from queue, send immediately */
 					didsend = 0;
 			} else {
@@ -1291,7 +1292,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		   - In all other cases, don't send anything now.
 		*/
 		if (users[userid].outpacket.len > 0 && !didsend)
-			send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
+			send_chunk_or_dataless(dns_fds, userid, &users[userid].q);
 		else if (!didsend || !users[userid].lazy) {
 			if (upstream_ok && lastfrag) {
 				memcpy(&(users[userid].q_sendrealsoon),
@@ -1300,7 +1301,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 				users[userid].q_sendrealsoon_new = 1;
 				users[userid].q.id = 0;  /* used */
 			} else {
-				send_chunk_or_dataless(dns_fd, userid, &users[userid].q);
+				send_chunk_or_dataless(dns_fds, userid, &users[userid].q);
 			}
 		}
 	}
@@ -1687,8 +1688,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			    users[userid].q_sendrealsoon.id != 0 &&
 			    users[userid].conn == CONN_DNS_NULL &&
 			    !users[userid].q_sendrealsoon_new) {
-				int dns_fd = get_dns_fd(dns_fds, &users[userid].q_sendrealsoon.address.remote);
-				send_chunk_or_dataless(dns_fd, userid, &users[userid].q_sendrealsoon);
+				send_chunk_or_dataless(dns_fds, userid, &users[userid].q_sendrealsoon);
 			}
 	}
 
@@ -1726,11 +1726,9 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 
 					/* Start sending immediately if query is waiting */
 					if (users[touser].q_sendrealsoon.id != 0) {
-						int dns_fd = get_dns_fd(dns_fds, &users[touser].q_sendrealsoon.address.remote);
-						send_chunk_or_dataless(dns_fd, touser, &users[touser].q_sendrealsoon);
+						send_chunk_or_dataless(dns_fds, touser, &users[touser].q_sendrealsoon);
 					} else if (users[touser].q.id != 0) {
-						int dns_fd = get_dns_fd(dns_fds, &users[touser].q.address.remote);
-						send_chunk_or_dataless(dns_fd, touser, &users[touser].q);
+						send_chunk_or_dataless(dns_fds, touser, &users[touser].q);
 					}
 #ifdef OUTPACKETQ_LEN
 				} else {
