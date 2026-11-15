@@ -253,7 +253,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	check_privileges(username, 0);
+	check_privileges(username, newroot, 0);
 
 	argc -= optind;
 	argv += optind;

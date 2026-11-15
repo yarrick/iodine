@@ -56,9 +56,10 @@ is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
 #endif
 
 void
-check_privileges(char *username, int port)
+check_privileges(char *username, char *newroot, int port)
 {
 	(void)username;
+	(void)newroot;
 	(void)port;
 #if HAVE_LIBCAPNG
 	bool capable = true;
@@ -101,6 +102,11 @@ check_privileges(char *username, int port)
 			warnx("capabilities: CAP_SETGID required");
 			capable = false;
 		}
+	}
+
+	if (newroot && !capng_have_capability(CAPNG_EFFECTIVE, CAP_SYS_CHROOT)) {
+		warnx("capabilities: CAP_SYS_CHROOT required");
+		capable = false;
 	}
 
 	if (!capable) {
