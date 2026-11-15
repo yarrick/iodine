@@ -69,8 +69,7 @@ int outchunkresent = 0;
 
 /* My userid at the server */
 static char userid;
-static char userid_char;		/* used when sending (lowercase) */
-static char userid_char2;		/* also accepted when receiving (uppercase) */
+static char userid_char;
 
 /* DNS id for next packet */
 static uint16_t chunkid;
@@ -785,6 +784,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	char buf[64*1024];
 	int read;
 	int send_something_now = 0;
+	unsigned char command;
 
 	memset(q.name, 0, sizeof(q.name));
 	read = read_dns_withq(dns_fd, tun_fd, buf, sizeof(buf), &q);
@@ -802,8 +802,8 @@ tunnel_dns(int tun_fd, int dns_fd)
 	   mostly 1 sec apart, will continuously break the >=2-second select
 	   timeout, which means we won't send a proper ping for a while.
 	   So make select a bit faster, <1sec. */
-	if (q.name[0] != 'P' && q.name[0] != 'p' &&
-	    q.name[0] != userid_char && q.name[0] != userid_char2) {
+	command = ascii_tolower(q.name[0]);
+	if (command != 'p' && command != userid_char) {
 		send_ping_soon = 700;
 		return -1;	/* nothing done */
 	}
@@ -1323,7 +1323,6 @@ static int
 handshake_version(int dns_fd, int *seed)
 {
 	char hex[] = "0123456789abcdef";
-	char hex2[] = "0123456789ABCDEF";
 	char in[4096];
 	uint32_t payload;
 	int i;
@@ -1345,7 +1344,6 @@ handshake_version(int dns_fd, int *seed)
 				*seed = payload;
 				userid = in[8];
 				userid_char = hex[userid & 15];
-				userid_char2 = hex2[userid & 15];
 
 				ui_log("Version ok, both using protocol v 0x%08x. You are user #%d\n",
 					PROTOCOL_VERSION, userid);
