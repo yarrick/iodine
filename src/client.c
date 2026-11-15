@@ -57,7 +57,7 @@ static int running;
 static const char *password;
 
 static struct net_addr nameserv;
-static struct net_addr raw_serv;
+static struct udp_addr raw_serv;
 static const char *topdomain;
 
 static uint16_t rand_seed;
@@ -222,7 +222,7 @@ client_set_hostname_maxlen(int i)
 const char *
 client_get_raw_addr(void)
 {
-	return format_addr(&raw_serv);
+	return format_addr(&raw_serv.remote);
 }
 
 static void
@@ -305,7 +305,7 @@ send_raw(int fd, char *buf, unsigned int buflen, int cmd)
 	len += RAW_HDR_LEN;
 	packet[RAW_HDR_CMD] = cmd | (userid & 0x0F);
 
-	sendto(fd, packet, len, 0, (struct sockaddr*)&raw_serv.addr, raw_serv.addrlen);
+	send_udp(fd, packet, len, &raw_serv);
 }
 
 static void
@@ -1450,21 +1450,21 @@ handshake_raw_udp(int dns_fd, int seed)
 
 		if (len == 5 && in[0] == 'I') {
 			/* Received IPv4 address */
-			struct sockaddr_in *raw4_serv = (struct sockaddr_in *) &raw_serv.addr;
+			struct sockaddr_in *raw4_serv = (struct sockaddr_in *) &raw_serv.remote.addr;
 			raw4_serv->sin_family = AF_INET;
 			memcpy(&raw4_serv->sin_addr, &in[1], sizeof(struct in_addr));
 			raw4_serv->sin_port = htons(DNS_PORT);
-			raw_serv.addrlen = sizeof(struct sockaddr_in);
+			raw_serv.remote.addrlen = sizeof(struct sockaddr_in);
 			got_addr = 1;
 			break;
 		}
 		if (len == 17 && in[0] == 'I') {
 			/* Received IPv6 address */
-			struct sockaddr_in6 *raw6_serv = (struct sockaddr_in6 *) &raw_serv.addr;
+			struct sockaddr_in6 *raw6_serv = (struct sockaddr_in6 *) &raw_serv.remote.addr;
 			raw6_serv->sin6_family = AF_INET6;
 			memcpy(&raw6_serv->sin6_addr, &in[1], sizeof(struct in6_addr));
 			raw6_serv->sin6_port = htons(DNS_PORT);
-			raw_serv.addrlen = sizeof(struct sockaddr_in6);
+			raw_serv.remote.addrlen = sizeof(struct sockaddr_in6);
 			got_addr = 1;
 			break;
 		}
@@ -1480,7 +1480,7 @@ handshake_raw_udp(int dns_fd, int seed)
 		return 0;
 	}
 	ui_log_partial("Server is at %s, trying raw login: (skip with -r) ",
-		format_addr(&raw_serv));
+		client_get_raw_addr());
 
 	/* do login against port 53 on remote server
 	 * based on the old seed. If reply received,
