@@ -2,9 +2,9 @@ name: windows
 
 on:
   push:
-    branches: [ master ]
+    branches: [ iodine-0.9 ]
   pull_request:
-    branches: [ master ]
+    branches: [ iodine-0.9 ]
 
 permissions:
     contents: read
