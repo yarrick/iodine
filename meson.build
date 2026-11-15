@@ -213,15 +213,17 @@ executable('iodine',
 
 libserver = static_library(
   'server',
-  files('src/ext_ip.c', 'src/fw_query.c', 'src/user.c'),
+  files('src/ext_ip.c', 'src/fw_query.c', 'src/server.c', 'src/user.c'),
   include_directories: includes,
+  link_with: libcommon,
+  dependencies: zlib,
 )
 
 executable('iodined',
-  sources: files('src/iodined.c', 'src/server.c'),
+  sources: files('src/iodined.c'),
   c_args: '-DUSED_LIBS="@0@"'.format(', '.join(server_usage)),
-  link_with: [libcommon, libserver],
-  dependencies: serverdeps + zlib,
+  link_with: libserver,
+  dependencies: serverdeps,
   include_directories: includes,
   install: true,
   install_dir: target_dir,

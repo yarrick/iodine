@@ -20,7 +20,7 @@ if libcheck.found()
       files(
         '@0@.c'.format(suite),
       ),
-      link_with: [libcommon, libserver],
+      link_with: libserver,
       include_directories: includes,
       dependencies: [libcheck],
       build_by_default: false,
@@ -37,11 +37,10 @@ tun_ping = executable('tun_ping',
 )
 
 thin_server = executable('thin_server',
-  sources: files('thin_server.c', '../src/server.c'),
+  sources: files('thin_server.c'),
   build_by_default: false,
   include_directories: includes,
-  dependencies: serverdeps + zlib,
-  link_with: [libcommon, libserver],
+  link_with: libserver,
 )
 
 py3 = disabler()
