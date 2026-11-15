@@ -134,7 +134,8 @@ static void
 version(void)
 {
 	ui_log("iodine IP over DNS tunneling server\n"
-	       "Version: %s\n", IODINE_VERSION);
+	       "Version: %s\nLibraries used: %s\n",
+	       IODINE_VERSION, USED_LIBS);
 
 	exit(0);
 }

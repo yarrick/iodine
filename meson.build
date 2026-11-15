@@ -187,8 +187,23 @@ libcommon = static_library(
   dependencies: commondeps,
 )
 
+client_usage = []
+server_usage = []
+foreach d : [zlib] + commondeps
+  if d.type_name() != 'library' and d.found()
+    client_usage += d.name()
+    server_usage += d.name()
+  endif
+endforeach
+foreach d : serverdeps
+  if d.type_name() != 'library' and d.found()
+    server_usage += d.name()
+  endif
+endforeach
+
 executable('iodine',
   sources: files('src/client.c', 'src/iodine.c'),
+  c_args: '-DUSED_LIBS="@0@"'.format(', '.join(client_usage)),
   link_with: libcommon,
   include_directories: includes,
   dependencies: zlib,
@@ -204,6 +219,7 @@ libserver = static_library(
 
 executable('iodined',
   sources: files('src/iodined.c', 'src/server.c'),
+  c_args: '-DUSED_LIBS="@0@"'.format(', '.join(server_usage)),
   link_with: [libcommon, libserver],
   dependencies: serverdeps + zlib,
   include_directories: includes,
