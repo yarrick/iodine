@@ -1,0 +1,6 @@
+# DNS AAAA query for "ns.t.kryo.se" (returns NOERROR SOA over IPv4)
+05 46 01 00 00 01 00 00 00 00 00 01
+02 6e 73
+01 74 04 6b 72 79 6f 02 73 65 00
+00 1c 00 01
+00 00 29 10 00 00 00 80 00 00 00

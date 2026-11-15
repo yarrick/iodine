@@ -1,0 +1,6 @@
+# DNS NULL query for "yrbaaa.t.kryo.se" (downstream codec check, Raw, variant 1)
+05 3d 01 00 00 01 00 00 00 00 00 01
+06 79 72 62 61 61 61
+01 74 04 6b 72 79 6f 02 73 65 00
+00 0a 00 01
+00 00 29 10 00 00 00 80 00 00 00

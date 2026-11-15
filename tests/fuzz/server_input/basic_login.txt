@@ -1,0 +1,7 @@
+# DNS NULL query for "lagkiiql3sylkes3q4xbk5beriarqaaq.t.kryo.se"
+# (userid=1, login hash for password "fuzzpass" with seed 0x01010101, cmc 0x0002)
+05 3a 01 00 00 01 00 00 00 00 00 01
+20 6c 61 67 6b 69 69 71 6c 33 73 79 6c 6b 65 73 33 71 34 78 62 6b 35 62 65 72 69 61 72 71 61 61 71
+01 74 04 6b 72 79 6f 02 73 65 00
+00 0a 00 01
+00 00 29 10 00 00 00 80 00 00 00

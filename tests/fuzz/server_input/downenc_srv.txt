@@ -1,0 +1,6 @@
+# DNS SRV query for "ytbaaa.t.kryo.se" (downstream codec check, Base32 in SRV)
+05 4d 01 00 00 01 00 00 00 00 00 01
+06 79 74 62 61 61 61
+01 74 04 6b 72 79 6f 02 73 65 00
+00 21 00 01
+00 00 29 10 00 00 00 80 00 00 00

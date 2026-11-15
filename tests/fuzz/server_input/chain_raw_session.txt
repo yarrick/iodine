@@ -1,0 +1,8 @@
+# Raw UDP session chain (userid=2): raw login -> raw data -> raw ping
+10 d1 9e 12
+4a ea 91 ae c9 6c 6a 7c 2b 0f cb 99 65 83 e7 16
+;
+10 d1 9e 22
+00 00 08 00 45 00 00 1c 12 34 00 00 40 01 00 00 0a 00 00 05 0a 00 00 01 08 00 f7 ff 00 01 00 01
+;
+10 d1 9e 32

@@ -1,0 +1,7 @@
+# DNS NULL query for "0ejbbbiaaabikaaaaccaa455qaaiaae.t.kryo.se"
+# (second/final fragment seq=1 frag=1 last=1 acking downstream seq=1 frag=0 for userid=0)
+05 58 01 00 00 01 00 00 00 00 00 01
+1f 30 65 6a 62 62 62 69 61 61 61 62 69 6b 61 61 61 61 63 63 61 61 34 35 35 71 61 61 69 61 61 65
+01 74 04 6b 72 79 6f 02 73 65 00
+00 0a 00 01
+00 00 29 10 00 00 00 80 00 00 00

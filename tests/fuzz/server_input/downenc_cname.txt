@@ -1,0 +1,6 @@
+# DNS CNAME query for "yubaaa.t.kryo.se" (downstream codec check, Base64u in CNAME)
+05 4b 01 00 00 01 00 00 00 00 00 01
+06 79 75 62 61 61 61
+01 74 04 6b 72 79 6f 02 73 65 00
+00 05 00 01
+00 00 29 10 00 00 00 80 00 00 00

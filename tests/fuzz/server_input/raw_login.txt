@@ -1,0 +1,3 @@
+# Raw UDP login packet for userid=2 (password "fuzzpass", seed 0x01010101 + 1)
+10 d1 9e 12
+4a ea 91 ae c9 6c 6a 7c 2b 0f cb 99 65 83 e7 16

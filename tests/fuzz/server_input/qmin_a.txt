@@ -1,0 +1,6 @@
+# DNS A query for "_.t.kryo.se" (RFC 7816 qname minimisation -> NXDOMAIN SOA)
+05 48 01 00 00 01 00 00 00 00 00 01
+01 5f
+01 74 04 6b 72 79 6f 02 73 65 00
+00 01 00 01
+00 00 29 10 00 00 00 80 00 00 00

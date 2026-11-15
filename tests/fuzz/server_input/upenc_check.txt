@@ -1,0 +1,6 @@
+# DNS NULL query for "zaaaaAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ+0129-.t.kryo.se" (upstream codec check)
+05 3c 01 00 00 01 00 00 00 00 00 01
+3e 7a 61 61 61 61 41 62 42 63 43 64 44 65 45 66 46 67 47 68 48 69 49 6a 4a 6b 4b 6c 4c 6d 4d 6e 4e 6f 4f 70 50 71 51 72 52 73 53 74 54 75 55 76 56 77 57 78 58 79 59 7a 5a 2b 30 31 32 39 2d
+01 74 04 6b 72 79 6f 02 73 65 00
+00 0a 00 01
+00 00 29 10 00 00 00 80 00 00 00

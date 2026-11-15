@@ -1,0 +1,3 @@
+# Raw UDP data packet from userid=4 (uncompressed TUN + IPv4 ICMP packet)
+10 d1 9e 24
+00 00 08 00 45 00 00 1c 12 34 00 00 40 01 00 00 0a 00 00 05 0a 00 00 01 08 00 f7 ff 00 01 00 01

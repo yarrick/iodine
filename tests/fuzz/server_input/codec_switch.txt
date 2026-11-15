@@ -1,0 +1,6 @@
+# DNS NULL query for "scgaaa.t.kryo.se" (switch upstream codec to Base64 for userid=2)
+05 3e 01 00 00 01 00 00 00 00 00 01
+06 73 63 67 61 61 61
+01 74 04 6b 72 79 6f 02 73 65 00
+00 0a 00 01
+00 00 29 10 00 00 00 80 00 00 00

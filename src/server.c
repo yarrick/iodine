@@ -440,7 +440,7 @@ send_chunk_or_dataless(struct dnsfd *dns_fds, int userid, struct dns_msg *q)
 	return 0;	/* don't call us again */
 }
 
-static int
+int
 tunnel_tun(sock_t tun_fd, struct dnsfd *dns_fds)
 {
 	unsigned long outlen;

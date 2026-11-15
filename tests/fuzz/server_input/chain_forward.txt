@@ -1,0 +1,18 @@
+# Query forwarding chain:
+# 1) External DNS A query for "example.com" (id=0x1234) -> forwarded to bind_fd
+12 34 01 00 00 01 00 00 00 00 00 00
+07 65 78 61 6d 70 6c 65 03 63 6f 6d 00
+00 01 00 01
+;
+# 2) Matching local nameserver reply on bind_fd (id=0x1234) -> relayed back to client
+n1
+12 34 81 80 00 01 00 01 00 00 00 00
+07 65 78 61 6d 70 6c 65 03 63 6f 6d 00
+00 01 00 01
+c0 0c 00 01 00 01 00 00 00 3c 00 04 5d b8 d8 22
+;
+# 3) Unmatched local nameserver reply on bind_fd (id=0x9999) -> dropped
+n1
+99 99 81 80 00 01 00 00 00 00 00 00
+07 65 78 61 6d 70 6c 65 03 63 6f 6d 00
+00 01 00 01

@@ -47,5 +47,6 @@ int server_tunnel(sock_t tun_fd, struct dnsfd *dns_fds, sock_t bind_fd, int max_
 void server_stop(void);
 int tunnel_bind(sock_t bind_fd, struct dnsfd *dns_fds);
 int tunnel_dns(sock_t tun_fd, sock_t dns_fd, struct dnsfd *dns_fds, sock_t bind_fd);
+int tunnel_tun(sock_t tun_fd, struct dnsfd *dns_fds);
 
 #endif

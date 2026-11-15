@@ -48,6 +48,13 @@ thin_server = executable('thin_server',
   link_with: libserver,
 )
 
+fuzz_server = executable('fuzz_server',
+  sources: files('fuzz/fuzz_server.c', 'fuzz/fuzz_main.c'),
+  build_by_default: false,
+  include_directories: includes,
+  link_with: libserver,
+)
+
 py3 = disabler()
 foreach py_name : ['python3', 'python3.14', 'python3.13', 'python3.12']
   if not py3.found()

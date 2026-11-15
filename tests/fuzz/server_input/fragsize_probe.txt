@@ -1,0 +1,6 @@
+# DNS NULL query for "reyadaaaaaaaaaaaa.t.kryo.se" (fragsize probe 768 bytes for userid=2)
+05 40 01 00 00 01 00 00 00 00 00 01
+11 72 65 79 61 64 61 61 61 61 61 61 61 61 61 61 61 61
+01 74 04 6b 72 79 6f 02 73 65 00
+00 0a 00 01
+00 00 29 10 00 00 00 80 00 00 00

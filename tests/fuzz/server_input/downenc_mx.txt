@@ -1,0 +1,6 @@
+# DNS MX query for "yvbaaa.t.kryo.se" (downstream codec check, Base128 in MX)
+05 4c 01 00 00 01 00 00 00 00 00 01
+06 79 76 62 61 61 61
+01 74 04 6b 72 79 6f 02 73 65 00
+00 0f 00 01
+00 00 29 10 00 00 00 80 00 00 00

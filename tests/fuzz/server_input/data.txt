@@ -1,0 +1,7 @@
+# DNS NULL query for "3eabaaaaaqacfaaabyeruaaaeaaiaaafaaaafbiaaaaiiad154aabaaaq.t.kryo.se"
+# (complete uncompressed TUN + IPv4 ICMP packet seq=1 frag=0 last=1 from userid=3)
+05 44 01 00 00 01 00 00 00 00 00 01
+39 33 65 61 62 61 61 61 61 61 71 61 63 66 61 61 61 62 79 65 72 75 61 61 61 65 61 61 69 61 61 61 66 61 61 61 61 66 62 69 61 61 61 61 69 69 61 64 31 35 34 61 61 62 61 61 61 71
+01 74 04 6b 72 79 6f 02 73 65 00
+00 0a 00 01
+00 00 29 10 00 00 00 80 00 00 00
