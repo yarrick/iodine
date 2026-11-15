@@ -476,26 +476,16 @@ dns_get_id(char *packet, size_t packetlen)
 
 #define SRV_MX_NAMES (250)
 
-int
-dns_decode(char *buf, size_t buflen, struct dns_msg *q, qr_t qr, char *packet,
-	   size_t packetlen)
+static int
+decode_question(struct dns_msg *q, qr_t qr, char *packet, size_t packetlen, char **ppos)
 {
 	char name[DNS_MSG_NAME_SIZE];
-	char rdata[4*1024];
 	HEADER *header;
-	short qdcount;
-	short ancount;
-	uint32_t ttl;
-	unsigned short class;
-	unsigned short type;
 	char *data;
-	char *pktend;
-	unsigned short rlen;
-	int id;
-	unsigned int rv;
+	unsigned int namelen;
+	unsigned short qdcount;
+	unsigned short class;
 
-	q->id2 = 0;
-	rv = 0;
 	header = (HEADER*)packet;
 
 	/* Reject short packets */
@@ -508,62 +498,120 @@ dns_decode(char *buf, size_t buflen, struct dns_msg *q, qr_t qr, char *packet,
 	}
 
 	data = packet + sizeof(HEADER);
-	pktend = packet + packetlen;
 	qdcount = ntohs(header->qdcount);
+
+	if (qdcount != 1) {
+		warnx("%d questions in dns packet, skipping", qdcount);
+		return -1;
+	}
+	CHECKLEN(5);
+	namelen = readname(packet, packetlen, &data, name, sizeof(name));
+	if (!namelen)
+		return -1;
+	CHECKLEN(4);
+	readshort(packet, &data, &q->type);
+	readshort(packet, &data, &class);
+
+	strlcpy(q->name, name, sizeof(q->name));
+	q->id = ntohs(header->id);
+	q->id2 = 0;
+	q->rcode = header->rcode;
+	q->rtype = 0;
+
+	if (ppos)
+		*ppos = data;
+	return strlen(q->name);
+}
+
+int
+dns_decode_query(struct dns_msg *q, char *packet, size_t packetlen)
+{
+	return decode_question(q, QR_QUERY, packet, packetlen, NULL);
+}
+
+int
+dns_decode_answer(char *buf, size_t buflen, struct dns_msg *q,
+                  char *packet, size_t packetlen)
+{
+	char name[DNS_MSG_NAME_SIZE];
+	char rdata[4*1024];
+	HEADER *header;
+	short ancount;
+	uint32_t ttl;
+	unsigned short class;
+	unsigned short rtype;
+	char *data;
+	char *pktend;
+	unsigned short rlen;
+	unsigned int rv;
+
+	if (decode_question(q, QR_ANSWER, packet, packetlen, &data) <= 0)
+		return -1;
+
+	header = (HEADER*)packet;
+	pktend = packet + packetlen;
 	ancount = ntohs(header->ancount);
 
-	id = ntohs(header->id);
-	id = id & 0xFFFF; /* Kill any sign extension */
-
+	rv = 0;
 	rlen = 0;
+	rtype = 0;
 
-	if (q != NULL)
-		q->rcode = header->rcode;
+	if (ancount < 1) {
+		/* DNS errors like NXDOMAIN have ancount=0 and
+			stop here. CNAME may also have A; MX/SRV may have
+			multiple results. */
+		return -1;
+	}
 
-	switch (qr) {
-	case QR_ANSWER:
-		if (qdcount < 1) {
-			/* We need a question */
-			return -1;
-		}
-
-		if (q != NULL)
-			q->id = id;
-
-		/* Read name even if no answer, to give better error message */
+	/* Here type is still the question type */
+	if (q->type == T_NULL || q->type == T_PRIVATE) {
+		/* Assume that first answer is what we wanted */
 		readname(packet, packetlen, &data, name, sizeof(name));
-		CHECKLEN(4);
-		readshort(packet, &data, &type);
+		CHECKLEN(10);
+		readshort(packet, &data, &rtype);
 		readshort(packet, &data, &class);
+		readlong(packet, &data, &ttl);
+		readshort(packet, &data, &rlen);
 
-		/* if CHECKLEN okay, then we're sure to have a proper name */
-		if (q != NULL) {
-			strlcpy(q->name, name, sizeof(q->name));
-			q->type = type;
+		/* The advertised rdata length must not exceed
+			the bytes actually remaining in the packet. */
+		if (data + rlen > pktend)
+			return 0;
+
+		rv = MIN(rlen, sizeof(rdata));
+		rv = readdata(packet, &data, rdata, rv);
+		if (rv >= 2 && buf) {
+			rv = MIN(rv, buflen);
+			memcpy(buf, rdata, rv);
+		} else {
+			rv = 0;
 		}
+	}
+	else if ((q->type == T_A || q->type == T_CNAME) && buf) {
+		/* Assume that first answer is what we wanted */
+		readname(packet, packetlen, &data, name, sizeof(name));
+		CHECKLEN(10);
+		readshort(packet, &data, &rtype);
+		readshort(packet, &data, &class);
+		readlong(packet, &data, &ttl);
+		readshort(packet, &data, &rlen);
 
-		if (ancount < 1) {
-			/* DNS errors like NXDOMAIN have ancount=0 and
-			   stop here. CNAME may also have A; MX/SRV may have
-			   multiple results. */
-			return -1;
+		/* The advertised rdata length must not exceed
+			the bytes actually remaining in the packet. */
+		if (data + rlen > pktend)
+			return 0;
+
+		if (rtype == T_CNAME) {
+			/* For tunnels, query type A has CNAME type answer */
+			memset(name, 0, sizeof(name));
+			readname(packet, packetlen, &data, name, sizeof(name) - 1);
+			name[sizeof(name)-1] = '\0';
+			strlcpy(buf, name, buflen);
+			rv = strlen(buf);
 		}
-
-		/* Here type is still the question type */
-		if (type == T_NULL || type == T_PRIVATE) {
-			/* Assume that first answer is what we wanted */
-			readname(packet, packetlen, &data, name, sizeof(name));
-			CHECKLEN(10);
-			readshort(packet, &data, &type);
-			readshort(packet, &data, &class);
-			readlong(packet, &data, &ttl);
-			readshort(packet, &data, &rlen);
-
-			/* The advertised rdata length must not exceed
-			   the bytes actually remaining in the packet. */
-			if (data + rlen > pktend)
-				return 0;
-
+		if (rtype == T_A) {
+			/* Answer type A includes only 4 bytes.
+				Not used for tunneling. */
 			rv = MIN(rlen, sizeof(rdata));
 			rv = readdata(packet, &data, rdata, rv);
 			if (rv >= 2 && buf) {
@@ -573,165 +621,101 @@ dns_decode(char *buf, size_t buflen, struct dns_msg *q, qr_t qr, char *packet,
 				rv = 0;
 			}
 		}
-		else if ((type == T_A || type == T_CNAME) && buf) {
-			/* Assume that first answer is what we wanted */
+	}
+	else if ((q->type == T_MX || q->type == T_SRV) && buf) {
+		/* We support 250 records, 250*(255+header) ~= 64kB.
+			Only exact 10-multiples are accepted, and gaps in
+			numbering are not jumped over (->truncated).
+			Hopefully DNS servers won't mess around too much.
+			*/
+		char names[SRV_MX_NAMES][DNS_MSG_NAME_SIZE];
+		char *rdatastart;
+		unsigned short pref;
+		int i;
+		size_t offset;
+
+		memset(names, 0, sizeof(names));
+
+		for (i = 0; i < ancount; i++) {
 			readname(packet, packetlen, &data, name, sizeof(name));
-			CHECKLEN(10);
-			readshort(packet, &data, &type);
+			CHECKLEN(12);
+			readshort(packet, &data, &rtype);
 			readshort(packet, &data, &class);
 			readlong(packet, &data, &ttl);
 			readshort(packet, &data, &rlen);
+			rdatastart = data;
 
 			/* The advertised rdata length must not exceed
-			   the bytes actually remaining in the packet. */
+				the bytes actually remaining in the packet. */
 			if (data + rlen > pktend)
 				return 0;
 
-			if (type == T_CNAME) {
-				/* For tunnels, query type A has CNAME type answer */
-				memset(name, 0, sizeof(name));
-				readname(packet, packetlen, &data, name, sizeof(name) - 1);
-				name[sizeof(name)-1] = '\0';
-				strlcpy(buf, name, buflen);
-				rv = strlen(buf);
-			}
-			if (type == T_A) {
-				/* Answer type A includes only 4 bytes.
-				   Not used for tunneling. */
-				rv = MIN(rlen, sizeof(rdata));
-				rv = readdata(packet, &data, rdata, rv);
-				if (rv >= 2 && buf) {
-					rv = MIN(rv, buflen);
-					memcpy(buf, rdata, rv);
-				} else {
-					rv = 0;
-				}
-			}
-		}
-		else if ((type == T_MX || type == T_SRV) && buf) {
-			/* We support 250 records, 250*(255+header) ~= 64kB.
-			   Only exact 10-multiples are accepted, and gaps in
-			   numbering are not jumped over (->truncated).
-			   Hopefully DNS servers won't mess around too much.
-			 */
-			char names[SRV_MX_NAMES][DNS_MSG_NAME_SIZE];
-			char *rdatastart;
-			unsigned short pref;
-			int i;
-			size_t offset;
+			readshort(packet, &data, &pref);
 
-			memset(names, 0, sizeof(names));
-
-			for (i = 0; i < ancount; i++) {
-				readname(packet, packetlen, &data, name, sizeof(name));
-				CHECKLEN(12);
-				readshort(packet, &data, &type);
-				readshort(packet, &data, &class);
-				readlong(packet, &data, &ttl);
-				readshort(packet, &data, &rlen);
-				rdatastart = data;
-
-				/* The advertised rdata length must not exceed
-				   the bytes actually remaining in the packet. */
-				if (data + rlen > pktend)
-					return 0;
-
-				readshort(packet, &data, &pref);
-
-				if (type == T_SRV) {
-					/* skip weight, port */
-					data += 4;
-					CHECKLEN(0);
-				}
-
-				if (pref % 10 == 0 && pref >= 10 &&
-				    pref < (SRV_MX_NAMES * 10)) {
-					readname(packet, packetlen, &data,
-						 names[pref / 10 - 1],
-						 DNS_MSG_NAME_SIZE - 1);
-					names[pref / 10 - 1]
-						[DNS_MSG_NAME_SIZE-1] = '\0';
-				}
-
-				/* always trust rlen, not name encoding */
-				data = rdatastart + rlen;
+			if (rtype == T_SRV) {
+				/* skip weight, port */
+				data += 4;
 				CHECKLEN(0);
 			}
 
-			/* output is like Hname10.com\0Hname20.com\0\0 */
-			offset = 0;
-			i = 0;
-			while (i < SRV_MX_NAMES && names[i][0] != '\0') {
-				size_t l;
-				if (offset + 2 > buflen)
-					break;
-				l = MIN(strlen(names[i]), buflen - offset - 2);
-				if (l <= 0)
-					break;
-				memcpy(buf + offset, names[i], l);
-				offset += l;
-				buf[offset++] = '\0';
-				i++;
+			if (pref % 10 == 0 && pref >= 10 &&
+				pref < (SRV_MX_NAMES * 10)) {
+				readname(packet, packetlen, &data,
+						names[pref / 10 - 1],
+						DNS_MSG_NAME_SIZE - 1);
+				names[pref / 10 - 1]
+					[DNS_MSG_NAME_SIZE-1] = '\0';
 			}
-			if (offset >= buflen)
-				return 0;
-			buf[offset] = '\0';
-			rv = offset;
-		}
-		else if (type == T_TXT && buf) {
-			/* Assume that first answer is what we wanted */
-			readname(packet, packetlen, &data, name, sizeof(name));
-			CHECKLEN(10);
-			readshort(packet, &data, &type);
-			readshort(packet, &data, &class);
-			readlong(packet, &data, &ttl);
-			readshort(packet, &data, &rlen);
 
-			/* The advertised rdata length must not exceed
-			   the bytes actually remaining in the packet. */
-			if (data + rlen > pktend)
-				return 0;
-
-			rv = readtxtbin(packet, &data, rlen, rdata,
-				        sizeof(rdata));
-			if (rv >= 1) {
-				rv = MIN(rv, buflen);
-				memcpy(buf, rdata, rv);
-			} else {
-				rv = 0;
-			}
+			/* always trust rlen, not name encoding */
+			data = rdatastart + rlen;
+			CHECKLEN(0);
 		}
 
-		/* Here type is the answer type (note A->CNAME) */
-		if (q != NULL)
-			q->type = type;
-		break;
-	case QR_QUERY:
-		if (qdcount < 1) {
-			warnx("no question section in name query");
-			return -1;
+		/* output is like Hname10.com\0Hname20.com\0\0 */
+		offset = 0;
+		i = 0;
+		while (i < SRV_MX_NAMES && names[i][0] != '\0') {
+			size_t l;
+			if (offset + 2 > buflen)
+				break;
+			l = MIN(strlen(names[i]), buflen - offset - 2);
+			if (l <= 0)
+				break;
+			memcpy(buf + offset, names[i], l);
+			offset += l;
+			buf[offset++] = '\0';
+			i++;
 		}
-
-		memset(name, 0, sizeof(name));
-		readname(packet, packetlen, &data, name, sizeof(name) - 1);
-		name[sizeof(name)-1] = '\0';
-		CHECKLEN(4);
-		readshort(packet, &data, &type);
-		readshort(packet, &data, &class);
-
-		if (q == NULL) {
-			rv = 0;
-			break;
-		}
-
-		strlcpy(q->name, name, sizeof(q->name));
-		q->type = type;
-		q->id = id;
-
-		rv = strlen(q->name);
-		break;
+		if (offset >= buflen)
+			return 0;
+		buf[offset] = '\0';
+		rv = offset;
 	}
+	else if (q->type == T_TXT && buf) {
+		/* Assume that first answer is what we wanted */
+		readname(packet, packetlen, &data, name, sizeof(name));
+		CHECKLEN(10);
+		readshort(packet, &data, &rtype);
+		readshort(packet, &data, &class);
+		readlong(packet, &data, &ttl);
+		readshort(packet, &data, &rlen);
 
+		/* The advertised rdata length must not exceed
+			the bytes actually remaining in the packet. */
+		if (data + rlen > pktend)
+			return 0;
+
+		rv = readtxtbin(packet, &data, rlen, rdata,
+				sizeof(rdata));
+		if (rv >= 1) {
+			rv = MIN(rv, buflen);
+			memcpy(buf, rdata, rv);
+		} else {
+			rv = 0;
+		}
+	}
+	q->rtype = rtype;
 	return rv;
 }
 

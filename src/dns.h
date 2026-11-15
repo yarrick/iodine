@@ -36,6 +36,9 @@ int dns_encode_standard_response(char *buf, size_t buflen, struct dns_msg *q,
 int dns_encode_soa(char *buf, size_t buflen, struct dns_msg *q,
 		   const char *zone, int rcode);
 unsigned short dns_get_id(char *packet, size_t packetlen);
-int dns_decode(char *, size_t, struct dns_msg *, qr_t, char *, size_t);
+
+int dns_decode_query(struct dns_msg *q, char *packet, size_t packetlen);
+int dns_decode_answer(char *buf, size_t buflen, struct dns_msg *q,
+                      char *packet, size_t packetlen);
 
 #endif /* _DNS_H_ */

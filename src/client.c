@@ -566,11 +566,11 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 			/* useless packet */
 			return 0;
 
-		rv = dns_decode(buf, buflen, q, QR_ANSWER, data, r);
+		rv = dns_decode_answer(buf, buflen, q, data, r);
 		if (rv <= 0)
 			return rv;
 
-		if (q->type == T_CNAME || q->type == T_TXT)
+		if (q->rtype == T_CNAME || q->rtype == T_TXT)
 		/* CNAME can also be returned from an A question */
 		{
 			/*
@@ -588,7 +588,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 			if (rv > 0)
 				memcpy(buf, data, rv);
 
-		} else if (q->type == T_MX || q->type == T_SRV) {
+		} else if (q->rtype == T_MX || q->rtype == T_SRV) {
 			/* buf is like "Hname.com\0Hanother.com\0\0" */
 			int buftotal = rv;	/* idx of last \0 */
 			int bufoffset = 0;

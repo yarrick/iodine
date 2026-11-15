@@ -84,6 +84,7 @@ struct dns_msg {
 	char name[DNS_MSG_NAME_SIZE];
 	unsigned short type;
 	unsigned short rcode;
+	unsigned short rtype;
 	unsigned short id;
 	struct udp_addr address;
 	struct udp_addr address2;

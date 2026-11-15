@@ -127,7 +127,9 @@ START_TEST(test_decode_query)
 	len = sizeof(query_packet) - 1;
 	enc = &base32_ops;
 
-	dns_decode(buf, sizeof(buf), &q, QR_QUERY, query_packet, len);
+	dns_decode_query(&q, query_packet, len);
+	ck_assert_uint_eq(q.id, 1337);
+	ck_assert_uint_eq(q.type, T_NULL);
 	domain = strstr(q.name, topdomain);
 	len = sizeof(buf);
 	unpack_data(buf, len, &(q.name[1]), (int) (domain - q.name) - 1, enc);
@@ -171,12 +173,13 @@ START_TEST(test_decode_response)
 	len = sizeof(buf);
 	memset(&buf, 0, sizeof(buf));
 
-	ret = dns_decode(buf, len, &q, QR_ANSWER, answer_packet, sizeof(answer_packet)-1);
+	ret = dns_decode_answer(buf, len, &q, answer_packet, sizeof(answer_packet)-1);
 	ck_assert_int_eq(ret, strlen(msgData));
 	ck_assert_str_eq(q.name, host);
 	ck_assert_uint_eq(q.type, T_NULL);
 	ck_assert_str_eq(msgData, buf);
 	ck_assert_uint_eq(q.id, 0x0539);
+	ck_assert_uint_eq(q.rtype, T_NULL);
 }
 END_TEST
 
@@ -190,7 +193,7 @@ START_TEST(test_decode_response_with_high_trans_id)
 	len = sizeof(buf);
 	memset(&buf, 0, sizeof(buf));
 
-	ret = dns_decode(buf, len, &q, QR_ANSWER, answer_packet_high_trans_id, sizeof(answer_packet_high_trans_id)-1);
+	ret = dns_decode_answer(buf, len, &q, answer_packet_high_trans_id, sizeof(answer_packet_high_trans_id)-1);
 	ck_assert_int_eq(ret, strlen(msgData));
 	ck_assert_str_eq(msgData, buf);
 	ck_assert_int_eq(q.id, 0x8539);
@@ -213,8 +216,7 @@ START_TEST(test_decode_response_overflow_rlen)
 
 	memset(&q, 0, sizeof(q));
 	memset(&buf, 0, sizeof(buf));
-	ret = dns_decode(buf, sizeof(buf), &q, QR_ANSWER,
-			   packet, sizeof(packet) - 1);
+	ret = dns_decode_answer(buf, sizeof(buf), &q, packet, sizeof(packet) - 1);
 	ck_assert_msg(ret == 0,
 			"Overlong advertised rlen (0xFFFF) was not rejected: rv=%d",
 			ret);
@@ -264,9 +266,9 @@ START_TEST(test_decode_response_compressed_mx)
 			putshort(&p, 0xc00c);
 		}
 
-		ret = dns_decode(out, sizeof(out), &q, QR_ANSWER,
-				 packet, (size_t)(p - packet));
+		ret = dns_decode_answer(out, sizeof(out), &q, packet, (size_t)(p - packet));
 		ck_assert_int_eq(ret, MIN(sizeof(packet) - 1, answers * 254));
+		ck_assert_uint_eq(q.rtype, T_MX);
 	}
 }
 END_TEST

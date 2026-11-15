@@ -1503,7 +1503,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		return 0;
 	}
 
-	if (dns_decode(NULL, 0, &q, QR_QUERY, packet, read) <= 0) {
+	if (dns_decode_query(&q, packet, read) <= 0) {
 		return 0;
 	}
 

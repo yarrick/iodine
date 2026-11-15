@@ -88,8 +88,8 @@ get_external_ip(struct in_addr *ip)
 			buflen = sizeof(buf);
 			buflen = recv(fd, buf, buflen, 0);
 			if (buflen > 0) {
-				out_len = dns_decode((char *)ip, sizeof(struct in_addr),
-						     &query, QR_ANSWER, buf, buflen);
+				out_len = dns_decode_answer((char *)ip, sizeof(struct in_addr),
+							    &query, buf, buflen);
 				if (out_len > 0) break;
 			}
 		}
