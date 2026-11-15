@@ -28,14 +28,14 @@ typedef enum {
 
 extern int dnsc_use_edns0;
 
-int dns_encode(char *, size_t, struct query *, qr_t, const char *, size_t);
-int dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
+int dns_encode(char *, size_t, struct dns_msg *, qr_t, const char *, size_t);
+int dns_encode_ns_response(char *buf, size_t buflen, struct dns_msg *q,
 			   int topdomain_offset, struct sockaddr *address);
-int dns_encode_standard_response(char *buf, size_t buflen, struct query *q,
+int dns_encode_standard_response(char *buf, size_t buflen, struct dns_msg *q,
 				 struct sockaddr *address);
-int dns_encode_soa(char *buf, size_t buflen, struct query *q,
+int dns_encode_soa(char *buf, size_t buflen, struct dns_msg *q,
 		   const char *zone, int rcode);
 unsigned short dns_get_id(char *packet, size_t packetlen);
-int dns_decode(char *, size_t, struct query *, qr_t, char *, size_t);
+int dns_decode(char *, size_t, struct dns_msg *, qr_t, char *, size_t);
 
 #endif /* _DNS_H_ */

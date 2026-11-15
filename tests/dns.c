@@ -75,7 +75,7 @@ START_TEST(test_encode_query)
 {
 	char buf[512];
 	char resolv[512];
-	struct query q;
+	struct dns_msg q;
 	const struct encoder *enc;
 	char *d;
 	size_t len;
@@ -85,7 +85,7 @@ START_TEST(test_encode_query)
 	enclen = sizeof(resolv);
 	memset(&buf, 0, sizeof(buf));
 	memset(&resolv, 0, sizeof(resolv));
-	memset(&q, 0, sizeof(struct query));
+	memset(&q, 0, sizeof(struct dns_msg));
 	q.type = T_NULL;
 	q.id = 1337;
 	d = resolv;
@@ -117,11 +117,11 @@ START_TEST(test_decode_query)
 {
 	char buf[512];
 	char *domain;
-	struct query q;
+	struct dns_msg q;
 	const struct encoder *enc;
 	size_t len;
 
-	memset(&q, 0, sizeof(struct query));
+	memset(&q, 0, sizeof(struct dns_msg));
 	memset(&buf, 0, sizeof(buf));
 	q.id = 0;
 	len = sizeof(query_packet) - 1;
@@ -141,14 +141,14 @@ START_TEST(test_encode_response)
 {
 	char buf[512];
 	char *host = "silly.host.of.iodine.code.kryo.se";
-	struct query q;
+	struct dns_msg q;
 	int len;
 	int ret;
 
 	len = sizeof(buf);
 	memset(&buf, 0, sizeof(buf));
-	memset(&q, 0, sizeof(struct query));
-	strlcpy(q.name, host, QUERY_NAME_SIZE);
+	memset(&q, 0, sizeof(struct dns_msg));
+	strlcpy(q.name, host, DNS_MSG_NAME_SIZE);
 	q.type = T_NULL;
 	q.id = 1337;
 
@@ -163,7 +163,7 @@ END_TEST
 START_TEST(test_decode_response)
 {
 	char buf[512];
-	struct query q;
+	struct dns_msg q;
 	int len;
 	int ret;
 
@@ -180,7 +180,7 @@ END_TEST
 START_TEST(test_decode_response_with_high_trans_id)
 {
 	char buf[512];
-	struct query q;
+	struct dns_msg q;
 	int len;
 	int ret;
 
@@ -205,7 +205,7 @@ START_TEST(test_decode_response_overflow_rlen)
 		"\x63\x6F\x64\x65\x04\x6B\x72\x79\x6F\x02\x73\x65\x00\x00\x0A\x00\x01"
 		"\x01\x62\x00\x00\x0A\x00\x01\x00\x00\x00\x00\xFF\xFF\x78\x78\x78";
 	char buf[512];
-	struct query q;
+	struct dns_msg q;
 	int ret;
 
 	memset(&q, 0, sizeof(q));
@@ -226,7 +226,7 @@ START_TEST(test_decode_response_compressed_mx)
 
 	for (answers = 1; answers < 20; answers++) {
 		char *p = packet;
-		struct query q;
+		struct dns_msg q;
 		unsigned int i;
 		int ret;
 
@@ -331,7 +331,7 @@ START_TEST(test_encode_a_response)
 		"\x00\x00\x0E\x10"                                 /*   TTL: 3600 */
 		"\x00\x04\x01\x02\x03\x04";                        /*   RDLENGTH: 4, RDATA: 1.2.3.4 */
 	char buf[512];
-	struct query q;
+	struct dns_msg q;
 	struct sockaddr_storage address;
 	struct sockaddr_in *dest;
 	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
@@ -376,7 +376,7 @@ START_TEST(test_encode_aaaa_response)
 		"\x00\x00\x0E\x10\x00\x10"                         /*   TTL: 3600, RDLENGTH: 16 */
 		"\x20\x01\x0D\xB8\x00\x00\x00\x00\x00\x01\x00\xF2\x0F\x03\xF0\x04";   /*   RDATA: 2001:db8::1:f2:f03:f004 */
 	char buf[512];
-	struct query q;
+	struct dns_msg q;
 	struct sockaddr_storage address;
 	struct sockaddr_in6 *dest;
 	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
@@ -424,7 +424,7 @@ START_TEST(test_encode_ns_response)
 		"\x00\x00\x0E\x10"                                 /*   TTL: 3600 */
 		"\x00\x04\x01\x02\x03\x04";                        /*   RDLENGTH: 4, RDATA: 1.2.3.4 */
 	char buf[512];
-	struct query q;
+	struct dns_msg q;
 	struct sockaddr_storage address;
 	struct sockaddr_in *dest;
 	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */

@@ -49,7 +49,7 @@ int
 get_external_ip(struct in_addr *ip)
 {
 	static const char target[] = "myip.opendns.com";
-	struct query query;
+	struct dns_msg query;
 	struct net_addr addr;
 	int attempt;
 	int res;

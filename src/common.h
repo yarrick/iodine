@@ -52,7 +52,7 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
 
-#define QUERY_NAME_SIZE 256
+#define DNS_MSG_NAME_SIZE 256
 
 #define T_PRIVATE 65399
 /* Undefined RR type; "private use" range, see
@@ -80,8 +80,8 @@ struct udp_addr {
 	struct net_addr remote;
 };
 
-struct query {
-	char name[QUERY_NAME_SIZE];
+struct dns_msg {
+	char name[DNS_MSG_NAME_SIZE];
 	unsigned short type;
 	unsigned short rcode;
 	unsigned short id;

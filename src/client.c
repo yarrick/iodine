@@ -228,7 +228,7 @@ static void
 send_query(int fd, char *hostname)
 {
 	char packet[4096];
-	struct query q;
+	struct dns_msg q;
 	size_t len;
 
 	chunkid_prev2 = chunkid_prev;
@@ -403,7 +403,7 @@ send_ping(int fd)
 }
 
 static void
-write_dns_error(struct query *q, int ignore_some_errors)
+write_dns_error(struct dns_msg *q, int ignore_some_errors)
 /* This is called from:
    1. handshake_waitdns() when already checked that reply fits to our
       latest query.
@@ -544,7 +544,7 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 }
 
 static int
-read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct query *q)
+read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 /* FIXME: tun_fd needed for raw handling */
 /* Returns -1 on receive error or decode error, including DNS error replies.
    Returns 0 on replies that could be correct but are useless, and are not
@@ -660,7 +660,7 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char cmd, int timeout)
    so effective timeout may be longer than specified.
 */
 {
-	struct query q;
+	struct dns_msg q;
 	int r, rv;
 	fd_set fds;
 	struct timeval tv;
@@ -782,7 +782,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	int up_ack_fragment;
 	int new_down_seqno;
 	int new_down_fragment;
-	struct query q;
+	struct dns_msg q;
 	unsigned long datalen;
 	char buf[64*1024];
 	int read;

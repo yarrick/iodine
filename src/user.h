@@ -73,8 +73,8 @@ struct tun_user {
 	in_addr_t tun_ip;
 	struct net_addr host;
 	struct udp_addr raw_addr;
-	struct query q;
-	struct query q_sendrealsoon;
+	struct dns_msg q;
+	struct dns_msg q_sendrealsoon;
 	int q_sendrealsoon_new;
 	struct packet inpacket;
 	struct packet outpacket;
@@ -94,7 +94,7 @@ struct tun_user {
 	int outpacketq_filled;
 #endif
 #ifdef DNSCACHE_LEN
-	struct query dnscache_q[DNSCACHE_LEN];
+	struct dns_msg dnscache_q[DNSCACHE_LEN];
 	char dnscache_answer[DNSCACHE_LEN][4096];
 	int dnscache_answerlen[DNSCACHE_LEN];
 	int dnscache_lastfilled;

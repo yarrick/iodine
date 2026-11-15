@@ -46,7 +46,7 @@ int dnsc_use_edns0 = 1;
 #define CHECKLEN(x) if (buflen < (x) + (size_t)(p-buf))  return 0
 
 int
-dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr,
+dns_encode(char *buf, size_t buflen, struct dns_msg *q, qr_t qr,
 	   const char *data, size_t datalen)
 {
 	HEADER *header;
@@ -227,7 +227,7 @@ dns_encode(char *buf, size_t buflen, struct query *q, qr_t qr,
 /* Only used when iodined gets an NS type query */
 /* Mostly same as dns_encode_a_response() below */
 int
-dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
+dns_encode_ns_response(char *buf, size_t buflen, struct dns_msg *q,
 		       int topdomain_offset, struct sockaddr *address)
 {
 	HEADER *header;
@@ -322,7 +322,7 @@ dns_encode_ns_response(char *buf, size_t buflen, struct query *q,
 /* Only used when iodined gets an A/AAAA type query for ns.topdomain or
  * www.topdomain . Mostly same as dns_encode_ns_response() above */
 int
-dns_encode_standard_response(char *buf, size_t buflen, struct query *q,
+dns_encode_standard_response(char *buf, size_t buflen, struct dns_msg *q,
 			     struct sockaddr *address)
 {
 	HEADER *header;
@@ -393,7 +393,7 @@ dns_encode_standard_response(char *buf, size_t buflen, struct query *q,
 }
 
 int
-dns_encode_soa(char *buf, size_t buflen, struct query *q, const char *zone, int rcode)
+dns_encode_soa(char *buf, size_t buflen, struct dns_msg *q, const char *zone, int rcode)
 {
 	char rnamebuf[256];
 	char nsbuf[256];
@@ -477,10 +477,10 @@ dns_get_id(char *packet, size_t packetlen)
 #define SRV_MX_NAMES (250)
 
 int
-dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
+dns_decode(char *buf, size_t buflen, struct dns_msg *q, qr_t qr, char *packet,
 	   size_t packetlen)
 {
-	char name[QUERY_NAME_SIZE];
+	char name[DNS_MSG_NAME_SIZE];
 	char rdata[4*1024];
 	HEADER *header;
 	short qdcount;
@@ -615,7 +615,7 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 			   numbering are not jumped over (->truncated).
 			   Hopefully DNS servers won't mess around too much.
 			 */
-			char names[SRV_MX_NAMES][QUERY_NAME_SIZE];
+			char names[SRV_MX_NAMES][DNS_MSG_NAME_SIZE];
 			char *rdatastart;
 			unsigned short pref;
 			int i;
@@ -649,9 +649,9 @@ dns_decode(char *buf, size_t buflen, struct query *q, qr_t qr, char *packet,
 				    pref < (SRV_MX_NAMES * 10)) {
 					readname(packet, packetlen, &data,
 						 names[pref / 10 - 1],
-						 QUERY_NAME_SIZE - 1);
+						 DNS_MSG_NAME_SIZE - 1);
 					names[pref / 10 - 1]
-						[QUERY_NAME_SIZE-1] = '\0';
+						[DNS_MSG_NAME_SIZE-1] = '\0';
 				}
 
 				/* always trust rlen, not name encoding */

@@ -71,7 +71,7 @@ static in_addr_t ns_ip;
 
 static struct net_addr bind_addr;
 
-static void write_dns(int fd, struct query *q, const char *data, size_t datalen, char downenc);
+static void write_dns(int fd, struct dns_msg *q, const char *data, size_t datalen, char downenc);
 static void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid);
 static int raw_decode(char *packet, int len, struct udp_addr *addr, int dns_fd, struct dnsfd *dns_fds, int tun_fd);
 
@@ -218,7 +218,7 @@ get_from_outpacketq(int userid)
 */
 
 static void
-save_to_dnscache(int userid, struct query *q, char *answer, unsigned int answerlen)
+save_to_dnscache(int userid, struct dns_msg *q, char *answer, unsigned int answerlen)
 /* Store answer in our little DNS cache. */
 {
 	int fill;
@@ -230,7 +230,7 @@ save_to_dnscache(int userid, struct query *q, char *answer, unsigned int answerl
 	if (answerlen > sizeof(users[userid].dnscache_answer[fill]))
 		return;  /* can't store this */
 
-	memcpy(&(users[userid].dnscache_q[fill]), q, sizeof(struct query));
+	memcpy(&(users[userid].dnscache_q[fill]), q, sizeof(struct dns_msg));
 	memcpy(users[userid].dnscache_answer[fill], answer, answerlen);
 	users[userid].dnscache_answerlen[fill] = answerlen;
 
@@ -238,7 +238,7 @@ save_to_dnscache(int userid, struct query *q, char *answer, unsigned int answerl
 }
 
 static int
-answer_from_dnscache(int dns_fd, int userid, struct query *q)
+answer_from_dnscache(int dns_fd, int userid, struct dns_msg *q)
 /* Checks cache and sends repeated answer if we alreay saw this query recently.
    Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
    a new query. */
@@ -279,7 +279,7 @@ answer_from_dnscache(int dns_fd, int userid, struct query *q)
 #endif /* DNSCACHE_LEN */
 
 static inline void
-save_to_qmem_pingordata(int userid, struct query *q)
+save_to_qmem_pingordata(int userid, struct dns_msg *q)
 {
 	/* Our CMC is a bit more than the "official" CMC; we store 4 bytes
 	   just because we can, and because it may prevent some false matches.
@@ -327,7 +327,7 @@ save_to_qmem_pingordata(int userid, struct query *q)
 }
 
 static int
-answer_from_qmem(int dns_fd, struct query *q,
+answer_from_qmem(int dns_fd, struct dns_msg *q,
 			    int userid, enum qmem_id qmid,
 			    char *cmc_to_check)
 /* Checks query memory and sends an (illegal) answer if this is a duplicate.
@@ -362,7 +362,7 @@ answer_from_qmem(int dns_fd, struct query *q,
    0 = don't call us again for now.
 */
 static int
-send_chunk_or_dataless(struct dnsfd *dns_fds, int userid, struct query *q)
+send_chunk_or_dataless(struct dnsfd *dns_fds, int userid, struct dns_msg *q)
 {
 	char pkt[4096];
 	unsigned int datalen = 0;
@@ -502,7 +502,7 @@ typedef enum {
 
 static void
 send_version_response(int fd, version_ack_t ack, uint32_t payload,
-				  int userid, struct query *q)
+				  int userid, struct dns_msg *q)
 {
 	char out[9];
 	char *writer;
@@ -527,7 +527,7 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload,
 }
 
 static void
-handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_version_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	char unpacked[64*1024];
 	int read;
@@ -562,7 +562,7 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct query *q)
 	/* Store remote IP number */
 	users[userid].host = q->address.remote;
 
-	memcpy(&(users[userid].q), q, sizeof(struct query));
+	memcpy(&(users[userid].q), q, sizeof(struct dns_msg));
 	users[userid].encoder = &base32_ops;
 	users[userid].downenc = 'T';
 	send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
@@ -638,7 +638,7 @@ process_downstream_ack(int userid, int down_seq, int down_frag)
 }
 
 static void
-handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_login_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	struct in_addr tempip;
 	char logindata[16];
@@ -694,7 +694,7 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct query *q)
 }
 
 static void
-handle_ip_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_ip_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	unsigned int userid;
 	/* Request for IP number */
@@ -729,7 +729,7 @@ handle_ip_request(int dns_fd, char *in, int domain_len, struct query *q)
 }
 
 static void
-handle_upstream_codec_check_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_upstream_codec_check_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	/* Check for case conservation and chars not allowed according to RFC */
 
@@ -739,7 +739,7 @@ handle_upstream_codec_check_request(int dns_fd, char *in, int domain_len, struct
 }
 
 static void
-handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	unsigned int userid;
 	int codec;
@@ -779,7 +779,7 @@ handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struc
 }
 
 static void
-handle_options_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_options_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	unsigned int userid;
 
@@ -832,7 +832,7 @@ handle_options_request(int dns_fd, char *in, int domain_len, struct query *q)
 }
 
 static void
-handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	int i;
 	char *datap;
@@ -906,7 +906,7 @@ handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, stru
 }
 
 static void
-handle_downstream_fragsize_probe_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_downstream_fragsize_probe_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	unsigned int userid;
 	int req_frag_size;
@@ -945,7 +945,7 @@ handle_downstream_fragsize_probe_request(int dns_fd, char *in, int domain_len, s
 }
 
 static void
-handle_downstream_fragsize_set_request(int dns_fd, char *in, int domain_len, struct query *q)
+handle_downstream_fragsize_set_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	char unpacked[64*1024];
 	unsigned int userid;
@@ -977,7 +977,7 @@ handle_downstream_fragsize_set_request(int dns_fd, char *in, int domain_len, str
 }
 
 static int
-check_duplicate_query(int dns_fd, int userid, struct query *q,
+check_duplicate_query(int dns_fd, int userid, struct dns_msg *q,
 		      enum qmem_id qmid, char *cmc, char *log_prefix)
 {
 #ifdef DNSCACHE_LEN
@@ -1025,7 +1025,7 @@ check_duplicate_query(int dns_fd, int userid, struct query *q,
 }
 
 static void
-handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query *q, int domain_len)
+handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct dns_msg *q, int domain_len)
 {
 	char in[512];
 	char unpacked[64*1024];
@@ -1117,7 +1117,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		/* Save new query and time info */
-		memcpy(&(users[userid].q), q, sizeof(struct query));
+		memcpy(&(users[userid].q), q, sizeof(struct dns_msg));
 		users[userid].last_pkt = time(NULL);
 
 		/* If anything waiting and we didn't already send above, send
@@ -1267,7 +1267,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			} else {
 				memcpy(&(users[userid].q_sendrealsoon),
 				       &(users[userid].q),
-				       sizeof(struct query));
+				       sizeof(struct dns_msg));
 				users[userid].q_sendrealsoon_new = 1;
 				users[userid].q.id = 0;  /* used */
 				didsend = 1;
@@ -1275,7 +1275,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 		}
 
 		/* Save new query and time info */
-		memcpy(&(users[userid].q), q, sizeof(struct query));
+		memcpy(&(users[userid].q), q, sizeof(struct dns_msg));
 		users[userid].last_pkt = time(NULL);
 
 		/* If we still need to ack this upstream frag, do it to keep
@@ -1297,7 +1297,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 			if (upstream_ok && lastfrag) {
 				memcpy(&(users[userid].q_sendrealsoon),
 				       &(users[userid].q),
-				       sizeof(struct query));
+				       sizeof(struct dns_msg));
 				users[userid].q_sendrealsoon_new = 1;
 				users[userid].q.id = 0;  /* used */
 			} else {
@@ -1308,7 +1308,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct query 
 }
 
 static void
-handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
+handle_ns_request(int dns_fd, struct dns_msg *q, int topdomain_offset)
 /* Mostly identical to handle_a_request() below */
 {
 	struct sockaddr_storage address;
@@ -1337,7 +1337,7 @@ handle_ns_request(int dns_fd, struct query *q, int topdomain_offset)
 }
 
 static void
-handle_a_request(int dns_fd, struct query *q, int fakeip)
+handle_a_request(int dns_fd, struct dns_msg *q, int fakeip)
 /* Mostly identical to handle_ns_request() above */
 {
 	struct sockaddr_storage address;
@@ -1373,7 +1373,7 @@ handle_a_request(int dns_fd, struct query *q, int fakeip)
 }
 
 static void
-handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fakeip)
+handle_aaaa_request(int dns_fd, struct dns_msg *q, const char *topdomain, int fakeip)
 {
 	struct sockaddr_storage address;
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &address;
@@ -1409,7 +1409,7 @@ handle_aaaa_request(int dns_fd, struct query *q, const char *topdomain, int fake
 
 
 static void
-handle_soa_request(int dns_fd, struct query *q, const char *topdomain, int rcode)
+handle_soa_request(int dns_fd, struct dns_msg *q, const char *topdomain, int rcode)
 {
 	char buf[64*1024];
 	int len;
@@ -1426,7 +1426,7 @@ handle_soa_request(int dns_fd, struct query *q, const char *topdomain, int rcode
 }
 
 static void
-forward_query(int bind_fd, struct query *q)
+forward_query(int bind_fd, struct dns_msg *q)
 {
 	char buf[64*1024];
 	int len;
@@ -1492,7 +1492,7 @@ int
 tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 {
 	char packet[64*1024];
-	struct query q;
+	struct dns_msg q;
 	int read;
 	int domain_len;
 
@@ -1913,7 +1913,7 @@ write_dns_nameenc(char *buf, size_t buflen, const char *data, size_t datalen, ch
 }
 
 static void
-write_dns(int fd, struct query *q, const char *data, size_t datalen, char downenc)
+write_dns(int fd, struct dns_msg *q, const char *data, size_t datalen, char downenc)
 {
 	char buf[64*1024];
 	int len = 0;
