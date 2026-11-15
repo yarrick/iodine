@@ -1,4 +1,6 @@
-project('iodine', 'c',
+project(
+  'iodine',
+  'c',
   default_options: [
     'buildtype=release',
     'c_std=c99',
@@ -6,7 +8,7 @@ project('iodine', 'c',
   ],
   license: 'ISC',
   meson_version: '>=0.64.0',
-  version : '0.9.1.99-git' +
+  version: '0.9.1.99-git' +
     run_command('git', 'rev-parse',  '--short', 'HEAD',
                 check: true).stdout().strip(),
 )
@@ -41,20 +43,16 @@ if host_machine.system() == 'linux'
   libcapng = dependency('libcap-ng', required: get_option('libcapng'))
   cdata.set10('HAVE_LIBCAPNG', libcapng.found())
   commondeps += libcapng
-endif
-if host_machine.system() == 'android'
+elif host_machine.system() == 'android'
   cdata.set10('LINUX', true)
-endif
-if host_machine.system() == 'darwin'
+elif host_machine.system() == 'darwin'
   add_project_arguments('-D__APPLE_USE_RFC_3542', language: 'c')
   add_project_arguments('-DBIND_8_COMPAT', language: 'c')
-endif
-if host_machine.system() == 'haiku'
+elif host_machine.system() == 'haiku'
   commondeps += cc.find_library('network')
   commondeps += cc.find_library('bsd')
   add_project_arguments('-D_BSD_SOURCE', language: 'c')
-endif
-if host_machine.system() == 'windows'
+elif host_machine.system() == 'windows'
   add_project_arguments(
     '-DWINVER=0x0601',
     '-D_WIN32_WINNT=0x0601',
