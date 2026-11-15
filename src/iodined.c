@@ -2575,7 +2575,7 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
-	check_privileges(username, port);
+	check_privileges(username, newroot, port);
 
 	netsize = strchr(argv[0], '/');
 	if (netsize) {
