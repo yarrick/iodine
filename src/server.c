@@ -105,7 +105,7 @@ get_dns_fd(struct dnsfd *fds, struct net_addr *addr)
 }
 
 static void
-send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct query *q)
+send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct udp_addr *addr)
 {
 	char packet[4096];
 	size_t len;
@@ -121,9 +121,9 @@ send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct query *q)
 	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
 
 	ui_debug(2, "TX-raw: client %s, cmd %d, %zu bytes\n",
-		 format_addr(&q->address.remote), cmd, len);
+		 format_addr(&addr->remote), cmd, len);
 
-	send_udp(fd, packet, len, &q->address);
+	send_udp(fd, packet, len, addr);
 }
 
 
@@ -488,7 +488,7 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 		return outlen;
 	} else { /* CONN_RAW_UDP */
 		int dns_fd = get_dns_fd(dns_fds, &users[userid].q.address.remote);
-		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].q);
+		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].q.address);
 		return outlen;
 	}
 }
@@ -1743,7 +1743,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 				int dns_fd = get_dns_fd(dns_fds, &users[touser].q.address.remote);
 				send_raw(dns_fd, users[userid].inpacket.data,
 					 users[userid].inpacket.len, touser,
-					 RAW_HDR_CMD_DATA, &users[touser].q);
+					 RAW_HDR_CMD_DATA, &users[touser].q.address);
 			}
 		}
 	} else {
@@ -1781,7 +1781,7 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
 		login_calculate(myhash, 16, password, users[userid].seed - 1);
-		send_raw(fd, myhash, 16, userid, RAW_HDR_CMD_LOGIN, q);
+		send_raw(fd, myhash, 16, userid, RAW_HDR_CMD_LOGIN, &q->address);
 
 		users[userid].authenticated_raw = 1;
 	}
@@ -1825,7 +1825,7 @@ handle_raw_ping(struct query *q, int dns_fd, int userid)
 	ui_debug(1, "IN   ping raw, from user %d\n", userid);
 
 	/* Send ping reply */
-	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, q);
+	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, &q->address);
 }
 
 static int
