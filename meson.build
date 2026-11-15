@@ -191,13 +191,13 @@ client_usage = []
 server_usage = []
 foreach d : [zlib] + commondeps
   if d.type_name() != 'library' and d.found()
-    client_usage += d.name()
-    server_usage += d.name()
+    client_usage += '@0@(@1@)'.format(d.name(), d.version())
+    server_usage += '@0@(@1@)'.format(d.name(), d.version())
   endif
 endforeach
 foreach d : serverdeps
   if d.type_name() != 'library' and d.found()
-    server_usage += d.name()
+    server_usage += '@0@(@1@)'.format(d.name(), d.version())
   endif
 endforeach
 
