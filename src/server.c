@@ -96,9 +96,9 @@ server_init(struct server_params *params)
 }
 
 static int
-get_dns_fd(struct dnsfd *fds, struct net_addr *addr)
+get_dns_fd(struct dnsfd *fds, struct udp_addr *addr)
 {
-	if (addr->addr.ss_family == AF_INET6) {
+	if (addr->remote.addr.ss_family == AF_INET6) {
 		return fds->v6fd;
 	}
 	return fds->v4fd;
@@ -406,14 +406,14 @@ send_chunk_or_dataless(struct dnsfd *dns_fds, int userid, struct query *q)
 	ui_debug(1, "OUT  pkt seq# %d, frag %d (last=%d), offset %d, fragsize %u, total %d, to user %d\n",
 		 users[userid].outpacket.seqno & 7, users[userid].outpacket.fragment & 15,
 		 last, users[userid].outpacket.offset, datalen, users[userid].outpacket.len, userid);
-	dns_fd = get_dns_fd(dns_fds, &q->address.remote);
+	dns_fd = get_dns_fd(dns_fds, &q->address);
 	write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
 
 	if (q->id2 != 0) {
 		q->id = q->id2;
 		q->address = q->address2;
 		ui_debug(1, "OUT  again to last duplicate\n");
-		dns_fd = get_dns_fd(dns_fds, &q->address.remote);
+		dns_fd = get_dns_fd(dns_fds, &q->address);
 		write_dns(dns_fd, q, pkt, datalen + 2, users[userid].downenc);
 	}
 
@@ -488,7 +488,7 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 
 		return outlen;
 	} else { /* CONN_RAW_UDP */
-		int dns_fd = get_dns_fd(dns_fds, &users[userid].raw_addr.remote);
+		int dns_fd = get_dns_fd(dns_fds, &users[userid].raw_addr);
 		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].raw_addr);
 		return outlen;
 	}
@@ -1482,7 +1482,7 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 	ui_debug(2, "TX: client %s id %u, %d bytes\n",
 		 format_addr(&query->addr.remote), (id & 0xffff), r);
 
-	dns_fd = get_dns_fd(dns_fds, &query->addr.remote);
+	dns_fd = get_dns_fd(dns_fds, &query->addr);
 	send_udp(dns_fd, packet, r, &query->addr);
 
 	return 0;
@@ -1738,7 +1738,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 #endif
 				}
 			} else{ /* CONN_RAW_UDP */
-				int dns_fd = get_dns_fd(dns_fds, &users[touser].raw_addr.remote);
+				int dns_fd = get_dns_fd(dns_fds, &users[touser].raw_addr);
 				send_raw(dns_fd, users[userid].inpacket.data,
 					 users[userid].inpacket.len, touser,
 					 RAW_HDR_CMD_DATA, &users[touser].raw_addr);
