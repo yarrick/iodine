@@ -28,4 +28,6 @@ jobs:
           meson setup build
           cd build
           ninja
+          ./iodine -v
+          ./iodined -v
           ninja test
