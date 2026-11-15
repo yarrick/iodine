@@ -30,6 +30,7 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 	char *d;
 	char *pktend;
 	unsigned int len;
+	unsigned int sublen;
 	int offset;
 	char c;
 
@@ -69,7 +70,13 @@ readname_loop(char *packet, int packetlen, char **src, char *dst, size_t length,
 				}
 			}
 			dummy = packet + offset;
-			len += readname_loop(packet, packetlen, &dummy, d, length - len, loop - 1);
+			sublen = readname_loop(packet, packetlen, &dummy, d, length - len, loop - 1);
+			if (sublen == 0) {
+				if (len == 0)
+					return 0;
+				break;
+			}
+			len += sublen;
 			goto end;
 		}
 
@@ -99,6 +106,7 @@ end:
 unsigned int
 readname(char *packet, int packetlen, char **src, char *dst, size_t length)
 {
+	*dst = '\0';
 	return readname_loop(packet, packetlen, src, dst, length, 10);
 }
 
