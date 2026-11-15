@@ -164,6 +164,7 @@ START_TEST(test_decode_response)
 {
 	char buf[512];
 	struct dns_msg q;
+	char *host = "silly.host.of.iodine.code.kryo.se";
 	int len;
 	int ret;
 
@@ -172,8 +173,10 @@ START_TEST(test_decode_response)
 
 	ret = dns_decode(buf, len, &q, QR_ANSWER, answer_packet, sizeof(answer_packet)-1);
 	ck_assert_int_eq(ret, strlen(msgData));
+	ck_assert_str_eq(q.name, host);
+	ck_assert_uint_eq(q.type, T_NULL);
 	ck_assert_str_eq(msgData, buf);
-	ck_assert_int_eq(q.id, 0x0539);
+	ck_assert_uint_eq(q.id, 0x0539);
 }
 END_TEST
 

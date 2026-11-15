@@ -538,9 +538,8 @@ dns_decode(char *buf, size_t buflen, struct dns_msg *q, qr_t qr, char *packet,
 
 		/* if CHECKLEN okay, then we're sure to have a proper name */
 		if (q != NULL) {
-			/* We only need the first char to check it */
-			q->name[0] = name[0];
-			q->name[1] = '\0';
+			strlcpy(q->name, name, sizeof(q->name));
+			q->type = type;
 		}
 
 		if (ancount < 1) {
