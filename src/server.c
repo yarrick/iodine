@@ -1867,10 +1867,9 @@ write_dns_nameenc(char *buf, size_t buflen, const char *data, size_t datalen, ch
 	char *b;
 
 	/* Make a rotating topdomain to prevent filtering */
-	td1+=3;
-	td2+=7;
-	if (td1>=26) td1-=26;
-	if (td2>=25) td2-=25;
+	td1 = (td1 + 3) % 26;
+	td2 = (td2 + 7) % 25;
+
 
 	/* encode data,datalen to CNAME/MX answer
 	   (adapted from build_hostname() in encoding.c)
