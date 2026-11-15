@@ -120,7 +120,7 @@ main(int argc, char **argv)
 		return 1;
 	}
 	progname_init(argv[0]);
-	check_privileges(NULL, 0);
+	check_privileges(NULL, NULL, 0);
 	network_init();
 	fd = open_tun(argv[1]);
 	if (fd < 0) {
