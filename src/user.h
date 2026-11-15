@@ -72,6 +72,7 @@ struct tun_user {
 	int seed;
 	in_addr_t tun_ip;
 	struct net_addr host;
+	struct udp_addr raw_addr;
 	struct query q;
 	struct query q_sendrealsoon;
 	int q_sendrealsoon_new;

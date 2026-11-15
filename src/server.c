@@ -73,7 +73,7 @@ static struct net_addr bind_addr;
 
 static void write_dns(int fd, struct query *q, const char *data, size_t datalen, char downenc);
 static void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid);
-static int raw_decode(char *packet, int len, struct query *q, int dns_fd, struct dnsfd *dns_fds, int tun_fd);
+static int raw_decode(char *packet, int len, struct udp_addr *addr, int dns_fd, struct dnsfd *dns_fds, int tun_fd);
 
 void
 server_stop(void)
@@ -487,8 +487,8 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 
 		return outlen;
 	} else { /* CONN_RAW_UDP */
-		int dns_fd = get_dns_fd(dns_fds, &users[userid].q.address.remote);
-		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].q.address);
+		int dns_fd = get_dns_fd(dns_fds, &users[userid].raw_addr.remote);
+		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].raw_addr);
 		return outlen;
 	}
 }
@@ -1498,7 +1498,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 	if ((read = read_udp(dns_fd, packet, sizeof(packet), &q.address)) <= 0)
 		return 0;
 
-	if (raw_decode(packet, read, &q, dns_fd, dns_fds, tun_fd)) {
+	if (raw_decode(packet, read, &q.address, dns_fd, dns_fds, tun_fd)) {
 		return 0;
 	}
 
@@ -1740,10 +1740,10 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 #endif
 				}
 			} else{ /* CONN_RAW_UDP */
-				int dns_fd = get_dns_fd(dns_fds, &users[touser].q.address.remote);
+				int dns_fd = get_dns_fd(dns_fds, &users[touser].raw_addr.remote);
 				send_raw(dns_fd, users[userid].inpacket.data,
 					 users[userid].inpacket.len, touser,
-					 RAW_HDR_CMD_DATA, &users[touser].q.address);
+					 RAW_HDR_CMD_DATA, &users[touser].raw_addr);
 			}
 		}
 	} else {
@@ -1756,14 +1756,14 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 }
 
 static void
-handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
+handle_raw_login(char *packet, int len, struct udp_addr *addr, int fd, int userid)
 {
 	char myhash[16];
 
 	if (len < 16) return;
 
 	/* Skip ip check since this is expected to come directly from client */
-	if (check_authenticated_user_and_ip(userid, /*check_ip=*/0, &q->address))
+	if (check_authenticated_user_and_ip(userid, /*check_ip=*/0, addr))
 		return;
 
 	ui_debug(1, "IN   login raw, len %d, from user %d\n", len, userid);
@@ -1771,33 +1771,33 @@ handle_raw_login(char *packet, int len, struct query *q, int fd, int userid)
 	/* User sends hash of seed + 1 */
 	login_calculate(myhash, 16, password, users[userid].seed + 1);
 	if (memcmp(packet, myhash, 16) == 0) {
-		/* Update query and time info for user */
+		/* Update address and time info for user */
 		users[userid].last_pkt = time(NULL);
-		memcpy(&(users[userid].q), q, sizeof(struct query));
+		users[userid].raw_addr = *addr;
 
-		/* Store remote IP number */
-		users[userid].host = q->address.remote;
+		/* Store remote IP address */
+		users[userid].host = addr->remote;
 
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
 		login_calculate(myhash, 16, password, users[userid].seed - 1);
-		send_raw(fd, myhash, 16, userid, RAW_HDR_CMD_LOGIN, &q->address);
+		send_raw(fd, myhash, 16, userid, RAW_HDR_CMD_LOGIN, addr);
 
 		users[userid].authenticated_raw = 1;
 	}
 }
 
 static void
-handle_raw_data(char *packet, int len, struct query *q, struct dnsfd *dns_fds, int tun_fd, int userid)
+handle_raw_data(char *packet, int len, struct udp_addr *addr, struct dnsfd *dns_fds, int tun_fd, int userid)
 {
-	if (check_authenticated_user_and_ip(userid, check_ip, &q->address) != 0) {
+	if (check_authenticated_user_and_ip(userid, check_ip, addr) != 0) {
 		return;
 	}
 	if (!users[userid].authenticated_raw) return;
 
-	/* Update query and time info for user */
+	/* Update address and time info for user */
 	users[userid].last_pkt = time(NULL);
-	memcpy(&(users[userid].q), q, sizeof(struct query));
+	users[userid].raw_addr = *addr;
 
 	/* copy to packet buffer, update length */
 	users[userid].inpacket.offset = 0;
@@ -1811,25 +1811,25 @@ handle_raw_data(char *packet, int len, struct query *q, struct dnsfd *dns_fds, i
 }
 
 static void
-handle_raw_ping(struct query *q, int dns_fd, int userid)
+handle_raw_ping(struct udp_addr *addr, int dns_fd, int userid)
 {
-	if (check_authenticated_user_and_ip(userid, check_ip, &q->address) != 0) {
+	if (check_authenticated_user_and_ip(userid, check_ip, addr) != 0) {
 		return;
 	}
 	if (!users[userid].authenticated_raw) return;
 
-	/* Update query and time info for user */
+	/* Update address and time info for user */
 	users[userid].last_pkt = time(NULL);
-	memcpy(&(users[userid].q), q, sizeof(struct query));
+	users[userid].raw_addr = *addr;
 
 	ui_debug(1, "IN   ping raw, from user %d\n", userid);
 
 	/* Send ping reply */
-	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, &q->address);
+	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, addr);
 }
 
 static int
-raw_decode(char *packet, int len, struct query *q, int dns_fd, struct dnsfd *dns_fds, int tun_fd)
+raw_decode(char *packet, int len, struct udp_addr *addr, int dns_fd, struct dnsfd *dns_fds, int tun_fd)
 {
 	int raw_user;
 
@@ -1842,15 +1842,15 @@ raw_decode(char *packet, int len, struct query *q, int dns_fd, struct dnsfd *dns
 	switch (RAW_HDR_GET_CMD(packet)) {
 	case RAW_HDR_CMD_LOGIN:
 		/* Login challenge */
-		handle_raw_login(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, dns_fd, raw_user);
+		handle_raw_login(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, addr, dns_fd, raw_user);
 		break;
 	case RAW_HDR_CMD_DATA:
 		/* Data packet */
-		handle_raw_data(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, q, dns_fds, tun_fd, raw_user);
+		handle_raw_data(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, addr, dns_fds, tun_fd, raw_user);
 		break;
 	case RAW_HDR_CMD_PING:
 		/* Keepalive packet */
-		handle_raw_ping(q, dns_fd, raw_user);
+		handle_raw_ping(addr, dns_fd, raw_user);
 		break;
 	default:
 		warnx("Unhandled raw command %02X from user %d", RAW_HDR_GET_CMD(packet), raw_user);
