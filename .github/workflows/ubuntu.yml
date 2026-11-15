@@ -43,6 +43,12 @@ jobs:
     - name: build
       working-directory: build
       run: ninja
+    - name: iodine -v
+      working-directory: build
+      run: ./iodine -v
+    - name: iodined -v
+      working-directory: build
+      run: ./iodined -v
     - name: run tests
       working-directory: build
       run: ninja test

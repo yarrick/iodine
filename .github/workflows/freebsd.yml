@@ -32,6 +32,8 @@ jobs:
           meson setup build
           cd build
           ninja
+          ./iodine -v
+          ./iodined -v
           ninja test
           python3 -m pip install ping3
           ninja tun_bench
