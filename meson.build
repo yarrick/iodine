@@ -157,7 +157,7 @@ client = files(
 
 client_usage = []
 server_usage = []
-foreach d : [zlib] + commondeps
+foreach d : commondeps
   if d.type_name() != 'library' and d.found()
     client_usage += d.name()
     server_usage += d.name()
