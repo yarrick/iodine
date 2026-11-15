@@ -115,7 +115,8 @@ static inline void usage(void)
 static void version(void)
 {
 	fprintf(stderr, "iodine IP over DNS tunneling client\n"
-			"Version: %s\n", IODINE_VERSION);
+		"Version: %s\nLibraries used: %s\n",
+		IODINE_VERSION, USED_LIBS);
 
 	exit(0);
 }

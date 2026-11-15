@@ -155,8 +155,23 @@ client = files(
   'src/iodine.c',
 )
 
+client_usage = []
+server_usage = []
+foreach d : [zlib] + commondeps
+  if d.type_name() != 'library' and d.found()
+    client_usage += d.name()
+    server_usage += d.name()
+  endif
+endforeach
+foreach d : serverdeps
+  if d.type_name() != 'library' and d.found()
+    server_usage += d.name()
+  endif
+endforeach
+
 executable('iodine',
   sources: client,
+  c_args: '-DUSED_LIBS="@0@"'.format(', '.join(client_usage)),
   link_with: libcommon,
   include_directories: includes,
   install: true,
@@ -171,6 +186,7 @@ libserver = static_library(
 
 executable('iodined',
   sources: files('src/iodined.c'),
+  c_args: '-DUSED_LIBS="@0@"'.format(', '.join(server_usage)),
   link_with: [libcommon, libserver],
   dependencies: serverdeps,
   include_directories: includes,
