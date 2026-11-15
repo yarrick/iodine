@@ -48,8 +48,13 @@ run_as_user_switch(struct run_as_user *runas)
 {
 	(void)runas;
 #if HAVE_GETPWNAM && HAVE_LIBCAPNG
-	return capng_change_id(runas->pw->pw_uid, runas->pw->pw_gid,
-			       CAPNG_DROP_SUPP_GRP);
+	capng_flags_t flags = CAPNG_DROP_SUPP_GRP | CAPNG_CLEAR_AMBIENT;
+	if (capng_get_caps_process() == 0 &&
+	    capng_have_capability(CAPNG_EFFECTIVE, CAP_SETPCAP)) {
+		flags |= CAPNG_CLEAR_BOUNDING;
+	}
+	capng_clear(CAPNG_SELECT_CAPS);
+	return capng_change_id(runas->pw->pw_uid, runas->pw->pw_gid, flags);
 #elif HAVE_GETPWNAM
 #if HAVE_SETGROUPS
        int result;
