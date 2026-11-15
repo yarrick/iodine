@@ -6,7 +6,6 @@ iodine - https://code.kryo.se/iodine
 CHANGES:
 
 master:
-	- Fixed parsing of -z flag (SELinux context) for iodine client.
 	- Added Haiku support, tested on R1/beta 6.
 	- Support for reading packet destination IP added on Windows.
 	- Downstream fragment autoprobe target size lowered from 1536
@@ -19,8 +18,18 @@ master:
 	    response and version/login checks (needs dnspython module).
 	- Source IP address set to original destination address when sending
 	  replies in iodined (not yet supported on Windows).
+	- Added meson option for setting max number of users.
+
+2026-11-15: 0.9.1 "Caps Lock"
+	- Fixed parsing of -z flag (SELinux context) for iodine client.
 	- Added meson options for forcing optional Linux dependencies,
-	  setting installdir for docs and setting max number of users.
+	  and setting installdir for docs.
+	- Minor fixes handling invalid inputs on the server.
+	- Added check for CAP_SYS_CHROOT capability on Linux when
+	  libcap-ng is enabled and a chroot directory is set.
+	- Fixed clearing capabilities when switching user on Linux with
+	  libcap-ng enabled (issue #137, reported by Gergely Imreh).
+	- Added listing of included libraries when printing version.
 
 2026-10-25: 0.9.0 "20 years"
 	- Changed deprecated tzsetwall() to tzset() (only used by FreeBSD),
