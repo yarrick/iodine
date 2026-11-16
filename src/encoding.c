@@ -15,8 +15,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <stdint.h>
 #include <string.h>
+
 #include "config.h"
+
 #ifndef WINDOWS
 #include <arpa/nameser.h>
 #ifdef DARWIN
@@ -26,6 +29,7 @@
 #include "android_dns.h"
 #endif
 #endif
+
 #include "common.h"
 #include "compat.h"
 #include "encoding.h"
