@@ -563,7 +563,7 @@ handle_version_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 	users[userid].host = q->address.remote;
 
 	memcpy(&(users[userid].q), q, sizeof(struct dns_msg));
-	users[userid].encoder = &base32_ops;
+	users[userid].up_encoder = &base32_ops;
 	users[userid].downenc = 'T';
 	send_version_response(dns_fd, VERSION_ACK, users[userid].seed, userid, q);
 	syslog(LOG_INFO, "accepted version for user #%d from %s",
@@ -774,7 +774,7 @@ handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struc
 		write_dns(dns_fd, q, "BADCODEC", 8, users[userid].downenc);
 		return;
 	}
-	user_switch_codec(userid, enc);
+	user_switch_up_codec(userid, enc);
 	write_dns(dns_fd, q, enc->name, strlen(enc->name), users[userid].downenc);
 }
 
@@ -1211,7 +1211,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct dns_ms
 		if (upstream_ok) {
 			/* decode with this user's encoding */
 			read = unpack_data(unpacked, sizeof(unpacked), &(in[5]), domain_len - 5,
-					   users[userid].encoder);
+					   users[userid].up_encoder);
 
 			/* copy to packet buffer, update length */
 			read = MIN((unsigned int)read, sizeof(users[userid].inpacket.data) - users[userid].inpacket.offset);

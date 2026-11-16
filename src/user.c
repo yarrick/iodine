@@ -171,12 +171,12 @@ find_available_user(unsigned int *user)
 }
 
 void
-user_switch_codec(unsigned int userid, const struct encoder *enc)
+user_switch_up_codec(unsigned int userid, const struct encoder *enc)
 {
 	if (userid >= usercount)
 		return;
 
-	users[userid].encoder = enc;
+	users[userid].up_encoder = enc;
 }
 
 void
