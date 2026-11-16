@@ -81,7 +81,7 @@ static uint16_t chunkid_prev2;
 static const struct encoder *dataenc = &base32_ops;
 
 /* The encoder to use for downstream data */
-static char downenc = ' ';
+static const struct encoder *downenc = NULL;
 
 /* set query type to send */
 static unsigned short do_qtype = T_UNSET;
@@ -184,19 +184,18 @@ client_get_qtype(void)
 	return c;
 }
 
-void
+int
 client_set_downenc(char *encoding)
 {
-	if (!strcasecmp(encoding, "base32"))
-		downenc = 'T';
-	else if (!strcasecmp(encoding, "base64"))
-		downenc = 'S';
-	else if (!strcasecmp(encoding, "base64u"))
-		downenc = 'U';
-	else if (!strcasecmp(encoding, "base128"))
-		downenc = 'V';
-	else if (!strcasecmp(encoding, "raw"))
-		downenc = 'R';
+	const struct encoder *enc = get_encoder_by_name(encoding);
+	if (enc) {
+		if (do_qtype == T_UNSET || encoder_valid_for_qtype(enc, do_qtype)) {
+			downenc = enc;
+			return 0;
+		}
+		return 1;
+	}
+	return 1;
 }
 
 void
@@ -1630,7 +1629,7 @@ handshake_upenc_autodetect(int dns_fd)
 }
 
 static int
-handshake_downenctest(int dns_fd, char trycodec)
+handshake_downenctest(int dns_fd, const struct encoder *trycodec)
 /* Returns:
    0: not identical or error or timeout
    1: identical string returned
@@ -1644,7 +1643,7 @@ handshake_downenctest(int dns_fd, char trycodec)
 
 	for (i = 0; running && i < 3; i++) {
 
-		send_downenctest(dns_fd, trycodec, 1);
+		send_downenctest(dns_fd, trycodec->down_char, 1);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', i+1);
 
@@ -1673,52 +1672,49 @@ handshake_downenctest(int dns_fd, char trycodec)
 	return 0;
 }
 
-static char
+static const struct encoder *
 handshake_downenc_autodetect(int dns_fd)
-/* Returns codec char (or ' ' if no advanced codec works) */
 {
-	int base64ok = 0;
-	int base64uok = 0;
-	int base128ok = 0;
+	const struct encoder *selected = NULL;
 
 	if (do_qtype == T_NULL || do_qtype == T_PRIVATE) {
 		/* no other choice than raw */
 		ui_log("No alternative downstream codec available, using default (Raw)\n");
-		return ' ';
+		return NULL;
 	}
 
 	ui_log("Autodetecting downstream codec (use -O to override)\n");
 
 	/* Try Base64 */
-	if (handshake_downenctest(dns_fd, 'S'))
-		base64ok = 1;
-	else if (running && handshake_downenctest(dns_fd, 'U'))
-		base64uok = 1;
-
-	/* Try Base128 only if 64 gives us some perspective */
-	if (running && (base64ok || base64uok)) {
-		if (handshake_downenctest(dns_fd, 'V'))
-			base128ok = 1;
+	if (handshake_downenctest(dns_fd, &base64_ops)) {
+		selected = &base64_ops;
+	} else if (running && handshake_downenctest(dns_fd, &base64u_ops)) {
+		selected = &base64u_ops;
 	}
 
-	/* If 128 works, then TXT may give us Raw as well */
-	if (running && (base128ok && do_qtype == T_TXT)) {
-		if (handshake_downenctest(dns_fd, 'R'))
-			return 'R';
+	/* Try Base128 only if 64 gives us some perspective */
+	if (running && selected) {
+		if (handshake_downenctest(dns_fd, &base128_ops)) {
+			selected = &base128_ops;
+
+			/* If 128 works, then TXT may give us Raw as well */
+			if (running && do_qtype == T_TXT) {
+				if (handshake_downenctest(dns_fd, &raw_ops)) {
+					selected = &raw_ops;
+				}
+			}
+		}
 	}
 
 	if (!running)
-		return ' ';
+		return NULL;
 
-	if (base128ok)
-		return 'V';
-	if (base64ok)
-		return 'S';
-	if (base64uok)
-		return 'U';
+	if (selected) {
+		return selected;
+	}
 
 	ui_log("No advanced downstream codecs seem to work, using default (Base32)\n");
-	return ' ';
+	return NULL;
 }
 
 static int
@@ -1859,16 +1855,16 @@ handshake_edns0_check(int dns_fd)
 	int read;
 	char *s = DOWNCODECCHECK1;
 	int slen = DOWNCODECCHECK1_LEN;
-	char trycodec;
+	const struct encoder *codec;
 
-	if (do_qtype == T_NULL)
-		trycodec = 'R';
+	if (do_qtype == T_NULL || do_qtype == T_PRIVATE)
+		codec = &raw_ops;
 	else
-		trycodec = 'T';
+		codec = &base32_ops;
 
 	for (i = 0; running && i < 3; i++) {
 
-		send_downenctest(dns_fd, trycodec, 1);
+		send_downenctest(dns_fd, codec->down_char, 1);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', i+1);
 
@@ -1955,23 +1951,12 @@ codec_revert:
 static void
 handshake_switch_downenc(int dns_fd)
 {
-	char sw_downenc[] = { 'o', b32_5to8(userid), ascii_tolower(downenc), 0 };
+	char sw_downenc[] = { 'o', b32_5to8(userid), downenc->down_char, 0 };
 	char in[4096];
 	int i;
 	int read;
-	char *dname;
 
-	dname = "Base32";
-	if (downenc == 'S')
-		dname = "Base64";
-	else if (downenc == 'U')
-		dname = "Base64u";
-	else if (downenc == 'V')
-		dname = "Base128";
-	else if (downenc == 'R')
-		dname = "Raw";
-
-	ui_log("Switching downstream to codec %s\n", dname);
+	ui_log("Switching downstream to codec %s\n", downenc->name);
 	for (i = 0; running && i < 5; i++) {
 
 		send_handshake_query(dns_fd, sw_downenc);
@@ -2133,7 +2118,7 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 		*max_fragsize = acked_fragsize;
 		return 1;
 	} else {
-		if (downenc != ' ' && downenc != 'T') {
+		if (downenc && downenc != &base32_ops) {
 			ui_log("%d corrupted at %d.. (Try -O Base32)\n", acked_fragsize, i);
 		} else {
 			ui_log_partial("%d corrupted at %d.. ", acked_fragsize, i);
@@ -2316,13 +2301,13 @@ client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsiz
 		if (!running)
 			return -1;
 
-		if (downenc == ' ') {
+		if (!downenc) {
 			downenc = handshake_downenc_autodetect(dns_fd);
 		}
 		if (!running)
 			return -1;
 
-		if (downenc != ' ') {
+		if (downenc) {
 			handshake_switch_downenc(dns_fd);
 		}
 		if (!running)

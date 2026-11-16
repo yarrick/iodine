@@ -65,8 +65,8 @@ extern const struct encoder base64_ops;
 extern const struct encoder base64u_ops;
 extern const struct encoder base128_ops;
 extern const struct encoder raw_ops;
-extern const struct encoder *const encoders[];
 
+const struct encoder *get_encoder_by_name(const char *);
 const struct encoder *get_encoder_by_host_char(char);
 const struct encoder *get_encoder_by_down_char(char);
 int encoder_valid_for_qtype(const struct encoder *enc, unsigned short qtype);

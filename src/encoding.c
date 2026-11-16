@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <strings.h>
 
 #include "config.h"
 
@@ -206,7 +207,7 @@ const struct encoder raw_ops = {
 	.down_char = 'r',
 };
 
-const struct encoder *const encoders[] = {
+static const struct encoder *const encoders[] = {
 	&base32_ops,
 	&base64_ops,
 	&base64u_ops,
@@ -214,6 +215,21 @@ const struct encoder *const encoders[] = {
 	&raw_ops,
 	NULL,
 };
+
+const struct encoder *
+get_encoder_by_name(const char *name)
+{
+	const struct encoder *const *enc;
+
+	if (!name)
+		return NULL;
+
+	for (enc = encoders; *enc != NULL; enc++) {
+		if (strcasecmp(name, (*enc)->name) == 0)
+			return *enc;
+	}
+	return NULL;
+}
 
 const struct encoder *
 get_encoder_by_host_char(char c)

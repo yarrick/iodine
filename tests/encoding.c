@@ -107,6 +107,20 @@ START_TEST(test_unpack_data_bounds)
 }
 END_TEST
 
+START_TEST(test_get_encoder_by_name)
+{
+	ck_assert_ptr_eq(get_encoder_by_name("Base32"), &base32_ops);
+	ck_assert_ptr_eq(get_encoder_by_name("base32"), &base32_ops);
+	ck_assert_ptr_eq(get_encoder_by_name("BASE64"), &base64_ops);
+	ck_assert_ptr_eq(get_encoder_by_name("base64u"), &base64u_ops);
+	ck_assert_ptr_eq(get_encoder_by_name("Base128"), &base128_ops);
+	ck_assert_ptr_eq(get_encoder_by_name("raw"), &raw_ops);
+	ck_assert_ptr_null(get_encoder_by_name("bogus"));
+	ck_assert_ptr_null(get_encoder_by_name(""));
+	ck_assert_ptr_null(get_encoder_by_name(NULL));
+}
+END_TEST
+
 TCase *
 test_create(void)
 {
@@ -117,6 +131,7 @@ test_create(void)
 	tcase_add_loop_test(tc, test_inline_undotify, 0, TUPLES);
 	tcase_add_test(tc, test_build_hostname);
 	tcase_add_test(tc, test_unpack_data_bounds);
+	tcase_add_test(tc, test_get_encoder_by_name);
 
 	return tc;
 }

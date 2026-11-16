@@ -130,6 +130,8 @@ main(int argc, char **argv)
 	char *context;
 	char *device;
 	char *pidfile;
+	char *qtype;
+	char *down_codec;
 	int choice;
 	int tun_fd;
 	int dns_fd;
@@ -155,6 +157,8 @@ main(int argc, char **argv)
 	context = NULL;
 	device = NULL;
 	pidfile = NULL;
+	qtype = NULL;
+	down_codec = NULL;
 
 	autodetect_frag_size = 1;
 	max_downstream_frag_size = 3072;
@@ -227,11 +231,12 @@ main(int argc, char **argv)
 			pidfile = optarg;
 			break;
 		case 'T':
+			qtype = optarg;
 			if (client_set_qtype(optarg))
 				errx(5, "Invalid query type '%s'", optarg);
 			break;
 		case 'O':       /* not -D, is Debug in server */
-			client_set_downenc(optarg);
+			down_codec = optarg;
 			break;
 		case 'L':
 			lazymode = atoi(optarg);
@@ -268,6 +273,16 @@ main(int argc, char **argv)
 		topdomain = strdup(argv[1]);
 		break;
 	default:
+		usage();
+		/* NOTREACHED */
+	}
+
+	if (down_codec && client_set_downenc(down_codec)) {
+		if (qtype) {
+			warnx("Invalid downstream codec %s for type %s", down_codec, qtype);
+		} else {
+			warnx("Invalid downstream codec %s", down_codec);
+		}
 		usage();
 		/* NOTREACHED */
 	}
