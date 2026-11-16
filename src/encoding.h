@@ -69,6 +69,7 @@ extern const struct encoder *const encoders[];
 
 const struct encoder *get_encoder_by_host_char(char);
 const struct encoder *get_encoder_by_down_char(char);
+int encoder_valid_for_qtype(const struct encoder *enc, unsigned short qtype);
 
 int b32_5to8(int);
 int b32_8to5(int);

@@ -17,6 +17,15 @@
 
 #include <string.h>
 #include "config.h"
+#ifndef WINDOWS
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser_compat.h>
+#endif
+#ifdef ANDROID
+#include "android_dns.h"
+#endif
+#endif
 #include "common.h"
 #include "compat.h"
 #include "encoding.h"
@@ -232,4 +241,25 @@ get_encoder_by_down_char(char c)
 			return *enc;
 	}
 	return NULL;
+}
+
+int
+encoder_valid_for_qtype(const struct encoder *enc, unsigned short qtype)
+{
+	if (!enc)
+		return 0;
+	switch (qtype) {
+	case T_TXT:
+		return 1;
+	case T_CNAME:
+	case T_A:
+	case T_MX:
+	case T_SRV:
+		return enc->host_char != '\0';
+	case T_NULL:
+	case T_PRIVATE:
+		return enc == &raw_ops;
+	default:
+		return 0;
+	}
 }

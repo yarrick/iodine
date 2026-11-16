@@ -80,7 +80,7 @@ struct tun_user {
 	struct packet outpacket;
 	int outfragresent;
 	const struct encoder *up_encoder;
-	char downenc;
+	const struct encoder *down_encoder;
 	int out_acked_seqno;
 	int out_acked_fragment;
 	unsigned int fragsize;
