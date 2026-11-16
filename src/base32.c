@@ -237,4 +237,6 @@ const struct encoder base32_ops = {
 
 	.blocksize_raw = BASE32_BLKSIZE_RAW,
 	.blocksize_encoded = BASE32_BLKSIZE_ENC,
+	.host_char = 'h',
+	.down_char = 't',
 };

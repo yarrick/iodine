@@ -159,3 +159,45 @@ inline_undotify(char *buf, size_t len)
 	/* return new length of string */
 	return len - dots;
 }
+
+static unsigned int
+raw_encode(char *dst, size_t *dstlen, const void *src, size_t srclen)
+{
+	size_t len = MIN(*dstlen, srclen);
+
+	memcpy(dst, src, len);
+	dst[len] = '\0';
+	*dstlen = len;
+	return len;
+}
+
+static unsigned int
+raw_decode(void *dst, size_t *dstlen, const char *src, size_t srclen)
+{
+	size_t len = MIN(*dstlen, srclen);
+
+	memcpy(dst, src, len);
+	((char *)dst)[len] = '\0';
+	return len;
+}
+
+const struct encoder raw_ops = {
+	.name = "Raw",
+
+	.encode = raw_encode,
+	.decode = raw_decode,
+
+	.blocksize_raw = 1,
+	.blocksize_encoded = 1,
+	.host_char = '\0',
+	.down_char = 'r',
+};
+
+const struct encoder *const encoders[] = {
+	&base32_ops,
+	&base64_ops,
+	&base64u_ops,
+	&base128_ops,
+	&raw_ops,
+	NULL,
+};

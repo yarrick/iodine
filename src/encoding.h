@@ -37,6 +37,7 @@
 #define DOWNCODECCHECK1_LEN  48
 
 struct encoder {
+	/* This name is sent as reply when switching codec */
 	const char name[8];
 	unsigned int (*encode)(char *dst, size_t *dstlen,
 			       const void *src, size_t srclen);
@@ -45,6 +46,11 @@ struct encoder {
 
 	const int blocksize_raw;
 	const int blocksize_encoded;
+	/* Used to identify codec in CNAME/SRV/MX hostnames,
+	 * or \0 if not used. */
+	const char host_char;
+	/* Used to identify codec in downstream codec switch, and in TXT data */
+	const char down_char;
 };
 
 size_t hostname_need(const char *);
@@ -58,6 +64,8 @@ extern const struct encoder base32_ops;
 extern const struct encoder base64_ops;
 extern const struct encoder base64u_ops;
 extern const struct encoder base128_ops;
+extern const struct encoder raw_ops;
+extern const struct encoder *const encoders[];
 
 int b32_5to8(int);
 int b32_8to5(int);

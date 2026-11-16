@@ -204,6 +204,8 @@ const struct encoder base64_ops = {
 
 	.blocksize_raw = BASE64_BLKSIZE_RAW,
 	.blocksize_encoded = BASE64_BLKSIZE_ENC,
+	.host_char = 'i',
+	.down_char = 's',
 };
 
 static unsigned int
@@ -226,4 +228,6 @@ const struct encoder base64u_ops = {
 
 	.blocksize_raw = BASE64_BLKSIZE_RAW,
 	.blocksize_encoded = BASE64_BLKSIZE_ENC,
+	.host_char = 'j',
+	.down_char = 'u',
 };
