@@ -457,9 +457,8 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 		return 0;
 	outdatalenu = outdatalen - 1;
 
-	switch (buf[0]) {
+	switch (ascii_tolower(buf[0])) {
 	case 'h': /* Hostname with base32 */
-	case 'H':
 		/* Need 1 byte H, 3 bytes ".xy", >=1 byte data */
 		if (buflen < 5)
 			return 0;
@@ -469,7 +468,6 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 				   &base32_ops);
 
 	case 'i': /* Hostname++ with base64 */
-	case 'I':
 		/* Need 1 byte I, 3 bytes ".xy", >=1 byte data */
 		if (buflen < 5)
 			return 0;
@@ -479,7 +477,6 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 				   &base64_ops);
 
 	case 'j': /* Hostname++ with base64u */
-	case 'J':
 		/* Need 1 byte J, 3 bytes ".xy", >=1 byte data */
 		if (buflen < 5)
 			return 0;
@@ -489,7 +486,6 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 				   &base64u_ops);
 
 	case 'k': /* Hostname++ with base128 */
-	case 'K':
 		/* Need 1 byte J, 3 bytes ".xy", >=1 byte data */
 		if (buflen < 5)
 			return 0;
@@ -499,35 +495,30 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
 				   &base128_ops);
 
 	case 't': /* plain base32(Thirty-two) from TXT */
-	case 'T':
 		if (buflen < 2)
 			return 0;
 
 		return base32_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
 
 	case 's': /* plain base64(Sixty-four) from TXT */
-	case 'S':
 		if (buflen < 2)
 			return 0;
 
 		return base64_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
 
 	case 'u': /* plain base64u (Underscore) from TXT */
-	case 'U':
 		if (buflen < 2)
 			return 0;
 
 		return base64u_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
 
 	case 'v': /* plain base128 from TXT */
-	case 'V':
 		if (buflen < 2)
 			return 0;
 
 		return base128_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
 
 	case 'r': /* Raw binary from TXT */
-	case 'R':
 		/* buflen>=1 already checked */
 		buflen--;
 		buflen = MIN(buflen, outdatalen);

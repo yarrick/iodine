@@ -855,8 +855,7 @@ handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, stru
 		return;
 	}
 
-	switch (in[1]) {
-	case 'T':
+	switch (ascii_tolower(in[1])) {
 	case 't':
 		if (q->type == T_TXT ||
 			q->type == T_SRV || q->type == T_MX ||
@@ -865,7 +864,6 @@ handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, stru
 			return;
 		}
 		break;
-	case 'S':
 	case 's':
 		if (q->type == T_TXT ||
 			q->type == T_SRV || q->type == T_MX ||
@@ -874,7 +872,6 @@ handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, stru
 			return;
 		}
 		break;
-	case 'U':
 	case 'u':
 		if (q->type == T_TXT ||
 			q->type == T_SRV || q->type == T_MX ||
@@ -883,7 +880,6 @@ handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, stru
 			return;
 		}
 		break;
-	case 'V':
 	case 'v':
 		if (q->type == T_TXT ||
 			q->type == T_SRV || q->type == T_MX ||
@@ -892,7 +888,6 @@ handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, stru
 			return;
 		}
 		break;
-	case 'R':
 	case 'r':
 		if (q->type == T_NULL || q->type == T_TXT) {
 			write_dns(dns_fd, q, datap, datalen, 'R');
