@@ -470,8 +470,8 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 
 		return payload_unwrap(buf, rv, q->rtype);
 	} else { /* CONN_RAW_UDP */
-		unsigned long datalen;
-		char buf[64*1024];
+		unsigned long packetlen;
+		char packet[64*1024];
 
 		/* minimum length */
 		if (r < RAW_HDR_LEN) return 0;
@@ -488,9 +488,9 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 		if (RAW_HDR_GET_CMD(data) != RAW_HDR_CMD_DATA) return 0;
 
 		r -= RAW_HDR_LEN;
-		datalen = sizeof(buf);
-		if (uncompress((uint8_t*)buf, &datalen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
-			write_tun(tun_fd, buf, datalen);
+		packetlen = sizeof(packet);
+		if (uncompress((uint8_t*)packet, &packetlen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
+			write_tun(tun_fd, packet, packetlen);
 		}
 
 		/* don't process any further */
