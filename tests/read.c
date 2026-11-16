@@ -112,15 +112,15 @@ START_TEST(test_read_name_inf_loop)
 	memset(buf, '@', sizeof(buf));
 	data = (char*) infloop + sizeof(HEADER);
 	rv = readname((char*) infloop, sizeof(infloop), &data, buf, 4);
-	ck_assert_int_eq(rv, 3);
+	ck_assert_int_eq(rv, 0);
 	ck_assert_str_eq(buf, "A.");
 	ck_assert_int_eq(buf[4], '@');
 
 	memset(buf, '@', sizeof(buf));
 	data = (char*) infloop + sizeof(HEADER);
 	rv = readname((char*) infloop, sizeof(infloop), &data, buf, 256);
-	ck_assert_int_eq(rv, 21);
-	ck_assert_str_eq(buf, "A.A.A.A.A.A.A.A.A.A.");
+	ck_assert_int_eq(rv, 0);
+	ck_assert_str_eq(buf, "A.");
 	ck_assert_int_eq(buf[256], '@');
 }
 END_TEST
@@ -143,7 +143,7 @@ START_TEST(test_read_name_longname)
 	memset(buf, '@', sizeof(buf));
 	data = (char*) longname + sizeof(HEADER);
 	rv = readname((char*) longname, sizeof(longname), &data, buf, 256);
-	ck_assert_int_eq(rv, 256);
+	ck_assert_int_eq(rv, 0);
 	ck_assert_int_eq(buf[255], '\0');
 	ck_assert_int_eq(buf[256], '@');
 }
@@ -228,7 +228,7 @@ START_TEST(test_read_name_badjump_second)
 		data = (char*) jumper + sizeof(HEADER);
 		rv = readname((char*) jumper, sizeof(badjump2), &data, buf, 256);
 
-		ck_assert_int_eq(rv, 4);
+		ck_assert_int_eq(rv, 0);
 		ck_assert_str_eq("BA.", buf);
 	}
 	free(jumper);
@@ -254,7 +254,7 @@ START_TEST(test_read_name_truncated_label)
 		memcpy(pm, p, sizeof(p));
 		data = (char *) pm + sizeof(HEADER);
 		rv = readname((char *) pm, sizeof(p), &data, buf, 255);
-		ck_assert_int_gt(rv, 0);
+		ck_assert_int_eq(rv, 0);
 		ck_assert_msg(buf[255] == '@', "readname ran past its bounds");
 		ck_assert_str_eq("a", buf);
 		free(pm);
@@ -280,7 +280,7 @@ START_TEST(test_read_name_ptr_at_packet_end)
 		memcpy(pm, p, sizeof(p));
 		data = (char *) pm + sizeof(HEADER);
 		rv = readname((char *) pm, sizeof(p), &data, buf, 256);
-		ck_assert_int_eq(rv, 1);
+		ck_assert_int_eq(rv, 0);
 		ck_assert_str_eq("", buf);
 		free(pm);
 	}
