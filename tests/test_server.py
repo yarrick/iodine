@@ -15,7 +15,7 @@ import dns.rdatatype as rr
 import dns.rrset
 
 PROTOCOL_VERSION = 0x00000502
-HANDSHAKE_TYPES = [rr.NULL, rr.CNAME, rr.MX]
+HANDSHAKE_TYPES = [rr.NULL, rr.TXT, rr.CNAME, rr.MX]
 _B32_ENC_TRANS = str.maketrans(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
     "abcdefghijklmnopqrstuvwxyz012345",
@@ -233,6 +233,10 @@ class HandshakeTest(ServerTestCase):
         self.assertEqual(rrset.rdtype, self.rdtype)
         if self.rdtype == rr.NULL:
             return rrset[0].data
+        if self.rdtype == rr.TXT:
+            txt = b"".join(rrset[0].strings)
+            self.assertEqual(txt[:1], b"t")
+            return b32_decode(txt[1:].decode("ascii"))
         if self.rdtype == rr.CNAME:
             name = rrset[0].target.to_text()
         else:
@@ -255,6 +259,27 @@ class HandshakeTest(ServerTestCase):
         payload = struct.pack("!BH", userid << 3, cmc)
         return self.query_payload('I', payload)
 
+    def probe_downstream_codec(self, codec_char, cmc):
+        # Variant 1 ('b' in iodine base32) = DOWNCODECCHECK1
+        qname = f"Y{codec_char}b{cmc:03x}.{self.topdomain}"
+        resp = query_dns(self.ip, self.port, qname, self.rdtype)
+        self.assertEqual(resp.rcode(), dns.rcode.NOERROR)
+        rrset = resp.answer[0]
+        self.assertEqual(rrset.rdtype, self.rdtype)
+        if self.rdtype == rr.NULL:
+            return rrset[0].data != b"BADCODEC"
+        if self.rdtype == rr.TXT:
+            txt = b"".join(rrset[0].strings)
+            if txt[:1] == b"t":
+                return b32_decode(txt[1:].decode("ascii")) != b"BADCODEC"
+            self.assertEqual(txt[:1], codec_char.encode("ascii"))
+            return len(txt) > 1
+        name = rrset[0].target if self.rdtype == rr.CNAME else rrset[0].exchange
+        raw = b"".join(name.labels[:-2])
+        if raw[:1] == b"h":
+            return b32_decode(raw[1:].decode("ascii")) != b"BADCODEC"
+        return len(raw) > 1
+
     def test_login(self):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)
         self.assertEqual(status, b"VACK")
@@ -274,6 +299,19 @@ class HandshakeTest(ServerTestCase):
             self.assertEqual(actual_ip, str(self.ip))
         elif self.srv.ns_addr or target_os != "haiku":
             self.assertEqual(actual_ip, self.srv.ns_addr or str(self.ip))
+
+        if self.rdtype == rr.NULL:
+            valid_codecs = {"r"}
+        elif self.rdtype == rr.TXT:
+            valid_codecs = {"t", "s", "u", "v", "r"}
+        else:
+            valid_codecs = {"t", "s", "u", "v"}
+        for idx, codec_char in enumerate(("t", "s", "u", "v", "r", "x"), start=10):
+            self.assertEqual(
+                self.probe_downstream_codec(codec_char, idx),
+                codec_char in valid_codecs,
+                f"unexpected probe result for codec '{codec_char}' on {self.rdtype.name}",
+            )
 
     def test_login_wrong_password(self):
         status, seed, userid = self.send_version(PROTOCOL_VERSION)

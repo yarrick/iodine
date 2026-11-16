@@ -28,8 +28,8 @@
 #include "ui.h"
 #include "user.h"
 
-/* Needs to be at least 12 since 6 tests are done for each of IPv4 and IPv6 */
-#define USERS 13
+/* Needs to be 16 since 8 tests are done for each of IPv4 and IPv6 */
+#define USERS 16
 
 static int running = 1;
 
