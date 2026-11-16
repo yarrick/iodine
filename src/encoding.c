@@ -283,3 +283,96 @@ encoder_valid_for_qtype(const struct encoder *enc, unsigned short qtype)
 		return 0;
 	}
 }
+
+static int
+unwrap_hostname(char *outdata, size_t outdatalen, char *buf, size_t buflen)
+/* Decodes *buf to *outdata.
+ * *buf WILL be changed by undotify.
+ * Note: buflen must be _exactly_ strlen(buf) before undotifying.
+ * (undotify of reduced-len won't copy \0, base-X decode will decode too much.)
+ * Returns #bytes usefully filled in outdata.
+ */
+{
+	const struct encoder *enc;
+
+	if (outdatalen <= 0 || buflen < 1)
+		return 0;
+
+	enc = get_encoder_by_host_char(buf[0]);
+	if (!enc) {
+		warnx("Received unsupported hostname encoding");
+		return 0;
+	}
+
+	/* Need 1 byte for codec, 3 bytes ".xy", >=1 byte data */
+	if (buflen < 5)
+		return 0;
+
+	/* this also does undotify */
+	return unpack_data(outdata, outdatalen, buf + 1, buflen - 4, enc);
+}
+
+int
+payload_unwrap(char *buf, size_t buflen, unsigned short rtype)
+{
+	char data[64*1024];
+	size_t rv = 0;
+
+	if (rtype == T_NULL || rtype == T_PRIVATE) {
+		return buflen;
+	}
+
+	/* CNAME can also be returned from an A question */
+	if (rtype == T_CNAME) {
+		/*
+		 * buf is a hostname or txt stream that we still need to
+		 * decode to binary
+		 *
+		 * also update rv with the number of valid bytes
+		 *
+		 * data is unused here, and will certainly hold the smaller binary
+		 */
+		rv = unwrap_hostname(data, sizeof(data), buf, buflen);
+	} else if (rtype == T_TXT) {
+		const struct encoder *enc;
+		size_t datalen = sizeof(data) - 1;
+
+		if (buflen < 2)
+			return 0;
+
+		/* TXT uses down char to signal codec */
+		enc = get_encoder_by_down_char(buf[0]);
+		if (!enc) {
+			warnx("Received unsupported encoding in TXT");
+			return 0;
+		}
+		rv = enc->decode(data, &datalen, buf + 1, buflen - 1);
+	} else if (rtype == T_MX || rtype == T_SRV) {
+		/* buf is like "Hname.com\0Hanother.com\0\0" */
+		int buftotal = buflen;	/* idx of last \0 */
+		int bufoffset = 0;
+		int dataoffset = 0;
+		int thispartlen, dataspace, datanew;
+
+		while (1) {
+			thispartlen = strlen(buf + bufoffset);
+			thispartlen = MIN(thispartlen, buftotal-bufoffset);
+			dataspace = sizeof(data) - dataoffset;
+			if (thispartlen <= 0 || dataspace <= 0)
+				break;
+
+			datanew = unwrap_hostname(data + dataoffset, dataspace,
+						  buf + bufoffset, thispartlen);
+			if (datanew <= 0)
+				break;
+
+			bufoffset += thispartlen + 1;
+			dataoffset += datanew;
+		}
+		rv = dataoffset;
+	}
+	rv = MIN(rv, buflen);
+	if (rv > 0)
+		memcpy(buf, data, rv);
+	return rv;
+}

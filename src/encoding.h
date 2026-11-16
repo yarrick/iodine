@@ -74,4 +74,6 @@ int encoder_valid_for_qtype(const struct encoder *enc, unsigned short qtype);
 int b32_5to8(int);
 int b32_8to5(int);
 
+int payload_unwrap(char *buf, size_t buflen, unsigned short qtype);
+
 #endif

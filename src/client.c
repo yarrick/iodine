@@ -442,45 +442,6 @@ write_dns_error(struct dns_msg *q, int ignore_some_errors)
 }
 
 static int
-dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
-/* Decodes *buf to *outdata.
- * *buf WILL be changed by undotify.
- * Note: buflen must be _exactly_ strlen(buf) before undotifying.
- * (undotify of reduced-len won't copy \0, base-X decode will decode too much.)
- * Returns #bytes usefully filled in outdata.
- */
-{
-	size_t outdatalenu;
-	const struct encoder *enc;
-
-	if (outdatalen <= 0 || buflen < 1)
-		return 0;
-	outdatalenu = outdatalen - 1;
-
-	/* For CNAME/MX/SRV payload */
-	enc = get_encoder_by_host_char(buf[0]);
-	if (enc) {
-		/* Need 1 byte for codec, 3 bytes ".xy", >=1 byte data */
-		if (buflen < 5)
-			return 0;
-
-		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4, enc);
-	}
-
-	/* TXT uses down char to signal codec */
-	enc = get_encoder_by_down_char(buf[0]);
-	if (enc) {
-		/* Need 1 byte for codec, >=1 byte data */
-		if (buflen < 2)
-			return 0;
-		return enc->decode(outdata, &outdatalenu, buf + 1, buflen - 1);
-	}
-	warnx("Received unsupported encoding");
-	return 0;
-}
-
-static int
 read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 /* FIXME: tun_fd needed for raw handling */
 /* Returns -1 on receive error or decode error, including DNS error replies.
@@ -507,53 +468,7 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 		if (rv <= 0)
 			return rv;
 
-		if (q->rtype == T_CNAME || q->rtype == T_TXT)
-		/* CNAME can also be returned from an A question */
-		{
-			/*
-			 * buf is a hostname or txt stream that we still need to
-			 * decode to binary
-			 *
-			 * also update rv with the number of valid bytes
-			 *
-			 * data is unused here, and will certainly hold the smaller binary
-			 */
-
-			rv = dns_namedec(data, sizeof(data), buf, rv);
-
-			rv = MIN(rv, buflen);
-			if (rv > 0)
-				memcpy(buf, data, rv);
-
-		} else if (q->rtype == T_MX || q->rtype == T_SRV) {
-			/* buf is like "Hname.com\0Hanother.com\0\0" */
-			int buftotal = rv;	/* idx of last \0 */
-			int bufoffset = 0;
-			int dataoffset = 0;
-			int thispartlen, dataspace, datanew;
-
-			while (1) {
-				thispartlen = strlen(buf + bufoffset);
-				thispartlen = MIN(thispartlen, buftotal-bufoffset);
-				dataspace = sizeof(data) - dataoffset;
-				if (thispartlen <= 0 || dataspace <= 0)
-					break;
-
-				datanew = dns_namedec(data + dataoffset, dataspace,
-						      buf + bufoffset, thispartlen);
-				if (datanew <= 0)
-					break;
-
-				bufoffset += thispartlen + 1;
-				dataoffset += datanew;
-			}
-			rv = dataoffset;
-			rv = MIN(rv, buflen);
-			if (rv > 0)
-				memcpy(buf, data, rv);
-		}
-
-		return rv;
+		return payload_unwrap(buf, rv, q->rtype);
 	} else { /* CONN_RAW_UDP */
 		unsigned long datalen;
 		char buf[64*1024];
