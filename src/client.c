@@ -452,85 +452,32 @@ dns_namedec(char *outdata, int outdatalen, char *buf, int buflen)
  */
 {
 	size_t outdatalenu;
+	const struct encoder *enc;
 
-	if (outdatalen <= 0)
+	if (outdatalen <= 0 || buflen < 1)
 		return 0;
 	outdatalenu = outdatalen - 1;
 
-	switch (ascii_tolower(buf[0])) {
-	case 'h': /* Hostname with base32 */
-		/* Need 1 byte H, 3 bytes ".xy", >=1 byte data */
+	/* For CNAME/MX/SRV payload */
+	enc = get_encoder_by_host_char(buf[0]);
+	if (enc) {
+		/* Need 1 byte for codec, 3 bytes ".xy", >=1 byte data */
 		if (buflen < 5)
 			return 0;
 
 		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4,
-				   &base32_ops);
-
-	case 'i': /* Hostname++ with base64 */
-		/* Need 1 byte I, 3 bytes ".xy", >=1 byte data */
-		if (buflen < 5)
-			return 0;
-
-		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4,
-				   &base64_ops);
-
-	case 'j': /* Hostname++ with base64u */
-		/* Need 1 byte J, 3 bytes ".xy", >=1 byte data */
-		if (buflen < 5)
-			return 0;
-
-		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4,
-				   &base64u_ops);
-
-	case 'k': /* Hostname++ with base128 */
-		/* Need 1 byte J, 3 bytes ".xy", >=1 byte data */
-		if (buflen < 5)
-			return 0;
-
-		/* this also does undotify */
-		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4,
-				   &base128_ops);
-
-	case 't': /* plain base32(Thirty-two) from TXT */
-		if (buflen < 2)
-			return 0;
-
-		return base32_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
-
-	case 's': /* plain base64(Sixty-four) from TXT */
-		if (buflen < 2)
-			return 0;
-
-		return base64_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
-
-	case 'u': /* plain base64u (Underscore) from TXT */
-		if (buflen < 2)
-			return 0;
-
-		return base64u_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
-
-	case 'v': /* plain base128 from TXT */
-		if (buflen < 2)
-			return 0;
-
-		return base128_ops.decode(outdata, &outdatalenu, buf + 1, buflen - 1);
-
-	case 'r': /* Raw binary from TXT */
-		/* buflen>=1 already checked */
-		buflen--;
-		buflen = MIN(buflen, outdatalen);
-		memcpy(outdata, buf + 1, buflen);
-		return buflen;
-
-	default:
-		warnx("Received unsupported encoding");
-		return 0;
+		return unpack_data(outdata, outdatalen, buf + 1, buflen - 4, enc);
 	}
 
-	/* notreached */
+	/* TXT uses down char to signal codec */
+	enc = get_encoder_by_down_char(buf[0]);
+	if (enc) {
+		/* Need 1 byte for codec, >=1 byte data */
+		if (buflen < 2)
+			return 0;
+		return enc->decode(outdata, &outdatalenu, buf + 1, buflen - 1);
+	}
+	warnx("Received unsupported encoding");
 	return 0;
 }
 

@@ -67,6 +67,9 @@ extern const struct encoder base128_ops;
 extern const struct encoder raw_ops;
 extern const struct encoder *const encoders[];
 
+const struct encoder *get_encoder_by_host_char(char);
+const struct encoder *get_encoder_by_down_char(char);
+
 int b32_5to8(int);
 int b32_8to5(int);
 

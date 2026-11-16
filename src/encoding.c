@@ -201,3 +201,35 @@ const struct encoder *const encoders[] = {
 	&raw_ops,
 	NULL,
 };
+
+const struct encoder *
+get_encoder_by_host_char(char c)
+{
+	const struct encoder *const *enc;
+
+	c = ascii_tolower((unsigned char)c);
+	if (c == '\0')
+		return NULL;
+
+	for (enc = encoders; *enc != NULL; enc++) {
+		if ((*enc)->host_char == c)
+			return *enc;
+	}
+	return NULL;
+}
+
+const struct encoder *
+get_encoder_by_down_char(char c)
+{
+	const struct encoder *const *enc;
+
+	c = ascii_tolower((unsigned char)c);
+	if (c == '\0')
+		return NULL;
+
+	for (enc = encoders; *enc != NULL; enc++) {
+		if ((*enc)->down_char == c)
+			return *enc;
+	}
+	return NULL;
+}
