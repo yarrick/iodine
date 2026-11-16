@@ -252,23 +252,125 @@ START_TEST(test_decode_response_compressed_mx)
 			p += label_len;
 		}
 		*p++ = 0;
-		putshort(&p, 15); /* MX */
-		putshort(&p, 1);  /* IN */
+		putshort(&p, T_MX);
+		putshort(&p, C_IN);
 
 		for (i = 0; i < answers; i++) {
 			/* Owner and exchange both compress to the question at offset 12. */
 			putshort(&p, 0xc00c);
-			putshort(&p, 15); /* MX */
-			putshort(&p, 1);  /* IN */
+			putshort(&p, T_MX);
+			putshort(&p, C_IN);
 			putlong(&p, 0);
 			putshort(&p, 4);
-			putshort(&p, (unsigned int)(10 * (i + 1)));
+			putshort(&p, 10 * (i + 1));
 			putshort(&p, 0xc00c);
 		}
 
 		ret = dns_decode_answer(out, sizeof(out), &q, packet, (size_t)(p - packet));
 		ck_assert_int_eq(ret, MIN(sizeof(packet) - 1, answers * 254));
 		ck_assert_uint_eq(q.rtype, T_MX);
+	}
+}
+END_TEST
+
+START_TEST(test_decode_response_mx_plus_srv)
+{
+	char packet[4096];
+	char out[4096];
+	char *p = packet;
+	struct dns_msg q;
+	unsigned int i;
+	int ret;
+
+	memset(packet, 0, sizeof(packet));
+	/* Response, one question, one SRV answer followed by 2 MX answers. */
+	putshort(&p, 0x1234);
+	putshort(&p, 0x8000);
+	putshort(&p, 1);
+	putshort(&p, 3);
+	putshort(&p, 0);
+	putshort(&p, 0);
+
+	/* A 253-character presentation name (255 bytes on the wire). */
+	for (i = 0; i < 4; i++) {
+		int label_len = (i == 3) ? 61 : 63;
+		*p++ = (unsigned char)label_len;
+		memset(p, 'a' + i, (size_t)label_len);
+		p += label_len;
+	}
+	*p++ = 0;
+	putshort(&p, T_MX);
+	putshort(&p, C_IN);
+
+	/* Initial SRV answer */
+	putshort(&p, 0xc00c);
+	putshort(&p, T_SRV);
+	putshort(&p, C_IN);
+	putlong(&p, 0);
+	putshort(&p, 8);
+	putshort(&p, 30);
+	putshort(&p, 100);
+	putshort(&p, 53);
+	putshort(&p, 0xc00c);
+	for (i = 0; i < 2; i++) {
+		/* Owner and exchange both compress to the question at offset 12. */
+		putshort(&p, 0xc00c);
+		putshort(&p, T_MX);
+		putshort(&p, C_IN);
+		putlong(&p, 0);
+		putshort(&p, 4);
+		putshort(&p, 10 * (i + 1));
+		putshort(&p, 0xc00c);
+	}
+
+	ret = dns_decode_answer(out, sizeof(out), &q, packet, (size_t)(p - packet));
+	ck_assert_int_eq(ret, MIN(sizeof(packet) - 1, 2 * 254));
+	ck_assert_uint_eq(q.rtype, T_MX);
+}
+END_TEST
+
+#define NUM_RAW_QTYPES 3
+static const unsigned short
+raw_qtypes[NUM_RAW_QTYPES] = { T_NULL, T_PRIVATE, T_TXT };
+
+START_TEST(test_encode_decode_raw_data)
+{
+	char packet[4096];
+	char out[4096];
+	char bin_data[300];
+	size_t datalen;
+	size_t i;
+
+	for (i = 0; i < sizeof(bin_data); i++) {
+		bin_data[i] = (char)(i & 0xff);
+	}
+
+	for (datalen = 1; datalen <= sizeof(bin_data); datalen++) {
+		struct dns_msg q;
+		struct dns_msg reply;
+		int pktlen;
+		int ret;
+
+		memset(&q, 0, sizeof(q));
+		strlcpy(q.name, "z12345.t.iodine.tun", sizeof(q.name));
+		q.type = raw_qtypes[_i];
+		q.id = (unsigned short)(0x2200 + _i);
+
+		pktlen = dns_encode(packet, sizeof(packet), &q, QR_ANSWER,
+				bin_data, datalen);
+		ck_assert_int_gt(pktlen, 0);
+
+		memset(&reply, 0, sizeof(reply));
+		memset(out, '@', sizeof(out));
+		ret = dns_decode_answer(out, sizeof(out), &reply, packet, (size_t)pktlen);
+
+		ck_assert_int_eq(ret, datalen);
+		ck_assert_uint_eq(reply.id, q.id);
+		ck_assert_str_eq(reply.name, q.name);
+		ck_assert_uint_eq(reply.type, q.type);
+		ck_assert_uint_eq(reply.rtype, q.type);
+		ck_assert_uint_eq(reply.rcode, NOERROR);
+		ck_assert_mem_eq(out, bin_data, datalen);
 	}
 }
 END_TEST
@@ -336,7 +438,9 @@ START_TEST(test_encode_a_response)
 		"\x00\x00\x0E\x10"                                 /*   TTL: 3600 */
 		"\x00\x04\x01\x02\x03\x04";                        /*   RDLENGTH: 4, RDATA: 1.2.3.4 */
 	char buf[512];
+	struct in_addr out;
 	struct dns_msg q;
+	struct dns_msg reply;
 	struct sockaddr_storage address;
 	struct sockaddr_in *dest;
 	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
@@ -366,6 +470,16 @@ START_TEST(test_encode_a_response)
 	ret = dns_encode_standard_response(buf, sizeof(buf), &q, (struct sockaddr *) &address);
 	ck_assert_int_eq(ret, expected_len);
 	ck_assert_mem_eq(buf, expected, expected_len);
+
+	memset(&reply, 0, sizeof(reply));
+	memset(&out, '@', sizeof(out));
+	ret = dns_decode_answer((char *)&out, sizeof(out), &reply, buf, expected_len);
+	ck_assert_int_eq(ret, sizeof(out));
+	ck_assert_uint_eq(reply.id, q.id);
+	ck_assert_str_eq(reply.name, q.name);
+	ck_assert_uint_eq(reply.type, T_A);
+	ck_assert_uint_eq(reply.rtype, T_A);
+	ck_assert_mem_eq(&out, &dest->sin_addr, sizeof(out));
 }
 END_TEST
 
@@ -381,7 +495,9 @@ START_TEST(test_encode_aaaa_response)
 		"\x00\x00\x0E\x10\x00\x10"                         /*   TTL: 3600, RDLENGTH: 16 */
 		"\x20\x01\x0D\xB8\x00\x00\x00\x00\x00\x01\x00\xF2\x0F\x03\xF0\x04";   /*   RDATA: 2001:db8::1:f2:f03:f004 */
 	char buf[512];
+	struct in6_addr out;
 	struct dns_msg q;
+	struct dns_msg reply;
 	struct sockaddr_storage address;
 	struct sockaddr_in6 *dest;
 	size_t expected_len = sizeof(expected) - 1; /* Skip zero termination of string */
@@ -410,6 +526,16 @@ START_TEST(test_encode_aaaa_response)
 	ret = dns_encode_standard_response(buf, sizeof(buf), &q, (struct sockaddr *) &address);
 	ck_assert_int_eq(ret, expected_len);
 	ck_assert_mem_eq(buf, expected, expected_len);
+
+	memset(&reply, 0, sizeof(reply));
+	memset(&out, '@', sizeof(out));
+	ret = dns_decode_answer((char *)&out, sizeof(out), &reply, buf, expected_len);
+	ck_assert_int_eq(ret, sizeof(out));
+	ck_assert_uint_eq(reply.id, q.id);
+	ck_assert_str_eq(reply.name, q.name);
+	ck_assert_uint_eq(reply.type, T_AAAA);
+	ck_assert_uint_eq(reply.rtype, T_AAAA);
+	ck_assert_mem_eq(&out, &dest->sin6_addr, sizeof(out));
 }
 END_TEST
 
@@ -487,6 +613,8 @@ test_create(void)
 	tcase_add_test(tc, test_decode_response_with_high_trans_id);
 	tcase_add_test(tc, test_decode_response_overflow_rlen);
 	tcase_add_test(tc, test_decode_response_compressed_mx);
+	tcase_add_test(tc, test_decode_response_mx_plus_srv);
+	tcase_add_loop_test(tc, test_encode_decode_raw_data, 0, NUM_RAW_QTYPES);
 	tcase_add_test(tc, test_get_id_short_packet);
 	tcase_add_test(tc, test_get_id_low);
 	tcase_add_test(tc, test_get_id_high);
