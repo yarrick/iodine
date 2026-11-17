@@ -15,17 +15,20 @@ if libcheck.found()
     host_machine.system() == 'windows' ? '".exe"' : '""')
 
   foreach suite : suites
-    test(suite, executable(
-      'test_@0@'.format(suite),
-      files(
-        '@0@.c'.format(suite),
+    test(suite,
+      executable(
+        'test_@0@'.format(suite),
+        files(
+          '@0@.c'.format(suite),
+        ),
+        link_with: libserver,
+        include_directories: includes,
+        dependencies: [libcheck],
+        build_by_default: false,
+        c_args: testargs + '-DSUITE_NAME="@0@"'.format(suite),
       ),
-      link_with: libserver,
-      include_directories: includes,
-      dependencies: [libcheck],
-      build_by_default: false,
-      c_args: testargs + '-DSUITE_NAME="@0@"'.format(suite),
-    ))
+      is_parallel: host_machine.system() != 'haiku',
+    )
   endforeach
 endif
 

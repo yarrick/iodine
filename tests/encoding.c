@@ -267,7 +267,6 @@ test_create(void)
 	TCase *tc;
 
 	tc = tcase_create("Encoding");
-	tcase_set_timeout(tc, 10);
 	tcase_add_loop_test(tc, test_inline_dotify, 0, TUPLES);
 	tcase_add_loop_test(tc, test_inline_undotify, 0, TUPLES);
 	tcase_add_test(tc, test_build_hostname);
