@@ -43,7 +43,7 @@
 bool
 is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
 	BOOL is_member = FALSE;
-	byte sid_buffer[SECURITY_MAX_SID_SIZE];
+	BYTE sid_buffer[SECURITY_MAX_SID_SIZE];
 	PSID sid = (PSID)sid_buffer;
 	DWORD sid_size = sizeof(sid_buffer);
 

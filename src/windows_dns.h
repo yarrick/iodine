@@ -24,7 +24,6 @@ typedef unsigned long in_addr_t;
 #include <windows.h>
 #include <windns.h>
 #include <ws2tcpip.h>
-#include <iphlpapi.h>
 
 /* Missing from the mingw headers */
 #ifndef DNS_TYPE_SRV

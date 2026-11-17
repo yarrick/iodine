@@ -64,6 +64,7 @@ elif host_machine.system() == 'windows'
   add_project_arguments(
     '-DWINVER=0x0601',
     '-D_WIN32_WINNT=0x0601',
+    '-DWIN32_LEAN_AND_MEAN',
     language: 'c'
   )
   commondeps += cc.find_library('ws2_32')

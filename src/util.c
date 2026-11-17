@@ -18,6 +18,9 @@
 #include <stdio.h>
 #include "config.h"
 #include "compat.h"
+#ifdef WINDOWS
+#include <iphlpapi.h>
+#endif
 #include "ui.h"
 #include "util.h"
 

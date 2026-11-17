@@ -24,7 +24,6 @@
 #include <winsock2.h>
 #include <mswsock.h>
 #include <windows.h>
-#undef CMSG_DATA
 #define CMSG_DATA WSA_CMSG_DATA
 static LPFN_WSARECVMSG wsa_recvmsg = NULL;
 #else

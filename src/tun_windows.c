@@ -32,6 +32,7 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <winioctl.h>
+#include <iphlpapi.h>
 
 DWORD WINAPI tun_reader(LPVOID arg);
 struct tun_data {
