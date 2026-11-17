@@ -468,6 +468,9 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 		if (rv <= 0)
 			return rv;
 
+		if (q->rtype == T_NULL || q->rtype == T_PRIVATE) {
+			return rv;
+		}
 		return payload_unwrap(buf, rv, q->rtype);
 	} else { /* CONN_RAW_UDP */
 		unsigned long packetlen;

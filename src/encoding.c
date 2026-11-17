@@ -318,10 +318,6 @@ payload_unwrap(char *buf, size_t buflen, unsigned short rtype)
 	char data[64*1024];
 	size_t rv = 0;
 
-	if (rtype == T_NULL || rtype == T_PRIVATE) {
-		return buflen;
-	}
-
 	/* CNAME can also be returned from an A question */
 	if (rtype == T_CNAME) {
 		/*
