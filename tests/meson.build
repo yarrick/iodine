@@ -21,9 +21,9 @@ if libcheck.found()
         files(
           '@0@.c'.format(suite),
         ),
-        link_with: libserver,
+        link_with: ['fw_query', 'user'].contains(suite) ? libserver : libcommon,
         include_directories: includes,
-        dependencies: [libcheck],
+        dependencies: libcheck,
         build_by_default: false,
         c_args: testargs + '-DSUITE_NAME="@0@"'.format(suite),
       ),
