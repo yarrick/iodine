@@ -402,7 +402,7 @@ send_ping(int fd)
 }
 
 static void
-write_dns_error(struct dns_msg *q, int ignore_some_errors)
+log_dns_error(struct dns_msg *q, int ignore_some_errors)
 /* This is called from:
    1. handshake_waitdns() when already checked that reply fits to our
       latest query.
@@ -576,7 +576,7 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char cmd, int timeout)
 			sleep(1);
 
 		if (rv < 0) {
-			write_dns_error(&q, 1);
+			log_dns_error(&q, 1);
 			return -2;
 		}
 		/* rv either 0 or >0, return it as is. */
@@ -671,7 +671,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 		   but wait a bit to prevent fast ping-pong loops. */
 
 		if (read < 0)
-			write_dns_error(&q, 0);
+			log_dns_error(&q, 0);
 
 		if (read < 0 && q.rcode == SERVFAIL && lazymode &&
 		    selecttimeout > 1) {
@@ -2035,16 +2035,13 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 		ui_log_partial("%d ok.. ", acked_fragsize);
 		*max_fragsize = acked_fragsize;
 		return 1;
-	} else {
-		if (downenc && downenc != &base32_ops) {
-			ui_log("%d corrupted at %d.. (Try -O Base32)\n", acked_fragsize, i);
-		} else {
-			ui_log_partial("%d corrupted at %d.. ", acked_fragsize, i);
-		}
-		return 1;
 	}
 
-	/* notreached */
+	if (downenc && downenc != &base32_ops) {
+		ui_log("%d corrupted at %d.. (Try -O Base32)\n", acked_fragsize, i);
+	} else {
+		ui_log_partial("%d corrupted at %d.. ", acked_fragsize, i);
+	}
 	return 1;
 }
 
