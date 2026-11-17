@@ -372,3 +372,103 @@ payload_unwrap(char *buf, size_t buflen, unsigned short rtype)
 		memcpy(buf, data, rv);
 	return rv;
 }
+
+static size_t
+wrap_hostname(char *buf, size_t buflen, const char *data, size_t datalen,
+	      const struct encoder *downenc)
+/* Returns #bytes of data that were encoded */
+{
+	static int td1 = 0;
+	static int td2 = 0;
+	size_t space;
+	char *b;
+
+	/* Make a rotating topdomain to prevent filtering */
+	td1 = (td1 + 3) % 26;
+	td2 = (td2 + 7) % 25;
+
+	/* encode data,datalen to CNAME/MX answer
+	   (adapted from build_hostname() in encoding.c)
+	 */
+
+	/* Avoid using raw codec */
+	if (!downenc || !downenc->host_char)
+		downenc = &base32_ops;
+
+	if (buflen <= 7)
+		return 0;
+
+	space = MIN(0xFF, buflen) - 4 - 2;
+	/* -1 encoding type, -3 ".xy", -2 for safety */
+
+	memset(buf, 0, buflen);
+	space -= (space / 57);	/* space for dots */
+
+	buf[0] = downenc->host_char;
+	downenc->encode(buf+1, &space, data, datalen);
+	inline_dotify(buf, buflen);
+
+	/* Add dot (if it wasn't there already) and topdomain */
+	b = buf;
+	b += strlen(buf) - 1;
+	if (*b != '.')
+		*++b = '.';
+	b++;
+
+	*b = 'a' + td1;
+	b++;
+	*b = 'a' + td2;
+	b++;
+	*b = '\0';
+
+	return space;
+}
+
+int
+payload_wrap(char *buf, size_t buflen, const char *data, size_t datalen,
+	     unsigned short qtype, const struct encoder *downenc)
+{
+	if (qtype == T_CNAME || qtype == T_A) {
+		if (buflen <= 7)
+			return 0;
+		wrap_hostname(buf, buflen, data, datalen, downenc);
+		return strlen(buf);
+	} else if (qtype == T_MX || qtype == T_SRV) {
+		char *b = buf;
+		unsigned int offset = 0;
+		unsigned int res;
+
+		if (buflen <= 7)
+			return 0;
+
+		while (1) {
+			res = wrap_hostname(b, buflen - (b - buf),
+					    data + offset,
+					    datalen - offset, downenc);
+			if (res < 1) {
+				/* nothing encoded */
+				b++;	/* for final \0 */
+				break;
+			}
+
+			b = b + strlen(b) + 1;
+
+			offset += res;
+			if (offset >= datalen)
+				break;
+		}
+
+		/* Add final \0 */
+		*b = '\0';
+		return b - buf;
+	} else if (qtype == T_TXT) {
+		if (buflen < 2)
+			return 0;
+		/* TXT with codec prefix */
+		size_t space = buflen - 2;
+		memset(buf, 0, buflen);
+		buf[0] = downenc->down_char;
+		return 1 + downenc->encode(buf+1, &space, data, datalen);
+	}
+	return 0;
+}

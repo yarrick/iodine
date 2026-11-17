@@ -75,5 +75,7 @@ int b32_5to8(int);
 int b32_8to5(int);
 
 int payload_unwrap(char *buf, size_t buflen, unsigned short qtype);
+int payload_wrap(char *buf, size_t buflen, const char *data, size_t datalen,
+		 unsigned short qtype, const struct encoder *downenc);
 
 #endif

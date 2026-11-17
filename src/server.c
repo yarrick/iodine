@@ -1803,110 +1803,21 @@ raw_decode(char *packet, int len, struct udp_addr *addr, int dns_fd, struct dnsf
 	return 1;
 }
 
-static size_t
-write_dns_nameenc(char *buf, size_t buflen, const char *data, size_t datalen,
-		  const struct encoder *downenc)
-/* Returns #bytes of data that were encoded */
-{
-	static int td1 = 0;
-	static int td2 = 0;
-	size_t space;
-	char *b;
-
-	/* Make a rotating topdomain to prevent filtering */
-	td1 = (td1 + 3) % 26;
-	td2 = (td2 + 7) % 25;
-
-
-	/* encode data,datalen to CNAME/MX answer
-	   (adapted from build_hostname() in encoding.c)
-	 */
-
-	/* Avoid using raw codec */
-	if (!downenc || !downenc->host_char)
-		downenc = &base32_ops;
-
-	space = MIN(0xFF, buflen) - 4 - 2;
-	/* -1 encoding type, -3 ".xy", -2 for safety */
-
-	memset(buf, 0, buflen);
-	space -= (space / 57);	/* space for dots */
-
-	buf[0] = downenc->host_char;
-	downenc->encode(buf+1, &space, data, datalen);
-	inline_dotify(buf, buflen);
-
-	/* Add dot (if it wasn't there already) and topdomain */
-	b = buf;
-	b += strlen(buf) - 1;
-	if (*b != '.')
-		*++b = '.';
-	b++;
-
-	*b = 'a' + td1;
-	b++;
-	*b = 'a' + td2;
-	b++;
-	*b = '\0';
-
-	return space;
-}
-
 static void
 write_dns(int fd, struct dns_msg *q, const char *data, size_t datalen, const struct encoder *downenc)
 {
 	char buf[64*1024];
 	int len = 0;
 
-	if (q->type == T_CNAME || q->type == T_A) {
-		char cnamebuf[1024];		/* max 255 */
-
-		write_dns_nameenc(cnamebuf, sizeof(cnamebuf),
-				  data, datalen, downenc);
-
-		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, cnamebuf,
-				 sizeof(cnamebuf));
-	} else if (q->type == T_MX || q->type == T_SRV) {
-		char mxbuf[64*1024];
-		char *b = mxbuf;
-		unsigned int offset = 0;
-		unsigned int res;
-
-		while (1) {
-			res = write_dns_nameenc(b, sizeof(mxbuf) - (b - mxbuf),
-						data + offset,
-						datalen - offset, downenc);
-			if (res < 1) {
-				/* nothing encoded */
-				b++;	/* for final \0 */
-				break;
-			}
-
-			b = b + strlen(b) + 1;
-
-			offset += res;
-			if (offset >= datalen)
-				break;
-		}
-
-		/* Add final \0 */
-		*b = '\0';
-
-		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, mxbuf,
-				 sizeof(mxbuf));
-	} else if (q->type == T_TXT) {
-		/* TXT with codec prefix */
-		char txtbuf[64*1024];
-		size_t space = sizeof(txtbuf) - 2;
-
-		memset(txtbuf, 0, sizeof(txtbuf));
-
-		txtbuf[0] = downenc->down_char;
-		len = downenc->encode(txtbuf+1, &space, data, datalen);
-		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, txtbuf, len+1);
-	} else {
-		/* Normal NULL-record encode */
+	if (q->type == T_NULL || q->type == T_PRIVATE) {
+		/* Always raw data */
 		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
+	} else {
+		char wrapped[64*1024];
+		len = payload_wrap(wrapped, sizeof(wrapped), data, datalen, q->type, downenc);
+		if (len > 0) {
+			len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, wrapped, len);
+		}
 	}
 
 	if (len < 1) {
