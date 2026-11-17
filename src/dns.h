@@ -25,9 +25,6 @@
 
 #ifndef WINDOWS
 #include <arpa/nameser.h>
-#ifdef DARWIN
-#include <arpa/nameser_compat.h>
-#endif
 #endif
 
 typedef enum {
