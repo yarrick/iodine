@@ -3,7 +3,6 @@ project(
   'c',
   default_options: [
     'buildtype=release',
-    'b_lto=true',
     'c_std=c99',
     'warning_level=3',
   ],
@@ -15,6 +14,14 @@ project(
 )
 fs = import('fs')
 cc = meson.get_compiler('c')
+add_project_arguments(
+  cc.get_supported_arguments(['-ffunction-sections','-fdata-sections']),
+  language: 'c',
+)
+add_project_link_arguments(
+  cc.get_supported_link_arguments(['-Wl,--gc-sections', '-Wl,-dead_strip']),
+  language: 'c',
+)
 
 # config.h contents
 cdata = configuration_data()
