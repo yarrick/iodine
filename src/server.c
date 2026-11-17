@@ -33,13 +33,7 @@
 #include "server.h"
 #include "ui.h"
 
-#ifdef WINDOWS
-#include "windows_dns.h"
-#else
-#include <arpa/nameser.h>
-#ifdef DARWIN
-#include <arpa/nameser_compat.h>
-#endif
+#ifndef WINDOWS
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netdb.h>

@@ -26,19 +26,6 @@
 #include <time.h>
 
 #include "config.h"
-
-#ifdef WINDOWS
-#include "windows_dns.h"
-#else
-#include <arpa/nameser.h>
-#ifdef ANDROID
-#include "android_dns.h"
-#endif
-#ifdef DARWIN
-#include <arpa/nameser_compat.h>
-#endif
-#endif
-
 #include "common.h"
 #include "compat.h"
 #include "encoding.h"

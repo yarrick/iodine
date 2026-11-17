@@ -22,18 +22,8 @@
 #include <string.h>
 
 #include "config.h"
-
-#ifndef WINDOWS
-#include <arpa/nameser.h>
-#ifdef DARWIN
-#include <arpa/nameser_compat.h>
-#endif
-#ifdef ANDROID
-#include "android_dns.h"
-#endif
-#endif
-
 #include "compat.h"
+#include "dns.h"
 #include "encoding.h"
 #include "test_main.h"
 

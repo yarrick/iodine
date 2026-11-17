@@ -18,8 +18,17 @@
 #ifndef __DNS_H__
 #define __DNS_H__
 
+#include <stdint.h>
+
 #include "config.h"
 #include "common.h"
+
+#ifndef WINDOWS
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser_compat.h>
+#endif
+#endif
 
 typedef enum {
 	QR_QUERY = 0,

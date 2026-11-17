@@ -18,17 +18,11 @@
 #include "config.h"
 
 #include <sys/types.h>
-#ifdef WINDOWS
-#include "windows_dns.h"
-#else
+#ifndef WINDOWS
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/nameser.h>
 #endif
 #include <sys/stat.h>
-#ifdef DARWIN
-#include <arpa/nameser_compat.h>
-#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

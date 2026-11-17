@@ -21,17 +21,8 @@
 
 #include "config.h"
 
-#ifdef WINDOWS
-#include "windows_dns.h"
-#else
+#ifndef WINDOWS
 #include <sys/types.h>
-#include <arpa/nameser.h>
-#ifdef ANDROID
-#include "android_dns.h"
-#endif
-#ifdef DARWIN
-#include <arpa/nameser_compat.h>
-#endif
 #include <netdb.h>
 #include <sys/select.h>
 #endif
