@@ -34,6 +34,7 @@
 #include "ui.h"
 
 #ifndef WINDOWS
+#include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netdb.h>

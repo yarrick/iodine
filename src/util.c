@@ -20,6 +20,9 @@
 #include "compat.h"
 #ifdef WINDOWS
 #include <iphlpapi.h>
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
 #endif
 #include "ui.h"
 #include "util.h"

@@ -26,6 +26,9 @@
 #include <time.h>
 
 #include "config.h"
+#ifndef WINDOWS
+#include <netinet/in.h>
+#endif
 #include "common.h"
 #include "compat.h"
 #include "encoding.h"

@@ -21,8 +21,12 @@
 
 #include "config.h"
 
-#ifndef WINDOWS
+#ifdef WINDOWS
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <sys/types.h>
+#include <netinet/in.h>
 #include <netdb.h>
 #include <sys/select.h>
 #endif

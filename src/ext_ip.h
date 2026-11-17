@@ -18,7 +18,7 @@
 #ifndef __EXT_IP_H__
 #define __EXT_IP_H__
 
-#include "compat.h"
+struct in_addr;
 
 int get_external_ip(struct in_addr *ip);
 

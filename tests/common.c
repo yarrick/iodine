@@ -29,6 +29,7 @@
 #include "src/windows_dns.h"
 #else
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <netdb.h>
 #endif
 
