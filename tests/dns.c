@@ -375,6 +375,86 @@ START_TEST(test_encode_decode_raw_data)
 }
 END_TEST
 
+#define NUM_WRAPPED_QTYPES 5
+static const unsigned short
+wrapped_qtypes[NUM_WRAPPED_QTYPES] = { T_A, T_CNAME, T_MX, T_SRV, T_TXT };
+
+#define NUM_ENCODERS 5
+static const struct encoder *const
+test_encoders[NUM_ENCODERS] = {
+	&base32_ops,
+	&base64_ops,
+	&base64u_ops,
+	&base128_ops,
+	&raw_ops,
+};
+
+START_TEST(test_encode_decode_wrapped_data)
+{
+	char wrapped[4096];
+	char packet[4096];
+	char out[4096];
+	char bin_data[400];
+	unsigned short qtype = wrapped_qtypes[_i];
+	size_t datalen;
+	size_t e;
+	size_t i;
+
+	for (i = 0; i < sizeof(bin_data); i++) {
+		bin_data[i] = (char)((i * 107 + 19) & 0xff);
+	}
+
+	for (e = 0; e < NUM_ENCODERS; e++) {
+		const struct encoder *enc = test_encoders[e];
+
+		if (!encoder_valid_for_qtype(enc, qtype))
+			continue;
+
+		for (datalen = 1; datalen <= sizeof(bin_data); datalen++) {
+			struct dns_msg q;
+			struct dns_msg reply;
+			unsigned short expected_rtype;
+			size_t wrapped_data = datalen;
+			int wraplen;
+			int pktlen;
+			int ret;
+
+			memset(&q, 0, sizeof(q));
+			strlcpy(q.name, "z12345.t.iodine.tun", sizeof(q.name));
+			q.type = qtype;
+			q.id = (unsigned short)(0x3300 + (_i << 4) + e);
+
+			wraplen = payload_wrap(wrapped, sizeof(wrapped),
+					bin_data, &wrapped_data, q.type, enc);
+			ck_assert_int_gt(wraplen, 0);
+			ck_assert_uint_gt(wrapped_data, 0);
+			ck_assert_uint_le(wrapped_data, datalen);
+
+			pktlen = dns_encode(packet, sizeof(packet), &q, QR_ANSWER,
+					wrapped, (size_t)wraplen);
+			ck_assert_int_gt(pktlen, 0);
+
+			memset(&reply, 0, sizeof(reply));
+			memset(out, '@', sizeof(out));
+			ret = dns_decode_answer(out, sizeof(out), &reply,
+					packet, (size_t)pktlen);
+			ck_assert_int_gt(ret, 0);
+
+			expected_rtype = (q.type == T_A) ? T_CNAME : q.type;
+			ck_assert_uint_eq(reply.id, q.id);
+			ck_assert_str_eq(reply.name, q.name);
+			ck_assert_uint_eq(reply.type, q.type);
+			ck_assert_uint_eq(reply.rtype, expected_rtype);
+			ck_assert_uint_eq(reply.rcode, NOERROR);
+
+			ret = payload_unwrap(out, (size_t)ret, reply.rtype);
+			ck_assert_int_eq(ret, wrapped_data);
+			ck_assert_mem_eq(out, bin_data, wrapped_data);
+		}
+	}
+}
+END_TEST
+
 START_TEST(test_get_id_short_packet)
 {
 	char buf[5];
@@ -615,6 +695,7 @@ test_create(void)
 	tcase_add_test(tc, test_decode_response_compressed_mx);
 	tcase_add_test(tc, test_decode_response_mx_plus_srv);
 	tcase_add_loop_test(tc, test_encode_decode_raw_data, 0, NUM_RAW_QTYPES);
+	tcase_add_loop_test(tc, test_encode_decode_wrapped_data, 0, NUM_WRAPPED_QTYPES);
 	tcase_add_test(tc, test_get_id_short_packet);
 	tcase_add_test(tc, test_get_id_low);
 	tcase_add_test(tc, test_get_id_high);

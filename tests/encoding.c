@@ -16,11 +16,23 @@
  */
 
 #include <check.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "config.h"
+
+#ifndef WINDOWS
+#include <arpa/nameser.h>
+#ifdef DARWIN
+#include <arpa/nameser_compat.h>
+#endif
+#ifdef ANDROID
+#include "android_dns.h"
+#endif
+#endif
+
 #include "compat.h"
 #include "encoding.h"
 #include "test_main.h"
@@ -121,6 +133,118 @@ START_TEST(test_get_encoder_by_name)
 }
 END_TEST
 
+START_TEST(test_payload_wrap_unwrap)
+{
+	static const unsigned short qtypes[] = {
+		T_A, T_CNAME, T_MX, T_SRV, T_TXT, 0
+	};
+	static const struct encoder *const encs[] = {
+		&base32_ops, &base64_ops, &base64u_ops, &base128_ops, &raw_ops, NULL
+	};
+	char bin_data[400];
+	char buf[4096];
+	size_t i, q, e, datalen;
+
+	for (i = 0; i < sizeof(bin_data); i++) {
+		bin_data[i] = (char)((i * 73 + 5) & 0xff);
+	}
+
+	for (q = 0; qtypes[q] != 0; q++) {
+		unsigned short qtype = qtypes[q];
+		unsigned short rtype = (qtype == T_A) ? T_CNAME : qtype;
+
+		for (e = 0; encs[e] != NULL; e++) {
+			const struct encoder *enc = encs[e];
+
+			if (!encoder_valid_for_qtype(enc, qtype))
+				continue;
+
+			for (datalen = 1; datalen <= sizeof(bin_data); datalen += 7) {
+				size_t wrapped_data = datalen;
+				int wraplen;
+				int ret;
+
+				memset(buf, '@', sizeof(buf));
+				wraplen = payload_wrap(buf, sizeof(buf),
+						bin_data, &wrapped_data, qtype, enc);
+				ck_assert_int_gt(wraplen, 0);
+				ck_assert_uint_gt(wrapped_data, 0);
+				ck_assert_uint_le(wrapped_data, datalen);
+
+				if (qtype == T_TXT) {
+					ck_assert_int_eq(buf[0], enc->down_char);
+				} else {
+					ck_assert_int_eq(buf[0], enc->host_char);
+					ck_assert_ptr_null(strstr(buf, ".."));
+				}
+
+				if (qtype == T_MX || qtype == T_SRV) {
+					/* Full 400 bytes fit across multiple records */
+					ck_assert_uint_eq(wrapped_data, datalen);
+					ck_assert_int_eq(buf[wraplen], '\0');
+				}
+
+				ret = payload_unwrap(buf, (size_t)wraplen, rtype);
+				ck_assert_int_eq(ret, wrapped_data);
+				ck_assert_mem_eq(buf, bin_data, wrapped_data);
+			}
+		}
+	}
+
+	/* Raw/NULL encoder on hostname qtypes falls back to Base32 */
+	datalen = 12;
+	i = payload_wrap(buf, sizeof(buf), bin_data, &datalen, T_CNAME, &raw_ops);
+	ck_assert_uint_gt(i, 0);
+	ck_assert_int_eq(buf[0], base32_ops.host_char);
+	ck_assert_int_eq(payload_unwrap(buf, i, T_CNAME), 12);
+	ck_assert_mem_eq(buf, bin_data, 12);
+}
+END_TEST
+
+START_TEST(test_payload_wrap_unwrap_bounds)
+{
+	char bin_data[] = "hello iodine wrap unwrap bounds test";
+	char buf[64];
+	size_t wrapped_data;
+	int wraplen;
+	int ret;
+
+	/* Too-small buffers return 0 and report 0 wrapped bytes */
+	wrapped_data = sizeof(bin_data);
+	ck_assert_int_eq(payload_wrap(buf, 7, bin_data, &wrapped_data, T_CNAME, &base32_ops), 0);
+	ck_assert_uint_eq(wrapped_data, 0);
+
+	wrapped_data = sizeof(bin_data);
+	ck_assert_int_eq(payload_wrap(buf, 7, bin_data, &wrapped_data, T_MX, &base32_ops), 0);
+	ck_assert_uint_eq(wrapped_data, 0);
+
+	wrapped_data = sizeof(bin_data);
+	ck_assert_int_eq(payload_wrap(buf, 1, bin_data, &wrapped_data, T_TXT, &base32_ops), 0);
+	ck_assert_uint_eq(wrapped_data, 0);
+
+	/* Tight MX buffer: wraps partial data without writing past buflen */
+	memset(buf, '!', sizeof(buf));
+	wrapped_data = 5;
+	wraplen = payload_wrap(buf, 10, bin_data, &wrapped_data, T_MX, &base64_ops);
+	ck_assert_int_eq(wraplen, 9);
+	ck_assert_uint_eq(wrapped_data, 3);
+	ck_assert_int_eq(buf[10], '!');
+	ret = payload_unwrap(buf, (size_t)wraplen, T_MX);
+	ck_assert_int_eq(ret, 3);
+	ck_assert_mem_eq(buf, bin_data, 3);
+
+	/* Mismatched / truncated inputs to payload_unwrap return 0 */
+	memcpy(buf, "habcd.xy", 9);
+	ck_assert_int_eq(payload_unwrap(buf, 4, T_CNAME), 0);
+	memcpy(buf, "habcd.xy", 9);
+	ck_assert_int_eq(payload_unwrap(buf, 8, T_TXT), 0);
+	memcpy(buf, "tabcdefg", 9);
+	ck_assert_int_eq(payload_unwrap(buf, 8, T_CNAME), 0);
+	ck_assert_int_eq(payload_unwrap(buf, 1, T_TXT), 0);
+	ck_assert_int_eq(payload_unwrap(buf, 8, T_NULL), 0);
+}
+END_TEST
+
 TCase *
 test_create(void)
 {
@@ -132,6 +256,8 @@ test_create(void)
 	tcase_add_test(tc, test_build_hostname);
 	tcase_add_test(tc, test_unpack_data_bounds);
 	tcase_add_test(tc, test_get_encoder_by_name);
+	tcase_add_test(tc, test_payload_wrap_unwrap);
+	tcase_add_test(tc, test_payload_wrap_unwrap_bounds);
 
 	return tc;
 }

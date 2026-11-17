@@ -425,50 +425,66 @@ wrap_hostname(char *buf, size_t buflen, const char *data, size_t datalen,
 }
 
 int
-payload_wrap(char *buf, size_t buflen, const char *data, size_t datalen,
+payload_wrap(char *buf, size_t buflen, const char *data, size_t *datalen,
 	     unsigned short qtype, const struct encoder *downenc)
 {
 	if (qtype == T_CNAME || qtype == T_A) {
-		if (buflen <= 7)
+		if (buflen <= 7) {
+			*datalen = 0;
 			return 0;
-		wrap_hostname(buf, buflen, data, datalen, downenc);
+		}
+		*datalen = wrap_hostname(buf, buflen, data, *datalen, downenc);
 		return strlen(buf);
 	} else if (qtype == T_MX || qtype == T_SRV) {
 		char *b = buf;
-		unsigned int offset = 0;
-		unsigned int res;
+		size_t offset = 0;
+		size_t res;
 
-		if (buflen <= 7)
+		if (buflen <= 7) {
+			*datalen = 0;
 			return 0;
+		}
 
 		while (1) {
 			res = wrap_hostname(b, buflen - (b - buf),
 					    data + offset,
-					    datalen - offset, downenc);
+					    *datalen - offset, downenc);
 			if (res < 1) {
 				/* nothing encoded */
-				b++;	/* for final \0 */
+				if (offset == 0) {
+					*datalen = 0;
+					return 0;
+				}
 				break;
 			}
 
 			b = b + strlen(b) + 1;
 
 			offset += res;
-			if (offset >= datalen)
+			if (offset >= *datalen)
 				break;
 		}
 
 		/* Add final \0 */
 		*b = '\0';
+		*datalen = offset;
 		return b - buf;
 	} else if (qtype == T_TXT) {
-		if (buflen < 2)
+		int len;
+		size_t space;
+
+		if (buflen < 2) {
+			*datalen = 0;
 			return 0;
+		}
 		/* TXT with codec prefix */
-		size_t space = buflen - 2;
+		space = buflen - 2;
 		memset(buf, 0, buflen);
 		buf[0] = downenc->down_char;
-		return 1 + downenc->encode(buf+1, &space, data, datalen);
+		len = 1 + downenc->encode(buf+1, &space, data, *datalen);
+		*datalen = space;
+		return len;
 	}
+	*datalen = 0;
 	return 0;
 }

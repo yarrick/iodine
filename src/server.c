@@ -1814,7 +1814,7 @@ write_dns(int fd, struct dns_msg *q, const char *data, size_t datalen, const str
 		len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, data, datalen);
 	} else {
 		char wrapped[64*1024];
-		len = payload_wrap(wrapped, sizeof(wrapped), data, datalen, q->type, downenc);
+		len = payload_wrap(wrapped, sizeof(wrapped), data, &datalen, q->type, downenc);
 		if (len > 0) {
 			len = dns_encode(buf, sizeof(buf), q, QR_ANSWER, wrapped, len);
 		}
