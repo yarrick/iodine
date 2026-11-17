@@ -133,71 +133,87 @@ START_TEST(test_get_encoder_by_name)
 }
 END_TEST
 
+#define NUM_WRAP_QTYPES 5
+static const unsigned short
+wrap_qtypes[NUM_WRAP_QTYPES] = { T_A, T_CNAME, T_MX, T_SRV, T_TXT };
+
 START_TEST(test_payload_wrap_unwrap)
 {
-	static const unsigned short qtypes[] = {
-		T_A, T_CNAME, T_MX, T_SRV, T_TXT, 0
-	};
 	static const struct encoder *const encs[] = {
 		&base32_ops, &base64_ops, &base64u_ops, &base128_ops, &raw_ops, NULL
 	};
+	unsigned short qtype = wrap_qtypes[_i];
+	unsigned short rtype = (qtype == T_A) ? T_CNAME : qtype;
 	char bin_data[400];
 	char buf[4096];
-	size_t i, q, e, datalen;
+	size_t i, e, datalen;
 
 	for (i = 0; i < sizeof(bin_data); i++) {
 		bin_data[i] = (char)((i * 73 + 5) & 0xff);
 	}
 
-	for (q = 0; qtypes[q] != 0; q++) {
-		unsigned short qtype = qtypes[q];
-		unsigned short rtype = (qtype == T_A) ? T_CNAME : qtype;
+	for (e = 0; encs[e] != NULL; e++) {
+		const struct encoder *enc = encs[e];
 
-		for (e = 0; encs[e] != NULL; e++) {
-			const struct encoder *enc = encs[e];
+		if (!encoder_valid_for_qtype(enc, qtype))
+			continue;
 
-			if (!encoder_valid_for_qtype(enc, qtype))
-				continue;
+		for (datalen = 1; datalen <= sizeof(bin_data); datalen += 7) {
+			size_t wrapped_data = datalen;
+			int wraplen;
+			int ret;
 
-			for (datalen = 1; datalen <= sizeof(bin_data); datalen += 7) {
-				size_t wrapped_data = datalen;
-				int wraplen;
-				int ret;
+			memset(buf, '@', sizeof(buf));
+			wraplen = payload_wrap(buf, sizeof(buf),
+					bin_data, &wrapped_data, qtype, enc);
+			ck_assert_int_gt(wraplen, 0);
+			ck_assert_uint_gt(wrapped_data, 0);
+			ck_assert_uint_le(wrapped_data, datalen);
 
-				memset(buf, '@', sizeof(buf));
-				wraplen = payload_wrap(buf, sizeof(buf),
-						bin_data, &wrapped_data, qtype, enc);
-				ck_assert_int_gt(wraplen, 0);
-				ck_assert_uint_gt(wrapped_data, 0);
-				ck_assert_uint_le(wrapped_data, datalen);
-
-				if (qtype == T_TXT) {
-					ck_assert_int_eq(buf[0], enc->down_char);
-				} else {
-					ck_assert_int_eq(buf[0], enc->host_char);
-					ck_assert_ptr_null(strstr(buf, ".."));
-				}
-
-				if (qtype == T_MX || qtype == T_SRV) {
-					/* Full 400 bytes fit across multiple records */
-					ck_assert_uint_eq(wrapped_data, datalen);
-					ck_assert_int_eq(buf[wraplen], '\0');
-				}
-
-				ret = payload_unwrap(buf, (size_t)wraplen, rtype);
-				ck_assert_int_eq(ret, wrapped_data);
-				ck_assert_mem_eq(buf, bin_data, wrapped_data);
+			if (qtype == T_TXT) {
+				ck_assert_int_eq(buf[0], enc->down_char);
+			} else {
+				ck_assert_int_eq(buf[0], enc->host_char);
+				ck_assert_ptr_null(strstr(buf, ".."));
 			}
+
+			if (qtype == T_MX || qtype == T_SRV) {
+				/* Full 400 bytes fit across multiple records */
+				ck_assert_uint_eq(wrapped_data, datalen);
+				ck_assert_int_eq(buf[wraplen], '\0');
+			}
+
+			ret = payload_unwrap(buf, (size_t)wraplen, rtype);
+			ck_assert_int_eq(ret, wrapped_data);
+			ck_assert_mem_eq(buf, bin_data, wrapped_data);
 		}
 	}
+}
+END_TEST
 
-	/* Raw/NULL encoder on hostname qtypes falls back to Base32 */
-	datalen = 12;
-	i = payload_wrap(buf, sizeof(buf), bin_data, &datalen, T_CNAME, &raw_ops);
-	ck_assert_uint_gt(i, 0);
+START_TEST(test_payload_wrap_raw_fallback)
+{
+	const char bin_data[] = "fallback1234";
+	char buf[256];
+	size_t datalen;
+	int wraplen;
+
+	/* Raw and NULL encoders on hostname qtypes fall back to Base32 */
+	datalen = sizeof(bin_data) - 1;
+	wraplen = payload_wrap(buf, sizeof(buf), bin_data, &datalen, T_CNAME, &raw_ops);
+	ck_assert_int_gt(wraplen, 0);
+	ck_assert_uint_eq(datalen, sizeof(bin_data) - 1);
 	ck_assert_int_eq(buf[0], base32_ops.host_char);
-	ck_assert_int_eq(payload_unwrap(buf, i, T_CNAME), 12);
-	ck_assert_mem_eq(buf, bin_data, 12);
+	ck_assert_int_eq(payload_unwrap(buf, (size_t)wraplen, T_CNAME), sizeof(bin_data) - 1);
+	ck_assert_mem_eq(buf, bin_data, sizeof(bin_data) - 1);
+
+	datalen = sizeof(bin_data) - 1;
+	wraplen = payload_wrap(buf, sizeof(buf), bin_data, &datalen, T_MX, NULL);
+	ck_assert_int_gt(wraplen, 0);
+	ck_assert_uint_eq(datalen, sizeof(bin_data) - 1);
+	ck_assert_int_eq(buf[0], base32_ops.host_char);
+	ck_assert_int_eq(payload_unwrap(buf, (size_t)wraplen, T_MX), sizeof(bin_data) - 1);
+	ck_assert_mem_eq(buf, bin_data, sizeof(bin_data) - 1);
 }
 END_TEST
 
@@ -251,12 +267,14 @@ test_create(void)
 	TCase *tc;
 
 	tc = tcase_create("Encoding");
+	tcase_set_timeout(tc, 10);
 	tcase_add_loop_test(tc, test_inline_dotify, 0, TUPLES);
 	tcase_add_loop_test(tc, test_inline_undotify, 0, TUPLES);
 	tcase_add_test(tc, test_build_hostname);
 	tcase_add_test(tc, test_unpack_data_bounds);
 	tcase_add_test(tc, test_get_encoder_by_name);
-	tcase_add_test(tc, test_payload_wrap_unwrap);
+	tcase_add_loop_test(tc, test_payload_wrap_unwrap, 0, NUM_WRAP_QTYPES);
+	tcase_add_test(tc, test_payload_wrap_raw_fallback);
 	tcase_add_test(tc, test_payload_wrap_unwrap_bounds);
 
 	return tc;

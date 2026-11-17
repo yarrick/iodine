@@ -686,6 +686,7 @@ test_create(void)
 	TCase *tc;
 
 	tc = tcase_create("Dns");
+	tcase_set_timeout(tc, 10);
 	tcase_add_test(tc, test_encode_query);
 	tcase_add_test(tc, test_decode_query);
 	tcase_add_test(tc, test_encode_response);

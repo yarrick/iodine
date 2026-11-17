@@ -376,6 +376,7 @@ test_create(void)
 	TCase *tc;
 
 	tc = tcase_create("Read");
+	tcase_set_timeout(tc, 10);
 	tcase_add_test(tc, test_read_putshort);
 	tcase_add_test(tc, test_read_putlong);
 	tcase_add_test(tc, test_read_name_empty_loop);
