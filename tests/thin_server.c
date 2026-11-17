@@ -19,14 +19,14 @@
 #include <sys/socket.h>
 #endif
 
-#include "common.h"
-#include "compat.h"
-#include "ext_ip.h"
-#include "fw_query.h"
-#include "server.h"
-#include "udp.h"
-#include "ui.h"
-#include "user.h"
+#include "src/common.h"
+#include "src/compat.h"
+#include "src/ext_ip.h"
+#include "src/fw_query.h"
+#include "src/server.h"
+#include "src/udp.h"
+#include "src/ui.h"
+#include "src/user.h"
 
 /* Needs to be 16 since 8 tests are done for each of IPv4 and IPv6 */
 #define USERS 16

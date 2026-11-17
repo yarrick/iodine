@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "compat.h"
+#include "src/compat.h"
 
 #ifndef __TEST_MAIN_H__
 #define __TEST_MAIN_H__

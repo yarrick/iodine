@@ -16,8 +16,8 @@
  */
 
 #include "config.h"
-#include "common.h"
-#include "random.h"
+#include "src/common.h"
+#include "src/random.h"
 #include "test_main.h"
 
 #include <check.h>

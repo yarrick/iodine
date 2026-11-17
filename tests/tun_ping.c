@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 #ifdef WINDOWS
-#include "windows_dns.h"
+#include "src/windows_dns.h"
 #include <ws2def.h>
 #else
 #include <arpa/inet.h>
@@ -16,10 +16,10 @@
 #include <sys/socket.h>
 #endif
 
-#include "compat.h"
-#include "process.h"
-#include "tun.h"
-#include "ui.h"
+#include "src/compat.h"
+#include "src/process.h"
+#include "src/tun.h"
+#include "src/ui.h"
 
 #define ICMP_ECHO_REQUEST	8
 #define ICMP_ECHO_REPLY		0

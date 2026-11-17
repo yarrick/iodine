@@ -28,7 +28,6 @@ cdata = configuration_data()
 cdata.set_quoted('IODINE_VERSION', meson.project_version())
 cdata.set('MAX_USERS', get_option('max_users'))
 
-includes = include_directories('.', 'src', 'wintun/include')
 target_dir = get_option('sbindir')
 docdir = get_option('docdir')
 if docdir == ''
@@ -190,7 +189,6 @@ configure_file(output: 'config.h',
 libcommon = static_library(
   'common',
   common_sources,
-  include_directories: includes,
   dependencies: commondeps,
 )
 
@@ -212,7 +210,6 @@ executable('iodine',
   sources: files('src/client.c', 'src/iodine.c'),
   c_args: '-DUSED_LIBS="@0@"'.format(', '.join(client_usage)),
   link_with: libcommon,
-  include_directories: includes,
   dependencies: zlib,
   install: true,
   install_dir: target_dir,
@@ -221,7 +218,6 @@ executable('iodine',
 libserver = static_library(
   'server',
   files('src/ext_ip.c', 'src/fw_query.c', 'src/server.c', 'src/user.c'),
-  include_directories: includes,
   link_with: libcommon,
   dependencies: zlib,
 )
@@ -231,7 +227,6 @@ executable('iodined',
   c_args: '-DUSED_LIBS="@0@"'.format(', '.join(server_usage)),
   link_with: libserver,
   dependencies: serverdeps,
-  include_directories: includes,
   install: true,
   install_dir: target_dir,
 )

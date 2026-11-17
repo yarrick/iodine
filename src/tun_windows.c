@@ -27,7 +27,7 @@
 #include "tun.h"
 #include "udp.h"
 #include "ui.h"
-#include "wintun.h"
+#include "wintun/include/wintun.h"
 
 #include <winsock2.h>
 #include <windows.h>

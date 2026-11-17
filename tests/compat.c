@@ -22,7 +22,7 @@
 #include <errno.h>
 
 #include "config.h"
-#include "compat.h"
+#include "src/compat.h"
 #include "test_main.h"
 
 START_TEST(test_progname)

@@ -16,8 +16,8 @@
  */
 
 #include "config.h"
-#include "compat.h"
-#include "common.h"
+#include "src/compat.h"
+#include "src/common.h"
 #include "test_main.h"
 
 #include <check.h>
@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #ifdef WINDOWS
-#include "windows_dns.h"
+#include "src/windows_dns.h"
 #else
 #include <sys/socket.h>
 #include <netdb.h>

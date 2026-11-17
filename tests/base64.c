@@ -21,7 +21,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "encoding.h"
+#include "src/encoding.h"
 #include "test_main.h"
 
 #define TUPLES 5

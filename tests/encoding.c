@@ -22,9 +22,9 @@
 #include <string.h>
 
 #include "config.h"
-#include "compat.h"
-#include "dns.h"
-#include "encoding.h"
+#include "src/compat.h"
+#include "src/dns.h"
+#include "src/encoding.h"
 #include "test_main.h"
 
 #define TUPLES 4

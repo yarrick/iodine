@@ -1,3 +1,5 @@
+includes = include_directories('..')
+
 libcheck = dependency('check', required: false)
 if libcheck.found()
   suites = [

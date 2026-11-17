@@ -22,7 +22,7 @@
 #include <unistd.h>
 
 #include "config.h"
-#include "ui.h"
+#include "src/ui.h"
 #include "test_main.h"
 
 #ifdef WINDOWS

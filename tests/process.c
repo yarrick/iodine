@@ -16,8 +16,8 @@
  */
 
 #include "config.h"
-#include "compat.h"
-#include "process.h"
+#include "src/compat.h"
+#include "src/process.h"
 #include "test_main.h"
 
 #include <check.h>

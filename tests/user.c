@@ -22,17 +22,17 @@
 #include <string.h>
 #include <time.h>
 #ifdef WINDOWS
-#include "windows_dns.h"
+#include "src/windows_dns.h"
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
 
-#include "common.h"
-#include "compat.h"
-#include "encoding.h"
-#include "user.h"
+#include "src/common.h"
+#include "src/compat.h"
+#include "src/encoding.h"
+#include "src/user.h"
 #include "test_main.h"
 
 #define TEST_USERS 16

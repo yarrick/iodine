@@ -29,10 +29,10 @@
 #include <string.h>
 #include <check.h>
 
-#include "common.h"
-#include "encoding.h"
-#include "dns.h"
-#include "read.h"
+#include "src/common.h"
+#include "src/encoding.h"
+#include "src/dns.h"
+#include "src/read.h"
 #include "test_main.h"
 
 START_TEST(test_read_putshort)

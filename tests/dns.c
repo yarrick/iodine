@@ -29,11 +29,11 @@
 #endif
 #include <sys/stat.h>
 
-#include "common.h"
-#include "compat.h"
-#include "dns.h"
-#include "encoding.h"
-#include "read.h"
+#include "src/common.h"
+#include "src/compat.h"
+#include "src/dns.h"
+#include "src/encoding.h"
+#include "src/read.h"
 #include "test_main.h"
 
 static void dump_packet(char *, size_t);
