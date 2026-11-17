@@ -3,6 +3,7 @@ project(
   'c',
   default_options: [
     'buildtype=release',
+    'b_lto=true',
     'c_std=c99',
     'warning_level=3',
   ],
