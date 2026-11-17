@@ -19,15 +19,9 @@
 #define __COMPAT_H__
 
 #include <stdarg.h>
+#include <stddef.h>
 
 #include "config.h"
-
-#ifdef WINDOWS
-#include "windows_dns.h"
-#else
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#endif
 
 extern char *__progname;
 
