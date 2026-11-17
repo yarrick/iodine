@@ -442,8 +442,45 @@ log_dns_error(struct dns_msg *q, int ignore_some_errors)
 }
 
 static int
-read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
-/* FIXME: tun_fd needed for raw handling */
+tunnel_raw(int tun_fd, int dns_fd)
+{
+	struct udp_addr addr;
+	char data[64*1024];
+	unsigned long packetlen;
+	char packet[64*1024];
+	int r;
+
+	r = read_udp(dns_fd, data, sizeof(data), &addr);
+	if (r < 0) {
+		return -1;
+	}
+
+	/* minimum length */
+	if (r < RAW_HDR_LEN) return 0;
+	/* should start with header */
+	if (memcmp(data, raw_header, RAW_HDR_IDENT_LEN)) return 0;
+	/* should be my user id */
+	if (RAW_HDR_GET_USR(data) != userid) return 0;
+
+	if (RAW_HDR_GET_CMD(data) == RAW_HDR_CMD_DATA ||
+		RAW_HDR_GET_CMD(data) == RAW_HDR_CMD_PING)
+		lastdownstreamtime = time(NULL);
+
+	/* should be data packet */
+	if (RAW_HDR_GET_CMD(data) != RAW_HDR_CMD_DATA) return 0;
+
+	r -= RAW_HDR_LEN;
+	packetlen = sizeof(packet);
+	if (uncompress((uint8_t*)packet, &packetlen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
+		write_tun(tun_fd, packet, packetlen);
+	}
+
+	/* don't process any further */
+	return 0;
+}
+
+static int
+read_dns(int dns_fd, char *buf, int buflen, struct dns_msg *q)
 /* Returns -1 on receive error or decode error, including DNS error replies.
    Returns 0 on replies that could be correct but are useless, and are not
    DNS error replies.
@@ -451,54 +488,21 @@ read_dns_withq(int dns_fd, int tun_fd, char *buf, int buflen, struct dns_msg *q)
 */
 {
 	char data[64*1024];
-	int r;
+	int rv;
 
-	r = read_udp(dns_fd, data, sizeof(data), &q->address);
-	if (r < 0) {
-		return -1;
+	rv = read_udp(dns_fd, data, sizeof(data), &q->address);
+	if (rv <= 0)
+		/* useless packet */
+		return rv;
+
+	rv = dns_decode_answer(buf, buflen, q, data, rv);
+	if (rv <= 0)
+		return rv;
+
+	if (q->rtype == T_NULL || q->rtype == T_PRIVATE) {
+		return rv;
 	}
-
-	if (conn == CONN_DNS_NULL) {
-		int rv;
-		if (r <= 0)
-			/* useless packet */
-			return 0;
-
-		rv = dns_decode_answer(buf, buflen, q, data, r);
-		if (rv <= 0)
-			return rv;
-
-		if (q->rtype == T_NULL || q->rtype == T_PRIVATE) {
-			return rv;
-		}
-		return payload_unwrap(buf, rv, q->rtype);
-	} else { /* CONN_RAW_UDP */
-		unsigned long packetlen;
-		char packet[64*1024];
-
-		/* minimum length */
-		if (r < RAW_HDR_LEN) return 0;
-		/* should start with header */
-		if (memcmp(data, raw_header, RAW_HDR_IDENT_LEN)) return 0;
-		/* should be my user id */
-		if (RAW_HDR_GET_USR(data) != userid) return 0;
-
-		if (RAW_HDR_GET_CMD(data) == RAW_HDR_CMD_DATA ||
-		    RAW_HDR_GET_CMD(data) == RAW_HDR_CMD_PING)
-			lastdownstreamtime = time(NULL);
-
-		/* should be data packet */
-		if (RAW_HDR_GET_CMD(data) != RAW_HDR_CMD_DATA) return 0;
-
-		r -= RAW_HDR_LEN;
-		packetlen = sizeof(packet);
-		if (uncompress((uint8_t*)packet, &packetlen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
-			write_tun(tun_fd, packet, packetlen);
-		}
-
-		/* don't process any further */
-		return 0;
-	}
+	return payload_unwrap(buf, rv, q->rtype);
 }
 
 static int
@@ -537,7 +541,7 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char cmd, int timeout)
 
 		q.id = 0;
 		q.name[0] = '\0';
-		rv = read_dns_withq(dns_fd, 0, buf, buflen, &q);
+		rv = read_dns(dns_fd, buf, buflen, &q);
 		command = ascii_tolower(q.name[0]);
 
 		if (q.id != chunkid || command != cmd) {
@@ -645,10 +649,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 	unsigned char command;
 
 	memset(q.name, 0, sizeof(q.name));
-	read = read_dns_withq(dns_fd, tun_fd, buf, sizeof(buf), &q);
-
-	if (conn != CONN_DNS_NULL)
-		return 1;  /* everything already done */
+	read = read_dns(dns_fd, buf, sizeof(buf), &q);
 
 #if 0
 	ui_log("				Recv: id %5d name[0]='%c'\n",
@@ -1021,8 +1022,13 @@ client_tunnel(int tun_fd, int dns_fd)
 				   If chunk sent, sets send_ping_soon=0. */
 			}
 			if (FD_ISSET(dns_fd, &fds)) {
-				if (tunnel_dns(tun_fd, dns_fd) <= 0)
-					continue;
+				if (conn == CONN_DNS_NULL) {
+					if (tunnel_dns(tun_fd, dns_fd) <= 0)
+						continue;
+				} else {
+					if (tunnel_raw(tun_fd, dns_fd) <= 0)
+						continue;
+				}
 			}
 		}
 	}
