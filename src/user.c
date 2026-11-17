@@ -37,16 +37,17 @@ struct tun_user *users;
 static unsigned int usercount;
 
 int
-init_users(unsigned int max_users, in_addr_t my_ip, int netbits)
+init_users(unsigned int max_users, struct in_addr my_ip, int netbits)
 {
 	unsigned int i;
 	unsigned int net_max_users;
 	int skip = 0;
 	int n;
-	in_addr_t netmask = 0;
+	uint32_t netmask;
 	struct in_addr net;
 	struct in_addr ipstart;
 
+	netmask = 0;
 	for (n = 0; n < netbits; n++) {
 		netmask = (netmask << 1) | 1;
 	}
@@ -54,23 +55,22 @@ init_users(unsigned int max_users, in_addr_t my_ip, int netbits)
 		return -1;
 	netmask <<= (32 - netbits);
 	net.s_addr = htonl(netmask);
-	ipstart.s_addr = my_ip & net.s_addr;
+	ipstart.s_addr = my_ip.s_addr & net.s_addr;
 
 	net_max_users = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
 	usercount = MIN(net_max_users, max_users);
 
 	users = calloc(usercount, sizeof(struct tun_user));
 	for (i = 0; i < usercount; i++) {
-		in_addr_t ip;
+		struct in_addr ip;
 		users[i].id = i;
-		ip = ipstart.s_addr + htonl(i + skip + 1);
-		if (ip == my_ip && skip == 0) {
+		ip.s_addr = ipstart.s_addr + htonl(i + skip + 1);
+		if (ip.s_addr == my_ip.s_addr && skip == 0) {
 			/* This IP was taken by iodined */
 			skip++;
-			ip = ipstart.s_addr + htonl(i + skip + 1);
+			ip.s_addr = ipstart.s_addr + htonl(i + skip + 1);
 		}
 		users[i].tun_ip = ip;
-		net.s_addr = ip;
 		users[i].disabled = 0;
 		users[i].authenticated = 0;
 		users[i].authenticated_raw = 0;
@@ -82,14 +82,14 @@ init_users(unsigned int max_users, in_addr_t my_ip, int netbits)
 	return usercount;
 }
 
-const in_addr_t *
+const struct in_addr *
 users_get_first_ip(void)
 {
 	return &users[0].tun_ip;
 }
 
 int
-find_user_by_ip(uint32_t ip)
+find_user_by_ip(struct in_addr ip)
 {
 	int ret;
 	unsigned int i;
@@ -100,7 +100,7 @@ find_user_by_ip(uint32_t ip)
 			users[i].authenticated &&
 			!users[i].disabled &&
 			users[i].last_pkt + 60 > time(NULL) &&
-			ip == users[i].tun_ip) {
+			ip.s_addr == users[i].tun_ip.s_addr) {
 			ret = i;
 			break;
 		}

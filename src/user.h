@@ -70,7 +70,7 @@ struct tun_user {
 	int disabled;
 	time_t last_pkt;
 	int seed;
-	in_addr_t tun_ip;
+	struct in_addr tun_ip;
 	struct net_addr host;
 	struct udp_addr raw_addr;
 	struct dns_msg q;
@@ -103,9 +103,9 @@ struct tun_user {
 
 extern struct tun_user *users;
 
-int init_users(unsigned int, in_addr_t, int);
-const in_addr_t* users_get_first_ip(void);
-int find_user_by_ip(uint32_t);
+int init_users(unsigned int, struct in_addr, int);
+const struct in_addr* users_get_first_ip(void);
+int find_user_by_ip(struct in_addr);
 int all_users_waiting_to_send(void);
 int find_available_user(unsigned int*);
 void user_switch_up_codec(unsigned int userid, const struct encoder *enc);

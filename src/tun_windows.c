@@ -224,7 +224,7 @@ read_tun(int tun_fd, char *buf, size_t len)
 }
 
 int
-tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
+tun_setip(const struct in_addr *ip, const struct in_addr *peer_ip, int netbits)
 {
 	struct in_addr netmask;
 	struct in_addr localaddr;
@@ -238,7 +238,7 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 		return 1;
 	}
 
-	localaddr.s_addr = *ip;
+	localaddr = *ip;
 
 	/* Remove earlier IP addresses on interface */
 	if (GetUnicastIpAddressTable(AF_INET, &table) == NO_ERROR) {

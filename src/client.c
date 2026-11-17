@@ -1259,8 +1259,8 @@ handshake_login(int dns_fd, int seed)
 					ui_log("Received bad client IP (%s)\n", client);
 				} else if (inet_pton(AF_INET, server, &serveraddr) <= 0) {
 					ui_log("Received bad server IP (%s)\n", server);
-				} else if (tun_setip(&clientaddr.s_addr,
-						     &serveraddr.s_addr, netbits) == 0 &&
+				} else if (tun_setip(&clientaddr,
+						     &serveraddr, netbits) == 0 &&
 					   tun_setmtu(mtu) == 0) {
 					ui_log("Server tunnel IP is %s\n", server);
 					return 0;

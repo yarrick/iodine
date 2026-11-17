@@ -35,9 +35,9 @@ struct server_params {
 	int users;
 	int check_ip;
 	int tunnel_mtu;
-	in_addr_t server_ip;
+	struct in_addr server_ip;
 	int netmask;
-	in_addr_t nameserver_ip;
+	struct in_addr nameserver_ip;
 	struct net_addr bind_addr;
 };
 

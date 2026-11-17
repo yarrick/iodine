@@ -169,7 +169,7 @@ main(int argc, char **argv)
 	params.users = init_users(USERS, params.server_ip, params.netmask);
 	params.check_ip = 1;
 	params.tunnel_mtu = 1130;
-	params.nameserver_ip = ns_ip.s_addr;
+	params.nameserver_ip = ns_ip;
 	server_init(&params);
 
 	signal(SIGINT, sighandler);

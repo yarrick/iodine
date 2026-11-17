@@ -400,14 +400,14 @@ main(int argc, char **argv)
 	}
 
 	if (bind_enable) {
-		in_addr_t dns_ip = ((struct sockaddr_in *) &dns4addr.addr)->sin_addr.s_addr;
+		struct in_addr dns_ip = ((struct sockaddr_in *) &dns4addr.addr)->sin_addr;
 		if (bind_port < 1 || bind_port > 65535) {
 			warnx("Bad DNS server port number given.");
 			usage();
 			/* NOTREACHED */
 		}
 		/* Avoid forwarding loops */
-		if (bind_port == port && (dns_ip == INADDR_ANY || dns_ip == htonl(0x7f000001L))) {
+		if (bind_port == port && (dns_ip.s_addr == INADDR_ANY || dns_ip.s_addr == htonl(0x7f000001L))) {
 			warnx("Forward port is same as listen port (%d), will create a loop!", bind_port);
 			ui_log("Use -l to set listen ip to avoid this.\n");
 			usage();
@@ -450,14 +450,14 @@ main(int argc, char **argv)
 	dns_fds.v4fd = -1;
 	dns_fds.v6fd = -1;
 
-	created_users = init_users(MAX_USERS, my_ip.s_addr, netmask);
+	created_users = init_users(MAX_USERS, my_ip, netmask);
 
 	if ((tun_fd = open_tun(device)) == -1) {
 		/* nothing to clean up, just return */
 		return 1;
 	}
 	if (!skipipconfig) {
-		if (tun_setip(&my_ip.s_addr, users_get_first_ip(), netmask) != 0 ||
+		if (tun_setip(&my_ip, users_get_first_ip(), netmask) != 0 ||
 		    tun_setmtu(mtu) != 0) {
 			retval = 1;
 			goto cleanup;
@@ -561,9 +561,9 @@ main(int argc, char **argv)
 	params.users = created_users;
 	params.check_ip = check_ip;
 	params.tunnel_mtu = mtu;
-	params.server_ip = my_ip.s_addr;
+	params.server_ip = my_ip;
 	params.netmask = netmask;
-	params.nameserver_ip = ns_ip.s_addr;
+	params.nameserver_ip = ns_ip;
 	params.bind_addr = bind_addr;
 
 	server_init(&params);

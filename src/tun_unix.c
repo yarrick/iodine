@@ -414,7 +414,7 @@ tun_add_route(struct sockaddr_in *localaddr, struct sockaddr_in *maskaddr)
 #endif
 
 int
-tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
+tun_setip(const struct in_addr *ip, const struct in_addr *peer_ip, int netbits)
 {
 	int sock;
 	struct sockaddr_in localaddr, peeraddr, maskaddr;
@@ -431,11 +431,11 @@ tun_setip(const in_addr_t *ip, const in_addr_t *peer_ip, int netbits)
 
 	memset(&localaddr, 0, sizeof(localaddr));
 	localaddr.sin_family = AF_INET;
-	localaddr.sin_addr.s_addr = *ip;
+	localaddr.sin_addr = *ip;
 
 	memset(&peeraddr, 0, sizeof(peeraddr));
 	peeraddr.sin_family = AF_INET;
-	peeraddr.sin_addr.s_addr = *peer_ip;
+	peeraddr.sin_addr = *peer_ip;
 
 	memset(&maskaddr, 0, sizeof(maskaddr));
 	maskaddr.sin_family = AF_INET;

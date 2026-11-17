@@ -129,7 +129,7 @@ main(int argc, char **argv)
 
 	inet_pton(AF_INET, myaddr, &host);
 	inet_pton(AF_INET, peeraddr, &peer);
-	if (tun_setip(&host.s_addr, &peer.s_addr, netbits)) {
+	if (tun_setip(&host, &peer, netbits)) {
 		close(fd);
 		return -1;
 	}

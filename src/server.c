@@ -59,10 +59,10 @@ static int created_users;
 
 static int check_ip;
 static int my_mtu;
-static in_addr_t my_ip;
+static struct in_addr my_ip;
 static int netmask;
 
-static in_addr_t ns_ip;
+static struct in_addr ns_ip;
 
 static struct net_addr bind_addr;
 
@@ -454,7 +454,7 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 
 	/* find target ip in packet, in is padded with 4 bytes TUN header */
 	header = (struct ip*) (in + 4);
-	userid = find_user_by_ip(header->ip_dst.s_addr);
+	userid = find_user_by_ip(header->ip_dst);
 	if (userid < 0)
 		return 0;
 
@@ -635,7 +635,6 @@ process_downstream_ack(int userid, int down_seq, int down_frag)
 static void
 handle_login_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
-	struct in_addr tempip;
 	char logindata[16];
 	char unpacked[64*1024];
 	char out[64*1024];
@@ -667,10 +666,8 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 		users[userid].authenticated = 1;
 
 		/* Send ip/mtu/netmask info */
-		tempip.s_addr = my_ip;
-		tmp[0] = strdup(format_inaddr(&tempip));
-		tempip.s_addr = users[userid].tun_ip;
-		tmp[1] = strdup(format_inaddr(&tempip));
+		tmp[0] = strdup(format_inaddr(&my_ip));
+		tmp[1] = strdup(format_inaddr(&users[userid].tun_ip));
 
 		read = snprintf(out, sizeof(out), "%s-%s-%d-%d",
 				tmp[0], tmp[1], my_mtu, netmask);
@@ -705,7 +702,7 @@ handle_ip_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 
 	reply[0] = 'I';
 	if (q->address.remote.addr.ss_family == AF_INET) {
-		if (ns_ip != INADDR_ANY) {
+		if (ns_ip.s_addr != INADDR_ANY) {
 			/* If set, use assigned external ip (-n option) */
 			memcpy(&reply[1], &ns_ip, sizeof(ns_ip));
 		} else {
@@ -1257,7 +1254,7 @@ handle_ns_request(int dns_fd, struct dns_msg *q, int topdomain_offset)
 	int len;
 
 	memcpy(&address, &q->address.local.addr, q->address.local.addrlen);
-	if (ns_ip != INADDR_ANY) {
+	if (ns_ip.s_addr != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
 		struct sockaddr_in *addr = (struct sockaddr_in *) &address;
@@ -1290,7 +1287,7 @@ handle_a_request(int dns_fd, struct dns_msg *q, int fakeip)
 	if (fakeip) {
 		addr->sin_family = AF_INET;
 		inet_pton(AF_INET, "127.0.0.1", &addr->sin_addr);
-	} else if (ns_ip != INADDR_ANY) {
+	} else if (ns_ip.s_addr != INADDR_ANY) {
 		/* If ns_ip set, overwrite destination addr with it.
 		 * Destination addr will be sent as additional record (A, IN) */
 		addr->sin_family = AF_INET;
@@ -1652,7 +1649,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 		struct ip *hdr;
 
 		hdr = (struct ip*) (out + 4);
-		touser = find_user_by_ip(hdr->ip_dst.s_addr);
+		touser = find_user_by_ip(hdr->ip_dst);
 
 		if (touser == -1) {
 			/* send the uncompressed packet to tun device */
