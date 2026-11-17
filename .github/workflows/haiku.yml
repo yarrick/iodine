@@ -26,7 +26,7 @@ jobs:
           ninja
           ./iodine -v
           ./iodined -v
-          ninja test --num-processes 1
+          meson test -j 1
           python3 -m ensurepip
           python3 -m pip install ping3
           ifconfig tun/0 up
