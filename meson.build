@@ -109,6 +109,7 @@ foreach func : optional_functions
 endforeach
 
 cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
+cdata.set10('HAVE_SO_RTABLE', cc.has_header_symbol('sys/socket.h', 'SO_RTABLE'))
 cdata.set10('HAVE_NORETURN_ATTR', cc.has_function_attribute('noreturn'))
 cdata.set10('HAVE_FORMAT_ATTR', cc.has_function_attribute('format'))
 

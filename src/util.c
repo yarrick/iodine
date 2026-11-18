@@ -20,7 +20,7 @@
 #include "compat.h"
 #ifdef WINDOWS
 #include <iphlpapi.h>
-#else
+#elif HAVE_SO_RTABLE
 #include <sys/socket.h>
 #include <netinet/in.h>
 #endif
@@ -88,7 +88,7 @@ socket_setrtable(int fd, int rtable)
 {
 	(void)fd;
 	(void)rtable;
-#ifdef SO_RTABLE
+#if HAVE_SO_RTABLE
 	if (setsockopt (fd, IPPROTO_IP, SO_RTABLE, &rtable, sizeof(rtable)) == -1)
 		err(1, "Failed to set routing table %d", rtable);
 #else
