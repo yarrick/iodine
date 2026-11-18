@@ -11,6 +11,7 @@
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 #else
+#include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <netdb.h>
