@@ -24,6 +24,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 #ifndef WINDOWS
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #endif
