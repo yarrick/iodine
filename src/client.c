@@ -21,7 +21,6 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#include <sys/time.h>
 #include <zlib.h>
 #include <time.h>
 
@@ -35,6 +34,7 @@
 #include "dns.h"
 #include "login.h"
 #include "random.h"
+#include "sock.h"
 #include "tun.h"
 #include "version.h"
 #include "client.h"
@@ -511,18 +511,12 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char cmd, int timeout)
 {
 	struct dns_msg q;
 	int r, rv;
-	fd_set fds;
-	struct timeval tv;
 
 	/* In case it was uppercase, will be compared to lowercase below */
 	cmd = ascii_tolower(cmd);
 	while (1) {
 		unsigned char command;
-		tv.tv_sec = timeout;
-		tv.tv_usec = 0;
-		FD_ZERO(&fds);
-		FD_SET(dns_fd, &fds);
-		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+		r = sock_select(timeout * 1000, NULL, dns_fd);
 
 		if (r < 0)
 			return -1;	/* select error */
@@ -927,7 +921,6 @@ tunnel_dns(int tun_fd, int dns_fd)
 int
 client_tunnel(int tun_fd, int dns_fd)
 {
-	struct timeval tv;
 	fd_set fds;
 	int i;
 
@@ -935,33 +928,27 @@ client_tunnel(int tun_fd, int dns_fd)
 	send_query_sendcnt = 0;  /* start counting now */
 
 	while (running) {
-		tv.tv_sec = selecttimeout;
-		tv.tv_usec = 0;
+		int timeout_ms = selecttimeout * 1000;
+		int watch_tun;
 
 		if (is_sending()) {
 			/* fast timeout for retransmits */
-			tv.tv_sec = 1;
-			tv.tv_usec = 0;
+			timeout_ms = 1000;
 		}
 
 		if (send_ping_soon) {
-			tv.tv_sec = 0;
-			tv.tv_usec = send_ping_soon * 1000;
+			timeout_ms = send_ping_soon;
 		}
 
-		FD_ZERO(&fds);
-		if (!is_sending() || outchunkresent >= 2) {
-			/* If re-sending upstream data, chances are that
-			   we're several seconds behind already and TCP
-			   will start filling tun buffer with (useless)
-			   retransmits.
-			   Get up-to-date fast by simply dropping stuff,
-			   that's what TCP is designed to handle. */
-			FD_SET(tun_fd, &fds);
-		}
-		FD_SET(dns_fd, &fds);
+		/* If re-sending upstream data, chances are that
+		   we're several seconds behind already and TCP
+		   will start filling tun buffer with (useless)
+		   retransmits.
+		   Get up-to-date fast by simply dropping stuff,
+		   that's what TCP is designed to handle. */
+		watch_tun = (!is_sending() || outchunkresent >= 2) ? tun_fd : -1;
 
-		i = select(MAX(tun_fd, dns_fd) + 1, &fds, NULL, NULL, &tv);
+		i = sock_select(timeout_ms, &fds, watch_tun, dns_fd);
 
  		if (lastdownstreamtime + 60 < time(NULL)) {
  			warnx("No downstream data received in 60 seconds, shutting down.");
@@ -1003,7 +990,7 @@ client_tunnel(int tun_fd, int dns_fd)
 
 		} else {
 
-			if (FD_ISSET(tun_fd, &fds)) {
+			if (sock_isset(tun_fd, &fds)) {
 				if (tunnel_tun(tun_fd, dns_fd) <= 0)
 					continue;
 				/* Returns -1 on error OR when quickly
@@ -1011,7 +998,7 @@ client_tunnel(int tun_fd, int dns_fd)
 				   we need to _not_ do tunnel_dns() then.
 				   If chunk sent, sets send_ping_soon=0. */
 			}
-			if (FD_ISSET(dns_fd, &fds)) {
+			if (sock_isset(dns_fd, &fds)) {
 				if (conn == CONN_DNS_NULL) {
 					if (tunnel_dns(tun_fd, dns_fd) <= 0)
 						continue;
@@ -1281,10 +1268,8 @@ handshake_login(int dns_fd, int seed)
 static int
 handshake_raw_udp(int dns_fd, int seed)
 {
-	struct timeval tv;
 	char get_ip[] = { 'i', b32_5to8(userid), 0 };
 	char in[4096];
-	fd_set fds;
 	int i;
 	int r;
 	int len;
@@ -1338,15 +1323,9 @@ handshake_raw_udp(int dns_fd, int seed)
 	 * based on the old seed. If reply received,
 	 * switch to raw udp mode */
 	for (i = 0; running && i < 4; i++) {
-		tv.tv_sec = i + 1;
-		tv.tv_usec = 0;
-
 		send_raw_udp_login(dns_fd, seed);
 
-		FD_ZERO(&fds);
-		FD_SET(dns_fd, &fds);
-
-		r = select(dns_fd + 1, &fds, NULL, NULL, &tv);
+		r = sock_select((i + 1) * 1000, NULL, dns_fd);
 
 		if (r > 0) {
 			/* recv() needed for windows, dont change to read() */

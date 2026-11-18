@@ -36,6 +36,7 @@ static LPFN_WSARECVMSG wsa_recvmsg = NULL;
 
 #include "common.h"
 #include "compat.h"
+#include "sock.h"
 #include "ui.h"
 #include "udp.h"
 

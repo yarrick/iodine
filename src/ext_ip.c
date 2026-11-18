@@ -17,7 +17,6 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <sys/time.h>
 
 #include "config.h"
 
@@ -28,7 +27,6 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include <sys/select.h>
 #endif
 
 #include "common.h"
@@ -36,6 +34,7 @@
 #include "dns.h"
 #include "ext_ip.h"
 #include "random.h"
+#include "sock.h"
 #include "udp.h"
 #include "ui.h"
 
@@ -62,8 +61,6 @@ get_external_ip(struct in_addr *ip)
 	for (attempt = 0; attempt < 3; attempt++) {
 		char buf[64*1024];
 		int buflen;
-		fd_set fds;
-		struct timeval tv;
 
 		if (attempt)
 			ui_log("Retrying external IP lookup\n");
@@ -74,11 +71,7 @@ get_external_ip(struct in_addr *ip)
 
 		sendto(fd, buf, buflen, 0, (struct sockaddr*) &addr.addr, addr.addrlen);
 
-		tv.tv_sec = 1 + attempt;
-		tv.tv_usec = 0;
-		FD_ZERO(&fds);
-		FD_SET(fd, &fds);
-		res = select(fd + 1, &fds, NULL, NULL, &tv);
+		res = sock_select((1 + attempt) * 1000, NULL, fd);
 		if (res > 0) {
 			buflen = sizeof(buf);
 			buflen = recv(fd, buf, buflen, 0);

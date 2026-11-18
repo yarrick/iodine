@@ -15,7 +15,6 @@
 #include <net/if.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #endif
 
@@ -24,6 +23,7 @@
 #include "src/ext_ip.h"
 #include "src/fw_query.h"
 #include "src/server.h"
+#include "src/sock.h"
 #include "src/udp.h"
 #include "src/ui.h"
 #include "src/user.h"
@@ -185,41 +185,22 @@ main(int argc, char **argv)
 
 	while (running) {
 		fd_set fds;
-		struct timeval tv;
-		int maxfd = 0;
 		int res;
 
-		FD_ZERO(&fds);
-		if (dns_fds.v4fd >= 0) {
-			FD_SET(dns_fds.v4fd, &fds);
-			maxfd = MAX(maxfd, dns_fds.v4fd);
-		}
-		if (dns_fds.v6fd >= 0) {
-			FD_SET(dns_fds.v6fd, &fds);
-			maxfd = MAX(maxfd, dns_fds.v6fd);
-		}
-		if (bind_fd >= 0) {
-			FD_SET(bind_fd, &fds);
-			maxfd = MAX(maxfd, bind_fd);
-		}
-
-		tv.tv_sec = 0;
-		tv.tv_usec = 500000;
-
-		res = select(maxfd + 1, &fds, NULL, NULL, &tv);
+		res = sock_select(500, &fds, dns_fds.v4fd, dns_fds.v6fd, bind_fd);
 		if (res < 0) {
 			if (running)
 				warn("select");
 			break;
 		}
 		if (res > 0) {
-			if (dns_fds.v4fd >= 0 && FD_ISSET(dns_fds.v4fd, &fds)) {
+			if (sock_isset(dns_fds.v4fd, &fds)) {
 				tunnel_dns(-1, dns_fds.v4fd, &dns_fds, bind_fd);
 			}
-			if (dns_fds.v6fd >= 0 && FD_ISSET(dns_fds.v6fd, &fds)) {
+			if (sock_isset(dns_fds.v6fd, &fds)) {
 				tunnel_dns(-1, dns_fds.v6fd, &dns_fds, bind_fd);
 			}
-			if (bind_fd >= 0 && FD_ISSET(bind_fd, &fds)) {
+			if (sock_isset(bind_fd, &fds)) {
 				tunnel_bind(bind_fd, &dns_fds);
 			}
 		}

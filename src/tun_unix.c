@@ -59,6 +59,7 @@
 
 #include "tun.h"
 #include "common.h"
+#include "sock.h"
 
 static char if_name[250];
 

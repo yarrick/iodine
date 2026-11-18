@@ -20,7 +20,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/time.h>
 #include <time.h>
 #include <zlib.h>
 
@@ -31,6 +30,7 @@
 #include "random.h"
 #include "read.h"
 #include "server.h"
+#include "sock.h"
 #include "ui.h"
 
 #ifndef WINDOWS
@@ -1527,16 +1527,14 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 int
 server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 {
-	struct timeval tv;
 	fd_set fds;
 	int i;
 	int userid;
 	time_t last_action = time(NULL);
 
 	while (running) {
-		int maxfd;
-		tv.tv_sec = 10;			/* doesn't really matter */
-		tv.tv_usec = 0;
+		int timeout_ms = 10000;		/* doesn't really matter */
+		int watch_tun;
 
 		/* Adjust timeout if there is anything to send realsoon.
 		   Clients won't be sending new data until we send our ack,
@@ -1550,38 +1548,18 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 			    users[userid].last_pkt + 60 > time(NULL)) {
 				users[userid].q_sendrealsoon_new = 0;
 				if (users[userid].q_sendrealsoon.id != 0) {
-					tv.tv_sec = 0;
-					tv.tv_usec = 20000;
+					timeout_ms = 20;
 				}
 			}
 		}
 
-		FD_ZERO(&fds);
-		maxfd = 0;
-
-		if (dns_fds->v4fd >= 0) {
-			FD_SET(dns_fds->v4fd, &fds);
-			maxfd = MAX(dns_fds->v4fd, maxfd);
-		}
-		if (dns_fds->v6fd >= 0) {
-			FD_SET(dns_fds->v6fd, &fds);
-			maxfd = MAX(dns_fds->v6fd, maxfd);
-		}
-
-		if (bind_fd >= 0) {
-			/* wait for replies from real DNS */
-			FD_SET(bind_fd, &fds);
-			maxfd = MAX(bind_fd, maxfd);
-		}
-
 		/* Don't read from tun if no users can accept data anyway;
 		   tun queue/TCP buffers are larger than our outpacket-queues */
-		if (!all_users_waiting_to_send()) {
-			FD_SET(tun_fd, &fds);
-			maxfd = MAX(tun_fd, maxfd);
-		}
+		watch_tun = all_users_waiting_to_send() ? -1 : tun_fd;
 
-		i = select(maxfd + 1, &fds, NULL, NULL, &tv);
+		/* bind_fd waits for replies from real DNS */
+		i = sock_select(timeout_ms, &fds,
+		                dns_fds->v4fd, dns_fds->v6fd, bind_fd, watch_tun);
 
 		if (i < 0) {
 			if (running)
@@ -1605,16 +1583,16 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 				}
 			}
 		} else {
-			if (FD_ISSET(tun_fd, &fds)) {
+			if (sock_isset(tun_fd, &fds)) {
 				tunnel_tun(tun_fd, dns_fds);
 			}
-			if (dns_fds->v4fd >= 0 && FD_ISSET(dns_fds->v4fd, &fds)) {
+			if (sock_isset(dns_fds->v4fd, &fds)) {
 				tunnel_dns(tun_fd, dns_fds->v4fd, dns_fds, bind_fd);
 			}
-			if (dns_fds->v6fd >= 0 && FD_ISSET(dns_fds->v6fd, &fds)) {
+			if (sock_isset(dns_fds->v6fd, &fds)) {
 				tunnel_dns(tun_fd, dns_fds->v6fd, dns_fds, bind_fd);
 			}
-			if (bind_fd >= 0 && FD_ISSET(bind_fd, &fds)) {
+			if (sock_isset(bind_fd, &fds)) {
 				tunnel_bind(bind_fd, dns_fds);
 			}
 		}

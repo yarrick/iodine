@@ -38,6 +38,7 @@
 #include "encoding.h"
 #include "process.h"
 #include "run_as.h"
+#include "sock.h"
 #include "tun.h"
 #include "udp.h"
 #include "ui.h"
