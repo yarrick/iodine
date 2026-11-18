@@ -356,7 +356,7 @@ main(int argc, char **argv)
 		goto cleanup2;
 	}
 	if (rtable > 0)
-		socket_setrtable(dns_fd, rtable);
+		sock_setrtable(dns_fd, rtable);
 
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);

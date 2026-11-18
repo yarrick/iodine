@@ -23,9 +23,15 @@
 #else
 #include <sys/select.h>
 #include <sys/time.h>
+#if HAVE_SO_RTABLE
+#include <sys/socket.h>
+#include <netinet/in.h>
+#endif
 #endif
 
+#include "compat.h"
 #include "sock.h"
+#include "ui.h"
 
 int
 sock_select_fds(int timeout_ms, fd_set *fds, const int *list, size_t n)
@@ -56,4 +62,36 @@ bool
 sock_isset(int fd, fd_set *fds)
 {
 	return fd >= 0 && FD_ISSET(fd, fds);
+}
+
+/* Set FD_CLOEXEC flag on socket/file descriptor.
+ * This stops it from being inherited by system() calls.
+ */
+void
+sock_set_close_on_exec(int fd)
+{
+#if HAVE_FD_CLOEXEC
+	int flags;
+
+	flags = fcntl(fd, F_GETFD);
+	if (flags == -1)
+		err(4, "Failed to get fd flags");
+	flags |= FD_CLOEXEC;
+	if (fcntl(fd, F_SETFD, flags) == -1)
+		err(4, "Failed to set fd flags");
+#endif
+	(void)fd;
+}
+
+void
+sock_setrtable(int fd, int rtable)
+{
+	(void)fd;
+	(void)rtable;
+#if HAVE_SO_RTABLE
+	if (setsockopt(fd, IPPROTO_IP, SO_RTABLE, &rtable, sizeof(rtable)) == -1)
+		err(1, "Failed to set routing table %d", rtable);
+#else
+	ui_log("Routing domain support was not available at compile time.\n");
+#endif
 }

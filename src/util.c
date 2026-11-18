@@ -16,15 +16,12 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "config.h"
 #include "compat.h"
 #ifdef WINDOWS
 #include <iphlpapi.h>
-#elif HAVE_SO_RTABLE
-#include <sys/socket.h>
-#include <netinet/in.h>
 #endif
-#include "ui.h"
 #include "util.h"
 
 char *
@@ -81,17 +78,4 @@ get_resolvconf_addr(void)
 	free(fixed_info);
 #endif
 	return rv;
-}
-
-void
-socket_setrtable(int fd, int rtable)
-{
-	(void)fd;
-	(void)rtable;
-#if HAVE_SO_RTABLE
-	if (setsockopt (fd, IPPROTO_IP, SO_RTABLE, &rtable, sizeof(rtable)) == -1)
-		err(1, "Failed to set routing table %d", rtable);
-#else
-	ui_log("Routing domain support was not available at compile time.\n");
-#endif
 }

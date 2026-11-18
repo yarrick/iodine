@@ -37,4 +37,7 @@ int sock_select_fds(int timeout_ms, fd_set *fds, const int *list, size_t n);
 
 bool sock_isset(int fd, fd_set *fds);
 
+void sock_set_close_on_exec(int fd);
+void sock_setrtable(int fd, int rtable);
+
 #endif

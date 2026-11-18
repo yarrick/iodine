@@ -63,7 +63,7 @@ open_udp_opt(struct net_addr *addr, int v6only)
 #endif
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));
 
-	fd_set_close_on_exec(fd);
+	sock_set_close_on_exec(fd);
 
 	if (sockaddr->ss_family == AF_INET6 && v6only >= 0) {
 		setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (const void*) &v6only, sizeof(v6only));

@@ -89,7 +89,7 @@ open_tun(const char *tun_device)
 
 		if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 			ui_log("Opened %s\n", ifreq.ifr_name);
-			fd_set_close_on_exec(tun_fd);
+			sock_set_close_on_exec(tun_fd);
 			return tun_fd;
 		}
 
@@ -104,7 +104,7 @@ open_tun(const char *tun_device)
 			if (ioctl(tun_fd, TUNSETIFF, (void *) &ifreq) != -1) {
 				ui_log("Opened %s\n", ifreq.ifr_name);
 				snprintf(if_name, sizeof(if_name), "dns%d", i);
-				fd_set_close_on_exec(tun_fd);
+				sock_set_close_on_exec(tun_fd);
 				return tun_fd;
 			}
 
@@ -216,7 +216,7 @@ open_utun(const char *dev)
 	strlcpy(if_name, ifname, sizeof(if_name));
 
 	ui_log("Opened %s\n", ifname);
-	fd_set_close_on_exec(fd);
+	sock_set_close_on_exec(fd);
 
 	return fd;
 }
@@ -250,7 +250,7 @@ open_tun(const char *tun_device)
 		}
 
 		ui_log("Opened %s\n", tun_name);
-		fd_set_close_on_exec(tun_fd);
+		sock_set_close_on_exec(tun_fd);
 		return tun_fd;
 	} else {
 		for (i = 0; i < TUN_MAX_TRY; i++) {
@@ -259,7 +259,7 @@ open_tun(const char *tun_device)
 			if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) >= 0) {
 				ui_log("Opened %s\n", tun_name);
 				snprintf(if_name, sizeof(if_name), "tun%d", i);
-				fd_set_close_on_exec(tun_fd);
+				sock_set_close_on_exec(tun_fd);
 				return tun_fd;
 			}
 

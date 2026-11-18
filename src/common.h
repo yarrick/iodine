@@ -110,8 +110,6 @@ int query_datalen(const char *qname, const char *topdomain);
 
 int recent_seqno(int , int);
 
-void fd_set_close_on_exec(int fd);
-
 unsigned char ascii_tolower(unsigned char c);
 
 #endif

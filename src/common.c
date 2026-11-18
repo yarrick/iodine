@@ -22,7 +22,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
-#include <fcntl.h>
 
 #include "config.h"
 
@@ -285,25 +284,6 @@ recent_seqno(int ourseqno, int gotseqno)
 			return 1;
 	}
 	return 0;
-}
-
-/* Set FD_CLOEXEC flag on file descriptor.
- * This stops it from being inherited by system() calls.
- */
-void
-fd_set_close_on_exec(int fd)
-{
-#if HAVE_FD_CLOEXEC
-	int flags;
-
-	flags = fcntl(fd, F_GETFD);
-	if (flags == -1)
-		err(4, "Failed to get fd flags");
-	flags |= FD_CLOEXEC;
-	if (fcntl(fd, F_SETFD, flags) == -1)
-		err(4, "Failed to set fd flags");
-#endif
-	(void)fd;
 }
 
 unsigned char
