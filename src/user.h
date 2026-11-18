@@ -22,6 +22,7 @@
 #include <time.h>
 
 #include "common.h"
+#include "dns.h"
 
 struct encoder;
 

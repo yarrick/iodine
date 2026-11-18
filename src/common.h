@@ -41,16 +41,12 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #include <netinet/in.h>
 #endif
 
-#define DNS_PORT 53
-
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
-
-#define DNS_MSG_NAME_SIZE 256
 
 struct packet
 {
@@ -70,17 +66,6 @@ struct net_addr {
 struct udp_addr {
 	struct net_addr local;
 	struct net_addr remote;
-};
-
-struct dns_msg {
-	char name[DNS_MSG_NAME_SIZE];
-	unsigned short type;
-	unsigned short rcode;
-	unsigned short rtype;
-	unsigned short id;
-	struct udp_addr address;
-	struct udp_addr address2;
-	unsigned short id2;
 };
 
 enum connection {

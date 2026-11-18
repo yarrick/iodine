@@ -33,6 +33,21 @@ typedef enum {
 	QR_ANSWER = 1
 } qr_t;
 
+#define DNS_PORT 53
+
+#define DNS_MSG_NAME_SIZE 256
+
+struct dns_msg {
+	char name[DNS_MSG_NAME_SIZE];
+	unsigned short type;
+	unsigned short rcode;
+	unsigned short rtype;
+	unsigned short id;
+	struct udp_addr address;
+	struct udp_addr address2;
+	unsigned short id2;
+};
+
 #define T_PRIVATE 65399
 /* Undefined RR type; "private use" range, see
  * http://www.bind9.net/dns-parameters */

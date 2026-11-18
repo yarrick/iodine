@@ -35,6 +35,7 @@
 #include "client.h"
 #include "common.h"
 #include "compat.h"
+#include "dns.h"
 #include "encoding.h"
 #include "process.h"
 #include "run_as.h"

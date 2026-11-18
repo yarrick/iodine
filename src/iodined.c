@@ -46,6 +46,7 @@
 # include <systemd/sd-daemon.h>
 #endif
 
+#include "dns.h"
 #include "ext_ip.h"
 #include "fw_query.h"
 #include "run_as.h"
