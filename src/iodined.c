@@ -48,6 +48,7 @@
 #include "ext_ip.h"
 #include "fw_query.h"
 #include "run_as.h"
+#include "sock.h"
 #include "tun.h"
 #include "udp.h"
 #include "ui.h"
@@ -159,11 +160,11 @@ main(int argc, char **argv)
 	char *pidfile;
 	int addrfamily;
 	struct dnsfd dns_fds;
-	int tun_fd;
+	sock_t tun_fd;
 
 	/* settings for forwarding normal DNS to
 	 * local real DNS server */
-	int bind_fd;
+	sock_t bind_fd;
 	int bind_enable;
 	int bind_port;
 	struct net_addr bind_addr;
@@ -200,7 +201,7 @@ main(int argc, char **argv)
 	foreground = 0;
 	bind_enable = 0;
 	bind_port = 0;
-	bind_fd = -1;
+	bind_fd = INVALID_SOCK;
 	memset(&bind_addr, 0, sizeof(bind_addr));
 	mtu = 1130;	/* Very many relays give fragsize 1150 or slightly
 			   higher for NULL; tun/zlib adds ~17 bytes. */
@@ -447,12 +448,12 @@ main(int argc, char **argv)
 	}
 
 	/* Mark both file descriptors as unused */
-	dns_fds.v4fd = -1;
-	dns_fds.v6fd = -1;
+	dns_fds.v4fd = INVALID_SOCK;
+	dns_fds.v6fd = INVALID_SOCK;
 
 	created_users = init_users(MAX_USERS, my_ip, netmask);
 
-	if ((tun_fd = open_tun(device)) == -1) {
+	if ((tun_fd = open_tun(device)) == INVALID_SOCK) {
 		/* nothing to clean up, just return */
 		return 1;
 	}
@@ -473,14 +474,14 @@ main(int argc, char **argv)
 	} else if (nb_fds == 0) {
 #endif
 		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET) &&
-			(dns_fds.v4fd = open_udp(&dns4addr)) < 0) {
+			(dns_fds.v4fd = open_udp(&dns4addr)) == INVALID_SOCK) {
 
 			retval = 1;
 			goto cleanup;
 		}
 		if ((addrfamily == AF_UNSPEC || addrfamily == AF_INET6) &&
 			/* Set IPv6 socket to V6ONLY */
-			(dns_fds.v6fd = open_udp_opt(&dns6addr, 1)) < 0) {
+			(dns_fds.v6fd = open_udp_opt(&dns6addr, 1)) == INVALID_SOCK) {
 
 			retval = 1;
 			goto cleanup;
@@ -513,7 +514,7 @@ main(int argc, char **argv)
 			retval = 1;
 			goto cleanup;
 		}
-		if ((bind_fd = open_udp_from_host(NULL, 0, AF_INET, 0)) < 0) {
+		if ((bind_fd = open_udp_from_host(NULL, 0, AF_INET, 0)) == INVALID_SOCK) {
 			retval = 1;
 			goto cleanup;
 		}
@@ -569,12 +570,12 @@ main(int argc, char **argv)
 	server_tunnel(tun_fd, &dns_fds, bind_fd, max_idle_time);
 
 	syslog(LOG_INFO, "stopping");
-	if (bind_fd >= 0)
+	if (bind_fd != INVALID_SOCK)
 		close_udp(bind_fd);
 cleanup:
-	if (dns_fds.v6fd >= 0)
+	if (dns_fds.v6fd != INVALID_SOCK)
 		close_udp(dns_fds.v6fd);
-	if (dns_fds.v4fd >= 0)
+	if (dns_fds.v4fd != INVALID_SOCK)
 		close_udp(dns_fds.v4fd);
 	close_tun(tun_fd);
 

@@ -47,7 +47,7 @@ get_external_ip(struct in_addr *ip)
 	struct net_addr addr;
 	int attempt;
 	int res;
-	int fd;
+	sock_t fd;
 	int out_len = 0;
 	memset(&query, 0, sizeof(query));
 
@@ -56,7 +56,7 @@ get_external_ip(struct in_addr *ip)
 		return 1;
 
 	fd = open_udp_from_host(NULL, 0, AF_INET, AI_PASSIVE);
-	if (fd < 0) return 2;
+	if (fd == INVALID_SOCK) return 2;
 
 	for (attempt = 0; attempt < 3; attempt++) {
 		char buf[64*1024];

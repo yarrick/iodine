@@ -96,7 +96,7 @@ DWORD WINAPI
 tun_reader(LPVOID arg)
 {
 	struct tun_data *tun = arg;
-	int sock = open_udp_from_host("127.0.0.1", 0, AF_INET, 0);
+	sock_t sock = open_udp_from_host("127.0.0.1", 0, AF_INET, 0);
 	HANDLE read_event = WintunGetReadWaitEvent(tun->session);
 
 	while(TRUE) {
@@ -118,17 +118,17 @@ tun_reader(LPVOID arg)
 	return 0;
 }
 
-int
+sock_t
 open_tun(const char *tun_device)
 {
 	wchar_t wname[250];
-	int tunfd;
+	sock_t tunfd;
 	struct net_addr localsock;
 	u_long mode;
 
 	if(wintun_init()) {
 		warnx("Could not load wintun.dll");
-		return -1;
+		return INVALID_SOCK;
 	}
 
 	if (tun_device) {
@@ -146,7 +146,7 @@ open_tun(const char *tun_device)
 	}
 	if (!adapter_handle) {
 		warnx("open_tun: Could not create or open Wintun adapter '%s'.", if_name);
-		return -1;
+		return INVALID_SOCK;
 	}
 	ConvertInterfaceAliasToLuid(wname, &luid);
 	session_handle = WintunStartSession(adapter_handle, WINTUN_RING_CAPACITY);
@@ -154,7 +154,7 @@ open_tun(const char *tun_device)
 		warnx("Failed to start Wintun session");
 		WintunCloseAdapter(adapter_handle);
 		adapter_handle = NULL;
-		return -1;
+		return INVALID_SOCK;
 	}
 
 	/* Use a UDP connection to forward packets from tun,
@@ -162,19 +162,19 @@ open_tun(const char *tun_device)
 	 * A thread does blocking reads on the tun device and
 	 * sends data as udp to this socket */
 	if (get_addr("127.0.0.1", 0, AF_INET, 0, &localsock))
-		return -1;
+		return INVALID_SOCK;
 	tunfd = open_udp(&localsock);
 
 	/* Enable non-blocking mode for socket */
 	mode = 1;
 	if (ioctlsocket(tunfd, FIONBIO, &mode)) {
-		return -1;
+		return INVALID_SOCK;
 	}
 
 	data.session = session_handle;
 	data.addrlen = sizeof(data.addr);
 	if (getsockname(tunfd, (struct sockaddr *)&data.addr, &data.addrlen) < 0) {
-		return -1;
+		return INVALID_SOCK;
 	}
 	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)tun_reader, &data, 0, NULL);
 
@@ -182,14 +182,14 @@ open_tun(const char *tun_device)
 }
 
 void
-close_tun(int tun_fd)
+close_tun(sock_t tun_fd)
 {
-	if (tun_fd >= 0)
+	if (tun_fd != INVALID_SOCK)
 		close_udp(tun_fd);
 }
 
 int
-write_tun(int tun_fd, char *data, size_t len)
+write_tun(sock_t tun_fd, char *data, size_t len)
 {
 	(void)tun_fd;
 	if (len < 4)
@@ -209,7 +209,7 @@ write_tun(int tun_fd, char *data, size_t len)
 }
 
 ssize_t
-read_tun(int tun_fd, char *buf, size_t len)
+read_tun(sock_t tun_fd, char *buf, size_t len)
 {
 	int bytes;
 	memset(buf, 0, 4);
@@ -289,7 +289,7 @@ tun_setmtu(const unsigned mtu)
 }
 
 void
-tun_flush_rx(int tun_fd)
+tun_flush_rx(sock_t tun_fd)
 {
 	int len;
 	char buffer[4096];

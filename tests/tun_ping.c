@@ -54,7 +54,7 @@ inet_checksum(char* addr, int len) {
 }
 
 static void
-packet_read(int fd, struct in_addr peer)
+packet_read(sock_t fd, struct in_addr peer)
 {
     /* Reads packets from the tun device, and prints
      * the reason they are not processed, or ECHO
@@ -112,7 +112,7 @@ packet_read(int fd, struct in_addr peer)
 int
 main(int argc, char **argv)
 {
-	int fd;
+	sock_t fd;
 	struct in_addr host, peer;
 
 	if (argc < 2) {
@@ -123,7 +123,7 @@ main(int argc, char **argv)
 	check_privileges(NULL, NULL, 0);
 	network_init();
 	fd = open_tun(argv[1]);
-	if (fd < 0) {
+	if (fd == INVALID_SOCK) {
 		exit(-1);
 	}
 

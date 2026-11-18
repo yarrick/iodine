@@ -66,9 +66,9 @@ static struct in_addr ns_ip;
 
 static struct net_addr bind_addr;
 
-static void write_dns(int fd, struct dns_msg *q, const char *data, size_t datalen, const struct encoder *downenc);
-static void handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid);
-static int raw_decode(char *packet, int len, struct udp_addr *addr, int dns_fd, struct dnsfd *dns_fds, int tun_fd);
+static void write_dns(sock_t fd, struct dns_msg *q, const char *data, size_t datalen, const struct encoder *downenc);
+static void handle_full_packet(sock_t tun_fd, struct dnsfd *dns_fds, int userid);
+static int raw_decode(char *packet, int len, struct udp_addr *addr, sock_t dns_fd, struct dnsfd *dns_fds, sock_t tun_fd);
 
 void
 server_stop(void)
@@ -90,7 +90,7 @@ server_init(struct server_params *params)
 	bind_addr = params->bind_addr;
 }
 
-static int
+static sock_t
 get_dns_fd(struct dnsfd *fds, struct udp_addr *addr)
 {
 	if (addr->remote.addr.ss_family == AF_INET6) {
@@ -100,7 +100,7 @@ get_dns_fd(struct dnsfd *fds, struct udp_addr *addr)
 }
 
 static void
-send_raw(int fd, char *buf, size_t buflen, int user, int cmd, struct udp_addr *addr)
+send_raw(sock_t fd, char *buf, size_t buflen, int user, int cmd, struct udp_addr *addr)
 {
 	char packet[4096];
 	size_t len;
@@ -233,7 +233,7 @@ save_to_dnscache(int userid, struct dns_msg *q, char *answer, unsigned int answe
 }
 
 static int
-answer_from_dnscache(int dns_fd, int userid, struct dns_msg *q)
+answer_from_dnscache(sock_t dns_fd, int userid, struct dns_msg *q)
 /* Checks cache and sends repeated answer if we alreay saw this query recently.
    Returns: 1 = answer sent, drop this query, 0 = no answer sent, this is
    a new query. */
@@ -322,7 +322,7 @@ save_to_qmem_pingordata(int userid, struct dns_msg *q)
 }
 
 static int
-answer_from_qmem(int dns_fd, struct dns_msg *q,
+answer_from_qmem(sock_t dns_fd, struct dns_msg *q,
 			    int userid, enum qmem_id qmid,
 			    char *cmc_to_check)
 /* Checks query memory and sends an (illegal) answer if this is a duplicate.
@@ -362,7 +362,7 @@ send_chunk_or_dataless(struct dnsfd *dns_fds, int userid, struct dns_msg *q)
 	char pkt[4096];
 	unsigned int datalen = 0;
 	int last = 0;
-	int dns_fd;
+	sock_t dns_fd;
 
 	/* If re-sent too many times, drop entire packet */
 	if (users[userid].outpacket.len > 0 &&
@@ -440,7 +440,7 @@ send_chunk_or_dataless(struct dnsfd *dns_fds, int userid, struct dns_msg *q)
 }
 
 static int
-tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
+tunnel_tun(sock_t tun_fd, struct dnsfd *dns_fds)
 {
 	unsigned long outlen;
 	struct ip *header;
@@ -483,7 +483,7 @@ tunnel_tun(int tun_fd, struct dnsfd *dns_fds)
 
 		return outlen;
 	} else { /* CONN_RAW_UDP */
-		int dns_fd = get_dns_fd(dns_fds, &users[userid].raw_addr);
+		sock_t dns_fd = get_dns_fd(dns_fds, &users[userid].raw_addr);
 		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].raw_addr);
 		return outlen;
 	}
@@ -496,7 +496,7 @@ typedef enum {
 } version_ack_t;
 
 static void
-send_version_response(int fd, version_ack_t ack, uint32_t payload,
+send_version_response(sock_t fd, version_ack_t ack, uint32_t payload,
 				  int userid, struct dns_msg *q)
 {
 	char out[9];
@@ -522,7 +522,7 @@ send_version_response(int fd, version_ack_t ack, uint32_t payload,
 }
 
 static void
-handle_version_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_version_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	char unpacked[64*1024];
 	int read;
@@ -633,7 +633,7 @@ process_downstream_ack(int userid, int down_seq, int down_frag)
 }
 
 static void
-handle_login_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_login_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	char logindata[16];
 	char unpacked[64*1024];
@@ -686,7 +686,7 @@ handle_login_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 }
 
 static void
-handle_ip_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_ip_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	unsigned int userid;
 	/* Request for IP number */
@@ -721,7 +721,7 @@ handle_ip_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 }
 
 static void
-handle_upstream_codec_check_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_upstream_codec_check_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	/* Check for case conservation and chars not allowed according to RFC */
 
@@ -731,7 +731,7 @@ handle_upstream_codec_check_request(int dns_fd, char *in, int domain_len, struct
 }
 
 static void
-handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_upstream_codec_switch_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	unsigned int userid;
 	int codec;
@@ -771,7 +771,7 @@ handle_upstream_codec_switch_request(int dns_fd, char *in, int domain_len, struc
 }
 
 static void
-handle_options_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_options_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	unsigned int userid;
 	const struct encoder *down_enc;
@@ -811,7 +811,7 @@ handle_options_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
 }
 
 static void
-handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_downstream_codec_check_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	int i;
 	char *datap;
@@ -844,7 +844,7 @@ handle_downstream_codec_check_request(int dns_fd, char *in, int domain_len, stru
 }
 
 static void
-handle_downstream_fragsize_probe_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_downstream_fragsize_probe_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	unsigned int userid;
 	int req_frag_size;
@@ -883,7 +883,7 @@ handle_downstream_fragsize_probe_request(int dns_fd, char *in, int domain_len, s
 }
 
 static void
-handle_downstream_fragsize_set_request(int dns_fd, char *in, int domain_len, struct dns_msg *q)
+handle_downstream_fragsize_set_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 {
 	char unpacked[64*1024];
 	unsigned int userid;
@@ -915,7 +915,7 @@ handle_downstream_fragsize_set_request(int dns_fd, char *in, int domain_len, str
 }
 
 static int
-check_duplicate_query(int dns_fd, int userid, struct dns_msg *q,
+check_duplicate_query(sock_t dns_fd, int userid, struct dns_msg *q,
 		      enum qmem_id qmid, char *cmc, char *log_prefix)
 {
 #ifdef DNSCACHE_LEN
@@ -963,7 +963,7 @@ check_duplicate_query(int dns_fd, int userid, struct dns_msg *q,
 }
 
 static void
-handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct dns_msg *q, int domain_len)
+handle_null_request(sock_t tun_fd, sock_t dns_fd, struct dnsfd *dns_fds, struct dns_msg *q, int domain_len)
 {
 	char in[512];
 	char unpacked[64*1024];
@@ -1246,7 +1246,7 @@ handle_null_request(int tun_fd, int dns_fd, struct dnsfd *dns_fds, struct dns_ms
 }
 
 static void
-handle_ns_request(int dns_fd, struct dns_msg *q, int topdomain_offset)
+handle_ns_request(sock_t dns_fd, struct dns_msg *q, int topdomain_offset)
 /* Mostly identical to handle_a_request() below */
 {
 	struct sockaddr_storage address;
@@ -1275,7 +1275,7 @@ handle_ns_request(int dns_fd, struct dns_msg *q, int topdomain_offset)
 }
 
 static void
-handle_a_request(int dns_fd, struct dns_msg *q, int fakeip)
+handle_a_request(sock_t dns_fd, struct dns_msg *q, int fakeip)
 /* Mostly identical to handle_ns_request() above */
 {
 	struct sockaddr_storage address;
@@ -1311,7 +1311,7 @@ handle_a_request(int dns_fd, struct dns_msg *q, int fakeip)
 }
 
 static void
-handle_aaaa_request(int dns_fd, struct dns_msg *q, const char *topdomain, int fakeip)
+handle_aaaa_request(sock_t dns_fd, struct dns_msg *q, const char *topdomain, int fakeip)
 {
 	struct sockaddr_storage address;
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *) &address;
@@ -1347,7 +1347,7 @@ handle_aaaa_request(int dns_fd, struct dns_msg *q, const char *topdomain, int fa
 
 
 static void
-handle_soa_request(int dns_fd, struct dns_msg *q, const char *topdomain, int rcode)
+handle_soa_request(sock_t dns_fd, struct dns_msg *q, const char *topdomain, int rcode)
 {
 	char buf[64*1024];
 	int len;
@@ -1364,7 +1364,7 @@ handle_soa_request(int dns_fd, struct dns_msg *q, const char *topdomain, int rco
 }
 
 static void
-forward_query(int bind_fd, struct dns_msg *q)
+forward_query(sock_t bind_fd, struct dns_msg *q)
 {
 	char buf[64*1024];
 	int len;
@@ -1389,14 +1389,14 @@ forward_query(int bind_fd, struct dns_msg *q)
 }
 
 int
-tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
+tunnel_bind(sock_t bind_fd, struct dnsfd *dns_fds)
 {
 	char packet[64*1024];
 	struct sockaddr_storage from;
 	socklen_t fromlen;
 	struct fw_query *query;
 	unsigned short id;
-	int dns_fd;
+	sock_t dns_fd;
 	int r;
 
 	fromlen = sizeof(struct sockaddr);
@@ -1427,7 +1427,7 @@ tunnel_bind(int bind_fd, struct dnsfd *dns_fds)
 }
 
 int
-tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
+tunnel_dns(sock_t tun_fd, sock_t dns_fd, struct dnsfd *dns_fds, sock_t bind_fd)
 {
 	char packet[64*1024];
 	struct dns_msg q;
@@ -1517,7 +1517,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 		}
 	} else {
 		/* Forward query to other port ? */
-		if (bind_fd >= 0) {
+		if (bind_fd != INVALID_SOCK) {
 			forward_query(bind_fd, &q);
 		}
 	}
@@ -1525,7 +1525,7 @@ tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd)
 }
 
 int
-server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
+server_tunnel(sock_t tun_fd, struct dnsfd *dns_fds, sock_t bind_fd, int max_idle_time)
 {
 	fd_set fds;
 	int i;
@@ -1534,7 +1534,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 
 	while (running) {
 		int timeout_ms = 10000;		/* doesn't really matter */
-		int watch_tun;
+		sock_t watch_tun;
 
 		/* Adjust timeout if there is anything to send realsoon.
 		   Clients won't be sending new data until we send our ack,
@@ -1555,7 +1555,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 
 		/* Don't read from tun if no users can accept data anyway;
 		   tun queue/TCP buffers are larger than our outpacket-queues */
-		watch_tun = all_users_waiting_to_send() ? -1 : tun_fd;
+		watch_tun = all_users_waiting_to_send() ? INVALID_SOCK : tun_fd;
 
 		/* bind_fd waits for replies from real DNS */
 		i = sock_select(timeout_ms, &fds,
@@ -1612,7 +1612,7 @@ server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time)
 }
 
 static void
-handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
+handle_full_packet(sock_t tun_fd, struct dnsfd *dns_fds, int userid)
 {
 	unsigned long outlen;
 	char out[64*1024];
@@ -1654,7 +1654,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 #endif
 				}
 			} else{ /* CONN_RAW_UDP */
-				int dns_fd = get_dns_fd(dns_fds, &users[touser].raw_addr);
+				sock_t dns_fd = get_dns_fd(dns_fds, &users[touser].raw_addr);
 				send_raw(dns_fd, users[userid].inpacket.data,
 					 users[userid].inpacket.len, touser,
 					 RAW_HDR_CMD_DATA, &users[touser].raw_addr);
@@ -1670,7 +1670,7 @@ handle_full_packet(int tun_fd, struct dnsfd *dns_fds, int userid)
 }
 
 static void
-handle_raw_login(char *packet, int len, struct udp_addr *addr, int fd, int userid)
+handle_raw_login(char *packet, int len, struct udp_addr *addr, sock_t fd, int userid)
 {
 	char myhash[16];
 
@@ -1702,7 +1702,7 @@ handle_raw_login(char *packet, int len, struct udp_addr *addr, int fd, int useri
 }
 
 static void
-handle_raw_data(char *packet, int len, struct udp_addr *addr, struct dnsfd *dns_fds, int tun_fd, int userid)
+handle_raw_data(char *packet, int len, struct udp_addr *addr, struct dnsfd *dns_fds, sock_t tun_fd, int userid)
 {
 	if (check_authenticated_user_and_ip(userid, check_ip, addr) != 0) {
 		return;
@@ -1725,7 +1725,7 @@ handle_raw_data(char *packet, int len, struct udp_addr *addr, struct dnsfd *dns_
 }
 
 static void
-handle_raw_ping(struct udp_addr *addr, int dns_fd, int userid)
+handle_raw_ping(struct udp_addr *addr, sock_t dns_fd, int userid)
 {
 	if (check_authenticated_user_and_ip(userid, check_ip, addr) != 0) {
 		return;
@@ -1743,7 +1743,7 @@ handle_raw_ping(struct udp_addr *addr, int dns_fd, int userid)
 }
 
 static int
-raw_decode(char *packet, int len, struct udp_addr *addr, int dns_fd, struct dnsfd *dns_fds, int tun_fd)
+raw_decode(char *packet, int len, struct udp_addr *addr, sock_t dns_fd, struct dnsfd *dns_fds, sock_t tun_fd)
 {
 	int raw_user;
 
@@ -1774,7 +1774,7 @@ raw_decode(char *packet, int len, struct udp_addr *addr, int dns_fd, struct dnsf
 }
 
 static void
-write_dns(int fd, struct dns_msg *q, const char *data, size_t datalen, const struct encoder *downenc)
+write_dns(sock_t fd, struct dns_msg *q, const char *data, size_t datalen, const struct encoder *downenc)
 {
 	char buf[64*1024];
 	int len = 0;

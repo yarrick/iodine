@@ -94,12 +94,12 @@ list_local_addrs(void (*cb)(struct sockaddr *))
 }
 
 static int
-get_bound_port(int fd)
+get_bound_port(sock_t fd)
 {
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof(addr);
 
-	if (fd < 0 || getsockname(fd, (struct sockaddr *)&addr, &addrlen) != 0)
+	if (fd == INVALID_SOCK || getsockname(fd, (struct sockaddr *)&addr, &addrlen) != 0)
 		return 0;
 	if (addr.ss_family == AF_INET)
 		return ntohs(((struct sockaddr_in *)&addr)->sin_port);
@@ -111,12 +111,12 @@ get_bound_port(int fd)
 int
 main(int argc, char **argv)
 {
-	struct dnsfd dns_fds = { -1, -1 };
+	struct dnsfd dns_fds = { INVALID_SOCK, INVALID_SOCK };
 	struct server_params params;
 	const char *topdomain = "test.iodine.code";
 	char password[33] = "testpass";
 	struct in_addr ns_ip;
-	int bind_fd = -1;
+	sock_t bind_fd = INVALID_SOCK;
 	int bind_port = 0;
 
 	progname_init(argv[0]);
@@ -131,7 +131,7 @@ main(int argc, char **argv)
 	dns_fds.v4fd = open_udp_from_host(NULL, 0, AF_INET, AI_PASSIVE);
 	dns_fds.v6fd = open_udp_from_host(NULL, 0, AF_INET6, AI_PASSIVE);
 
-	if (dns_fds.v4fd < 0 && dns_fds.v6fd < 0) {
+	if (dns_fds.v4fd == INVALID_SOCK && dns_fds.v6fd == INVALID_SOCK) {
 		ui_log("Failed to open any UDP socket\n");
 		return 1;
 	}
@@ -157,7 +157,7 @@ main(int argc, char **argv)
 			return 1;
 		}
 		bind_fd = open_udp_from_host(NULL, 0, AF_INET, 0);
-		if (bind_fd < 0) {
+		if (bind_fd == INVALID_SOCK) {
 			ui_log("Failed to open bind UDP socket\n");
 			return 1;
 		}
@@ -177,9 +177,9 @@ main(int argc, char **argv)
 
 	list_local_addrs(print_sockaddr);
 	ui_log("OPEN %s", topdomain);
-	if (dns_fds.v4fd >= 0)
+	if (dns_fds.v4fd != INVALID_SOCK)
 		ui_log(" v4=%d", get_bound_port(dns_fds.v4fd));
-	if (dns_fds.v6fd >= 0)
+	if (dns_fds.v6fd != INVALID_SOCK)
 		ui_log(" v6=%d", get_bound_port(dns_fds.v6fd));
 	ui_log("\n");
 
@@ -195,10 +195,10 @@ main(int argc, char **argv)
 		}
 		if (res > 0) {
 			if (sock_isset(dns_fds.v4fd, &fds)) {
-				tunnel_dns(-1, dns_fds.v4fd, &dns_fds, bind_fd);
+				tunnel_dns(INVALID_SOCK, dns_fds.v4fd, &dns_fds, bind_fd);
 			}
 			if (sock_isset(dns_fds.v6fd, &fds)) {
-				tunnel_dns(-1, dns_fds.v6fd, &dns_fds, bind_fd);
+				tunnel_dns(INVALID_SOCK, dns_fds.v6fd, &dns_fds, bind_fd);
 			}
 			if (sock_isset(bind_fd, &fds)) {
 				tunnel_bind(bind_fd, &dns_fds);
@@ -206,11 +206,11 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (dns_fds.v4fd >= 0)
+	if (dns_fds.v4fd != INVALID_SOCK)
 		close_udp(dns_fds.v4fd);
-	if (dns_fds.v6fd >= 0)
+	if (dns_fds.v6fd != INVALID_SOCK)
 		close_udp(dns_fds.v6fd);
-	if (bind_fd >= 0)
+	if (bind_fd != INVALID_SOCK)
 		close_udp(bind_fd);
 
 	ui_log("END\n");

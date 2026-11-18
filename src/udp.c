@@ -40,20 +40,20 @@ static LPFN_WSARECVMSG wsa_recvmsg = NULL;
 #include "ui.h"
 #include "udp.h"
 
-int
+sock_t
 open_udp(struct net_addr *addr)
 {
 	return open_udp_opt(addr, -1);
 }
 
-int
+sock_t
 open_udp_opt(struct net_addr *addr, int v6only)
 {
 	struct sockaddr_storage *sockaddr = &addr->addr;
 	int flag;
-	int fd;
+	sock_t fd;
 
-	if ((fd = socket(sockaddr->ss_family, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+	if ((fd = socket(sockaddr->ss_family, SOCK_DGRAM, IPPROTO_UDP)) == INVALID_SOCK) {
 		err(1, "socket");
 	}
 
@@ -108,7 +108,7 @@ open_udp_opt(struct net_addr *addr, int v6only)
 	return fd;
 }
 
-int
+sock_t
 open_udp_from_host(char *host, int port, int addr_family, int flags)
 {
 	struct net_addr addr;
@@ -116,13 +116,13 @@ open_udp_from_host(char *host, int port, int addr_family, int flags)
 
 	res = get_addr(host, port, addr_family, flags, &addr);
 	if (res)
-		return res;
+		return INVALID_SOCK;
 
 	return open_udp(&addr);
 }
 
 void
-close_udp(int fd)
+close_udp(sock_t fd)
 {
 #ifdef WINDOWS
 	closesocket(fd);
@@ -163,7 +163,7 @@ set_v4_srcaddr(struct cmsghdr *cmsg, struct in_addr addr)
 #endif
 
 int
-read_udp(int fd, char *packet, size_t packetlen, struct udp_addr *addr)
+read_udp(sock_t fd, char *packet, size_t packetlen, struct udp_addr *addr)
 {
 	socklen_t addrlen = sizeof(struct sockaddr_storage);
 	int r;
@@ -253,7 +253,7 @@ read_udp(int fd, char *packet, size_t packetlen, struct udp_addr *addr)
 
 /* Send data to addr->remote, using addr->local as source address */
 int
-send_udp(int fd, const char *packet, size_t packetlen, struct udp_addr *addr)
+send_udp(sock_t fd, const char *packet, size_t packetlen, struct udp_addr *addr)
 {
 	int r;
 #ifndef WINDOWS

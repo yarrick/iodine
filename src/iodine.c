@@ -134,8 +134,8 @@ main(int argc, char **argv)
 	char *qtype;
 	char *down_codec;
 	int choice;
-	int tun_fd;
-	int dns_fd;
+	sock_t tun_fd;
+	sock_t dns_fd;
 	int max_downstream_frag_size;
 	int autodetect_frag_size;
 	int retval;
@@ -347,11 +347,11 @@ main(int argc, char **argv)
 
 	client_set_password(password);
 
-	if ((tun_fd = open_tun(device)) == -1) {
+	if ((tun_fd = open_tun(device)) == INVALID_SOCK) {
 		retval = 1;
 		goto cleanup1;
 	}
-	if ((dns_fd = open_udp_from_host(NULL, 0, nameservaddr.addr.ss_family, AI_PASSIVE)) < 0) {
+	if ((dns_fd = open_udp_from_host(NULL, 0, nameservaddr.addr.ss_family, AI_PASSIVE)) == INVALID_SOCK) {
 		retval = 1;
 		goto cleanup2;
 	}

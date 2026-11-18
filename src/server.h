@@ -19,14 +19,15 @@
 #define __SERVER_H__
 
 #include "common.h"
+#include "sock.h"
 
 /* Struct with IPv4 and IPv6 file descriptors.
  * Need to be passed on down to tunneling code since we can get a
  * packet on one fd meant for a user on the other.
  */
 struct dnsfd {
-	int v4fd;
-	int v6fd;
+	sock_t v4fd;
+	sock_t v6fd;
 };
 
 struct server_params {
@@ -42,9 +43,9 @@ struct server_params {
 };
 
 void server_init(struct server_params *params);
-int server_tunnel(int tun_fd, struct dnsfd *dns_fds, int bind_fd, int max_idle_time);
+int server_tunnel(sock_t tun_fd, struct dnsfd *dns_fds, sock_t bind_fd, int max_idle_time);
 void server_stop(void);
-int tunnel_bind(int bind_fd, struct dnsfd *dns_fds);
-int tunnel_dns(int tun_fd, int dns_fd, struct dnsfd *dns_fds, int bind_fd);
+int tunnel_bind(sock_t bind_fd, struct dnsfd *dns_fds);
+int tunnel_dns(sock_t tun_fd, sock_t dns_fd, struct dnsfd *dns_fds, sock_t bind_fd);
 
 #endif

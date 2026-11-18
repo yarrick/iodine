@@ -18,14 +18,16 @@
 #ifndef _TUN_H_
 #define _TUN_H_
 
+#include "sock.h"
+
 struct in_addr;
 
-int open_tun(const char *);
-void close_tun(int);
-int write_tun(int, char *, size_t);
-ssize_t read_tun(int, char *, size_t);
+sock_t open_tun(const char *);
+void close_tun(sock_t);
+int write_tun(sock_t, char *, size_t);
+ssize_t read_tun(sock_t, char *, size_t);
 int tun_setip(const struct in_addr *, const struct in_addr *, int);
 int tun_setmtu(const unsigned);
-void tun_flush_rx(int tun_fd);
+void tun_flush_rx(sock_t tun_fd);
 
 #endif /* _TUN_H_ */

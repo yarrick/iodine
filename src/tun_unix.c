@@ -67,16 +67,16 @@ static char if_name[250];
 
 #include <linux/if_tun.h>
 
-int
+sock_t
 open_tun(const char *tun_device)
 {
 	int i;
-	int tun_fd;
+	sock_t tun_fd;
 	struct ifreq ifreq;
 
-	if ((tun_fd = open(LINUX_TUN_DEV_PATH, O_RDWR | O_NONBLOCK)) < 0) {
+	if ((tun_fd = open(LINUX_TUN_DEV_PATH, O_RDWR | O_NONBLOCK)) == INVALID_SOCK) {
 		warn("open_tun: open(%s)", LINUX_TUN_DEV_PATH);
-		return -1;
+		return INVALID_SOCK;
 	}
 
 	memset(&ifreq, 0, sizeof(ifreq));
@@ -95,7 +95,7 @@ open_tun(const char *tun_device)
 
 		if (errno != EBUSY) {
 			warn("open_tun: ioctl[TUNSETIFF]");
-			return -1;
+			return INVALID_SOCK;
 		}
 	} else {
 		for (i = 0; i < TUN_MAX_TRY; i++) {
@@ -110,14 +110,14 @@ open_tun(const char *tun_device)
 
 			if (errno != EBUSY) {
 				warn("open_tun: ioctl[TUNSETIFF]");
-				return -1;
+				return INVALID_SOCK;
 			}
 		}
 
 		warn("open_tun: Couldn't set interface name");
 	}
 	warn("error when opening tun");
-	return -1;
+	return INVALID_SOCK;
 }
 
 #else /* BSD and friends */
@@ -223,18 +223,18 @@ open_utun(const char *dev)
 
 #endif
 
-int
+sock_t
 open_tun(const char *tun_device)
 {
 	int i;
-	int tun_fd;
+	sock_t tun_fd;
 	char tun_name[50];
 
 	if (tun_device != NULL) {
 #ifdef DARWIN
 		if (!strncmp(tun_device, "utun", 4)) {
 			tun_fd = open_utun(tun_device);
-			if (tun_fd >= 0) {
+			if (tun_fd != INVALID_SOCK) {
 				return tun_fd;
 			}
 		}
@@ -244,9 +244,9 @@ open_tun(const char *tun_device)
 		strlcpy(if_name, tun_device, sizeof(if_name));
 		if_name[sizeof(if_name)-1] = '\0';
 
-		if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) < 0) {
+		if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) == INVALID_SOCK) {
 			warn("open_tun: %s", tun_name);
-			return -1;
+			return INVALID_SOCK;
 		}
 
 		ui_log("Opened %s\n", tun_name);
@@ -256,7 +256,7 @@ open_tun(const char *tun_device)
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
 
-			if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) >= 0) {
+			if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) != INVALID_SOCK) {
 				ui_log("Opened %s\n", tun_name);
 				snprintf(if_name, sizeof(if_name), "tun%d", i);
 				sock_set_close_on_exec(tun_fd);
@@ -272,7 +272,7 @@ open_tun(const char *tun_device)
 		for (i = 0; i < TUN_MAX_TRY; i++) {
 			snprintf(tun_name, sizeof(tun_name), "utun%d", i);
 			tun_fd = open_utun(tun_name);
-			if (tun_fd >= 0) {
+			if (tun_fd != INVALID_SOCK) {
 				return tun_fd;
 			}
 		}
@@ -281,15 +281,15 @@ open_tun(const char *tun_device)
 		warn("open_tun: Failed to open tunneling device");
 	}
 
-	return -1;
+	return INVALID_SOCK;
 }
 
 #endif
 
 void
-close_tun(int tun_fd)
+close_tun(sock_t tun_fd)
 {
-	if (tun_fd >= 0)
+	if (tun_fd != INVALID_SOCK)
 		close(tun_fd);
 }
 
@@ -308,7 +308,7 @@ tun_uses_header(void)
 }
 
 int
-write_tun(int tun_fd, char *data, size_t len)
+write_tun(sock_t tun_fd, char *data, size_t len)
 {
 	if (!tun_uses_header()) {
 		data += 4;
@@ -339,7 +339,7 @@ write_tun(int tun_fd, char *data, size_t len)
 }
 
 ssize_t
-read_tun(int tun_fd, char *buf, size_t len)
+read_tun(sock_t tun_fd, char *buf, size_t len)
 {
 	if (!tun_uses_header()) {
 		int bytes;
@@ -566,7 +566,7 @@ tun_setmtu(const unsigned mtu)
 }
 
 void
-tun_flush_rx(int tun_fd)
+tun_flush_rx(sock_t tun_fd)
 {
 	(void)tun_fd;
 #ifndef HAIKU

@@ -20,6 +20,7 @@
 
 #include "config.h"
 #include "common.h"
+#include "sock.h"
 
 #ifdef WINDOWS
 #include "windows_dns.h"
@@ -28,11 +29,11 @@
 #include <sys/socket.h>
 #endif
 
-int open_udp(struct net_addr *addr);
-int open_udp_opt(struct net_addr *addr, int v6only);
-int open_udp_from_host(char *host, int port, int addr_family, int flags);
-void close_udp(int);
+sock_t open_udp(struct net_addr *addr);
+sock_t open_udp_opt(struct net_addr *addr, int v6only);
+sock_t open_udp_from_host(char *host, int port, int addr_family, int flags);
+void close_udp(sock_t);
 
-int read_udp(int fd, char *packet, size_t packetlen, struct udp_addr *addr);
-int send_udp(int fd, const char *packet, size_t packetlen, struct udp_addr *addr);
+int read_udp(sock_t fd, char *packet, size_t packetlen, struct udp_addr *addr);
+int send_udp(sock_t fd, const char *packet, size_t packetlen, struct udp_addr *addr);
 #endif

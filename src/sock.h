@@ -25,19 +25,23 @@
 
 #ifdef WINDOWS
 #include <winsock2.h>
+typedef SOCKET sock_t;
+#define INVALID_SOCK INVALID_SOCKET
 #else
 #include <sys/select.h>
+typedef int sock_t;
+#define INVALID_SOCK (-1)
 #endif
 
-int sock_select_fds(int timeout_ms, fd_set *fds, const int *list, size_t n);
+int sock_select_fds(int timeout_ms, fd_set *fds, const sock_t *list, size_t n);
 
 #define sock_select(timeout_ms, fds, ...) \
-	sock_select_fds((timeout_ms), (fds), (const int[]){__VA_ARGS__}, \
-	                sizeof((const int[]){__VA_ARGS__}) / sizeof(int))
+	sock_select_fds((timeout_ms), (fds), (const sock_t[]){__VA_ARGS__}, \
+	                sizeof((const sock_t[]){__VA_ARGS__}) / sizeof(sock_t))
 
-bool sock_isset(int fd, fd_set *fds);
+bool sock_isset(sock_t fd, fd_set *fds);
 
-void sock_set_close_on_exec(int fd);
-void sock_setrtable(int fd, int rtable);
+void sock_set_close_on_exec(sock_t fd);
+void sock_setrtable(sock_t fd, int rtable);
 
 #endif

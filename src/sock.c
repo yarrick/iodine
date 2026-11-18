@@ -35,11 +35,11 @@
 #include "ui.h"
 
 int
-sock_select_fds(int timeout_ms, fd_set *fds, const int *list, size_t n)
+sock_select_fds(int timeout_ms, fd_set *fds, const sock_t *list, size_t n)
 {
 	fd_set local_fds;
 	struct timeval tv;
-	int maxfd = 0;
+	sock_t maxfd = 0;
 
 	if (fds == NULL)
 		fds = &local_fds;
@@ -49,7 +49,7 @@ sock_select_fds(int timeout_ms, fd_set *fds, const int *list, size_t n)
 	tv.tv_usec = (timeout_ms % 1000) * 1000;
 
 	for (size_t i = 0; i < n; i++) {
-		if (list[i] >= 0) {
+		if (list[i] != INVALID_SOCK) {
 			FD_SET(list[i], fds);
 			if (list[i] > maxfd)
 				maxfd = list[i];
@@ -60,16 +60,16 @@ sock_select_fds(int timeout_ms, fd_set *fds, const int *list, size_t n)
 }
 
 bool
-sock_isset(int fd, fd_set *fds)
+sock_isset(sock_t fd, fd_set *fds)
 {
-	return fd >= 0 && FD_ISSET(fd, fds);
+	return fd != INVALID_SOCK && FD_ISSET(fd, fds);
 }
 
 /* Set FD_CLOEXEC flag on socket/file descriptor.
  * This stops it from being inherited by system() calls.
  */
 void
-sock_set_close_on_exec(int fd)
+sock_set_close_on_exec(sock_t fd)
 {
 #if HAVE_FD_CLOEXEC
 	int flags;
@@ -85,7 +85,7 @@ sock_set_close_on_exec(int fd)
 }
 
 void
-sock_setrtable(int fd, int rtable)
+sock_setrtable(sock_t fd, int rtable)
 {
 	(void)fd;
 	(void)rtable;

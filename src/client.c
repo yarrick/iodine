@@ -41,7 +41,7 @@
 #include "udp.h"
 #include "ui.h"
 
-static void handshake_lazyoff(int dns_fd);
+static void handshake_lazyoff(sock_t dns_fd);
 
 static int running;
 static const char *password;
@@ -214,7 +214,7 @@ client_get_raw_addr(void)
 }
 
 static void
-send_query(int fd, char *hostname)
+send_query(sock_t fd, char *hostname)
 {
 	char packet[4096];
 	struct dns_msg q;
@@ -278,7 +278,7 @@ send_query(int fd, char *hostname)
 }
 
 static void
-send_raw(int fd, char *buf, unsigned int buflen, int cmd)
+send_raw(sock_t fd, char *buf, unsigned int buflen, int cmd)
 {
 	char packet[4096];
 	int len;
@@ -297,7 +297,7 @@ send_raw(int fd, char *buf, unsigned int buflen, int cmd)
 }
 
 static void
-send_raw_data(int dns_fd)
+send_raw_data(sock_t dns_fd)
 {
 	send_raw(dns_fd, outpkt.data, outpkt.len, RAW_HDR_CMD_DATA);
 	outpkt.len = 0;
@@ -305,7 +305,7 @@ send_raw_data(int dns_fd)
 
 
 static void
-send_packet(int fd, char cmd, const char *data, const size_t datalen)
+send_packet(sock_t fd, char cmd, const char *data, const size_t datalen)
 {
 	char buf[4096];
 
@@ -323,7 +323,7 @@ is_sending(void)
 }
 
 static void
-send_chunk(int fd)
+send_chunk(sock_t fd)
 {
 	char buf[4096];
 	unsigned int avail;
@@ -368,7 +368,7 @@ send_chunk(int fd)
 }
 
 static void
-send_ping(int fd)
+send_ping(sock_t fd)
 {
 	if (conn == CONN_DNS_NULL) {
 		char data[4];
@@ -432,7 +432,7 @@ log_dns_error(struct dns_msg *q, int ignore_some_errors)
 }
 
 static int
-tunnel_raw(int tun_fd, int dns_fd)
+tunnel_raw(sock_t tun_fd, sock_t dns_fd)
 {
 	struct udp_addr addr;
 	char data[64*1024];
@@ -470,7 +470,7 @@ tunnel_raw(int tun_fd, int dns_fd)
 }
 
 static int
-read_dns(int dns_fd, char *buf, int buflen, struct dns_msg *q)
+read_dns(sock_t dns_fd, char *buf, int buflen, struct dns_msg *q)
 /* Returns -1 on receive error or decode error, including DNS error replies.
    Returns 0 on replies that could be correct but are useless, and are not
    DNS error replies.
@@ -496,7 +496,7 @@ read_dns(int dns_fd, char *buf, int buflen, struct dns_msg *q)
 }
 
 static int
-handshake_waitdns(int dns_fd, char *buf, int buflen, char cmd, int timeout)
+handshake_waitdns(sock_t dns_fd, char *buf, int buflen, char cmd, int timeout)
 /* Wait for DNS reply fitting to our latest query and returns it.
    Returns length of reply = #bytes used in buf.
    Returns 0 if fitting reply happens to be useless.
@@ -576,7 +576,7 @@ handshake_waitdns(int dns_fd, char *buf, int buflen, char cmd, int timeout)
 }
 
 static int
-tunnel_tun(int tun_fd, int dns_fd)
+tunnel_tun(sock_t tun_fd, sock_t dns_fd)
 {
 	unsigned long outlen;
 	unsigned long inlen;
@@ -616,7 +616,7 @@ tunnel_tun(int tun_fd, int dns_fd)
 }
 
 static int
-tunnel_dns(int tun_fd, int dns_fd)
+tunnel_dns(sock_t tun_fd, sock_t dns_fd)
 {
 	static long packrecv = 0;
 	static long packrecv_oos = 0;
@@ -919,7 +919,7 @@ tunnel_dns(int tun_fd, int dns_fd)
 }
 
 int
-client_tunnel(int tun_fd, int dns_fd)
+client_tunnel(sock_t tun_fd, sock_t dns_fd)
 {
 	fd_set fds;
 	int i;
@@ -929,7 +929,7 @@ client_tunnel(int tun_fd, int dns_fd)
 
 	while (running) {
 		int timeout_ms = selecttimeout * 1000;
-		int watch_tun;
+		sock_t watch_tun;
 
 		if (is_sending()) {
 			/* fast timeout for retransmits */
@@ -946,7 +946,7 @@ client_tunnel(int tun_fd, int dns_fd)
 		   retransmits.
 		   Get up-to-date fast by simply dropping stuff,
 		   that's what TCP is designed to handle. */
-		watch_tun = (!is_sending() || outchunkresent >= 2) ? tun_fd : -1;
+		watch_tun = (!is_sending() || outchunkresent >= 2) ? tun_fd : INVALID_SOCK;
 
 		i = sock_select(timeout_ms, &fds, watch_tun, dns_fd);
 
@@ -1014,7 +1014,7 @@ client_tunnel(int tun_fd, int dns_fd)
 }
 
 static void
-send_login(int fd, char *login, int len)
+send_login(sock_t fd, char *login, int len)
 {
 	char data[19];
 
@@ -1031,7 +1031,7 @@ send_login(int fd, char *login, int len)
 }
 
 static void
-send_fragsize_probe(int fd, int fragsize)
+send_fragsize_probe(sock_t fd, int fragsize)
 {
 	char probedata[256];
 	char buf[4096];
@@ -1060,7 +1060,7 @@ send_fragsize_probe(int fd, int fragsize)
 }
 
 static void
-send_set_downstream_fragsize(int fd, int fragsize)
+send_set_downstream_fragsize(sock_t fd, int fragsize)
 {
 	char data[5];
 
@@ -1076,7 +1076,7 @@ send_set_downstream_fragsize(int fd, int fragsize)
 }
 
 static void
-send_version(int fd, uint32_t version)
+send_version(sock_t fd, uint32_t version)
 {
 	char data[6];
 
@@ -1096,7 +1096,7 @@ send_version(int fd, uint32_t version)
 /* Add lower 15 bits of rand seed as base32,
  * followed by a dot and the tunnel domain and send */
 static void
-send_handshake_query(int fd, char *prefix)
+send_handshake_query(sock_t fd, char *prefix)
 {
 	char buf[300];
 	char cmc_dot[5];
@@ -1113,7 +1113,7 @@ send_handshake_query(int fd, char *prefix)
 }
 
 static void
-send_raw_udp_login(int dns_fd, int seed)
+send_raw_udp_login(sock_t dns_fd, int seed)
 {
 	char buf[16];
 	login_calculate(buf, 16, password, seed + 1);
@@ -1122,7 +1122,7 @@ send_raw_udp_login(int dns_fd, int seed)
 }
 
 static void
-send_upenctest(int fd, const char *s)
+send_upenctest(sock_t fd, const char *s)
 /* NOTE: String may be at most 63-4=59 chars to fit in 1 dns chunk. */
 {
 	char buf[512] = "z___";
@@ -1139,7 +1139,7 @@ send_upenctest(int fd, const char *s)
 }
 
 static void
-send_downenctest(int fd, char downenc, int variant)
+send_downenctest(sock_t fd, char downenc, int variant)
 {
 	char prefix[4] = "y__";
 	prefix[1] = ascii_tolower(downenc);
@@ -1150,7 +1150,7 @@ send_downenctest(int fd, char downenc, int variant)
 }
 
 static void
-send_lazy_switch(int fd)
+send_lazy_switch(sock_t fd)
 {
 	char sw_lazy[] = { 'o', b32_5to8(userid), 'i', 0 };
 
@@ -1161,7 +1161,7 @@ send_lazy_switch(int fd)
 }
 
 static int
-handshake_version(int dns_fd, int *seed)
+handshake_version(sock_t dns_fd, int *seed)
 {
 	char hex[] = "0123456789abcdef";
 	char in[4096];
@@ -1207,7 +1207,7 @@ handshake_version(int dns_fd, int *seed)
 }
 
 static int
-handshake_login(int dns_fd, int seed)
+handshake_login(sock_t dns_fd, int seed)
 {
 	char in[4096];
 	char login[16];
@@ -1266,7 +1266,7 @@ handshake_login(int dns_fd, int seed)
 }
 
 static int
-handshake_raw_udp(int dns_fd, int seed)
+handshake_raw_udp(sock_t dns_fd, int seed)
 {
 	char get_ip[] = { 'i', b32_5to8(userid), 0 };
 	char in[4096];
@@ -1350,7 +1350,7 @@ handshake_raw_udp(int dns_fd, int seed)
 }
 
 static int
-handshake_upenctest(int dns_fd, const char *s)
+handshake_upenctest(sock_t dns_fd, const char *s)
 /* NOTE: *s may be max 59 chars; must start with "aA" for case-swap check
    Returns:
    -1: case swap, no need for any further test: error printed; or Ctrl-C
@@ -1427,7 +1427,7 @@ handshake_upenctest(int dns_fd, const char *s)
 }
 
 static int
-handshake_upenc_autodetect(int dns_fd)
+handshake_upenc_autodetect(sock_t dns_fd)
 /* Returns:
    0: keep Base32
    1: Base64 is okay
@@ -1522,7 +1522,7 @@ handshake_upenc_autodetect(int dns_fd)
 }
 
 static int
-handshake_downenctest(int dns_fd, const struct encoder *trycodec)
+handshake_downenctest(sock_t dns_fd, const struct encoder *trycodec)
 /* Returns:
    0: not identical or error or timeout
    1: identical string returned
@@ -1566,7 +1566,7 @@ handshake_downenctest(int dns_fd, const struct encoder *trycodec)
 }
 
 static const struct encoder *
-handshake_downenc_autodetect(int dns_fd)
+handshake_downenc_autodetect(sock_t dns_fd)
 {
 	const struct encoder *selected = NULL;
 
@@ -1611,7 +1611,7 @@ handshake_downenc_autodetect(int dns_fd)
 }
 
 static int
-handshake_qtypetest(int dns_fd, int timeout)
+handshake_qtypetest(sock_t dns_fd, int timeout)
 /* Returns:
    0: doesn't work with this timeout
    1: works properly
@@ -1667,7 +1667,7 @@ handshake_qtype_numcvt(int num)
 }
 
 static int
-handshake_qtype_autodetect(int dns_fd)
+handshake_qtype_autodetect(sock_t dns_fd)
 /* Returns:
    0: okay, do_qtype set
    1: problem, program exit
@@ -1737,7 +1737,7 @@ handshake_qtype_autodetect(int dns_fd)
 }
 
 static int
-handshake_edns0_check(int dns_fd)
+handshake_edns0_check(sock_t dns_fd)
 /* Returns:
    0: EDNS0 not supported; or Ctrl-C
    1: EDNS0 works
@@ -1787,7 +1787,7 @@ handshake_edns0_check(int dns_fd)
 }
 
 static void
-handshake_switch_codec(int dns_fd, int bits)
+handshake_switch_codec(sock_t dns_fd, int bits)
 {
 	char sw_codec[] = { 's', b32_5to8(userid), b32_5to8(bits), 0 };
 	char in[4096];
@@ -1842,7 +1842,7 @@ codec_revert:
 }
 
 static void
-handshake_switch_downenc(int dns_fd)
+handshake_switch_downenc(sock_t dns_fd)
 {
 	char sw_downenc[] = { 'o', b32_5to8(userid), downenc->down_char, 0 };
 	char in[4096];
@@ -1884,7 +1884,7 @@ codec_revert:
 }
 
 static void
-handshake_try_lazy(int dns_fd)
+handshake_try_lazy(sock_t dns_fd)
 {
 	char in[4096];
 	int i;
@@ -1928,7 +1928,7 @@ codec_revert:
 }
 
 static void
-handshake_lazyoff(int dns_fd)
+handshake_lazyoff(sock_t dns_fd)
 /* Used in the middle of data transfer, timing is different and no error msgs */
 {
 	char in[4096];
@@ -2022,7 +2022,7 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 
 
 static int
-handshake_autoprobe_fragsize(int dns_fd)
+handshake_autoprobe_fragsize(sock_t dns_fd)
 {
 	char in[4096];
 	int i;
@@ -2094,7 +2094,7 @@ handshake_autoprobe_fragsize(int dns_fd)
 }
 
 static void
-handshake_set_fragsize(int dns_fd, int fragsize)
+handshake_set_fragsize(sock_t dns_fd, int fragsize)
 {
 	char in[4096];
 	int i;
@@ -2131,7 +2131,7 @@ handshake_set_fragsize(int dns_fd, int fragsize)
 }
 
 int
-client_handshake(int dns_fd, int raw_mode, int autodetect_frag_size, int fragsize)
+client_handshake(sock_t dns_fd, int raw_mode, int autodetect_frag_size, int fragsize)
 {
 	int seed;
 	int upcodec;
