@@ -65,7 +65,11 @@ secure_random(void *buf, size_t len)
 	}
 	return;
 #else
-#if HAVE_GETRANDOM
+
+#if HAVE_ARC4RANDOM_BUF
+	arc4random_buf(p, len);
+	return;
+#elif HAVE_GETRANDOM
 	{
 		ssize_t r;
 		do {
@@ -78,11 +82,6 @@ secure_random(void *buf, size_t len)
 	}
 	if (len == 0)
 		return;
-#endif
-
-#if HAVE_ARC4RANDOM_BUF
-	arc4random_buf(p, len);
-	return;
 #endif
 
 	{
