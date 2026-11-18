@@ -67,8 +67,8 @@ START_TEST(test_pidfile_rejects_symlink)
 	int tfd;
 	ssize_t n;
 
-	snprintf(link, sizeof(link), "/tmp/iodine_test_link_%d", (int)getpid());
-	snprintf(target, sizeof(target), "/tmp/iodine_test_target_%d", (int)getpid());
+	snprintf(link, sizeof(link), "iodine_test_link_%d", (int)getpid());
+	snprintf(target, sizeof(target), "iodine_test_target_%d", (int)getpid());
 
 	/* Sentinel content in the target so we can detect a redirected write. */
 	tfd = open(target, O_WRONLY | O_CREAT | O_TRUNC, 0600);
