@@ -95,7 +95,6 @@ optional_functions = [
   'CheckTokenMembership',
   'arc4random_buf',
   'chroot',
-  'daemon',
   'geteuid',
   'getpwnam',
   'getrandom',

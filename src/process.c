@@ -243,50 +243,40 @@ do_pidfile(char *pidfile)
 	}
 }
 
-/* Provide daemon(3) if required and not available */
-#if CAN_DETACH && !HAVE_DAEMON
-static int
-daemon(int nochdir, int noclose)
-{
-	int fd, i;
-
-	switch (fork()) {
-		case 0:
-			break;
-		case -1:
-			return -1;
-		default:
-			_exit(0);
-	}
-
-	if (!nochdir) {
-		chdir("/");
-	}
-
-	if (setsid() < 0) {
-		return -1;
-	}
-
-	if (!noclose) {
-		if ((fd = open("/dev/null", O_RDWR)) >= 0) {
-			for (i = 0; i < 3; i++) {
-				dup2(fd, i);
-			}
-			if (fd > 2) {
-				close(fd);
-			}
-		}
-	}
-	return 0;
-}
-#endif
-
 void
 do_detach(void)
 {
 #if CAN_DETACH
+	int fd;
+
 	ui_log("Detaching from terminal...\n");
-	daemon(0, 0);
+
+	switch (fork()) {
+	case 0:
+		break;
+	case -1:
+		err(1, "fork");
+	default:
+		_exit(0);
+	}
+
+	if (setsid() < 0) {
+		err(1, "setsid");
+	}
+
+	if (chdir("/") != 0) {
+		err(1, "chdir");
+	}
+
+	if ((fd = open("/dev/null", O_RDWR)) >= 0) {
+		for (int i = 0; i < 3; i++) {
+			dup2(fd, i);
+		}
+		if (fd > 2) {
+			close(fd);
+		}
+	}
+
 	umask(0);
 	alarm(0);
 #else
