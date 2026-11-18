@@ -526,11 +526,11 @@ main(int argc, char **argv)
 	}
 	ui_log("Listening to dns for domain %s\n", topdomain);
 
-	if (pidfile != NULL)
-		do_pidfile(pidfile);
-
 	if (foreground == 0)
 		do_detach();
+
+	if (pidfile != NULL)
+		do_pidfile(pidfile);
 
 	tzset();
 #if HAVE_SYSLOG

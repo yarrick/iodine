@@ -378,11 +378,11 @@ main(int argc, char **argv)
 
 	ui_log("Connection setup complete, transmitting data.\n");
 
-	if (pidfile != NULL)
-		do_pidfile(pidfile);
-
 	if (foreground == 0)
 		do_detach();
+
+	if (pidfile != NULL)
+		do_pidfile(pidfile);
 
 	if (newroot != NULL)
 		do_chroot(newroot);

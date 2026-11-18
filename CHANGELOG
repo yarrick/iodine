@@ -19,6 +19,8 @@ master:
 	- Source IP address set to original destination address when sending
 	  replies in iodined (not yet supported on Windows).
 	- Added meson option for setting max number of users.
+	- Changed pidfile to be written after detach so it includes the
+	  pid of the background process.
 
 2026-11-15: 0.9.1 "Caps Lock"
 	- Fixed parsing of -z flag (SELinux context) for iodine client.
