@@ -24,6 +24,8 @@
 #ifndef _ENCODING_H_
 #define _ENCODING_H_
 
+#include <stddef.h>
+
 #include "config.h"
 
 /* All-0, all-1, 01010101, 10101010: each 4 times to make sure the pattern

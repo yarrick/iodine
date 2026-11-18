@@ -18,6 +18,13 @@
 #ifndef __USER_H__
 #define __USER_H__
 
+#include <stdint.h>
+#include <time.h>
+
+#include "common.h"
+
+struct encoder;
+
 #define OUTPACKETQ_LEN 4		/* Note: 16 users * 1 packet = 1MB */
 /* Undefine to have no queue for packets coming in from tun device, which may
    lead to massive dropping in multi-user situations with high traffic. */

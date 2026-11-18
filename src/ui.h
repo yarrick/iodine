@@ -18,6 +18,8 @@
 #ifndef __UI_H__
 #define __UI_H__
 
+#include <stddef.h>
+
 #include "config.h"
 
 #if HAVE_FORMAT_ATTR

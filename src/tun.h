@@ -18,6 +18,9 @@
 #ifndef _TUN_H_
 #define _TUN_H_
 
+#include <stddef.h>
+#include <sys/types.h>
+
 #include "sock.h"
 
 struct in_addr;

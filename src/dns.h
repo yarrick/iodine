@@ -18,6 +18,7 @@
 #ifndef __DNS_H__
 #define __DNS_H__
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "config.h"

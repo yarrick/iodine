@@ -18,6 +18,9 @@
 #ifndef _READ_H_
 #define _READ_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
 unsigned int readname(char *, int, char **, char *, size_t);
 unsigned int readshort(char *, char **, unsigned short *);
 unsigned int readlong(char *, char **, uint32_t *);
