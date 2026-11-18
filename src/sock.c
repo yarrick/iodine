@@ -17,6 +17,7 @@
 
 #include "config.h"
 
+#include <fcntl.h>
 #include <string.h>
 #ifdef WINDOWS
 #include <winsock2.h>
