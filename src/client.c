@@ -26,6 +26,7 @@
 
 #include "config.h"
 #ifndef WINDOWS
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #endif
 #include "common.h"

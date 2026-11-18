@@ -33,6 +33,7 @@
 #ifdef WINDOWS
 #include "windows_dns.h"
 #else
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #endif

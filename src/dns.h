@@ -32,6 +32,12 @@ typedef enum {
 	QR_ANSWER = 1
 } qr_t;
 
+#define T_PRIVATE 65399
+/* Undefined RR type; "private use" range, see
+ * http://www.bind9.net/dns-parameters */
+#define T_UNSET 65432
+/* Unused RR type, never actually sent */
+
 extern int dnsc_use_edns0;
 
 int dns_encode(char *, size_t, struct dns_msg *, qr_t, const char *, size_t);

@@ -30,6 +30,7 @@
 #endif
 
 #include "common.h"
+#include "dns.h"
 #include "encoding.h"
 #include "user.h"
 

@@ -34,13 +34,11 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 
 #include "config.h"
 
-#include <stdarg.h>
 #ifdef WINDOWS
 #include "windows_dns.h"
 #else
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
+#include <netinet/in.h>
 #endif
 
 #define DNS_PORT 53
@@ -53,12 +51,6 @@ extern const unsigned char raw_header[RAW_HDR_LEN];
 #endif
 
 #define DNS_MSG_NAME_SIZE 256
-
-#define T_PRIVATE 65399
-/* Undefined RR type; "private use" range, see
- * http://www.bind9.net/dns-parameters */
-#define T_UNSET 65432
-/* Unused RR type, never actually sent */
 
 struct packet
 {
