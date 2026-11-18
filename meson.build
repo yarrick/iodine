@@ -102,7 +102,6 @@ optional_functions = [
   'setgroups',
   'strlcpy',
   'syslog',
-  'tzset',
   'warnx',
 ]
 foreach func : optional_functions

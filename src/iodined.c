@@ -531,9 +531,7 @@ main(int argc, char **argv)
 	if (foreground == 0)
 		do_detach();
 
-#ifdef HAVE_TZSET
 	tzset();
-#endif
 #if HAVE_SYSLOG
 	openlog(__progname, LOG_NDELAY, LOG_DAEMON);
 #endif
