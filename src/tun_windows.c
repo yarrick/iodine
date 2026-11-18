@@ -37,7 +37,6 @@
 DWORD WINAPI tun_reader(LPVOID arg);
 struct tun_data {
 	WINTUN_SESSION_HANDLE session;
-	int sock;
 	struct sockaddr_storage addr;
 	int addrlen;
 };
@@ -186,7 +185,7 @@ void
 close_tun(int tun_fd)
 {
 	if (tun_fd >= 0)
-		close(tun_fd);
+		close_udp(tun_fd);
 }
 
 int
@@ -292,10 +291,10 @@ tun_setmtu(const unsigned mtu)
 void
 tun_flush_rx(int tun_fd)
 {
-	ssize_t len;
+	int len;
 	char buffer[4096];
 
 	do {
-		len = read(tun_fd, buffer, sizeof(buffer));
+		len = recv(tun_fd, buffer, sizeof(buffer), 0);
 	} while (len > 0);
 }

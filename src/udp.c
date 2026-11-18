@@ -124,7 +124,11 @@ open_udp_from_host(char *host, int port, int addr_family, int flags)
 void
 close_udp(int fd)
 {
+#ifdef WINDOWS
+	closesocket(fd);
+#else
 	close(fd);
+#endif
 }
 
 static struct in_addr
