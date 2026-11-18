@@ -31,10 +31,10 @@ void network_init(void);
 #if !HAVE_WARNX
 void vwarn(const char *fmt, va_list list);
 void warn(const char *fmt, ...);
-void err(int eval, const char *fmt, ...);
+void err(int eval, const char *fmt, ...) NORETURN_ATTR;
 void vwarnx(const char *fmt, va_list list);
 void warnx(const char *fmt, ...);
-void errx(int eval, const char *fmt, ...);
+void errx(int eval, const char *fmt, ...) NORETURN_ATTR;
 #else
 #include <err.h>
 #endif

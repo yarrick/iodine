@@ -114,7 +114,9 @@ cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
 cdata.set10('HAVE_SO_REUSEPORT',
   cc.has_header_symbol('sys/socket.h', 'SO_REUSEPORT', args: header_args))
 cdata.set10('HAVE_SO_RTABLE', cc.has_header_symbol('sys/socket.h', 'SO_RTABLE'))
-cdata.set10('HAVE_NORETURN_ATTR', cc.has_function_attribute('noreturn'))
+cdata.set('NORETURN_ATTR',
+  cc.has_function_attribute('noreturn') ? '__attribute__((noreturn))' : ''
+)
 cdata.set10('HAVE_FORMAT_ATTR', cc.has_function_attribute('format'))
 
 cdata.set10('HAVE_PROGNAME', cc.links('''

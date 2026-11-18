@@ -57,12 +57,10 @@
 
 #define PASSWORD_ENV_VAR "IODINED_PASS"
 
-#if HAVE_NORETURN_ATTR
 /* mark as no return to help some compilers to avoid warnings
  * about use of uninitialized variables */
-static inline void usage(void) __attribute__((noreturn));
-static inline void help(FILE * stream) __attribute__((noreturn));
-#endif
+static inline void usage(void) NORETURN_ATTR;
+static inline void help(FILE * stream) NORETURN_ATTR;
 
 static char password[33];
 
