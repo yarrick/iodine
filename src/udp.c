@@ -57,7 +57,7 @@ open_udp_opt(struct net_addr *addr, int v6only)
 	}
 
 	flag = 1;
-#ifdef SO_REUSEPORT
+#if HAVE_SO_REUSEPORT
 	setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (const void*) &flag, sizeof(flag));
 #endif
 	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, sizeof(flag));

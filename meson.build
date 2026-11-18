@@ -38,9 +38,10 @@ zlib = dependency('zlib')
 commondeps = []
 serverdeps = []
 
+header_args = []
 cdata.set10(host_machine.system().to_upper(), true)
 if host_machine.system() == 'linux'
-  add_project_arguments('-D_GNU_SOURCE', language: 'c')
+  header_args = ['-D_GNU_SOURCE']
   selinux = dependency('libselinux', required: get_option('selinux'))
   cdata.set10('HAVE_SETCON', selinux.found())
   commondeps += selinux
@@ -56,9 +57,9 @@ elif host_machine.system() == 'darwin'
   add_project_arguments('-D__APPLE_USE_RFC_3542', language: 'c')
   add_project_arguments('-DBIND_8_COMPAT', language: 'c')
 elif host_machine.system() == 'haiku'
+  header_args = ['-D_BSD_SOURCE']
   commondeps += cc.find_library('network')
   commondeps += cc.find_library('bsd')
-  add_project_arguments('-D_BSD_SOURCE', language: 'c')
 elif host_machine.system() == 'windows'
   add_project_arguments(
     '-DWINVER=0x0601',
@@ -85,6 +86,7 @@ elif host_machine.system() == 'windows'
     )
   endif
 endif
+add_project_arguments(header_args, language: 'c')
 
 cdata.set10('CAN_DETACH',
             not ['android', 'windows'].contains(host_machine.system()))
@@ -109,6 +111,8 @@ foreach func : optional_functions
 endforeach
 
 cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
+cdata.set10('HAVE_SO_REUSEPORT',
+  cc.has_header_symbol('sys/socket.h', 'SO_REUSEPORT', args: header_args))
 cdata.set10('HAVE_SO_RTABLE', cc.has_header_symbol('sys/socket.h', 'SO_RTABLE'))
 cdata.set10('HAVE_NORETURN_ATTR', cc.has_function_attribute('noreturn'))
 cdata.set10('HAVE_FORMAT_ATTR', cc.has_function_attribute('format'))
