@@ -256,6 +256,7 @@ do_detach(void)
 		break;
 	case -1:
 		err(1, "fork");
+		break;
 	default:
 		_exit(0);
 	}
