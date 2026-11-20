@@ -106,3 +106,45 @@ jobs:
     - name: run bench
       working-directory: build
       run: sudo ninja tun_bench
+
+  fuzz_server:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: apt update
+      run: sudo apt update
+    - name: install deps
+      run: >-
+        sudo apt install -y
+        meson ninja-build afl++
+    - name: meson setup
+      env:
+        CC: afl-cc
+      run: >-
+        meson setup build
+        -Db_sanitize=address,undefined
+        -Db_lundef=false
+        -Dc_args=-fno-sanitize-recover=all
+    - name: build
+      working-directory: build
+      run: ninja tests/fuzz_server
+    - name: fuzz
+      env:
+        AFL_BENCH_UNTIL_CRASH: "1"
+        AFL_NO_UI: "1"
+        AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: "1"
+        AFL_SKIP_CPUFREQ: "1"
+      run: |
+        afl-fuzz -V 180 -i tests/fuzz/server_input/ -o fuzzed -- ./build/tests/fuzz_server
+        cat fuzzed/default/fuzzer_stats
+        if ! grep -q '^saved_crashes *: 0$' fuzzed/default/fuzzer_stats; then
+          for f in fuzzed/default/crashes/id:*; do
+            echo "=== Crash input: $f ==="
+            cat -v "$f"
+            echo
+            echo "=== Reproducing: $f ==="
+            ./build/tests/fuzz_server "$f" || true
+          done
+          exit 1
+        fi
