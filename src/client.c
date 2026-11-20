@@ -1693,16 +1693,6 @@ handshake_qtype_autodetect(sock_t dns_fd)
 	return 0;  /* okay */
 }
 
-static int
-handshake_edns0_check(sock_t dns_fd)
-/* Returns:
-   0: EDNS0 not supported; or Ctrl-C
-   1: EDNS0 works
-*/
-{
-	return handshake_downenc_check(dns_fd, NULL, 3, 1, "EDNS0 support");
-}
-
 static void
 handshake_switch_codec(sock_t dns_fd, int bits)
 {
@@ -2083,7 +2073,7 @@ client_handshake(sock_t dns_fd, int raw_mode, int autodetect_frag_size, int frag
 		}
 
 		dnsc_use_edns0 = 1;
-		if (handshake_edns0_check(dns_fd) && running) {
+		if (handshake_downenc_check(dns_fd, NULL, 3, 1, "EDNS0 support") && running) {
 			ui_log("Using EDNS0 extension\n");
 		} else if (!running) {
 			return -1;
