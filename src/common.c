@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <ctype.h>
 
 #include "config.h"
 
@@ -188,7 +187,7 @@ check_topdomain(char *str, int allow_wildcard, char **errormsg)
 			chunklen++;
 		}
 		if ((str[i] >= 'a' && str[i] <= 'z') || (str[i] >= 'A' && str[i] <= 'Z') ||
-				isdigit(str[i]) || str[i] == '-' || str[i] == '.') {
+		    (str[i] >= '0' && str[i] <= '9') || str[i] == '-' || str[i] == '.') {
 			continue;
 		} else if (allow_wildcard && str[i] == '*') {
 			/* First char allowed to be wildcard, if followed by dot */
