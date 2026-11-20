@@ -1607,19 +1607,6 @@ handshake_downenc_autodetect(sock_t dns_fd)
 }
 
 static int
-handshake_qtypetest(sock_t dns_fd, int timeout)
-/* Returns:
-   0: doesn't work with this timeout
-   1: works properly
-*/
-{
-	/* We could use 'Z' bouncing here, but 'Y' also tests that 0-255
-	   byte values can be returned, which is needed for NULL/PRIVATE
-	   to work. */
-	return handshake_downenc_check(dns_fd, NULL, 1, timeout, NULL);
-}
-
-static int
 handshake_qtype_numcvt(int num)
 {
 	switch (num) {
@@ -1665,7 +1652,9 @@ handshake_qtype_autodetect(sock_t dns_fd)
 
 			ui_log_partial(".");
 
-			if (handshake_qtypetest(dns_fd, timeout)) {
+			/* Use 'Y' (downenc check) rather than 'Z' bounce so
+			   0-255 byte values are also verified for NULL/PRIVATE. */
+			if (handshake_downenc_check(dns_fd, NULL, 1, timeout, NULL)) {
 				/* okay */
 				highestworking = qtypenum;
 #if 0
