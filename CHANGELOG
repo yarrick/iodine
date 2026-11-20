@@ -16,6 +16,8 @@ master:
 	    (needs privileges and ping3 python module).
 	  * test_server which tests the external IP lookup, standard DNS
 	    response and version/login checks (needs dnspython module).
+	  * fuzz_server for use with AFL++ or similar, with inputs
+	    provided in tests/fuzz/server_input.
 	- Source IP address set to original destination address when sending
 	  replies in iodined (not yet supported on Windows).
 	- Added meson option for setting max number of users.
