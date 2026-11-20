@@ -68,7 +68,7 @@ static uint16_t chunkid;
 static uint16_t chunkid_prev;
 static uint16_t chunkid_prev2;
 
-/* The encoder used for data packets
+/* The encoder used for upstream data packets
  * Defaults to Base32, can be changed after handshake */
 static const struct encoder *dataenc = &base32_ops;
 
@@ -1515,7 +1515,8 @@ handshake_upenc_autodetect(sock_t dns_fd)
 }
 
 static int
-handshake_downenctest(sock_t dns_fd, const struct encoder *trycodec)
+handshake_downenc_check(sock_t dns_fd, const struct encoder *trycodec,
+			int retries, int timeout, const char *test_reason)
 /* Returns:
    0: not identical or error or timeout
    1: identical string returned
@@ -1524,38 +1525,40 @@ handshake_downenctest(sock_t dns_fd, const struct encoder *trycodec)
 	char in[4096];
 	int i;
 	int read;
-	char *s = DOWNCODECCHECK1;
-	int slen = DOWNCODECCHECK1_LEN;
 
-	for (i = 0; running && i < 3; i++) {
+	if (trycodec == NULL) {
+		trycodec = (do_qtype == T_NULL || do_qtype == T_PRIVATE)
+			? &raw_ops : &base32_ops;
+	}
+
+	for (i = 0; running && i < retries; i++) {
 
 		send_downenctest(dns_fd, trycodec->down_char, 1);
 
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', i+1);
+		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', timeout + i);
 
 		if (read == -2)
 			return 0;	/* hard error */
 
-		if (read > 0 && read != slen)
+		if (read > 0 && read != DOWNCODECCHECK1_LEN)
 			return 0;	/* reply incorrect = unreliable */
 
 		if (read > 0) {
-			int k;
-			for (k = 0; k < slen; k++) {
-				if (in[k] != s[k]) {
-					/* Definitely not reliable */
-					return 0;
-				}
-			}
-			/* if still here, then all okay */
-			return 1;
+			return memcmp(in, DOWNCODECCHECK1, DOWNCODECCHECK1_LEN) == 0;
 		}
 
-		ui_log("Retrying downstream codec test...\n");
+		if (test_reason != NULL)
+			ui_log("Retrying %s test...\n", test_reason);
 	}
 
 	/* timeout */
 	return 0;
+}
+
+static int
+handshake_downenctest(sock_t dns_fd, const struct encoder *trycodec)
+{
+	return handshake_downenc_check(dns_fd, trycodec, 3, 1, "downstream codec");
 }
 
 static const struct encoder *
@@ -1610,38 +1613,10 @@ handshake_qtypetest(sock_t dns_fd, int timeout)
    1: works properly
 */
 {
-	char in[4096];
-	int read;
-	char *s = DOWNCODECCHECK1;
-	int slen = DOWNCODECCHECK1_LEN;
-	int trycodec;
-	int k;
-
-	if (do_qtype == T_NULL || do_qtype == T_PRIVATE)
-		trycodec = 'R';
-	else
-		trycodec = 'T';
-
 	/* We could use 'Z' bouncing here, but 'Y' also tests that 0-255
 	   byte values can be returned, which is needed for NULL/PRIVATE
 	   to work. */
-
-	send_downenctest(dns_fd, trycodec, 1);
-
-	read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', timeout);
-
-	if (read != slen)
-		return 0;	/* incorrect */
-
-	for (k = 0; k < slen; k++) {
-		if (in[k] != s[k]) {
-			/* corrupted */
-			return 0;
-		}
-	}
-
-	/* if still here, then all okay */
-	return 1;
+	return handshake_downenc_check(dns_fd, NULL, 1, timeout, NULL);
 }
 
 static int
@@ -1736,47 +1711,7 @@ handshake_edns0_check(sock_t dns_fd)
    1: EDNS0 works
 */
 {
-	char in[4096];
-	int i;
-	int read;
-	char *s = DOWNCODECCHECK1;
-	int slen = DOWNCODECCHECK1_LEN;
-	const struct encoder *codec;
-
-	if (do_qtype == T_NULL || do_qtype == T_PRIVATE)
-		codec = &raw_ops;
-	else
-		codec = &base32_ops;
-
-	for (i = 0; running && i < 3; i++) {
-
-		send_downenctest(dns_fd, codec->down_char, 1);
-
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'y', i+1);
-
-		if (read == -2)
-			return 0;	/* hard error */
-
-		if (read > 0 && read != slen)
-			return 0;	/* reply incorrect = unreliable */
-
-		if (read > 0) {
-			int k;
-			for (k = 0; k < slen; k++) {
-				if (in[k] != s[k]) {
-					/* Definitely not reliable */
-					return 0;
-				}
-			}
-			/* if still here, then all okay */
-			return 1;
-		}
-
-		ui_log("Retrying EDNS0 support test...\n");
-	}
-
-	/* timeout or Ctrl-C */
-	return 0;
+	return handshake_downenc_check(dns_fd, NULL, 3, 1, "EDNS0 support");
 }
 
 static void
