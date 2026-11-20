@@ -513,6 +513,9 @@ handshake_waitdns(sock_t dns_fd, char *buf, int buflen, char cmd, int timeout)
 	struct dns_msg q;
 	int r, rv;
 
+	if (buflen <= 0)
+		return -1;
+
 	/* In case it was uppercase, will be compared to lowercase below */
 	cmd = ascii_tolower(cmd);
 	while (1) {
@@ -526,7 +529,7 @@ handshake_waitdns(sock_t dns_fd, char *buf, int buflen, char cmd, int timeout)
 
 		q.id = 0;
 		q.name[0] = '\0';
-		rv = read_dns(dns_fd, buf, buflen, &q);
+		rv = read_dns(dns_fd, buf, buflen - 1, &q);
 		command = ascii_tolower(q.name[0]);
 
 		if (q.id != chunkid || command != cmd) {
@@ -568,7 +571,8 @@ handshake_waitdns(sock_t dns_fd, char *buf, int buflen, char cmd, int timeout)
 			log_dns_error(&q, 1);
 			return -2;
 		}
-		/* rv either 0 or >0, return it as is. */
+		/* rv either 0 or >0, always NUL-terminate in the reserved byte. */
+		buf[rv] = '\0';
 		return rv;
 	}
 
@@ -1825,7 +1829,6 @@ handshake_switch_codec(sock_t dns_fd, int bits)
 				ui_log("Server rejected the selected codec. ");
 				goto codec_revert;
 			}
-			in[read] = 0; /* zero terminate */
 			ui_log("Server switched upstream to codec %s\n", in);
 			dataenc = tempenc;
 			return;
@@ -1868,7 +1871,6 @@ handshake_switch_downenc(sock_t dns_fd)
 				ui_log("Server rejected the selected codec. ");
 				goto codec_revert;
 			}
-			in[read] = 0; /* zero terminate */
 			ui_log("Server switched downstream to codec %s\n", in);
 			return;
 		}
