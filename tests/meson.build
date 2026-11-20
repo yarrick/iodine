@@ -4,7 +4,8 @@ libcheck = dependency('check', required: false)
 if libcheck.found()
   suites = [
     'base32', 'base64', 'base64u', 'base128', 'common', 'compat', 'dns',
-    'encoding', 'fw_query', 'login', 'process', 'random', 'read', 'ui', 'user'
+    'encoding', 'fw_query', 'login', 'process', 'random', 'raw', 'read',
+    'ui', 'user'
   ]
 
   # Silence warning from check.h

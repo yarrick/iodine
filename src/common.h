@@ -18,20 +18,6 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-/* Last byte of raw header is the command */
-#define RAW_HDR_LEN 4
-#define RAW_HDR_IDENT_LEN 3
-#define RAW_HDR_CMD 3
-#define RAW_HDR_CMD_LOGIN 0x10
-#define RAW_HDR_CMD_DATA  0x20
-#define RAW_HDR_CMD_PING  0x30
-
-#define RAW_HDR_CMD_MASK  0xF0
-#define RAW_HDR_USR_MASK  0x0F
-#define RAW_HDR_GET_CMD(x) ((x)[RAW_HDR_CMD] & RAW_HDR_CMD_MASK)
-#define RAW_HDR_GET_USR(x) ((x)[RAW_HDR_CMD] & RAW_HDR_USR_MASK)
-extern const unsigned char raw_header[RAW_HDR_LEN];
-
 #include "config.h"
 
 #ifdef WINDOWS

@@ -35,6 +35,7 @@
 #include "dns.h"
 #include "login.h"
 #include "random.h"
+#include "raw.h"
 #include "sock.h"
 #include "tun.h"
 #include "version.h"
@@ -279,33 +280,6 @@ send_query(sock_t fd, char *hostname)
 }
 
 static void
-send_raw(sock_t fd, char *buf, unsigned int buflen, int cmd)
-{
-	char packet[4096];
-	int len;
-
-	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
-
-	memcpy(packet, raw_header, RAW_HDR_LEN);
-	if (len) {
-		memcpy(&packet[RAW_HDR_LEN], buf, len);
-	}
-
-	len += RAW_HDR_LEN;
-	packet[RAW_HDR_CMD] = cmd | (userid & 0x0F);
-
-	send_udp(fd, packet, len, &raw_serv);
-}
-
-static void
-send_raw_data(sock_t dns_fd)
-{
-	send_raw(dns_fd, outpkt.data, outpkt.len, RAW_HDR_CMD_DATA);
-	outpkt.len = 0;
-}
-
-
-static void
 send_packet(sock_t fd, char cmd, const char *data, const size_t datalen)
 {
 	char buf[4096];
@@ -388,7 +362,12 @@ send_ping(sock_t fd)
 
 		send_packet(fd, 'p', data, sizeof(data));
 	} else {
-		send_raw(fd, NULL, 0, RAW_HDR_CMD_PING);
+		struct raw_msg msg = {
+			.cmd = RAW_HDR_CMD_PING,
+			.userid = userid,
+		};
+
+		send_raw(fd, &msg, &raw_serv);
 	}
 }
 
@@ -436,6 +415,7 @@ static int
 tunnel_raw(sock_t tun_fd, sock_t dns_fd)
 {
 	struct udp_addr addr;
+	struct raw_msg msg;
 	char data[64*1024];
 	unsigned long packetlen;
 	char packet[64*1024];
@@ -446,23 +426,18 @@ tunnel_raw(sock_t tun_fd, sock_t dns_fd)
 		return -1;
 	}
 
-	/* minimum length */
-	if (r < RAW_HDR_LEN) return 0;
-	/* should start with header */
-	if (memcmp(data, raw_header, RAW_HDR_IDENT_LEN)) return 0;
+	if (!raw_decode(&msg, data, r)) return 0;
 	/* should be my user id */
-	if (RAW_HDR_GET_USR(data) != userid) return 0;
+	if (msg.userid != userid) return 0;
 
-	if (RAW_HDR_GET_CMD(data) == RAW_HDR_CMD_DATA ||
-		RAW_HDR_GET_CMD(data) == RAW_HDR_CMD_PING)
+	if (msg.cmd == RAW_HDR_CMD_DATA || msg.cmd == RAW_HDR_CMD_PING)
 		lastdownstreamtime = time(NULL);
 
 	/* should be data packet */
-	if (RAW_HDR_GET_CMD(data) != RAW_HDR_CMD_DATA) return 0;
+	if (msg.cmd != RAW_HDR_CMD_DATA) return 0;
 
-	r -= RAW_HDR_LEN;
 	packetlen = sizeof(packet);
-	if (uncompress((uint8_t*)packet, &packetlen, (uint8_t*) &data[RAW_HDR_LEN], r) == Z_OK) {
+	if (uncompress((uint8_t*)packet, &packetlen, (const uint8_t*) msg.data, msg.len) == Z_OK) {
 		write_tun(tun_fd, packet, packetlen);
 	}
 
@@ -614,7 +589,15 @@ tunnel_tun(sock_t tun_fd, sock_t dns_fd)
 
 		send_ping_soon = 0;
 	} else {
-		send_raw_data(dns_fd);
+		struct raw_msg msg = {
+			.cmd = RAW_HDR_CMD_DATA,
+			.userid = userid,
+			.data = outpkt.data,
+			.len = outpkt.len,
+		};
+
+		send_raw(dns_fd, &msg, &raw_serv);
+		outpkt.len = 0;
 	}
 
 	return read;
@@ -1121,9 +1104,15 @@ static void
 send_raw_udp_login(sock_t dns_fd, int seed)
 {
 	char buf[16];
-	login_calculate(buf, 16, password, seed + 1);
+	struct raw_msg msg = {
+		.cmd = RAW_HDR_CMD_LOGIN,
+		.userid = userid,
+		.data = buf,
+		.len = sizeof(buf),
+	};
+	login_calculate(buf, sizeof(buf), password, seed + 1);
 
-	send_raw(dns_fd, buf, sizeof(buf), RAW_HDR_CMD_LOGIN);
+	send_raw(dns_fd, &msg, &raw_serv);
 }
 
 static void
@@ -1334,14 +1323,13 @@ handshake_raw_udp(sock_t dns_fd, int seed)
 
 		if (r > 0) {
 			struct udp_addr address;
+			struct raw_msg msg;
 			len = read_udp(dns_fd, in, sizeof(in), &address);
-			if (len >= (16 + RAW_HDR_LEN)) {
+			if (len > 0 && raw_decode(&msg, in, len) &&
+				msg.cmd == RAW_HDR_CMD_LOGIN && msg.len >= 16) {
 				char hash[16];
 				login_calculate(hash, 16, password, seed - 1);
-				if (memcmp(in, raw_header, RAW_HDR_IDENT_LEN) == 0
-					&& RAW_HDR_GET_CMD(in) == RAW_HDR_CMD_LOGIN
-					&& memcmp(&in[RAW_HDR_LEN], hash, sizeof(hash)) == 0) {
-
+				if (memcmp(msg.data, hash, sizeof(hash)) == 0) {
 					ui_log("OK\n");
 					return 1;
 				}

@@ -28,6 +28,7 @@
 #include "common.h"
 #include "compat.h"
 #include "random.h"
+#include "raw.h"
 #include "read.h"
 #include "server.h"
 #include "sock.h"
@@ -69,7 +70,7 @@ static struct net_addr bind_addr;
 
 static void write_dns(sock_t fd, struct dns_msg *q, const char *data, size_t datalen, const struct encoder *downenc);
 static void handle_full_packet(sock_t tun_fd, struct dnsfd *dns_fds, int userid);
-static int raw_decode(char *packet, int len, struct udp_addr *addr, sock_t dns_fd, struct dnsfd *dns_fds, sock_t tun_fd);
+static int handle_raw(const char *packet, int len, struct udp_addr *addr, sock_t dns_fd, struct dnsfd *dns_fds, sock_t tun_fd);
 
 void
 server_stop(void)
@@ -99,29 +100,6 @@ get_dns_fd(struct dnsfd *fds, struct udp_addr *addr)
 	}
 	return fds->v4fd;
 }
-
-static void
-send_raw(sock_t fd, char *buf, size_t buflen, int user, int cmd, struct udp_addr *addr)
-{
-	char packet[4096];
-	size_t len;
-
-	len = MIN(sizeof(packet) - RAW_HDR_LEN, buflen);
-
-	memcpy(packet, raw_header, RAW_HDR_LEN);
-	if (len) {
-		memcpy(&packet[RAW_HDR_LEN], buf, len);
-	}
-
-	len += RAW_HDR_LEN;
-	packet[RAW_HDR_CMD] = cmd | (user & 0x0F);
-
-	ui_debug(2, "TX-raw: client %s, cmd %d, %zu bytes\n",
-		 format_addr(&addr->remote), cmd, len);
-
-	send_udp(fd, packet, len, addr);
-}
-
 
 static void
 start_new_outpacket(int userid, char *data, unsigned int datalen)
@@ -485,7 +463,13 @@ tunnel_tun(sock_t tun_fd, struct dnsfd *dns_fds)
 		return outlen;
 	} else { /* CONN_RAW_UDP */
 		sock_t dns_fd = get_dns_fd(dns_fds, &users[userid].raw_addr);
-		send_raw(dns_fd, out, outlen, userid, RAW_HDR_CMD_DATA, &users[userid].raw_addr);
+		struct raw_msg msg = {
+			.cmd = RAW_HDR_CMD_DATA,
+			.userid = userid,
+			.data = out,
+			.len = outlen,
+		};
+		send_raw(dns_fd, &msg, &users[userid].raw_addr);
 		return outlen;
 	}
 }
@@ -1431,7 +1415,7 @@ tunnel_dns(sock_t tun_fd, sock_t dns_fd, struct dnsfd *dns_fds, sock_t bind_fd)
 	if ((read = read_udp(dns_fd, packet, sizeof(packet), &q.address)) <= 0)
 		return 0;
 
-	if (raw_decode(packet, read, &q.address, dns_fd, dns_fds, tun_fd)) {
+	if (handle_raw(packet, read, &q.address, dns_fd, dns_fds, tun_fd)) {
 		return 0;
 	}
 
@@ -1649,9 +1633,13 @@ handle_full_packet(sock_t tun_fd, struct dnsfd *dns_fds, int userid)
 				}
 			} else{ /* CONN_RAW_UDP */
 				sock_t dns_fd = get_dns_fd(dns_fds, &users[touser].raw_addr);
-				send_raw(dns_fd, users[userid].inpacket.data,
-					 users[userid].inpacket.len, touser,
-					 RAW_HDR_CMD_DATA, &users[touser].raw_addr);
+				struct raw_msg msg = {
+					.cmd = RAW_HDR_CMD_DATA,
+					.userid = touser,
+					.data = users[userid].inpacket.data,
+					.len = users[userid].inpacket.len,
+				};
+				send_raw(dns_fd, &msg, &users[touser].raw_addr);
 			}
 		}
 	} else {
@@ -1664,7 +1652,7 @@ handle_full_packet(sock_t tun_fd, struct dnsfd *dns_fds, int userid)
 }
 
 static void
-handle_raw_login(char *packet, int len, struct udp_addr *addr, sock_t fd, int userid)
+handle_raw_login(const char *packet, size_t len, struct udp_addr *addr, sock_t fd, int userid)
 {
 	char myhash[16];
 
@@ -1674,11 +1662,18 @@ handle_raw_login(char *packet, int len, struct udp_addr *addr, sock_t fd, int us
 	if (check_authenticated_user_and_ip(userid, /*check_ip=*/0, addr))
 		return;
 
-	ui_debug(1, "IN   login raw, len %d, from user %d\n", len, userid);
+	ui_debug(1, "IN   login raw, len %zu, from user %d\n", len, userid);
 
 	/* User sends hash of seed + 1 */
-	login_calculate(myhash, 16, password, users[userid].seed + 1);
-	if (memcmp(packet, myhash, 16) == 0) {
+	login_calculate(myhash, sizeof(myhash), password, users[userid].seed + 1);
+	if (memcmp(packet, myhash, sizeof(myhash)) == 0) {
+		struct raw_msg msg = {
+			.cmd = RAW_HDR_CMD_LOGIN,
+			.userid = userid,
+			.data = myhash,
+			.len = sizeof(myhash),
+		};
+
 		/* Update address and time info for user */
 		users[userid].last_pkt = time(NULL);
 		users[userid].raw_addr = *addr;
@@ -1688,15 +1683,15 @@ handle_raw_login(char *packet, int len, struct udp_addr *addr, sock_t fd, int us
 
 		/* Correct hash, reply with hash of seed - 1 */
 		user_set_conn_type(userid, CONN_RAW_UDP);
-		login_calculate(myhash, 16, password, users[userid].seed - 1);
-		send_raw(fd, myhash, 16, userid, RAW_HDR_CMD_LOGIN, addr);
+		login_calculate(myhash, sizeof(myhash), password, users[userid].seed - 1);
+		send_raw(fd, &msg, addr);
 
 		users[userid].authenticated_raw = 1;
 	}
 }
 
 static void
-handle_raw_data(char *packet, int len, struct udp_addr *addr, struct dnsfd *dns_fds, sock_t tun_fd, int userid)
+handle_raw_data(const char *packet, size_t len, struct udp_addr *addr, struct dnsfd *dns_fds, sock_t tun_fd, int userid)
 {
 	if (check_authenticated_user_and_ip(userid, check_ip, addr) != 0) {
 		return;
@@ -1708,6 +1703,7 @@ handle_raw_data(char *packet, int len, struct udp_addr *addr, struct dnsfd *dns_
 	users[userid].raw_addr = *addr;
 
 	/* copy to packet buffer, update length */
+	len = MIN(len, sizeof(users[userid].inpacket.data));
 	users[userid].inpacket.offset = 0;
 	memcpy(users[userid].inpacket.data, packet, len);
 	users[userid].inpacket.len = len;
@@ -1721,6 +1717,11 @@ handle_raw_data(char *packet, int len, struct udp_addr *addr, struct dnsfd *dns_
 static void
 handle_raw_ping(struct udp_addr *addr, sock_t dns_fd, int userid)
 {
+	struct raw_msg msg = {
+		.cmd = RAW_HDR_CMD_PING,
+		.userid = userid,
+	};
+
 	if (check_authenticated_user_and_ip(userid, check_ip, addr) != 0) {
 		return;
 	}
@@ -1733,35 +1734,32 @@ handle_raw_ping(struct udp_addr *addr, sock_t dns_fd, int userid)
 	ui_debug(1, "IN   ping raw, from user %d\n", userid);
 
 	/* Send ping reply */
-	send_raw(dns_fd, NULL, 0, userid, RAW_HDR_CMD_PING, addr);
+	send_raw(dns_fd, &msg, addr);
 }
 
 static int
-raw_decode(char *packet, int len, struct udp_addr *addr, sock_t dns_fd, struct dnsfd *dns_fds, sock_t tun_fd)
+handle_raw(const char *packet, int len, struct udp_addr *addr, sock_t dns_fd, struct dnsfd *dns_fds, sock_t tun_fd)
 {
-	int raw_user;
+	struct raw_msg msg;
 
-	/* minimum length */
-	if (len < RAW_HDR_LEN) return 0;
-	/* should start with header */
-	if (memcmp(packet, raw_header, RAW_HDR_IDENT_LEN)) return 0;
+	if (len <= 0 || !raw_decode(&msg, packet, len))
+		return 0;
 
-	raw_user = RAW_HDR_GET_USR(packet);
-	switch (RAW_HDR_GET_CMD(packet)) {
+	switch (msg.cmd) {
 	case RAW_HDR_CMD_LOGIN:
 		/* Login challenge */
-		handle_raw_login(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, addr, dns_fd, raw_user);
+		handle_raw_login(msg.data, msg.len, addr, dns_fd, msg.userid);
 		break;
 	case RAW_HDR_CMD_DATA:
 		/* Data packet */
-		handle_raw_data(&packet[RAW_HDR_LEN], len - RAW_HDR_LEN, addr, dns_fds, tun_fd, raw_user);
+		handle_raw_data(msg.data, msg.len, addr, dns_fds, tun_fd, msg.userid);
 		break;
 	case RAW_HDR_CMD_PING:
 		/* Keepalive packet */
-		handle_raw_ping(addr, dns_fd, raw_user);
+		handle_raw_ping(addr, dns_fd, msg.userid);
 		break;
 	default:
-		warnx("Unhandled raw command %02X from user %d", RAW_HDR_GET_CMD(packet), raw_user);
+		warnx("Unhandled raw command %02X from user %d", msg.cmd, msg.userid);
 		break;
 	}
 	return 1;

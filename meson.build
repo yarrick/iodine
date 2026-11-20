@@ -166,6 +166,7 @@ common_sources = files(
   'src/md5.c',
   'src/process.c',
   'src/random.c',
+  'src/raw.c',
   'src/read.c',
   'src/run_as.c',
   'src/sock.c',
