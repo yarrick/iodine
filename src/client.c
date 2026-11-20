@@ -1434,79 +1434,54 @@ handshake_upenc_autodetect(sock_t dns_fd)
 	 */
 	const char *pat64 = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ+0129-";
 	const char *pat64u = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ_0129-";
-	const char *pat128a = "aA-Aaahhh-Drink-mal-ein-J\344germeister-";
-	const char *pat128b = "aA-La-fl\373te-na\357ve-fran\347aise-est-retir\351-\340-Cr\350te";
-	const char *pat128c = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ";
-	const char *pat128d = "aA0123456789\274\275\276\277"
-		"\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317";
-	const char *pat128e="aA"
+	static const char *const pat128[] = {
+		/* Start very gently to not draw attention */
+		"aA-Aaahhh-Drink-mal-ein-J\344germeister-",
+		"aA-La-fl\373te-na\357ve-fran\347aise-est-retir\351-\340-Cr\350te",
+		/* If those two worked, test the real stuff */
+		"aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ",
+		"aA0123456789\274\275\276\277"
+			"\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317",
+		"aA"
 			"\320\321\322\323\324\325\326\327\330\331\332\333\334\335\336\337"
 			"\340\341\342\343\344\345\346\347\350\351\352\353\354\355\356\357"
-			"\360\361\362\363\364\365\366\367\370\371\372\373\374\375";
+			"\360\361\362\363\364\365\366\367\370\371\372\373\374\375",
+		NULL,
+	};
+	int i;
 	int res;
 
-	/* Try Base128, starting very gently to not draw attention */
-	while (1) {
-		res = handshake_upenctest(dns_fd, pat128a);
-		if (res < 0) {
+	/* Try Base128 */
+	for (i = 0; pat128[i] != NULL; i++) {
+		res = handshake_upenctest(dns_fd, pat128[i]);
+		if (res < 0)
 			/* DNS swaps case, msg already printed; or Ctrl-C */
 			return NULL;
-		} else if (res == 0) {
+		if (res == 0)
 			/* Probably not okay, skip Base128 entirely */
 			break;
-		}
-
-		res = handshake_upenctest(dns_fd, pat128b);
-		if (res < 0)
-			return NULL;
-		else if (res == 0)
-			break;
-
-		/* if this works, we can test the real stuff */
-
-		res = handshake_upenctest(dns_fd, pat128c);
-		if (res < 0)
-			return NULL;
-		else if (res == 0)
-			break;
-
-		res = handshake_upenctest(dns_fd, pat128d);
-		if (res < 0)
-			return NULL;
-		else if (res == 0)
-			break;
-
-		res = handshake_upenctest(dns_fd, pat128e);
-		if (res < 0)
-			return NULL;
-		else if (res == 0)
-			break;
-
+	}
+	if (pat128[i] == NULL)
 		/* if still here, then base128 works completely */
 		return &base128_ops;
-	}
 
 	/* Try Base64 (with plus sign) */
 	res = handshake_upenctest(dns_fd, pat64);
 	if (res < 0) {
-		/* DNS swaps case, msg already printed; or Ctrl-C */
 		return NULL;
 	} else if (res > 0) {
-		/* All okay, Base64 msg will be printed later */
 		return &base64_ops;
 	}
 
 	/* Try Base64u (with _u_nderscore) */
 	res = handshake_upenctest(dns_fd, pat64u);
 	if (res < 0) {
-		/* DNS swaps case, msg already printed; or Ctrl-C */
 		return NULL;
 	} else if (res > 0) {
-		/* All okay, Base64u msg will be printed later */
 		return &base64u_ops;
 	}
 
-	/* if here, then nonthing worked */
+	/* if here, then nothing worked */
 	ui_log("Keeping upstream codec Base32\n");
 	return NULL;
 }
