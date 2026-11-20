@@ -1370,6 +1370,7 @@ forward_query(sock_t bind_fd, struct dns_msg *q)
 	char buf[64*1024];
 	int len;
 	struct fw_query fwq;
+	struct udp_addr addr;
 
 	len = dns_encode(buf, sizeof(buf), q, QR_QUERY, q->name, strlen(q->name));
 	if (len < 1) {
@@ -1382,9 +1383,12 @@ forward_query(sock_t bind_fd, struct dns_msg *q)
 	fwq.id = q->id;
 	fw_query_put(&fwq);
 
-	ui_debug(2, "TX: NS reply \n");
+	ui_debug(2, "TX: Forwarding query %u for %s to local nameserver\n",
+		 q->id, q->name);
 
-	if (sendto(bind_fd, buf, len, 0, (struct sockaddr *) &bind_addr.addr, bind_addr.addrlen) <= 0) {
+	memset(&addr, 0, sizeof(addr));
+	addr.remote = bind_addr;
+	if (send_udp(bind_fd, buf, len, &addr) <= 0) {
 		warn("forward query error");
 	}
 }
@@ -1393,23 +1397,20 @@ int
 tunnel_bind(sock_t bind_fd, struct dnsfd *dns_fds)
 {
 	char packet[64*1024];
-	struct sockaddr_storage from;
-	socklen_t fromlen;
+	struct udp_addr from;
 	struct fw_query *query;
 	unsigned short id;
 	sock_t dns_fd;
 	int r;
 
-	fromlen = sizeof(struct sockaddr);
-	r = recvfrom(bind_fd, packet, sizeof(packet), 0,
-		(struct sockaddr*)&from, &fromlen);
+	r = read_udp(bind_fd, packet, sizeof(packet), &from);
 
 	if (r <= 0)
 		return 0;
 
 	id = dns_get_id(packet, r);
 
-	ui_debug(2, "RX: Got response on query %u from DNS\n", (id & 0xFFFF));
+	ui_debug(2, "RX: Got response on query %u from local nameserver\n", id);
 
 	/* Get sockaddr from id */
 	fw_query_get(id, &query);
@@ -1419,7 +1420,7 @@ tunnel_bind(sock_t bind_fd, struct dnsfd *dns_fds)
 	}
 
 	ui_debug(2, "TX: client %s id %u, %d bytes\n",
-		 format_addr(&query->addr.remote), (id & 0xffff), r);
+		 format_addr(&query->addr.remote), id, r);
 
 	dns_fd = get_dns_fd(dns_fds, &query->addr);
 	send_udp(dns_fd, packet, r, &query->addr);
