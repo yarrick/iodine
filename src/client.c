@@ -59,7 +59,7 @@ static struct packet inpkt;
 int outchunkresent = 0;
 
 /* My userid at the server */
-static char userid;
+static unsigned char userid;
 static char userid_char;
 
 /* DNS id for next packet */
