@@ -1365,18 +1365,10 @@ handle_soa_request(sock_t dns_fd, struct dns_msg *q, const char *topdomain, int 
 }
 
 static void
-forward_query(sock_t bind_fd, struct dns_msg *q)
+forward_query(sock_t bind_fd, struct dns_msg *q, char *packet, int len)
 {
-	char buf[64*1024];
-	int len;
 	struct fw_query fwq;
 	struct udp_addr addr;
-
-	len = dns_encode(buf, sizeof(buf), q, QR_QUERY, q->name, strlen(q->name));
-	if (len < 1) {
-		warnx("dns_encode doesn't fit");
-		return;
-	}
 
 	/* Store sockaddr for q->id */
 	fwq.addr = q->address;
@@ -1388,7 +1380,7 @@ forward_query(sock_t bind_fd, struct dns_msg *q)
 
 	memset(&addr, 0, sizeof(addr));
 	addr.remote = bind_addr;
-	if (send_udp(bind_fd, buf, len, &addr) <= 0) {
+	if (send_udp(bind_fd, packet, len, &addr) <= 0) {
 		warn("forward query error");
 	}
 }
@@ -1520,7 +1512,7 @@ tunnel_dns(sock_t tun_fd, sock_t dns_fd, struct dnsfd *dns_fds, sock_t bind_fd)
 	} else {
 		/* Forward query to other port ? */
 		if (bind_fd != INVALID_SOCK) {
-			forward_query(bind_fd, &q);
+			forward_query(bind_fd, &q, packet, read);
 		}
 	}
 	return 0;
