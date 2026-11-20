@@ -32,8 +32,6 @@
 #include "dns.h"
 #include "read.h"
 
-int dnsc_use_edns0 = 1;
-
 #define CHECKLEN(x) if (buflen < (x) + (size_t)(p-buf))  return 0
 
 int
@@ -183,8 +181,6 @@ dns_encode(char *buf, size_t buflen, struct dns_msg *q, qr_t qr,
 		header->ancount = htons(ancnt);
 		break;
 	case QR_QUERY:
-		/* Note that iodined also uses this for forward queries */
-
 		header->qdcount = htons(1);
 
 		datalen = MIN(datalen, buflen - (p - buf));
@@ -196,7 +192,7 @@ dns_encode(char *buf, size_t buflen, struct dns_msg *q, qr_t qr,
 
 		/* EDNS0 to advertise maximum response length
 		   (even CNAME/A/MX, 255+255+header would be >512) */
-		if (dnsc_use_edns0) {
+		if (q->edns0) {
 			header->arcount = htons(1);
 			CHECKLEN(11);
 			putbyte(&p, 0x00);    /* Root */
@@ -508,6 +504,7 @@ decode_question(struct dns_msg *q, qr_t qr, char *packet, size_t packetlen, char
 	q->id2 = 0;
 	q->rcode = header->rcode;
 	q->rtype = 0;
+	q->edns0 = false;
 
 	if (ppos)
 		*ppos = data;

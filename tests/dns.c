@@ -83,6 +83,7 @@ START_TEST(test_encode_query)
 	memset(&q, 0, sizeof(struct dns_msg));
 	q.type = T_NULL;
 	q.id = 1337;
+	q.edns0 = true;
 	d = resolv;
 	enc = &base32_ops;
 

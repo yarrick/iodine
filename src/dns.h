@@ -18,6 +18,7 @@
 #ifndef __DNS_H__
 #define __DNS_H__
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -46,6 +47,7 @@ struct dns_msg {
 	struct udp_addr address;
 	struct udp_addr address2;
 	unsigned short id2;
+	bool edns0;
 };
 
 #define T_PRIVATE 65399
@@ -53,8 +55,6 @@ struct dns_msg {
  * http://www.bind9.net/dns-parameters */
 #define T_UNSET 65432
 /* Unused RR type, never actually sent */
-
-extern int dnsc_use_edns0;
 
 int dns_encode(char *, size_t, struct dns_msg *, qr_t, const char *, size_t);
 int dns_encode_ns_response(char *buf, size_t buflen, struct dns_msg *q,

@@ -88,6 +88,7 @@ static time_t lastdownstreamtime;
 static long send_query_sendcnt = -1;
 static long send_query_recvcnt = 0;
 static int hostname_maxlen = 0xFF;
+static bool use_edns0 = true;
 
 void
 client_init(void)
@@ -96,6 +97,7 @@ client_init(void)
 	secure_random(&rand_seed, sizeof(rand_seed));
 	send_ping_soon = 1;	/* send ping immediately at startup */
 	conn = CONN_DNS_NULL;
+	use_edns0 = true;
 
 	secure_random(&chunkid, sizeof(chunkid));
 	chunkid_prev = 0;
@@ -229,10 +231,10 @@ send_query(sock_t fd, char *hostname)
 		/* 0 is used as "no-query" in iodined.c */
 		chunkid = 7727;
 
+	memset(&q, 0, sizeof(q));
 	q.id = chunkid;
 	q.type = do_qtype;
-	memset(&q.address.local.addr, 0, sizeof(q.address.local.addr));
-	q.address.local.addrlen = 0;
+	q.edns0 = use_edns0;
 	q.address.remote = nameserv;
 
 	len = dns_encode(packet, sizeof(packet), &q, QR_QUERY, hostname, strlen(hostname));
@@ -2042,7 +2044,7 @@ client_handshake(sock_t dns_fd, int raw_mode, int autodetect_frag_size, int frag
 	int upcodec;
 	int r;
 
-	dnsc_use_edns0 = 0;
+	use_edns0 = false;
 
 	/* qtype message printed in handshake function */
 	if (do_qtype == T_UNSET) {
@@ -2072,14 +2074,14 @@ client_handshake(sock_t dns_fd, int raw_mode, int autodetect_frag_size, int frag
 			ui_log("Skipping raw mode\n");
 		}
 
-		dnsc_use_edns0 = 1;
+		use_edns0 = true;
 		if (handshake_downenc_check(dns_fd, NULL, 3, 1, "EDNS0 support") && running) {
 			ui_log("Using EDNS0 extension\n");
 		} else if (!running) {
 			return -1;
 		} else {
 			ui_log("DNS relay does not support EDNS0 extension\n");
-			dnsc_use_edns0 = 0;
+			use_edns0 = false;
 		}
 
 		upcodec = handshake_upenc_autodetect(dns_fd);

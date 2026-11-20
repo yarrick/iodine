@@ -52,6 +52,7 @@ get_external_ip(struct in_addr *ip)
 	memset(&query, 0, sizeof(query));
 
 	query.type = T_A;
+	query.edns0 = true;
 	if (get_addr("resolver1.opendns.com", DNS_PORT, AF_INET, 0, &addr))
 		return 1;
 
