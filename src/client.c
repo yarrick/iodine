@@ -1421,14 +1421,9 @@ handshake_upenctest(sock_t dns_fd, const char *s)
 	return 0;
 }
 
-static int
+static const struct encoder *
 handshake_upenc_autodetect(sock_t dns_fd)
-/* Returns:
-   0: keep Base32
-   1: Base64 is okay
-   2: Base64u is okay
-   3: Base128 is okay
-*/
+/* Returns NULL or usable codec to switch to */
 {
 	/* Note: max 59 chars, must start with "aA".
 	   pat64: If 0129 work, assume 3-8 are okay too.
@@ -1455,7 +1450,7 @@ handshake_upenc_autodetect(sock_t dns_fd)
 		res = handshake_upenctest(dns_fd, pat128a);
 		if (res < 0) {
 			/* DNS swaps case, msg already printed; or Ctrl-C */
-			return 0;
+			return NULL;
 		} else if (res == 0) {
 			/* Probably not okay, skip Base128 entirely */
 			break;
@@ -1463,7 +1458,7 @@ handshake_upenc_autodetect(sock_t dns_fd)
 
 		res = handshake_upenctest(dns_fd, pat128b);
 		if (res < 0)
-			return 0;
+			return NULL;
 		else if (res == 0)
 			break;
 
@@ -1471,49 +1466,49 @@ handshake_upenc_autodetect(sock_t dns_fd)
 
 		res = handshake_upenctest(dns_fd, pat128c);
 		if (res < 0)
-			return 0;
+			return NULL;
 		else if (res == 0)
 			break;
 
 		res = handshake_upenctest(dns_fd, pat128d);
 		if (res < 0)
-			return 0;
+			return NULL;
 		else if (res == 0)
 			break;
 
 		res = handshake_upenctest(dns_fd, pat128e);
 		if (res < 0)
-			return 0;
+			return NULL;
 		else if (res == 0)
 			break;
 
 		/* if still here, then base128 works completely */
-		return 3;
+		return &base128_ops;
 	}
 
 	/* Try Base64 (with plus sign) */
 	res = handshake_upenctest(dns_fd, pat64);
 	if (res < 0) {
 		/* DNS swaps case, msg already printed; or Ctrl-C */
-		return 0;
+		return NULL;
 	} else if (res > 0) {
 		/* All okay, Base64 msg will be printed later */
-		return 1;
+		return &base64_ops;
 	}
 
 	/* Try Base64u (with _u_nderscore) */
 	res = handshake_upenctest(dns_fd, pat64u);
 	if (res < 0) {
 		/* DNS swaps case, msg already printed; or Ctrl-C */
-		return 0;
+		return NULL;
 	} else if (res > 0) {
 		/* All okay, Base64u msg will be printed later */
-		return 2;
+		return &base64u_ops;
 	}
 
 	/* if here, then nonthing worked */
 	ui_log("Keeping upstream codec Base32\n");
-	return 0;
+	return NULL;
 }
 
 static int
@@ -1696,25 +1691,31 @@ handshake_qtype_autodetect(sock_t dns_fd)
 }
 
 static void
-handshake_switch_codec(sock_t dns_fd, int bits)
+handshake_switch_codec(sock_t dns_fd, const struct encoder *enc)
 {
-	char sw_codec[] = { 's', b32_5to8(userid), b32_5to8(bits), 0 };
+	char sw_codec[4];
 	char in[4096];
 	int i;
 	int read;
-	const struct encoder *tempenc;
+	int bits;
 
-	if (bits == 5)
-		tempenc = &base32_ops;
-	else if (bits == 6)
-		tempenc = &base64_ops;
-	else if (bits == 26)	/* "2nd" 6 bits per byte, with underscore */
-		tempenc = &base64u_ops;
-	else if (bits == 7)
-		tempenc = &base128_ops;
-	else return;
+	if (enc == &base32_ops)
+		bits = 5;
+	else if (enc == &base64_ops)
+		bits = 6;
+	else if (enc == &base64u_ops)
+		bits = 26;	/* "2nd" 6 bits per byte, with underscore */
+	else if (enc == &base128_ops)
+		bits = 7;
+	else
+		return;
 
-	ui_log("Switching upstream to codec %s\n", tempenc->name);
+	sw_codec[0] = 's';
+	sw_codec[1] = b32_5to8(userid);
+	sw_codec[2] = b32_5to8(bits);
+	sw_codec[3] = 0;
+
+	ui_log("Switching upstream to codec %s\n", enc->name);
 
 	for (i = 0; running && i < 5; i++) {
 
@@ -1734,7 +1735,7 @@ handshake_switch_codec(sock_t dns_fd, int bits)
 				goto codec_revert;
 			}
 			ui_log("Server switched upstream to codec %s\n", in);
-			dataenc = tempenc;
+			dataenc = enc;
 			return;
 		}
 
@@ -2041,7 +2042,7 @@ int
 client_handshake(sock_t dns_fd, int raw_mode, int autodetect_frag_size, int fragsize)
 {
 	int seed;
-	int upcodec;
+	const struct encoder *upcodec;
 	int r;
 
 	use_edns0 = false;
@@ -2088,12 +2089,8 @@ client_handshake(sock_t dns_fd, int raw_mode, int autodetect_frag_size, int frag
 		if (!running)
 			return -1;
 
-		if (upcodec == 1) {
-			handshake_switch_codec(dns_fd, 6);
-		} else if (upcodec == 2) {
-			handshake_switch_codec(dns_fd, 26);
-		} else if (upcodec == 3) {
-			handshake_switch_codec(dns_fd, 7);
+		if (upcodec) {
+			handshake_switch_codec(dns_fd, upcodec);
 		}
 		if (!running)
 			return -1;
