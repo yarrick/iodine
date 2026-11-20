@@ -734,20 +734,8 @@ handle_upstream_codec_switch_request(sock_t dns_fd, char *in, int domain_len, st
 	}
 
 	codec = b32_8to5(in[2]);
-	switch (codec) {
-	case 5: /* 5 bits per byte = base32 */
-		enc = &base32_ops;
-		break;
-	case 6: /* 6 bits per byte = base64 */
-		enc = &base64_ops;
-		break;
-	case 26: /* "2nd" 6 bits per byte = base64u, with underscore */
-		enc = &base64u_ops;
-		break;
-	case 7: /* 7 bits per byte = base128 */
-		enc = &base128_ops;
-		break;
-	default:
+	enc = get_encoder_by_switch_bits(codec);
+	if (!enc) {
 		write_dns(dns_fd, q, "BADCODEC", 8, users[userid].down_encoder);
 		return;
 	}

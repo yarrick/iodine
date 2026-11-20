@@ -123,6 +123,18 @@ START_TEST(test_get_encoder_by_name)
 }
 END_TEST
 
+START_TEST(test_get_encoder_by_switch_bits)
+{
+	ck_assert_ptr_eq(get_encoder_by_switch_bits(5), &base32_ops);
+	ck_assert_ptr_eq(get_encoder_by_switch_bits(6), &base64_ops);
+	ck_assert_ptr_eq(get_encoder_by_switch_bits(26), &base64u_ops);
+	ck_assert_ptr_eq(get_encoder_by_switch_bits(7), &base128_ops);
+	ck_assert_ptr_null(get_encoder_by_switch_bits(0));
+	ck_assert_ptr_null(get_encoder_by_switch_bits(1));
+	ck_assert_ptr_null(get_encoder_by_switch_bits(-1));
+}
+END_TEST
+
 #define NUM_WRAP_QTYPES 5
 static const unsigned short
 wrap_qtypes[NUM_WRAP_QTYPES] = { T_A, T_CNAME, T_MX, T_SRV, T_TXT };
@@ -262,6 +274,7 @@ test_create(void)
 	tcase_add_test(tc, test_build_hostname);
 	tcase_add_test(tc, test_unpack_data_bounds);
 	tcase_add_test(tc, test_get_encoder_by_name);
+	tcase_add_test(tc, test_get_encoder_by_switch_bits);
 	tcase_add_loop_test(tc, test_payload_wrap_unwrap, 0, NUM_WRAP_QTYPES);
 	tcase_add_test(tc, test_payload_wrap_raw_fallback);
 	tcase_add_test(tc, test_payload_wrap_unwrap_bounds);

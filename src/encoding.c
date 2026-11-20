@@ -195,6 +195,7 @@ const struct encoder raw_ops = {
 	.blocksize_encoded = 1,
 	.host_char = '\0',
 	.down_char = 'r',
+	.switch_bits = 0,
 };
 
 static const struct encoder *const encoders[] = {
@@ -248,6 +249,21 @@ get_encoder_by_down_char(char c)
 
 	for (enc = encoders; *enc != NULL; enc++) {
 		if ((*enc)->down_char == c)
+			return *enc;
+	}
+	return NULL;
+}
+
+const struct encoder *
+get_encoder_by_switch_bits(int bits)
+{
+	const struct encoder *const *enc;
+
+	if (bits == 0)
+		return NULL;
+
+	for (enc = encoders; *enc != NULL; enc++) {
+		if ((*enc)->switch_bits == bits)
 			return *enc;
 	}
 	return NULL;

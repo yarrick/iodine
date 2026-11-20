@@ -239,4 +239,5 @@ const struct encoder base32_ops = {
 	.blocksize_encoded = BASE32_BLKSIZE_ENC,
 	.host_char = 'h',
 	.down_char = 't',
+	.switch_bits = 5,
 };

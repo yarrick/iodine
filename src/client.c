@@ -1697,22 +1697,13 @@ handshake_switch_codec(sock_t dns_fd, const struct encoder *enc)
 	char in[4096];
 	int i;
 	int read;
-	int bits;
 
-	if (enc == &base32_ops)
-		bits = 5;
-	else if (enc == &base64_ops)
-		bits = 6;
-	else if (enc == &base64u_ops)
-		bits = 26;	/* "2nd" 6 bits per byte, with underscore */
-	else if (enc == &base128_ops)
-		bits = 7;
-	else
+	if (!enc || enc->switch_bits == 0)
 		return;
 
 	sw_codec[0] = 's';
 	sw_codec[1] = b32_5to8(userid);
-	sw_codec[2] = b32_5to8(bits);
+	sw_codec[2] = b32_5to8(enc->switch_bits);
 	sw_codec[3] = 0;
 
 	ui_log("Switching upstream to codec %s\n", enc->name);

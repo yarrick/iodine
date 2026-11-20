@@ -259,4 +259,5 @@ const struct encoder base128_ops = {
 	.blocksize_encoded = BASE128_BLKSIZE_ENC,
 	.host_char = 'k',
 	.down_char = 'v',
+	.switch_bits = 7,
 };

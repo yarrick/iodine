@@ -53,6 +53,9 @@ struct encoder {
 	const char host_char;
 	/* Used to identify codec in downstream codec switch, and in TXT data */
 	const char down_char;
+	/* Used to identify codec in upstream codec switch,
+	 * or 0 if not valid upstream. */
+	const int switch_bits;
 };
 
 size_t hostname_need(const char *);
@@ -71,6 +74,7 @@ extern const struct encoder raw_ops;
 const struct encoder *get_encoder_by_name(const char *);
 const struct encoder *get_encoder_by_host_char(char);
 const struct encoder *get_encoder_by_down_char(char);
+const struct encoder *get_encoder_by_switch_bits(int);
 int encoder_valid_for_qtype(const struct encoder *enc, unsigned short qtype);
 
 int b32_5to8(int);
