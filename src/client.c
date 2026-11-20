@@ -1333,7 +1333,7 @@ handshake_raw_udp(sock_t dns_fd, int seed)
 		r = sock_select((i + 1) * 1000, NULL, dns_fd);
 
 		if (r > 0) {
-			struct net_addr address;
+			struct udp_addr address;
 			len = read_udp(dns_fd, in, sizeof(in), &address);
 			if (len >= (16 + RAW_HDR_LEN)) {
 				char hash[16];
