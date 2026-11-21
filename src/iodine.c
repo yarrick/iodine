@@ -296,7 +296,8 @@ main(int argc, char **argv)
 	}
 
 	if (nameserv_host) {
-		if (get_addr(nameserv_host, DNS_PORT, nameserv_family, 0,
+		int flags = (nameserv_family == AF_UNSPEC) ? AI_ADDRCONFIG : 0;
+		if (get_addr(nameserv_host, DNS_PORT, nameserv_family, flags,
 			     &nameservaddr)) {
 			errx(1, "Cannot lookup nameserver '%s'", nameserv_host);
 		}
