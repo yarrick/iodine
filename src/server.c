@@ -643,9 +643,9 @@ handle_login_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *q)
 	}
 
 	users[userid].last_pkt = time(NULL);
-	login_calculate(logindata, 16, password, users[userid].seed);
+	login_calculate(logindata, sizeof(logindata), password, users[userid].seed);
 
-	if (read >= 18 && (memcmp(logindata, unpacked+1, 16) == 0)) {
+	if (read >= 18 && (memcmp(logindata, unpacked+1, sizeof(logindata)) == 0)) {
 		char *tmp[2];
 		/* Store login ok */
 		users[userid].authenticated = 1;
@@ -1644,7 +1644,7 @@ handle_raw_login(const char *packet, size_t len, struct udp_addr *addr, sock_t f
 {
 	char myhash[16];
 
-	if (len < 16) return;
+	if (len < sizeof(myhash)) return;
 
 	/* Skip ip check since this is expected to come directly from client */
 	if (check_authenticated_user_and_ip(userid, /*check_ip=*/0, addr))

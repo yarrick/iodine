@@ -1189,11 +1189,11 @@ handshake_login(sock_t dns_fd, int seed)
 	int i;
 	int read;
 
-	login_calculate(login, 16, password, seed);
+	login_calculate(login, sizeof(login), password, seed);
 
 	for (i = 0; running && i < 5; i++) {
 
-		send_login(dns_fd, login, 16);
+		send_login(dns_fd, login, sizeof(login));
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'l', i+1);
 
@@ -1308,7 +1308,7 @@ handshake_raw_udp(sock_t dns_fd, int seed)
 			if (len > 0 && raw_decode(&msg, in, len) &&
 				msg.cmd == RAW_HDR_CMD_LOGIN && msg.len >= 16) {
 				char hash[16];
-				login_calculate(hash, 16, password, seed - 1);
+				login_calculate(hash, sizeof(hash), password, seed - 1);
 				if (memcmp(msg.data, hash, sizeof(hash)) == 0) {
 					ui_log("OK\n");
 					return 1;
