@@ -21,6 +21,8 @@
 #include "test_main.h"
 
 #include <check.h>
+#include <errno.h>
+#include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -108,6 +110,21 @@ START_TEST(test_pidfile_rejects_symlink)
 END_TEST
 #endif
 
+START_TEST(test_confine_blocks_fs)
+{
+	do_confine();
+#if HAVE_PLEDGE
+	/* Under pledge("stdio inet"), open() raises SIGABRT. */
+	(void)open("/", O_RDONLY);
+#elif HAVE_LANDLOCK
+	if (get_landlock_abi() >= 1) {
+		ck_assert_int_eq(open("/", O_RDONLY), -1);
+		ck_assert_int_eq(errno, EACCES);
+	}
+#endif
+}
+END_TEST
+
 TCase *
 test_create(void)
 {
@@ -118,6 +135,11 @@ test_create(void)
 	tcase_add_test(tc, test_pidfile_writes_pid);
 #ifndef WINDOWS
 	tcase_add_test(tc, test_pidfile_rejects_symlink);
+#endif
+#if HAVE_PLEDGE
+	tcase_add_test_raise_signal(tc, test_confine_blocks_fs, SIGABRT);
+#else
+	tcase_add_test(tc, test_confine_blocks_fs);
 #endif
 	return tc;
 }

@@ -18,11 +18,16 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
+#include "config.h"
+
 void check_privileges(char *username, char *newroot, int port);
 void do_chroot(char *);
 void do_setcon(char *);
 void do_detach(void);
 void do_pidfile(char *);
-void do_pledge(void);
+#if HAVE_LANDLOCK
+int get_landlock_abi(void);
+#endif
+void do_confine(void);
 
 #endif

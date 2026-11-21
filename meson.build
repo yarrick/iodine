@@ -115,6 +115,9 @@ cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
 cdata.set10('HAVE_SO_REUSEPORT',
   cc.has_header_symbol('sys/socket.h', 'SO_REUSEPORT', args: header_args))
 cdata.set10('HAVE_SO_RTABLE', cc.has_header_symbol('sys/socket.h', 'SO_RTABLE'))
+cdata.set10('HAVE_LANDLOCK',
+  cc.has_header_symbol('linux/landlock.h', 'LANDLOCK_CREATE_RULESET_VERSION') and
+  cc.has_header_symbol('sys/syscall.h', 'SYS_landlock_create_ruleset'))
 cdata.set('NORETURN_ATTR',
   cc.has_function_attribute('noreturn') ? '__attribute__((noreturn))' : ''
 )

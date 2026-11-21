@@ -38,6 +38,11 @@
 #if HAVE_LIBCAPNG
 #include <cap-ng.h>
 #endif
+#if HAVE_LANDLOCK
+#include <linux/landlock.h>
+#include <sys/prctl.h>
+#include <sys/syscall.h>
+#endif
 
 #if HAVE_CHECKTOKENMEMBERSHIP
 bool
@@ -286,11 +291,71 @@ do_detach(void)
 #endif
 }
 
+#if HAVE_LANDLOCK
+int
+get_landlock_abi(void)
+{
+	return syscall(SYS_landlock_create_ruleset, NULL, 0,
+		       LANDLOCK_CREATE_RULESET_VERSION);
+}
+#endif
+
 void
-do_pledge(void)
+do_confine(void)
 {
 #if HAVE_PLEDGE
 	if (pledge("stdio inet", NULL) == -1)
-        err(1, "pledge");
+		err(1, "pledge");
+#elif HAVE_LANDLOCK
+	int abi;
+	int ruleset_fd;
+	struct landlock_ruleset_attr attr = { 0 };
+
+	abi = get_landlock_abi();
+	if (abi < 0)
+		return; /* Kernel does not support Landlock */
+
+	attr.handled_access_fs =
+		LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_WRITE_FILE |
+		LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR |
+		LANDLOCK_ACCESS_FS_REMOVE_DIR | LANDLOCK_ACCESS_FS_REMOVE_FILE |
+		LANDLOCK_ACCESS_FS_MAKE_CHAR | LANDLOCK_ACCESS_FS_MAKE_DIR |
+		LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_MAKE_SOCK |
+		LANDLOCK_ACCESS_FS_MAKE_FIFO | LANDLOCK_ACCESS_FS_MAKE_BLOCK |
+		LANDLOCK_ACCESS_FS_MAKE_SYM;
+#ifdef LANDLOCK_ACCESS_FS_REFER
+	if (abi >= 2)
+		attr.handled_access_fs |= LANDLOCK_ACCESS_FS_REFER;
+#endif
+#ifdef LANDLOCK_ACCESS_FS_TRUNCATE
+	if (abi >= 3)
+		attr.handled_access_fs |= LANDLOCK_ACCESS_FS_TRUNCATE;
+#endif
+#ifdef LANDLOCK_ACCESS_NET_BIND_TCP
+	if (abi >= 4)
+		attr.handled_access_net =
+			LANDLOCK_ACCESS_NET_BIND_TCP |
+			LANDLOCK_ACCESS_NET_CONNECT_TCP;
+#endif
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+	if (abi >= 5)
+		attr.handled_access_fs |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+#endif
+#ifdef LANDLOCK_SCOPE_SIGNAL
+	if (abi >= 6)
+		attr.scoped =
+			LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET |
+			LANDLOCK_SCOPE_SIGNAL;
+#endif
+
+	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1)
+		err(1, "prctl(PR_SET_NO_NEW_PRIVS)");
+
+	ruleset_fd = syscall(SYS_landlock_create_ruleset, &attr, sizeof(attr), 0);
+	if (ruleset_fd < 0)
+		err(1, "landlock_create_ruleset");
+	if (syscall(SYS_landlock_restrict_self, ruleset_fd, 0) < 0)
+		err(1, "landlock_restrict_self");
+	close(ruleset_fd);
 #endif
 }
