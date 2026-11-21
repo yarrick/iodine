@@ -1145,17 +1145,6 @@ send_downenctest(sock_t fd, char downenc, int variant)
 	send_handshake_query(fd, prefix);
 }
 
-static void
-send_lazy_switch(sock_t fd)
-{
-	char sw_lazy[] = { 'o', b32_5to8(userid), 'i', 0 };
-
-	if (lazymode)
-		sw_lazy[2] = 'l';
-
-	send_handshake_query(fd, sw_lazy);
-}
-
 static int
 handshake_version(sock_t dns_fd, int *seed)
 {
@@ -1687,48 +1676,49 @@ server_rejected(const char *buf, const char *badcodec_msg)
 	return 0;
 }
 
-static void
-handshake_switch_codec(sock_t dns_fd, const struct encoder *enc)
+static int
+handshake_send_option(sock_t dns_fd, char *prefix, char *in, size_t inlen,
+		      const char *badcodec_msg)
 {
-	char sw_codec[4];
-	char in[4096];
 	int i;
 	int read;
 
-	if (!enc || enc->switch_bits == 0)
-		return;
-
-	sw_codec[0] = 's';
-	sw_codec[1] = b32_5to8(userid);
-	sw_codec[2] = b32_5to8(enc->switch_bits);
-	sw_codec[3] = 0;
-
-	ui_log("Switching upstream to codec %s\n", enc->name);
-
 	for (i = 0; running && i < 5; i++) {
+		send_handshake_query(dns_fd, prefix);
 
-		send_handshake_query(dns_fd, sw_codec);
-
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 's', i+1);
-
+		read = handshake_waitdns(dns_fd, in, inlen, prefix[0], i + 1);
 		if (read > 0) {
-			if (server_rejected(in, NULL)) {
-				goto codec_revert;
-			}
-			ui_log("Server switched upstream to codec %s\n", in);
-			dataenc = enc;
-			return;
+			if (server_rejected(in, badcodec_msg))
+				return 0;
+			return read;
 		}
 
-		ui_log("Retrying codec switch...\n");
+		ui_log("Retrying...\n");
 	}
 	if (!running)
+		return 0;
+
+	ui_log("No reply from server. ");
+	return 0;
+}
+
+static void
+handshake_switch_codec(sock_t dns_fd, const struct encoder *enc)
+{
+	char sw_codec[] = { 's', b32_5to8(userid), 0, 0 };
+	char in[4096];
+
+	if (!enc || enc->switch_bits == 0)
 		return;
+	sw_codec[2] = b32_5to8(enc->switch_bits);
 
-	ui_log("No reply from server on codec switch. ");
-
-codec_revert:
-	ui_log("Falling back to upstream codec %s\n", dataenc->name);
+	ui_log("Switching upstream to codec %s\n", enc->name);
+	if (handshake_send_option(dns_fd, sw_codec, in, sizeof(in), NULL)) {
+		ui_log("Server switched upstream to codec %s\n", in);
+		dataenc = enc;
+	} else if (running) {
+		ui_log("Falling back to upstream codec %s\n", dataenc->name);
+	}
 }
 
 static void
@@ -1736,86 +1726,46 @@ handshake_switch_downenc(sock_t dns_fd)
 {
 	char sw_downenc[] = { 'o', b32_5to8(userid), downenc->down_char, 0 };
 	char in[4096];
-	int i;
-	int read;
 
 	ui_log("Switching downstream to codec %s\n", downenc->name);
-	for (i = 0; running && i < 5; i++) {
-
-		send_handshake_query(dns_fd, sw_downenc);
-
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', i+1);
-
-		if (read > 0) {
-			if (server_rejected(in, NULL)) {
-				goto codec_revert;
-			}
-			ui_log("Server switched downstream to codec %s\n", in);
-			return;
-		}
-
-		ui_log("Retrying codec switch...\n");
+	if (handshake_send_option(dns_fd, sw_downenc, in, sizeof(in), NULL)) {
+		ui_log("Server switched downstream to codec %s\n", in);
+	} else if (running) {
+		ui_log("Falling back to downstream codec Base32\n");
 	}
-	if (!running)
-		return;
-
-	ui_log("No reply from server on codec switch. ");
-
-codec_revert:
-	ui_log("Falling back to downstream codec Base32\n");
 }
 
 static void
 handshake_try_lazy(sock_t dns_fd)
 {
+	char sw_lazy[] = { 'o', b32_5to8(userid), 'l', 0 };
 	char in[4096];
-	int i;
-	int read;
 
 	ui_log("Switching to lazy mode for low-latency\n");
-	for (i = 0; running && i < 5 ;i++) {
-
-		send_lazy_switch(dns_fd);
-
-		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', i+1);
-
-		if (read > 0) {
-			if (server_rejected(in, "lazy mode")) {
-				goto codec_revert;
-			} else if (strncmp("Lazy", in, 4) == 0) {
-				ui_log("Server switched to lazy mode\n");
-				lazymode = 1;
-				return;
-			}
-		}
-
-		ui_log("Retrying lazy mode switch...\n");
+	if (handshake_send_option(dns_fd, sw_lazy, in, sizeof(in), "lazy mode") &&
+	    strncmp("Lazy", in, 4) == 0) {
+		ui_log("Server switched to lazy mode\n");
+		lazymode = 1;
+	} else if (running) {
+		ui_log("Falling back to legacy mode\n");
+		lazymode = 0;
+		selecttimeout = 1;
 	}
-	if (!running)
-		return;
-
-	ui_log("No reply from server on lazy switch. ");
-
-codec_revert:
-	ui_log("Falling back to legacy mode\n");
-	lazymode = 0;
-	selecttimeout = 1;
 }
 
 static void
 handshake_lazyoff(sock_t dns_fd)
 /* Used in the middle of data transfer, timing is different and no error msgs */
 {
+	char sw_lazy[] = { 'o', b32_5to8(userid), 'i', 0 };
 	char in[4096];
 	int i;
 	int read;
 
 	for (i = 0; running && i < 5; i++) {
-
-		send_lazy_switch(dns_fd);
+		send_handshake_query(dns_fd, sw_lazy);
 
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', 1);
-
 		if (read == 9 && strncmp("Immediate", in, 9) == 0) {
 			warnx("Server switched back to legacy mode.\n");
 			lazymode = 0;
