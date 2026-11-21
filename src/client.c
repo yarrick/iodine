@@ -36,6 +36,7 @@
 #include "login.h"
 #include "random.h"
 #include "raw.h"
+#include "read.h"
 #include "sock.h"
 #include "tun.h"
 #include "version.h"
@@ -1053,13 +1054,11 @@ static void
 send_set_downstream_fragsize(sock_t fd, int fragsize)
 {
 	char data[5];
+	char *d = data;
 
-	data[0] = userid;
-	data[1] = (fragsize & 0xff00) >> 8;
-	data[2] = (fragsize & 0x00ff);
-	data[3] = (rand_seed >> 8) & 0xff;
-	data[4] = (rand_seed >> 0) & 0xff;
-
+	putbyte(&d, userid);
+	putshort(&d, fragsize);
+	putshort(&d, rand_seed);
 	rand_seed++;
 
 	send_packet(fd, 'n', data, sizeof(data));
@@ -1069,15 +1068,10 @@ static void
 send_version(sock_t fd, uint32_t version)
 {
 	char data[6];
+	char *d = data;
 
-	data[0] = (version >> 24) & 0xff;
-	data[1] = (version >> 16) & 0xff;
-	data[2] = (version >> 8) & 0xff;
-	data[3] = (version >> 0) & 0xff;
-
-	data[4] = (rand_seed >> 8) & 0xff;
-	data[5] = (rand_seed >> 0) & 0xff;
-
+	putlong(&d, version);
+	putshort(&d, rand_seed);
 	rand_seed++;
 
 	send_packet(fd, 'v', data, sizeof(data));
