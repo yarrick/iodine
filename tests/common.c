@@ -18,14 +18,11 @@
 #include "config.h"
 #include "src/compat.h"
 #include "src/common.h"
-#include "src/sock.h"
-#include "src/udp.h"
 #include "test_main.h"
 
 #include <check.h>
 #include <ctype.h>
 #include <locale.h>
-#include <unistd.h>
 #include <stdio.h>
 #ifdef WINDOWS
 #include "src/windows_dns.h"
@@ -375,7 +372,6 @@ TCase *
 test_create(void)
 {
 	TCase *tc;
-	sock_t sock;
 	network_init();
 
 	tc = tcase_create("Common");
@@ -388,15 +384,10 @@ test_create(void)
 	tcase_add_test(tc, test_build_netmask);
 	tcase_add_test(tc, test_parse_format_ipv4);
 	tcase_add_test(tc, test_parse_format_ipv4_listen_all);
+	tcase_add_test(tc, test_parse_format_ipv6);
+	tcase_add_test(tc, test_parse_format_ipv4_mapped_ipv6);
 	tcase_add_test(tc, test_get_addr_err);
 	tcase_add_test(tc, test_ascii_tolower);
 
-	/* Tests require IPv6 support */
-	sock = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-	if (sock != INVALID_SOCK) {
-		close_udp(sock);
-		tcase_add_test(tc, test_parse_format_ipv6);
-		tcase_add_test(tc, test_parse_format_ipv4_mapped_ipv6);
-	}
 	return tc;
 }
