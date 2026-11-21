@@ -254,11 +254,11 @@ open_tun(const char *tun_device)
 		return tun_fd;
 	} else {
 		for (i = 0; i < TUN_MAX_TRY; i++) {
-			snprintf(tun_name, sizeof(tun_name), "/dev/tun%d", i);
+			snprintf(tun_name, sizeof(tun_name), "/dev/" TUN_NAME_PREFIX "%d", i);
 
 			if ((tun_fd = open(tun_name, O_RDWR | O_NONBLOCK)) != INVALID_SOCK) {
 				ui_log("Opened %s\n", tun_name);
-				snprintf(if_name, sizeof(if_name), "tun%d", i);
+				snprintf(if_name, sizeof(if_name), TUN_NAME_PREFIX "%d", i);
 				sock_set_close_on_exec(tun_fd);
 				return tun_fd;
 			}

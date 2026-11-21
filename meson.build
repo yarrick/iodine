@@ -188,6 +188,8 @@ else
   common_sources += files('src/tun_unix.c')
   cdata.set_quoted('LINUX_TUN_DEV_PATH',
     host_machine.system() == 'android' ? '/dev/tun' : '/dev/net/tun')
+  cdata.set_quoted('TUN_NAME_PREFIX',
+    host_machine.system() == 'haiku' ? 'tun/' : 'tun')
   cdata.set10('TUN_ADD_ROUTE',
     ['netbsd', 'freebsd', 'openbsd', 'darwin'].contains(host_machine.system()))
 endif

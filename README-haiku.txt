@@ -10,9 +10,9 @@ Extra README file for Haiku
 1. Create a tunnel device by running
    ifconfig tun/0 up
 
-2. Run iodine as normal, specifying the tunnel name with -d
+2. Run iodine as normal (it will automatically open tun/0; use -d to pick another)
 
-		./iodine -d tun/0 ...
+		./iodine ...
 
 == Building iodine for Haiku:
 1. Install meson with pkgman
