@@ -129,7 +129,8 @@ ui_read_password(char *buf, size_t len)
 	tcsetattr(0, TCSANOW, &tp);
 
 	ui_log_partial("Enter tunnel password: ");
-	fscanf(stdin, "%79[^\n]", pwd);
+	if (fscanf(stdin, "%79[^\n]", pwd) != 1)
+		pwd[0] = '\0';
 	ui_log("\n");
 
 	tcsetattr(0, TCSANOW, &old);

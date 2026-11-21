@@ -82,7 +82,8 @@ check_privileges(char *username, char *newroot, int port)
 			warnx("sysctl: unable to get ip_unprivileged_port_start value");
 			/* do not bail out here in case systemd.service has ProcSubset=pid set */
 		} else {
-			fscanf(file, "%hu", &ip_unprivileged_port_start);
+			if (fscanf(file, "%hu", &ip_unprivileged_port_start) != 1)
+				warnx("sysctl: unable to parse ip_unprivileged_port_start value");
 			fclose(file);
 		}
 
