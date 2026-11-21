@@ -17,6 +17,13 @@ if libcheck.found()
   testargs += '-DPROGNAME_SUFFIX=@0@'.format(
     host_machine.system() == 'windows' ? '".exe"' : '""')
 
+  # NetBSD's libm (pulled in by libcheck.so) emits compatibility warnings
+  # for cabs()/cabsf(), which fail under -Dwerror=true (-Wl,--fatal-warnings).
+  test_link_args = []
+  if host_machine.system() == 'netbsd'
+    test_link_args += '-Wl,--no-fatal-warnings'
+  endif
+
   foreach suite : suites
     test(suite,
       executable(
@@ -29,6 +36,7 @@ if libcheck.found()
         dependencies: libcheck,
         build_by_default: false,
         c_args: testargs + '-DSUITE_NAME="@0@"'.format(suite),
+        link_args: test_link_args,
       ),
       is_parallel: host_machine.system() != 'haiku',
     )
