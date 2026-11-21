@@ -45,9 +45,7 @@ get_resolvconf_addr(void)
 	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
 		err(1, "/etc/resolv.conf");
 
-	while (feof(fp) == 0) {
-		fgets(buf, sizeof(buf), fp);
-
+	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		if (sscanf(buf, "nameserver %256s", addr) == 1) {
 			rv = addr;
 			break;
