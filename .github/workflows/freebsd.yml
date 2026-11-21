@@ -29,7 +29,7 @@ jobs:
             dns/py-dnspython
         run: |
           git config --global --add safe.directory /home/runner/work/iodine/iodine
-          meson setup build
+          meson setup build -Dwerror=true
           cd build
           ninja
           ./iodine -v

@@ -54,7 +54,7 @@ jobs:
           ${{ matrix.pkg_prefix }}-python-pip
           ${{ matrix.pkg_prefix }}-python-dnspython
     - name: meson setup
-      run: meson setup build
+      run: meson setup build -Dwerror=true
     - name: build
       working-directory: build
       run: ninja
@@ -94,7 +94,7 @@ jobs:
         refreshenv
     - name: meson setup
       shell: pwsh
-      run: meson setup build-android --cross-file .github\windows-android-aarch64.ini
+      run: meson setup build-android --cross-file .github\windows-android-aarch64.ini -Dwerror=true
     - name: build
       shell: pwsh
       working-directory: build-android

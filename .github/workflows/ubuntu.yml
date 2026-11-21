@@ -37,7 +37,7 @@ jobs:
       env:
         CC: ${{ matrix.cc }}
       run: |
-        meson setup build-minimal -Dunit_tests=enabled
+        meson setup build-minimal -Dunit_tests=enabled -Dwerror=true
         ninja -C build-minimal
         build-minimal/iodine -v
         build-minimal/iodined -v
@@ -62,7 +62,8 @@ jobs:
                 -Dselinux="$selinux" \
                 -Dsystemd="$systemd" \
                 -Dlibcapng="$capng" \
-                -Dunit_tests=enabled
+                -Dunit_tests=enabled \
+                -Dwerror=true
               ninja -C "$dir"
               "$dir/iodine" -v
               "$dir/iodined" -v
@@ -82,7 +83,7 @@ jobs:
     - name: install deps
       run: sudo apt install meson ninja-build
     - name: meson setup
-      run: meson setup build-android --cross-file .github/ubuntu-android-aarch64.ini
+      run: meson setup build-android --cross-file .github/ubuntu-android-aarch64.ini -Dwerror=true
     - name: build
       working-directory: build-android
       run: ninja
@@ -98,7 +99,7 @@ jobs:
     - name: install deps
       run: sudo apt install meson ninja-build mingw-w64 mingw-w64-tools libz-mingw-w64-dev
     - name: meson setup
-      run: meson setup build-windows --cross-file .github/mingw-windows-x86_64.ini
+      run: meson setup build-windows --cross-file .github/mingw-windows-x86_64.ini -Dwerror=true
     - name: build
       working-directory: build-windows
       run: ninja
@@ -117,7 +118,7 @@ jobs:
     - name: install ping3
       run: sudo python3 -m pip install ping3 --break-system-packages
     - name: meson setup
-      run: meson setup build
+      run: meson setup build -Dwerror=true
     - name: run bench
       working-directory: build
       run: sudo ninja tun_bench
@@ -141,6 +142,7 @@ jobs:
         -Db_sanitize=address,undefined
         -Db_lundef=false
         -Dc_args=-fno-sanitize-recover=all
+        -Dwerror=true
     - name: build
       working-directory: build
       run: ninja tests/fuzz_server
