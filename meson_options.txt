@@ -30,3 +30,9 @@ option(
   description: 'Max number of concurrent users. Lower to reduce server RAM usage',
   value: 16,
 )
+option(
+  'unit_tests',
+  type: 'feature',
+  description: 'Build unit tests (requires check)',
+  value: 'auto',
+)

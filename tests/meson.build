@@ -1,6 +1,6 @@
 includes = include_directories('..')
 
-libcheck = dependency('check', required: false)
+libcheck = dependency('check', required: get_option('unit_tests'))
 if libcheck.found()
   suites = [
     'base32', 'base64', 'base64u', 'base128', 'common', 'compat', 'dns',
