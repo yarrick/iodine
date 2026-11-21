@@ -54,7 +54,7 @@ IP Request: (for where to try raw login)
 Client sends:
 	First byte i or I
 	5 bits coded as Base32 char, meaning userid
-	CMC as 3 Base32 chars
+	CMC as at least 3 Base32 chars
 Server replies
 	BADIP if bad userid
 	First byte I
@@ -74,7 +74,7 @@ Client sends:
 	First byte y or Y
 	1 char, meaning downstream codec to use
 	5 bits coded as Base32 char, meaning check variant
-	CMC as 3 Base32 chars
+	CMC as at least 3 Base32 chars
 	Possibly extra data, depending on check variant
 Server sends:
 	Data encoded with requested downstream codec; data content depending
@@ -100,7 +100,7 @@ Client sends:
 		6: Base64   (a-zA-Z0-9+-)
 		26: Base64u (a-zA-Z0-9_-)
 		7: Base128  (a-zA-Z0-9\274-\375)
-	CMC as 3 Base32 chars
+	CMC as at least 3 Base32 chars
 Server sends:
 	Name of codec if accepted. After this all upstream data packets must
 	be encoded with the new codec.
@@ -112,7 +112,7 @@ Client sends:
 	First byte o or O
 	5 bits coded as Base32 char, meaning userid
 	1 char, meaning option
-	CMC as 3 Base32 chars
+	CMC as at least 3 Base32 chars
 Server sends:
 	Full name of option if accepted. After this, option immediately takes
 	effect in server.

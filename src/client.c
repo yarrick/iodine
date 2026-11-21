@@ -1072,22 +1072,19 @@ send_version(sock_t fd, uint32_t version)
 	send_packet(fd, 'v', data, sizeof(data));
 }
 
-/* Add lower 15 bits of rand seed as base32,
+/* Add rand seed as base32,
  * followed by a dot and the tunnel domain and send */
 static void
 send_handshake_query(sock_t fd, char *prefix)
 {
 	char buf[300];
-	char cmc_dot[5];
+	char cmc[5];
+	size_t cmclen = sizeof(cmc) - 1;
 
-	cmc_dot[0] = b32_5to8((rand_seed >> 10) & 0x1f);
-	cmc_dot[1] = b32_5to8((rand_seed >> 5) & 0x1f);
-	cmc_dot[2] = b32_5to8((rand_seed) & 0x1f);
-	cmc_dot[3] = '.';
-	cmc_dot[4] = 0;
+	base32_ops.encode(cmc, &cmclen, &rand_seed, sizeof(rand_seed));
 	rand_seed++;
 
-	snprintf(buf, sizeof(buf), "%.60s%s%s", prefix, cmc_dot, topdomain);
+	snprintf(buf, sizeof(buf), "%.59s%s.%s", prefix, cmc, topdomain);
 	send_query(fd, buf);
 }
 
