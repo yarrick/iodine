@@ -79,6 +79,21 @@ static const struct encoder *downenc = NULL;
 /* set query type to send */
 static unsigned short do_qtype = T_UNSET;
 
+static const struct {
+	unsigned short type;
+	const char *name;
+} qtypes[] = {
+	/* Ordered by preference for handshake_qtype_autodetect() */
+	{ T_NULL,    "NULL"    },
+	{ T_PRIVATE, "PRIVATE" },
+	{ T_TXT,     "TXT"     },
+	{ T_SRV,     "SRV"     },
+	{ T_MX,      "MX"      },
+	{ T_CNAME,   "CNAME"   },
+	{ T_A,       "A"       },
+	{ T_UNSET,   NULL      },
+};
+
 /* My connection mode */
 static enum connection conn;
 
@@ -146,37 +161,27 @@ client_set_password(const char *cp)
 int
 client_set_qtype(char *qtype)
 {
-	if (!strcasecmp(qtype, "NULL"))
-		do_qtype = T_NULL;
-	else if (!strcasecmp(qtype, "PRIVATE"))
-		do_qtype = T_PRIVATE;
-	else if (!strcasecmp(qtype, "CNAME"))
-		do_qtype = T_CNAME;
-	else if (!strcasecmp(qtype, "A"))
-		do_qtype = T_A;
-	else if (!strcasecmp(qtype, "MX"))
-		do_qtype = T_MX;
-	else if (!strcasecmp(qtype, "SRV"))
-		do_qtype = T_SRV;
-	else if (!strcasecmp(qtype, "TXT"))
-		do_qtype = T_TXT;
-	return (do_qtype == T_UNSET);
+	int i;
+
+	for (i = 0; qtypes[i].name != NULL; i++) {
+		if (!strcasecmp(qtype, qtypes[i].name)) {
+			do_qtype = qtypes[i].type;
+			return 0;
+		}
+	}
+	return 1;
 }
 
-char *
+const char *
 client_get_qtype(void)
 {
-	char *c = "UNDEFINED";
+	int i;
 
-	if (do_qtype == T_NULL)		c = "NULL";
-	else if (do_qtype == T_PRIVATE)	c = "PRIVATE";
-	else if (do_qtype == T_CNAME)	c = "CNAME";
-	else if (do_qtype == T_A)	c = "A";
-	else if (do_qtype == T_MX)	c = "MX";
-	else if (do_qtype == T_SRV)	c = "SRV";
-	else if (do_qtype == T_TXT)	c = "TXT";
-
-	return c;
+	for (i = 0; qtypes[i].name != NULL; i++) {
+		if (do_qtype == qtypes[i].type)
+			return qtypes[i].name;
+	}
+	return "UNDEFINED";
 }
 
 int
@@ -1554,37 +1559,22 @@ handshake_downenc_autodetect(sock_t dns_fd)
 }
 
 static int
-handshake_qtype_numcvt(int num)
-{
-	switch (num) {
-	case 0:	return T_NULL;
-	case 1:	return T_PRIVATE;
-	case 2:	return T_TXT;
-	case 3:	return T_SRV;
-	case 4:	return T_MX;
-	case 5:	return T_CNAME;
-	case 6:	return T_A;
-	}
-	return T_UNSET;
-}
-
-static int
 handshake_qtype_autodetect(sock_t dns_fd)
 /* Returns:
    0: okay, do_qtype set
    1: problem, program exit
 */
 {
-	int highestworking = 100;
+	int selected = -1;
 	int timeout;
-	int qtypenum;
+	int i;
 
 	ui_log_partial("Autodetecting DNS query type (use -T to override)");
 
 	/* Method: try all "interesting" qtypes with a 1-sec timeout, then try
 	   all "still-interesting" qtypes with a 2-sec timeout, etc.
 	   "Interesting" means: qtypes that (are expected to) have higher
-	   bandwidth than what we know is working already (highestworking).
+	   bandwidth than what we know is working already (selected).
 
 	   Note that DNS relays may not immediately resolve the first (NULL)
 	   query in 1 sec, due to long recursive lookups, so we keep trying
@@ -1592,10 +1582,11 @@ handshake_qtype_autodetect(sock_t dns_fd)
 	 */
 
 	for (timeout = 1; running && timeout <= 3; timeout++) {
-		for (qtypenum = 0; running && qtypenum < highestworking; qtypenum++) {
-			do_qtype = handshake_qtype_numcvt(qtypenum);
-			if (do_qtype == T_UNSET)
-				break;	/* this round finished */
+		for (i = 0; running && qtypes[i].type != T_UNSET; i++) {
+			if (selected >= 0 && i >= selected)
+				break;
+
+			do_qtype = qtypes[i].type;
 
 			ui_log_partial(".");
 
@@ -1603,7 +1594,7 @@ handshake_qtype_autodetect(sock_t dns_fd)
 			   0-255 byte values are also verified for NULL/PRIVATE. */
 			if (handshake_downenc_check(dns_fd, NULL, 1, timeout, NULL)) {
 				/* okay */
-				highestworking = qtypenum;
+				selected = i;
 #if 0
 				ui_log(" Type %s timeout %d works\n",
 					client_get_qtype(), timeout);
@@ -1613,7 +1604,7 @@ handshake_qtype_autodetect(sock_t dns_fd)
 			}
 			/* else: try next qtype with same timeout */
 		}
-		if (highestworking == 0)
+		if (selected == 0)
 			/* good, we have NULL; abort immediately */
 			break;
 	}
@@ -1626,15 +1617,15 @@ handshake_qtype_autodetect(sock_t dns_fd)
 	}
 
 	/* finished */
-	do_qtype = handshake_qtype_numcvt(highestworking);
-
-	if (do_qtype == T_UNSET) {
-		/* also catches highestworking still 100 */
+	if (selected < 0) {
+		do_qtype = T_UNSET;
 		warnx("No suitable DNS query type found. Are you connected to a network?");
 		warnx("If you expect very long roundtrip delays, use -T explicitly.");
 		warnx("(Also, connecting to an \"ancient\" version of iodined won't work.)");
 		return 1;  /* problem */
 	}
+
+	do_qtype = qtypes[selected].type;
 
 	/* "using qtype" message printed in handshake function */
 	return 0;  /* okay */
