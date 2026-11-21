@@ -185,7 +185,6 @@ reset_user(int userid)
 	users[userid].authenticated = 0;
 	users[userid].authenticated_raw = 0;
 	users[userid].options_locked = 0;
-	users[userid].disabled = 0;
 	users[userid].last_pkt = 0;
 	users[userid].seed = 0;
 	memset(&users[userid].host, 0, sizeof(users[userid].host));
@@ -208,8 +207,6 @@ reset_user(int userid)
 	users[userid].outfragresent = 0;
 	users[userid].up_encoder = NULL;
 	users[userid].down_encoder = NULL;
-	users[userid].out_acked_seqno = 0;
-	users[userid].out_acked_fragment = 0;
 	users[userid].fragsize = 0;
 	users[userid].conn = CONN_DNS_NULL;
 	users[userid].lazy = 0;

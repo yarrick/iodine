@@ -336,12 +336,9 @@ START_TEST(test_check_user_and_ip)
 	users[0].last_pkt = time(NULL) - 61;
 	ck_assert_int_ne(check_user_and_ip(0, 0, &match_v4), 0);
 
-	/* Fresh packet, disabled vs enabled */
+	/* Fresh packet */
 	users[0].last_pkt = time(NULL);
 	ck_assert_int_eq(get_addr("192.0.2.10", 12345, AF_UNSPEC, 0, &users[0].host), 0);
-	users[0].disabled = 1;
-	ck_assert_int_ne(check_user_and_ip(0, 0, &match_v4), 0);
-	users[0].disabled = 0;
 
 	/* IPv4 matching (ignores port), mismatch, and family mismatch */
 	ck_assert_int_eq(check_user_and_ip(0, 1, &match_v4), 0);

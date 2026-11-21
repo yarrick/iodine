@@ -75,7 +75,6 @@ struct tun_user {
 	int authenticated;
 	int authenticated_raw;
 	int options_locked;
-	int disabled;
 	time_t last_pkt;
 	int seed;
 	struct in_addr tun_ip;
@@ -89,8 +88,6 @@ struct tun_user {
 	int outfragresent;
 	const struct encoder *up_encoder;
 	const struct encoder *down_encoder;
-	int out_acked_seqno;
-	int out_acked_fragment;
 	unsigned int fragsize;
 	enum connection conn;
 	int lazy;

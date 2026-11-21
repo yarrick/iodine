@@ -1510,7 +1510,7 @@ server_tunnel(sock_t tun_fd, struct dnsfd *dns_fds, sock_t bind_fd, int max_idle
 		   20msec: ~8 packs every 1/50sec = ~400 DNSreq/sec,
 		   or ~1200bytes every 1/50sec = ~0.5 Mbit/sec upstream */
 		for (userid = 0; userid < created_users; userid++) {
-			if (users[userid].active && !users[userid].disabled &&
+			if (users[userid].active &&
 			    users[userid].last_pkt + 60 > time(NULL)) {
 				users[userid].q_sendrealsoon_new = 0;
 				if (users[userid].q_sendrealsoon.id != 0) {
@@ -1565,7 +1565,7 @@ server_tunnel(sock_t tun_fd, struct dnsfd *dns_fds, sock_t bind_fd, int max_idle
 
 		/* Send realsoon's if tun or dns didn't already */
 		for (userid = 0; userid < created_users; userid++)
-			if (users[userid].active && !users[userid].disabled &&
+			if (users[userid].active &&
 			    users[userid].last_pkt + 60 > time(NULL) &&
 			    users[userid].q_sendrealsoon.id != 0 &&
 			    users[userid].conn == CONN_DNS_NULL &&

@@ -66,7 +66,6 @@ init_users(unsigned int max_users, struct in_addr my_ip, int netbits)
 			ip.s_addr = ipstart.s_addr + htonl(i + skip + 1);
 		}
 		users[i].tun_ip = ip;
-		users[i].disabled = 0;
 		users[i].authenticated = 0;
 		users[i].authenticated_raw = 0;
 		users[i].options_locked = 0;
@@ -93,7 +92,6 @@ find_user_by_ip(struct in_addr ip)
 	for (i = 0; i < usercount; i++) {
 		if (users[i].active &&
 			users[i].authenticated &&
-			!users[i].disabled &&
 			users[i].last_pkt + 60 > time(NULL) &&
 			ip.s_addr == users[i].tun_ip.s_addr) {
 			ret = i;
@@ -118,7 +116,7 @@ all_users_waiting_to_send(void)
 	ret = 1;
 	now = time(NULL);
 	for (i = 0; i < usercount; i++) {
-		if (users[i].active && !users[i].disabled &&
+		if (users[i].active &&
 			users[i].last_pkt + 60 > now &&
 			((users[i].conn == CONN_RAW_UDP) ||
 			((users[i].conn == CONN_DNS_NULL)
@@ -142,7 +140,7 @@ find_available_user(unsigned int *user)
 	unsigned int i;
 	for (i = 0; i < usercount; i++) {
 		/* Not used at all or not used in one minute */
-		if ((!users[i].active || users[i].last_pkt + 60 < time(NULL)) && !users[i].disabled) {
+		if (!users[i].active || users[i].last_pkt + 60 < time(NULL)) {
 			users[i].active = 1;
 			users[i].authenticated = 0;
 			users[i].authenticated_raw = 0;
@@ -247,7 +245,7 @@ check_user_and_ip(int userid, int check_ip, struct udp_addr *addr)
 	if (userid < 0 || (unsigned int) userid >= usercount) {
 		return 1;
 	}
-	if (!users[userid].active || users[userid].disabled) {
+	if (!users[userid].active) {
 		return 1;
 	}
 	if (users[userid].last_pkt + 60 < time(NULL)) {
