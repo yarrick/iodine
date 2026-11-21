@@ -1008,14 +1008,12 @@ static void
 send_login(sock_t fd, char *login, int len)
 {
 	char data[19];
+	char *d = data;
 
 	memset(data, 0, sizeof(data));
-	data[0] = userid;
-	memcpy(&data[1], login, MIN(len, 16));
-
-	data[17] = (rand_seed >> 8) & 0xff;
-	data[18] = (rand_seed >> 0) & 0xff;
-
+	putbyte(&d, userid);
+	putdata(&d, login, MIN(len,16));
+	putshort(&d, rand_seed);
 	rand_seed++;
 
 	send_packet(fd, 'l', data, sizeof(data));
