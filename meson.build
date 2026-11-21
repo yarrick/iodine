@@ -114,11 +114,6 @@ cdata.set10('HAVE_FD_CLOEXEC', cc.has_header_symbol('fcntl.h', 'FD_CLOEXEC'))
 cdata.set10('HAVE_SO_REUSEPORT',
   cc.has_header_symbol('sys/socket.h', 'SO_REUSEPORT', args: header_args))
 cdata.set10('HAVE_SO_RTABLE', cc.has_header_symbol('sys/socket.h', 'SO_RTABLE'))
-if not cc.has_header_symbol(
-    host_machine.system() == 'windows' ? 'ws2tcpip.h' : 'netdb.h',
-    'AI_ADDRCONFIG', args: header_args)
-  cdata.set('AI_ADDRCONFIG', 0)
-endif
 cdata.set('NORETURN_ATTR',
   cc.has_function_attribute('noreturn') ? '__attribute__((noreturn))' : ''
 )
