@@ -43,22 +43,16 @@ init_users(unsigned int max_users, struct in_addr my_ip, int netbits)
 	unsigned int i;
 	unsigned int net_max_users;
 	int skip = 0;
-	int n;
-	uint32_t netmask;
 	struct in_addr net;
 	struct in_addr ipstart;
 
-	netmask = 0;
-	for (n = 0; n < netbits; n++) {
-		netmask = (netmask << 1) | 1;
-	}
-	if (netbits > 30 || max_users < 1 || max_users > 16)
+	if (netbits > 30 || max_users < 1 || max_users > 16 ||
+	    build_netmask(netbits, &net) != 0)
 		return -1;
-	netmask <<= (32 - netbits);
-	net.s_addr = htonl(netmask);
 	ipstart.s_addr = my_ip.s_addr & net.s_addr;
 
-	net_max_users = (1 << (32-netbits)) - 3; /* 3: Net addr, broadcast addr, iodined addr */
+	/* 3 reserved: Net addr, broadcast addr, iodined addr */
+	net_max_users = (1U << (32 - netbits)) - 3;
 	usercount = MIN(net_max_users, max_users);
 
 	users = calloc(usercount, sizeof(struct tun_user));

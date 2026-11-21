@@ -218,7 +218,9 @@ START_TEST(test_user_count_from_netmask)
 	struct in_addr ip;
 
 	inet_pton(AF_INET, "127.0.0.1", &ip);
-	for (int i = 8; i < 28; i++) {
+	ck_assert_int_eq(init_users(TEST_USERS, ip, -1), -1);
+	ck_assert_int_eq(init_users(TEST_USERS, ip, 0), -1);
+	for (int i = 1; i < 28; i++) {
 		ck_assert_int_eq(init_users(TEST_USERS, ip, i), TEST_USERS);
 		free(users);
 	}
