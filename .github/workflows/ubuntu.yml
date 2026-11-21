@@ -15,11 +15,18 @@ jobs:
       fail-fast: false
       matrix:
         runner: [ubuntu-latest]
+        cc: [gcc]
         selinux: [libselinux1-dev, ""]
         systemd: [libsystemd-dev, ""]
         capng: [libcap-ng-dev, ""]
         include:
           - runner: ubuntu-26.04-arm
+            cc: gcc
+            selinux: libselinux1-dev
+            systemd: libsystemd-dev
+            capng: libcap-ng-dev
+          - runner: ubuntu-latest
+            cc: clang
             selinux: libselinux1-dev
             systemd: libsystemd-dev
             capng: libcap-ng-dev
@@ -39,6 +46,8 @@ jobs:
         ${{ matrix.systemd }}
         ${{ matrix.capng }}
     - name: meson setup
+      env:
+        CC: ${{ matrix.cc }}
       run: meson setup build
     - name: build
       working-directory: build
