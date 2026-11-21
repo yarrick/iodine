@@ -3,7 +3,7 @@ project(
   'c',
   default_options: [
     'buildtype=release',
-    'c_std=c99',
+    'c_std=c11',
     'warning_level=3',
   ],
   license: 'ISC',
