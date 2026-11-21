@@ -14,56 +14,62 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest]
-        cc: [gcc]
-        selinux: [libselinux1-dev, ""]
-        systemd: [libsystemd-dev, ""]
-        capng: [libcap-ng-dev, ""]
         include:
-          - runner: ubuntu-26.04-arm
+          - runner: ubuntu-latest
             cc: gcc
-            selinux: libselinux1-dev
-            systemd: libsystemd-dev
-            capng: libcap-ng-dev
           - runner: ubuntu-latest
             cc: clang
-            selinux: libselinux1-dev
-            systemd: libsystemd-dev
-            capng: libcap-ng-dev
+          - runner: ubuntu-26.04-arm
+            cc: gcc
     runs-on: ${{ matrix.runner }}
 
     steps:
     - uses: actions/checkout@v7
     - name: apt update
       run: sudo apt update
-    - name: install deps
+    - name: install base deps
       run: >-
         sudo apt install -y
         meson ninja-build
         check
         python3-dnspython
-        ${{ matrix.selinux }}
-        ${{ matrix.systemd }}
-        ${{ matrix.capng }}
-    - name: meson setup
+    - name: build and test without optional libs
       env:
         CC: ${{ matrix.cc }}
-      run: meson setup build
-    - name: build
-      working-directory: build
-      run: ninja
-    - name: iodine -v
-      working-directory: build
-      run: ./iodine -v
-    - name: iodined -v
-      working-directory: build
-      run: ./iodined -v
-    - name: run tests
-      working-directory: build
-      run: ninja test
-    - name: run test_server
-      working-directory: build
-      run: ninja test_server
+      run: |
+        meson setup build-minimal -Dunit_tests=enabled
+        ninja -C build-minimal
+        build-minimal/iodine -v
+        build-minimal/iodined -v
+        ninja -C build-minimal test
+        ninja -C build-minimal test_server
+    - name: install optional deps
+      run: >-
+        sudo apt install -y
+        libselinux1-dev
+        libsystemd-dev
+        libcap-ng-dev
+    - name: build and test all feature combinations
+      env:
+        CC: ${{ matrix.cc }}
+      run: |
+        for selinux in enabled disabled; do
+          for systemd in enabled disabled; do
+            for capng in enabled disabled; do
+              dir="build-${selinux}-${systemd}-${capng}"
+              echo "Setup selinux=${selinux} systemd=${systemd} libcapng=${capng}"
+              meson setup "$dir" \
+                -Dselinux="$selinux" \
+                -Dsystemd="$systemd" \
+                -Dlibcapng="$capng" \
+                -Dunit_tests=enabled
+              ninja -C "$dir"
+              "$dir/iodine" -v
+              "$dir/iodined" -v
+              ninja -C "$dir" test
+            done
+          done
+        done
 
   build-android:
 
