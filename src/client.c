@@ -1665,6 +1665,28 @@ handshake_qtype_autodetect(sock_t dns_fd)
 	return 0;  /* okay */
 }
 
+static int
+server_rejected(const char *buf, const char *badcodec_msg)
+{
+	if (strncmp("BADLEN", buf, 6) == 0) {
+		ui_log("Server got bad message length. ");
+		return 1;
+	} else if (strncmp("BADIP", buf, 5) == 0) {
+		ui_log("Server rejected sender IP address. ");
+		return 1;
+	} else if (strncmp("BADCODEC", buf, 8) == 0) {
+		if (!badcodec_msg) {
+			badcodec_msg = "the selected codec";
+		}
+		ui_log("Server rejected %s. ", badcodec_msg);
+		return 1;
+	} else if (strncmp("BADFRAG", buf, 7) == 0) {
+		ui_log("Server rejected fragsize. ");
+		return 1;
+	}
+	return 0;
+}
+
 static void
 handshake_switch_codec(sock_t dns_fd, const struct encoder *enc)
 {
@@ -1690,14 +1712,7 @@ handshake_switch_codec(sock_t dns_fd, const struct encoder *enc)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 's', i+1);
 
 		if (read > 0) {
-			if (strncmp("BADLEN", in, 6) == 0) {
-				ui_log("Server got bad message length. ");
-				goto codec_revert;
-			} else if (strncmp("BADIP", in, 5) == 0) {
-				ui_log("Server rejected sender IP address. ");
-				goto codec_revert;
-			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				ui_log("Server rejected the selected codec. ");
+			if (server_rejected(in, NULL)) {
 				goto codec_revert;
 			}
 			ui_log("Server switched upstream to codec %s\n", in);
@@ -1732,14 +1747,7 @@ handshake_switch_downenc(sock_t dns_fd)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', i+1);
 
 		if (read > 0) {
-			if (strncmp("BADLEN", in, 6) == 0) {
-				ui_log("Server got bad message length. ");
-				goto codec_revert;
-			} else if (strncmp("BADIP", in, 5) == 0) {
-				ui_log("Server rejected sender IP address. ");
-				goto codec_revert;
-			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				ui_log("Server rejected the selected codec. ");
+			if (server_rejected(in, NULL)) {
 				goto codec_revert;
 			}
 			ui_log("Server switched downstream to codec %s\n", in);
@@ -1772,14 +1780,7 @@ handshake_try_lazy(sock_t dns_fd)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'o', i+1);
 
 		if (read > 0) {
-			if (strncmp("BADLEN", in, 6) == 0) {
-				ui_log("Server got bad message length. ");
-				goto codec_revert;
-			} else if (strncmp("BADIP", in, 5) == 0) {
-				ui_log("Server rejected sender IP address. ");
-				goto codec_revert;
-			} else if (strncmp("BADCODEC", in, 8) == 0) {
-				ui_log("Server rejected lazy mode. ");
+			if (server_rejected(in, "lazy mode")) {
 				goto codec_revert;
 			} else if (strncmp("Lazy", in, 4) == 0) {
 				ui_log("Server switched to lazy mode\n");
@@ -1837,8 +1838,7 @@ fragsize_check(char *in, int read, int proposed_fragsize, int *max_fragsize)
 	int i;
 	unsigned int v;
 
-	if (read >= 5 && strncmp("BADIP", in, 5) == 0) {
-		ui_log_partial("got BADIP (Try iodined -c)..");
+	if (server_rejected(in, NULL)) {
 		return 0;		/* maybe temporary error */
 	}
 
@@ -1982,13 +1982,8 @@ handshake_set_fragsize(sock_t dns_fd, int fragsize)
 		read = handshake_waitdns(dns_fd, in, sizeof(in), 'n', i+1);
 
 		if (read > 0) {
-
-			if (strncmp("BADFRAG", in, 7) == 0) {
-				ui_log("Server rejected fragsize. Keeping default.\n");
-				return;
-			} else if (strncmp("BADIP", in, 5) == 0) {
-				ui_log("Server rejected sender IP address.\n");
-				return;
+			if (server_rejected(in, NULL)) {
+				goto rejected;
 			}
 
 			/* The server returns the accepted fragsize:
@@ -2001,7 +1996,9 @@ handshake_set_fragsize(sock_t dns_fd, int fragsize)
 	if (!running)
 		return;
 
-	ui_log("No reply from server when setting fragsize. Keeping default.\n");
+	ui_log("No reply from server when setting fragsize. ");
+rejected:
+	ui_log("Keeping default.\n");
 }
 
 int
