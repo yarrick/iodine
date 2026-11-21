@@ -100,6 +100,7 @@ optional_functions = [
   'geteuid',
   'getpwnam',
   'getrandom',
+  'pledge',
   'setgroups',
   'strlcpy',
   'syslog',

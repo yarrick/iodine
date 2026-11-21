@@ -286,3 +286,11 @@ do_detach(void)
 #endif
 }
 
+void
+do_pledge(void)
+{
+#if HAVE_PLEDGE
+	if (pledge("stdio inet", NULL) == -1)
+        err(1, "pledge");
+#endif
+}

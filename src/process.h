@@ -23,5 +23,6 @@ void do_chroot(char *);
 void do_setcon(char *);
 void do_detach(void);
 void do_pidfile(char *);
+void do_pledge(void);
 
 #endif

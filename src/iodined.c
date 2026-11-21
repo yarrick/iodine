@@ -551,6 +551,7 @@ main(int argc, char **argv)
 
 	if (context != NULL)
 		do_setcon(context);
+	do_pledge();
 
 	syslog(LOG_INFO, "started, listening on port %d", port);
 	ui_set_debuglevel(debug);

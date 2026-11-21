@@ -399,6 +399,7 @@ main(int argc, char **argv)
 
 	if (context != NULL)
 		do_setcon(context);
+	do_pledge();
 
 	client_tunnel(tun_fd, dns_fd);
 

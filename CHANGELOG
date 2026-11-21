@@ -25,6 +25,7 @@ master:
 	- Changed pidfile to be written after detach so it includes the
 	  pid of the background process.
 	- Android API version bumped to 24 (7.0 release from 2016).
+	- Use pledge(2) on OpenBSD (with stdio inet promises).
 
 2026-11-15: 0.9.1 "Caps Lock"
 	- Fixed parsing of -z flag (SELinux context) for iodine client.
