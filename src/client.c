@@ -1031,11 +1031,8 @@ send_fragsize_probe(sock_t fd, int fragsize)
 	 * build a large query domain which is random and maximum size,
 	 * will also take up maximal space in the return packet
 	 */
-	memset(probedata, MAX(1, rand_seed & 0xff), sizeof(probedata));
-	probedata[1] = MAX(1, (rand_seed >> 8) & 0xff);
-	rand_seed++;
-
-	/* Note: must either be same, or larger, than send_chunk() */
+	secure_random(&probedata, sizeof(probedata));
+	/* Note: hostname must either be same, or longer, than send_chunk() */
 	build_hostname(buf + 5, sizeof(buf) - 5, probedata, sizeof(probedata),
 		       topdomain, dataenc, hostname_maxlen);
 
