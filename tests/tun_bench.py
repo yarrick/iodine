@@ -10,14 +10,15 @@ if len(sys.argv) < 3:
 
 binary, target_os = sys.argv[1], sys.argv[2].lower()
 tunmap = {
-    'android':	'dns0',
-    'darwin':	'utun5',
-    'freebsd':	'tun0',
-    'haiku':	'tun/0',
-    'linux':	'dns0',
-    'netbsd':	'tun0',
-    'openbsd':	'tun0',
-    'windows':	'tunnel',
+    'android':		'dns0',
+    'darwin':		'utun5',
+    'dragonfly':	'tun0',
+    'freebsd':		'tun0',
+    'haiku':		'tun/0',
+    'linux':		'dns0',
+    'netbsd':		'tun0',
+    'openbsd':		'tun0',
+    'windows':		'tunnel',
 }
 
 if target_os not in tunmap:
