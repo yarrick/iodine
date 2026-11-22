@@ -64,12 +64,7 @@ fuzz_server = executable('fuzz_server',
   link_with: libserver,
 )
 
-py3 = disabler()
-foreach py_name : ['python3', 'python3.14', 'python3.13', 'python3.12']
-  if not py3.found()
-    py3 = import('python').find_installation(py_name, required: false)
-  endif
-endforeach
+py3 = import('python').find_installation(required: false)
 if py3.found()
   bench_deps = [tun_ping]
   if host_machine.system() == 'windows'
