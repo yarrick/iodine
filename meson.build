@@ -51,6 +51,9 @@ if host_machine.system() == 'linux'
   libcapng = dependency('libcap-ng', required: get_option('libcapng'))
   cdata.set10('HAVE_LIBCAPNG', libcapng.found())
   commondeps += libcapng
+  seccomp = dependency('libseccomp', version: '>=2.5.0', required: get_option('seccomp'))
+  cdata.set10('HAVE_SECCOMP', seccomp.found())
+  commondeps += seccomp
 elif host_machine.system() == 'android'
   cdata.set10('LINUX', true)
 elif host_machine.system() == 'darwin'

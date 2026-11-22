@@ -49,6 +49,7 @@ jobs:
         libselinux1-dev
         libsystemd-dev
         libcap-ng-dev
+        libseccomp-dev
     - name: build and test all feature combinations
       env:
         CC: ${{ matrix.cc }}
@@ -56,18 +57,21 @@ jobs:
         for selinux in enabled disabled; do
           for systemd in enabled disabled; do
             for capng in enabled disabled; do
-              dir="build-${selinux}-${systemd}-${capng}"
-              echo "Setup selinux=${selinux} systemd=${systemd} libcapng=${capng}"
-              meson setup "$dir" \
-                -Dselinux="$selinux" \
-                -Dsystemd="$systemd" \
-                -Dlibcapng="$capng" \
-                -Dunit_tests=enabled \
-                -Dwerror=true
-              ninja -C "$dir"
-              "$dir/iodine" -v
-              "$dir/iodined" -v
-              ninja -C "$dir" test
+              for seccomp in enabled disabled; do
+                dir="build-${selinux}-${systemd}-${capng}-${seccomp}"
+                echo "Setup selinux=${selinux} systemd=${systemd} libcapng=${capng} seccomp=${seccomp}"
+                meson setup "$dir" \
+                  -Dselinux="$selinux" \
+                  -Dsystemd="$systemd" \
+                  -Dlibcapng="$capng" \
+                  -Dseccomp="$seccomp" \
+                  -Dunit_tests=enabled \
+                  -Dwerror=true
+                ninja -C "$dir"
+                "$dir/iodine" -v
+                "$dir/iodined" -v
+                ninja -C "$dir" test
+              done
             done
           done
         done

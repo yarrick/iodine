@@ -11,6 +11,12 @@ option(
   value: 'auto',
 )
 option(
+  'seccomp',
+  type: 'feature',
+  description: 'build with libseccomp support on Linux, to block unneeded syscalls',
+  value: 'auto',
+)
+option(
   'selinux',
   type: 'feature',
   description: 'build with selinux support on Linux, to set security context',

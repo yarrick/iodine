@@ -23,12 +23,16 @@
 #include <check.h>
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #ifndef WINDOWS
 #include <sys/wait.h>
+#endif
+#if HAVE_SECCOMP
+#include <sys/socket.h>
 #endif
 
 START_TEST(test_pidfile_writes_pid)
@@ -112,12 +116,13 @@ END_TEST
 
 START_TEST(test_confine_blocks_fs)
 {
-	do_confine(PROC_NEED_NONE);
+	bool confined = do_confine(PROC_NEED_NONE);
 #if HAVE_PLEDGE
 	/* Under pledge("stdio inet"), open() raises SIGABRT. */
+	(void)confined;
 	(void)open("/", O_RDONLY);
-#elif HAVE_LANDLOCK
-	if (get_landlock_abi() >= 1) {
+#else
+	if (confined) {
 		ck_assert_int_eq(open("/", O_RDONLY), -1);
 		ck_assert_int_eq(errno, EACCES);
 	}
@@ -133,7 +138,7 @@ START_TEST(test_confine_detach_staged)
 	if (get_landlock_abi() < 1)
 		return;
 
-	do_confine(PROC_NEED_DETACH);
+	ck_assert(do_confine(PROC_NEED_DETACH));
 
 	/* Stage 1: /dev/null O_RDWR (used by do_detach) works, dirs are blocked */
 	fd = open("/dev/null", O_RDWR);
@@ -143,9 +148,41 @@ START_TEST(test_confine_detach_staged)
 	ck_assert_int_eq(errno, EACCES);
 
 	/* Stage 2: /dev/null is now blocked too */
-	do_confine(PROC_NEED_NONE);
+	ck_assert(do_confine(PROC_NEED_NONE));
 	ck_assert_int_eq(open("/dev/null", O_RDWR), -1);
 	ck_assert_int_eq(errno, EACCES);
+}
+END_TEST
+#endif
+
+#if HAVE_SECCOMP
+START_TEST(test_confine_seccomp_blocks_fork_exec)
+{
+	char *const argv[] = { "/bin/true", NULL };
+	char *const envp[] = { NULL };
+	int fd;
+
+	if (!do_confine(PROC_NEED_DETACH))
+		return;
+
+	/* Stage 1: execve is blocked while open(/dev/null) still works */
+	fd = open("/dev/null", O_RDWR);
+	ck_assert_int_ge(fd, 0);
+	close(fd);
+	ck_assert_int_eq(execve(argv[0], argv, envp), -1);
+	ck_assert_int_eq(errno, EACCES);
+
+	/* Stage 2: fork, open, and non-AF_UNIX sockets are blocked too */
+	ck_assert(do_confine(PROC_NEED_NONE));
+	ck_assert_int_eq(fork(), -1);
+	ck_assert_int_eq(errno, EACCES);
+	ck_assert_int_eq(open("/dev/null", O_RDWR), -1);
+	ck_assert_int_eq(errno, EACCES);
+	ck_assert_int_eq(socket(AF_INET, SOCK_DGRAM, 0), -1);
+	ck_assert_int_eq(errno, EACCES);
+	fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	ck_assert_int_ge(fd, 0);
+	close(fd);
 }
 END_TEST
 #endif
@@ -168,6 +205,9 @@ test_create(void)
 #endif
 #if HAVE_LANDLOCK
 	tcase_add_test(tc, test_confine_detach_staged);
+#endif
+#if HAVE_SECCOMP
+	tcase_add_test(tc, test_confine_seccomp_blocks_fork_exec);
 #endif
 	return tc;
 }

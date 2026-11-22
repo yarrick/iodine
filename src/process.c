@@ -44,6 +44,12 @@
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 #endif
+#if HAVE_SECCOMP
+#include <errno.h>
+#include <seccomp.h>
+#include <string.h>
+#include <sys/socket.h>
+#endif
 
 #if HAVE_CHECKTOKENMEMBERSHIP
 bool
@@ -300,29 +306,17 @@ get_landlock_abi(void)
 	return syscall(SYS_landlock_create_ruleset, NULL, 0,
 		       LANDLOCK_CREATE_RULESET_VERSION);
 }
-#endif
 
-void
-do_confine(unsigned int privs)
+static bool
+confine_landlock(unsigned int privs)
 {
-	(void)privs;
-#if HAVE_PLEDGE
-	if (privs == PROC_NEED_NONE) {
-		if (pledge("stdio inet", NULL) == -1)
-			err(1, "pledge");
-	}
-#elif HAVE_LANDLOCK
 	int abi;
 	int ruleset_fd;
 	struct landlock_ruleset_attr attr = { 0 };
 
-	/* PR_SET_NO_NEW_PRIVS interferes with setcon() */
-	if (privs & PROC_NEED_SETCON)
-		return;
-
 	abi = get_landlock_abi();
 	if (abi < 0)
-		return; /* Kernel does not support Landlock */
+		return false; /* Kernel does not support Landlock */
 
 	attr.handled_access_fs =
 		LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_DIR |
@@ -370,5 +364,149 @@ do_confine(unsigned int privs)
 	if (syscall(SYS_landlock_restrict_self, ruleset_fd, 0) < 0)
 		err(1, "landlock_restrict_self");
 	close(ruleset_fd);
+	return true;
+}
 #endif
+
+#if HAVE_SECCOMP
+static void
+seccomp_block_list(scmp_filter_ctx ctx, const int *syscalls)
+{
+	for (size_t i = 0; syscalls[i] != __NR_SCMP_ERROR; i++) {
+		int rc = seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EACCES),
+					  syscalls[i], 0);
+		if (rc < 0 && rc != -EDOM) {
+			seccomp_release(ctx);
+			errx(1, "seccomp_rule_add: %s", strerror(-rc));
+		}
+	}
+}
+
+static bool
+confine_seccomp(unsigned int privs)
+{
+	static const int always_blocked[] = {
+		SCMP_SYS(execve), SCMP_SYS(execveat),
+		SCMP_SYS(memfd_create), SCMP_SYS(userfaultfd),
+		SCMP_SYS(ptrace),
+		SCMP_SYS(process_vm_readv), SCMP_SYS(process_vm_writev),
+		SCMP_SYS(bpf), SCMP_SYS(perf_event_open),
+		SCMP_SYS(io_uring_setup),
+		SCMP_SYS(mount), SCMP_SYS(umount2), SCMP_SYS(pivot_root),
+		SCMP_SYS(unshare), SCMP_SYS(setns),
+		SCMP_SYS(init_module), SCMP_SYS(finit_module),
+		SCMP_SYS(delete_module),
+		SCMP_SYS(kexec_load), SCMP_SYS(kexec_file_load),
+		SCMP_SYS(reboot),
+		SCMP_SYS(kill),
+		SCMP_SYS(add_key), SCMP_SYS(request_key), SCMP_SYS(keyctl),
+		SCMP_SYS(personality), SCMP_SYS(swapon), SCMP_SYS(swapoff),
+		SCMP_SYS(bind), SCMP_SYS(listen),
+		SCMP_SYS(accept), SCMP_SYS(accept4), SCMP_SYS(socketpair),
+		SCMP_SYS(unlink), SCMP_SYS(unlinkat),
+		SCMP_SYS(rename), SCMP_SYS(renameat), SCMP_SYS(renameat2),
+		SCMP_SYS(mkdir), SCMP_SYS(mkdirat), SCMP_SYS(rmdir),
+		SCMP_SYS(symlink), SCMP_SYS(symlinkat),
+		SCMP_SYS(link), SCMP_SYS(linkat),
+		SCMP_SYS(mknod), SCMP_SYS(mknodat),
+		SCMP_SYS(chmod), SCMP_SYS(fchmod), SCMP_SYS(fchmodat),
+		SCMP_SYS(chown), SCMP_SYS(fchown), SCMP_SYS(lchown),
+		SCMP_SYS(fchownat),
+		SCMP_SYS(truncate), SCMP_SYS(ftruncate),
+		SCMP_SYS(open_by_handle_at),
+		__NR_SCMP_ERROR,
+	};
+	static const int detach_blocked[] = {
+		SCMP_SYS(fork), SCMP_SYS(vfork),
+		SCMP_SYS(clone), SCMP_SYS(clone3),
+		__NR_SCMP_ERROR,
+	};
+	static const int chroot_blocked[] = {
+		SCMP_SYS(chroot),
+		__NR_SCMP_ERROR,
+	};
+	static const int chdir_blocked[] = {
+		SCMP_SYS(chdir), SCMP_SYS(fchdir),
+		__NR_SCMP_ERROR,
+	};
+	static const int setuid_blocked[] = {
+		SCMP_SYS(setuid), SCMP_SYS(setgid),
+		SCMP_SYS(setreuid), SCMP_SYS(setregid),
+		SCMP_SYS(setresuid), SCMP_SYS(setresgid),
+		SCMP_SYS(setgroups), SCMP_SYS(capset),
+		__NR_SCMP_ERROR,
+	};
+	static const int open_blocked[] = {
+		SCMP_SYS(open), SCMP_SYS(openat),
+		SCMP_SYS(openat2), SCMP_SYS(creat),
+		__NR_SCMP_ERROR,
+	};
+	static const int tun_blocked[] = {
+		SCMP_SYS(ioctl),
+		__NR_SCMP_ERROR,
+	};
+	scmp_filter_ctx ctx;
+	int rc;
+
+	ctx = seccomp_init(SCMP_ACT_ALLOW);
+	if (ctx == NULL)
+		errx(1, "seccomp_init failed");
+
+	seccomp_block_list(ctx, always_blocked);
+	if ((privs & PROC_NEED_DETACH) == 0)
+		seccomp_block_list(ctx, detach_blocked);
+	if ((privs & PROC_NEED_CHROOT) == 0)
+		seccomp_block_list(ctx, chroot_blocked);
+	if ((privs & (PROC_NEED_DETACH | PROC_NEED_CHROOT)) == 0)
+		seccomp_block_list(ctx, chdir_blocked);
+	if ((privs & (PROC_NEED_SETUID | PROC_NEED_CHROOT)) == 0)
+		seccomp_block_list(ctx, setuid_blocked);
+	if ((privs & (PROC_NEED_PIDFILE | PROC_NEED_DETACH)) == 0)
+		seccomp_block_list(ctx, open_blocked);
+	if ((privs & PROC_NEED_TUN) == 0) {
+		seccomp_block_list(ctx, tun_blocked);
+		rc = seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EACCES),
+				      SCMP_SYS(socket), 1,
+				      SCMP_CMP(0, SCMP_CMP_NE, AF_UNIX, 0));
+		if (rc < 0 && rc != -EDOM) {
+			seccomp_release(ctx);
+			errx(1, "seccomp_rule_add: %s", strerror(-rc));
+		}
+	}
+
+	rc = seccomp_load(ctx);
+	seccomp_release(ctx);
+	if (rc == -ENOSYS || rc == -EOPNOTSUPP)
+		return false;
+	if (rc < 0)
+		errx(1, "seccomp_load: %s", strerror(-rc));
+	return true;
+}
+#endif
+
+bool
+do_confine(unsigned int privs)
+{
+	bool confined = false;
+#if HAVE_PLEDGE
+	if (privs == PROC_NEED_NONE) {
+		if (pledge("stdio inet", NULL) == -1)
+			err(1, "pledge");
+		return true;
+	}
+#endif
+
+	/* PR_SET_NO_NEW_PRIVS interferes with setcon() */
+	if (privs & PROC_NEED_SETCON)
+		return false;
+
+#if HAVE_LANDLOCK
+	if (confine_landlock(privs))
+		confined = true;
+#endif
+#if HAVE_SECCOMP
+	if (confine_seccomp(privs))
+		confined = true;
+#endif
+	return confined;
 }

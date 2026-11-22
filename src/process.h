@@ -18,6 +18,8 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
+#include <stdbool.h>
+
 #include "config.h"
 
 /* Privileges to keep after do_confine */
@@ -39,6 +41,6 @@ void do_pidfile(char *);
 #if HAVE_LANDLOCK
 int get_landlock_abi(void);
 #endif
-void do_confine(unsigned int privs);
+bool do_confine(unsigned int privs);
 
 #endif
