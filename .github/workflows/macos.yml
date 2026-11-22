@@ -55,7 +55,7 @@ jobs:
       run: >-
         meson setup build-android
         --cross-file .github/macos-android-aarch64.ini
-        --prefix=/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dwerror=true
+        --prefix=/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dstrip=true -Dwerror=true
     - name: build
       working-directory: build-android
       run: ninja
@@ -72,7 +72,7 @@ jobs:
       run: >-
         meson setup build-windows
         --cross-file .github/mingw-windows-x86_64.ini
-        --prefix=/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dwerror=true
+        --prefix=/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dstrip=true -Dwerror=true
     - name: build
       working-directory: build-windows
       run: ninja

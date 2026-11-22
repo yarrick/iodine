@@ -59,7 +59,7 @@ jobs:
     - name: meson setup
       run: >-
         meson setup build
-        --prefix=C:/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dwerror=true
+        --prefix=C:/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dstrip=true -Dwerror=true
     - name: build
       working-directory: build
       run: ninja
@@ -112,7 +112,7 @@ jobs:
       run: >-
         meson setup build-android
         --cross-file .github\windows-android-aarch64.ini
-        --prefix=C:/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dwerror=true
+        --prefix=/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dstrip=true -Dwerror=true
     - name: build
       shell: pwsh
       working-directory: build-android
