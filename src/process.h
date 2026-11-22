@@ -31,7 +31,7 @@ enum proc_need {
 	PROC_NEED_SETCON  = 1 << 5,
 };
 
-void check_privileges(char *username, char *newroot, int port);
+void check_privileges(unsigned int privs, int port);
 void do_chroot(char *);
 void do_setcon(char *);
 void do_detach(void);

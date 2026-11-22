@@ -266,7 +266,7 @@ main(int argc, char **argv)
 			/* NOTREACHED */
 		}
 	}
-	check_privileges(username, newroot, 0);
+	check_privileges(privs, 0);
 
 	argc -= optind;
 	argv += optind;

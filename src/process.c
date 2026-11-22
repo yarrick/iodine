@@ -62,10 +62,9 @@ is_user_in(WELL_KNOWN_SID_TYPE sid_type) {
 #endif
 
 void
-check_privileges(char *username, char *newroot, int port)
+check_privileges(unsigned int privs, int port)
 {
-	(void)username;
-	(void)newroot;
+	(void)privs;
 	(void)port;
 #if HAVE_LIBCAPNG
 	bool capable = true;
@@ -75,7 +74,8 @@ check_privileges(char *username, char *newroot, int port)
 		exit(-1);
 	}
 
-	if (!capng_have_capability(CAPNG_EFFECTIVE, CAP_NET_ADMIN)) {
+	if ((privs & PROC_NEED_TUN) &&
+	    !capng_have_capability(CAPNG_EFFECTIVE, CAP_NET_ADMIN)) {
 		warnx("capabilities: CAP_NET_ADMIN required");
 		capable = false;
 	}
@@ -100,7 +100,7 @@ check_privileges(char *username, char *newroot, int port)
 		}
 	}
 
-	if (username) {
+	if (privs & PROC_NEED_SETUID) {
 		if (!capng_have_capability(CAPNG_EFFECTIVE, CAP_SETUID)) {
 			warnx("capabilities: CAP_SETUID required");
 			capable = false;
@@ -111,7 +111,8 @@ check_privileges(char *username, char *newroot, int port)
 		}
 	}
 
-	if (newroot && !capng_have_capability(CAPNG_EFFECTIVE, CAP_SYS_CHROOT)) {
+	if ((privs & PROC_NEED_CHROOT) &&
+	    !capng_have_capability(CAPNG_EFFECTIVE, CAP_SYS_CHROOT)) {
 		warnx("capabilities: CAP_SYS_CHROOT required");
 		capable = false;
 	}

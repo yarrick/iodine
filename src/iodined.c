@@ -169,6 +169,7 @@ main(int argc, char **argv)
 	int bind_port;
 	struct net_addr bind_addr;
 
+	unsigned int privs;
 	int created_users;
 	struct in_addr my_ip;
 	int choice;
@@ -226,6 +227,7 @@ main(int argc, char **argv)
 	network_init();
 	fw_query_init();
 
+	privs = PROC_NEED_TUN | (CAN_DETACH ? PROC_NEED_DETACH : 0);
 	while ((choice = getopt(argc, argv, "46vcsfhDu:t:d:m:l:L:p:n:b:P:z:F:i:")) != -1) {
 		switch(choice) {
 		case '4':
@@ -245,6 +247,7 @@ main(int argc, char **argv)
 			break;
 		case 'f':
 			foreground = 1;
+			privs &= ~(unsigned int)PROC_NEED_DETACH;
 			break;
 		case 'h':
 			help(stdout);
@@ -254,9 +257,11 @@ main(int argc, char **argv)
 			break;
 		case 'u':
 			username = optarg;
+			privs |= PROC_NEED_SETUID;
 			break;
 		case 't':
 			newroot = optarg;
+			privs |= PROC_NEED_CHROOT;
 			break;
 		case 'd':
 			device = optarg;
@@ -286,6 +291,7 @@ main(int argc, char **argv)
 			break;
 		case 'F':
 			pidfile = optarg;
+			privs |= PROC_NEED_PIDFILE;
 			break;
 		case 'i':
 			max_idle_time = atoi(optarg);
@@ -298,6 +304,7 @@ main(int argc, char **argv)
 			break;
 		case 'z':
 			context = optarg;
+			privs |= PROC_NEED_SETCON;
 			break;
 		default:
 			usage();
@@ -313,7 +320,7 @@ main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
-	check_privileges(username, newroot, port);
+	check_privileges(privs, port);
 
 	netsize = strchr(argv[0], '/');
 	if (netsize) {
