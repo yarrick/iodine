@@ -20,6 +20,17 @@
 
 #include "config.h"
 
+/* Privileges to keep after do_confine */
+enum proc_need {
+	PROC_NEED_NONE    = 0,
+	PROC_NEED_TUN     = 1 << 0,
+	PROC_NEED_SETUID  = 1 << 1,
+	PROC_NEED_CHROOT  = 1 << 2,
+	PROC_NEED_DETACH  = 1 << 3,
+	PROC_NEED_PIDFILE = 1 << 4,
+	PROC_NEED_SETCON  = 1 << 5,
+};
+
 void check_privileges(char *username, char *newroot, int port);
 void do_chroot(char *);
 void do_setcon(char *);
@@ -28,6 +39,6 @@ void do_pidfile(char *);
 #if HAVE_LANDLOCK
 int get_landlock_abi(void);
 #endif
-void do_confine(void);
+void do_confine(unsigned int privs);
 
 #endif

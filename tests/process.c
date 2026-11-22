@@ -112,7 +112,7 @@ END_TEST
 
 START_TEST(test_confine_blocks_fs)
 {
-	do_confine();
+	do_confine(PROC_NEED_NONE);
 #if HAVE_PLEDGE
 	/* Under pledge("stdio inet"), open() raises SIGABRT. */
 	(void)open("/", O_RDONLY);

@@ -25,6 +25,7 @@
 #include "config.h"
 #include "compat.h"
 #include "ui.h"
+#include "process.h"
 
 #ifdef WINDOWS
 #include <windows.h>
@@ -301,34 +302,45 @@ get_landlock_abi(void)
 #endif
 
 void
-do_confine(void)
+do_confine(unsigned int privs)
 {
+	(void)privs;
 #if HAVE_PLEDGE
-	if (pledge("stdio inet", NULL) == -1)
-		err(1, "pledge");
+	if (privs == PROC_NEED_NONE) {
+		if (pledge("stdio inet", NULL) == -1)
+			err(1, "pledge");
+	}
 #elif HAVE_LANDLOCK
 	int abi;
 	int ruleset_fd;
 	struct landlock_ruleset_attr attr = { 0 };
+
+	/* PR_SET_NO_NEW_PRIVS interferes with setcon() */
+	if (privs & PROC_NEED_SETCON)
+		return;
 
 	abi = get_landlock_abi();
 	if (abi < 0)
 		return; /* Kernel does not support Landlock */
 
 	attr.handled_access_fs =
-		LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_WRITE_FILE |
-		LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR |
+		LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_DIR |
 		LANDLOCK_ACCESS_FS_REMOVE_DIR | LANDLOCK_ACCESS_FS_REMOVE_FILE |
 		LANDLOCK_ACCESS_FS_MAKE_CHAR | LANDLOCK_ACCESS_FS_MAKE_DIR |
-		LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_MAKE_SOCK |
-		LANDLOCK_ACCESS_FS_MAKE_FIFO | LANDLOCK_ACCESS_FS_MAKE_BLOCK |
-		LANDLOCK_ACCESS_FS_MAKE_SYM;
+		LANDLOCK_ACCESS_FS_MAKE_SOCK | LANDLOCK_ACCESS_FS_MAKE_FIFO |
+		LANDLOCK_ACCESS_FS_MAKE_BLOCK | LANDLOCK_ACCESS_FS_MAKE_SYM;
+	if ((privs & PROC_NEED_PIDFILE) == 0)
+		attr.handled_access_fs |= LANDLOCK_ACCESS_FS_MAKE_REG;
+	if ((privs & (PROC_NEED_PIDFILE | PROC_NEED_DETACH)) == 0)
+		attr.handled_access_fs |= LANDLOCK_ACCESS_FS_WRITE_FILE;
+	if ((privs & PROC_NEED_DETACH) == 0)
+		attr.handled_access_fs |= LANDLOCK_ACCESS_FS_READ_FILE;
 #ifdef LANDLOCK_ACCESS_FS_REFER
 	if (abi >= 2)
 		attr.handled_access_fs |= LANDLOCK_ACCESS_FS_REFER;
 #endif
 #ifdef LANDLOCK_ACCESS_FS_TRUNCATE
-	if (abi >= 3)
+	if ((privs & PROC_NEED_PIDFILE) == 0 && abi >= 3)
 		attr.handled_access_fs |= LANDLOCK_ACCESS_FS_TRUNCATE;
 #endif
 #ifdef LANDLOCK_ACCESS_NET_BIND_TCP

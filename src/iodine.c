@@ -147,6 +147,7 @@ main(int argc, char **argv)
 	int rtable = 0;
 	struct net_addr nameservaddr;
 	int nameserv_family;
+	unsigned int privs;
 
 	nameserv_host = NULL;
 	topdomain = NULL;
@@ -175,6 +176,7 @@ main(int argc, char **argv)
 	network_init();
 	client_init();
 
+	privs = PROC_NEED_TUN | (CAN_DETACH ? PROC_NEED_DETACH : 0);
 	while ((choice = getopt(argc, argv, "46vfhru:t:d:R:P:m:M:F:T:O:L:I:z:")) != -1) {
 		switch(choice) {
 		case '4':
@@ -188,6 +190,7 @@ main(int argc, char **argv)
 			/* NOTREACHED */
 			break;
 		case 'f':
+			privs &= ~(unsigned int)PROC_NEED_DETACH;
 			foreground = 1;
 			break;
 		case 'h':
@@ -199,9 +202,11 @@ main(int argc, char **argv)
 			break;
 		case 'u':
 			username = optarg;
+			privs |= PROC_NEED_SETUID;
 			break;
 		case 't':
 			newroot = optarg;
+			privs |= PROC_NEED_CHROOT;
 			break;
 		case 'd':
 			device = optarg;
@@ -228,9 +233,11 @@ main(int argc, char **argv)
 			break;
 		case 'z':
 			context = optarg;
+			privs |= PROC_NEED_SETCON;
 			break;
 		case 'F':
 			pidfile = optarg;
+			privs |= PROC_NEED_PIDFILE;
 			break;
 		case 'T':
 			qtype = optarg;
@@ -259,7 +266,6 @@ main(int argc, char **argv)
 			/* NOTREACHED */
 		}
 	}
-
 	check_privileges(username, newroot, 0);
 
 	argc -= optind;
@@ -366,6 +372,7 @@ main(int argc, char **argv)
 	ui_log("Sending DNS queries for %s to %s\n",
 		topdomain, format_addr(&nameservaddr));
 
+	do_confine(privs);
 	if (client_handshake(dns_fd, raw_mode, autodetect_frag_size, max_downstream_frag_size)) {
 		retval = 1;
 		goto cleanup2;
@@ -399,7 +406,7 @@ main(int argc, char **argv)
 
 	if (context != NULL)
 		do_setcon(context);
-	do_confine();
+	do_confine(PROC_NEED_NONE);
 
 	client_tunnel(tun_fd, dns_fd);
 

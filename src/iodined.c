@@ -551,7 +551,7 @@ main(int argc, char **argv)
 
 	if (context != NULL)
 		do_setcon(context);
-	do_confine();
+	do_confine(PROC_NEED_NONE);
 
 	syslog(LOG_INFO, "started, listening on port %d", port);
 	ui_set_debuglevel(debug);
