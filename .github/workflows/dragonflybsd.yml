@@ -1,0 +1,40 @@
+name: dragonflybsd
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+    contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: make
+      uses: vmactions/dragonflybsd-vm@v1.3.5
+      with:
+        prepare: |
+          pkg install -y \
+            check \
+            git \
+            pkgconf \
+            meson \
+            py312-pip \
+            py312-dnspython
+        run: |
+          git config --global --add safe.directory /home/runner/work/iodine/iodine
+          meson setup build -Dwerror=true
+          cd build
+          ninja
+          ./iodine -v
+          ./iodined -v
+          ninja test
+          python3.12 -m pip install ping3
+          ifconfig tun0 create
+          ninja tun_bench
+          ninja test_server
