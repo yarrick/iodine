@@ -402,9 +402,18 @@ tun_add_route(struct sockaddr_in *localaddr, struct sockaddr_in *maskaddr)
 	memcpy(&msg.netmask, maskaddr, sizeof(*maskaddr));
 
 	if (write(rtsock, &msg, sizeof(msg)) < 0) {
-		perror("tun_add_route: Routing add write failed");
-		close(rtsock);
-		return 1;
+		if (errno == EEXIST) {
+			msg.rtm.rtm_type = RTM_CHANGE;
+			if (write(rtsock, &msg, sizeof(msg)) < 0) {
+				perror("tun_add_route: Routing change write failed");
+				close(rtsock);
+				return 1;
+			}
+		} else {
+			perror("tun_add_route: Routing add write failed");
+			close(rtsock);
+			return 1;
+		}
 	}
 
 	close(rtsock);
