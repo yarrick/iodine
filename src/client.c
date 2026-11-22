@@ -1094,7 +1094,7 @@ send_handshake_query(sock_t fd, char *prefix)
 }
 
 static void
-send_raw_udp_login(sock_t dns_fd, int seed)
+send_raw_udp_login(sock_t dns_fd, uint32_t seed)
 {
 	char buf[16];
 	struct raw_msg msg = {
@@ -1137,7 +1137,7 @@ send_downenctest(sock_t fd, char downenc, int variant)
 }
 
 static int
-handshake_version(sock_t dns_fd, int *seed)
+handshake_version(sock_t dns_fd, uint32_t *seed)
 {
 	char hex[] = "0123456789abcdef";
 	char in[4096];
@@ -1183,7 +1183,7 @@ handshake_version(sock_t dns_fd, int *seed)
 }
 
 static int
-handshake_login(sock_t dns_fd, int seed)
+handshake_login(sock_t dns_fd, uint32_t seed)
 {
 	char in[4096];
 	char login[16];
@@ -1242,7 +1242,7 @@ handshake_login(sock_t dns_fd, int seed)
 }
 
 static int
-handshake_raw_udp(sock_t dns_fd, int seed)
+handshake_raw_udp(sock_t dns_fd, uint32_t seed)
 {
 	char get_ip[] = { 'i', b32_5to8(userid), 0 };
 	char in[4096];
@@ -1931,7 +1931,7 @@ rejected:
 int
 client_handshake(sock_t dns_fd, int raw_mode, int autodetect_frag_size, int fragsize)
 {
-	int seed;
+	uint32_t seed;
 	const struct encoder *upcodec;
 	int r;
 

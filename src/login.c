@@ -34,29 +34,23 @@
  * Needs a 16byte array for output, and 32 bytes password
  */
 void
-login_calculate(char *buf, int buflen, const char *pass, int seed)
+login_calculate(char *buf, int buflen, const char *pass, uint32_t seed)
 {
-	unsigned char temp[32];
+	uint32_t temp[8];
 	md5_state_t ctx;
-	int *ix;
 	int i;
-	int k;
 
 	if (buflen < 16)
 		return;
 
-	memcpy(temp, pass, 32);
-	ix = (int*) temp;
+	memcpy(temp, pass, sizeof(temp));
 
 	for (i = 0; i < 8; i++) {
-		k = ntohl(*ix);
-		k ^= seed;
-		*ix++ = htonl(k);
+		temp[i] = htonl(ntohl(temp[i]) ^ seed);
 	}
 
 	md5_init(&ctx);
-	md5_append(&ctx, temp, 32);
+	md5_append(&ctx, (unsigned char *) temp, sizeof(temp));
 	md5_finish(&ctx, (unsigned char *) buf);
-
 }
 

@@ -27,7 +27,7 @@ START_TEST(test_login_hash)
 	char good[] = "\x2A\x8A\x12\xB4\xE0\x42\xEE\xAB\xD0\x19\x17\x1E\x44\xA0\x88\xCD";
 	char pass[32] = "iodine is the shit";
 	int len;
-	int seed;
+	uint32_t seed;
 
 	len = sizeof(ans);
 	seed = 15;
@@ -44,7 +44,7 @@ START_TEST(test_login_hash_short)
 	char check[sizeof(ans)];
 	char pass[32] = "iodine is the shit";
 	int len;
-	int seed;
+	uint32_t seed;
 
 	len = sizeof(ans);
 	seed = 15;

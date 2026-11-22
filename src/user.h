@@ -76,7 +76,7 @@ struct tun_user {
 	int authenticated_raw;
 	int options_locked;
 	time_t last_pkt;
-	int seed;
+	uint32_t seed;
 	struct in_addr tun_ip;
 	struct net_addr host;
 	struct udp_addr raw_addr;
