@@ -37,6 +37,7 @@ endif
 zlib = dependency('zlib')
 commondeps = []
 serverdeps = []
+package_deps = []
 
 header_args = []
 cdata.set10(host_machine.system().to_upper(), true)
@@ -83,7 +84,7 @@ elif host_machine.system() == 'windows'
                                  default_value: '') / 'bin' / 'zlib1.dll'
   endif
   if fs.exists(zlib_dll)
-    fs.copyfile(
+    package_deps += fs.copyfile(
       zlib_dll,
       install: true,
       install_dir: target_dir,
@@ -185,7 +186,7 @@ common_sources = files(
 if host_machine.system() == 'windows'
   common_sources += files('src/tun_windows.c')
   wintun_dll = files('wintun/bin' / host_machine.cpu_family() / 'wintun.dll')
-  fs.copyfile(
+  package_deps += fs.copyfile(
     wintun_dll,
     install: true,
     install_dir: target_dir,
@@ -224,7 +225,7 @@ foreach d : serverdeps
   endif
 endforeach
 
-executable('iodine',
+iodine = executable('iodine',
   sources: files('src/client.c', 'src/iodine.c'),
   c_args: '-DUSED_LIBS="@0@"'.format(', '.join(client_usage)),
   link_with: libcommon,
@@ -240,7 +241,7 @@ libserver = static_library(
   dependencies: zlib,
 )
 
-executable('iodined',
+iodined = executable('iodined',
   sources: files('src/iodined.c'),
   c_args: '-DUSED_LIBS="@0@"'.format(', '.join(server_usage)),
   link_with: libserver,
@@ -248,6 +249,7 @@ executable('iodined',
   install: true,
   install_dir: target_dir,
 )
+package_deps += [iodine, iodined]
 
 if not ['android', 'windows'].contains(host_machine.system())
   man_conf = configuration_data()
@@ -292,7 +294,8 @@ run_target('package',
     meson.project_version(),
     host_machine.system(),
     host_machine.cpu_family(),
-  ]
+  ],
+  depends: package_deps,
 )
 
 subdir('tests')
