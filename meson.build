@@ -94,8 +94,8 @@ elif host_machine.system() == 'windows'
 endif
 add_project_arguments(header_args, language: 'c')
 
-cdata.set10('CAN_DETACH',
-            not ['android', 'windows'].contains(host_machine.system()))
+unixy = not ['android', 'windows'].contains(host_machine.system())
+cdata.set10('CAN_DETACH', unixy)
 
 optional_functions = [
   'CheckTokenMembership',
@@ -249,7 +249,7 @@ iodined = executable('iodined',
 )
 package_deps += [iodine, iodined]
 
-if not ['android', 'windows'].contains(host_machine.system())
+if unixy
   man_conf = configuration_data()
   man_desc = fs.read('man/desc_and_common_options.roff')
   man_conf.set('DESC_AND_COMMON_OPTIONS', man_desc)
@@ -272,6 +272,12 @@ if not ['android', 'windows'].contains(host_machine.system())
   )
 endif
 
+doc_suffix = unixy ? '' : '.txt'
+install_data('CHANGELOG', 'LICENSE',
+  rename: ['CHANGELOG' + doc_suffix, 'LICENSE' + doc_suffix],
+  install_dir: docdir,
+  install_tag: 'doc',
+)
 install_data('README.md',
   install_dir: docdir,
   install_tag: 'doc',
