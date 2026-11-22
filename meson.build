@@ -14,6 +14,7 @@ project(
 )
 fs = import('fs')
 cc = meson.get_compiler('c')
+py3 = import('python').find_installation()
 add_project_arguments(
   cc.get_supported_arguments(['-ffunction-sections','-fdata-sections']),
   language: 'c',
@@ -249,29 +250,6 @@ iodined = executable('iodined',
 )
 package_deps += [iodine, iodined]
 
-if unixy
-  man_conf = configuration_data()
-  man_desc = fs.read('man/desc_and_common_options.roff')
-  man_conf.set('DESC_AND_COMMON_OPTIONS', man_desc)
-  man_example = fs.read('man/examples_and_security.roff')
-  man_conf.set('EXAMPLES_SECURITY', man_example)
-  foreach page : ['iodine', 'iodined']
-    configure_file(
-      input: 'man/@0@.8.in'.format(page),
-      output: '@0@.8'.format(page),
-      configuration: man_conf,
-      install: true,
-      install_dir: get_option('mandir') / 'man8',
-      install_tag: 'man',
-    )
-  endforeach
-  install_data(
-    'misc/bash-completion/iodine',
-    'misc/bash-completion/iodined',
-    install_dir: get_option('datadir') / 'bash-completion' / 'completions',
-  )
-endif
-
 doc_suffix = unixy ? '' : '.txt'
 install_data('CHANGELOG', 'LICENSE',
   rename: ['CHANGELOG' + doc_suffix, 'LICENSE' + doc_suffix],
@@ -290,16 +268,6 @@ if fs.exists(os_readme)
   )
 endif
 
-py3 = import('python').find_installation()
-run_target('package',
-  command: [
-    py3,
-    files('misc/package.py'),
-    meson.project_version(),
-    host_machine.system(),
-    host_machine.cpu_family(),
-  ],
-  depends: package_deps,
-)
-
+subdir('man')
+subdir('misc')
 subdir('tests')
