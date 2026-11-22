@@ -434,6 +434,7 @@ tun_setip(const struct in_addr *ip, const struct in_addr *peer_ip, int netbits)
 	char peer_str[INET_ADDRSTRLEN];
 	char mask_str[INET_ADDRSTRLEN];
 #else
+	struct ifreq ifr;
 	struct in_aliasreq ifra;
 #endif
 
@@ -518,6 +519,15 @@ tun_setip(const struct in_addr *ip, const struct in_addr *peer_ip, int netbits)
 	close(sock);
 	return 0;
 #else
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
+	while (ioctl(sock, SIOCGIFADDR, &ifr) == 0) {
+		if (ioctl(sock, SIOCDIFADDR, &ifr) < 0)
+			break;
+		memset(&ifr, 0, sizeof(ifr));
+		strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
+	}
+
 	memset(&ifra, 0, sizeof(ifra));
 	strlcpy(ifra.ifra_name, if_name, IFNAMSIZ);
 
