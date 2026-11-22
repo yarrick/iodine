@@ -35,4 +35,5 @@ jobs:
           ninja test
           pip install ping3 --break-system-packages
           ninja tun_bench
+          ninja tun_bench
           ninja test_server

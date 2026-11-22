@@ -36,7 +36,9 @@ jobs:
       run: /opt/homebrew/bin/python3 -m pip install ping3 --break-system-packages
     - name: run bench
       working-directory: build
-      run: sudo -E ninja tun_bench
+      run: |
+        sudo -E ninja tun_bench
+        sudo -E ninja tun_bench
     - name: install dnspython
       run: /opt/homebrew/bin/python3 -m pip install dnspython --break-system-packages
     - name: run test_server

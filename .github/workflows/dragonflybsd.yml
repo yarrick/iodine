@@ -37,4 +37,5 @@ jobs:
           python3.12 -m pip install ping3
           ifconfig tun0 create
           ninja tun_bench
+          ninja tun_bench
           ninja test_server
