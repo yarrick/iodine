@@ -294,14 +294,14 @@ close_tun(sock_t tun_fd)
 static int
 tun_uses_header(void)
 {
-#if defined (FREEBSD) || defined (NETBSD) || HAIKU
-	/* FreeBSD/NetBSD/Haiku has no header */
-	return 0;
-#elif defined (DARWIN)
+#if defined (DARWIN)
 	/* Darwin tun has no header, Darwin utun does */
 	return !strncmp(if_name, "utun", 4);
-#else  /* LINUX/OPENBSD */
+#elif defined(LINUX) || defined(OPENBSD)
 	return 1;
+#else
+	/* FreeBSD/DragonFlyBSD/NetBSD/Haiku has no header */
+	return 0;
 #endif
 }
 
