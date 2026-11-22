@@ -44,14 +44,12 @@
 #include <netinet/ip.h>
 #endif
 
-#if TUN_ADD_ROUTE
+#if !defined(LINUX) && !defined(HAIKU)
 #include <sys/sockio.h>
 #include <net/route.h>
 #include <net/if_dl.h>
 #include <netinet/in_var.h>
-#endif
-
-#ifdef HAIKU
+#elif defined(HAIKU)
 #include <sys/sockio.h>
 #endif
 
@@ -356,7 +354,7 @@ read_tun(sock_t tun_fd, char *buf, size_t len)
 	}
 }
 
-#if TUN_ADD_ROUTE
+#if !defined(LINUX) && !defined(HAIKU)
 static int
 tun_add_route(struct sockaddr_in *localaddr, struct sockaddr_in *maskaddr)
 {

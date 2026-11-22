@@ -198,8 +198,6 @@ else
     host_machine.system() == 'android' ? '/dev/tun' : '/dev/net/tun')
   cdata.set_quoted('TUN_NAME_PREFIX',
     host_machine.system() == 'haiku' ? 'tun/' : 'tun')
-  cdata.set10('TUN_ADD_ROUTE',
-    ['netbsd', 'freebsd', 'openbsd', 'darwin'].contains(host_machine.system()))
 endif
 
 configure_file(output: 'config.h',
