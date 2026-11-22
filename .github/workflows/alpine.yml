@@ -11,13 +11,29 @@ permissions:
 
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            seccomp: enabled
+          - platform: linux/s390x
+            seccomp: disabled
+          - platform: linux/arm/v7
+            seccomp: disabled
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v7
+    - name: set up QEMU
+      if: matrix.platform != 'linux/amd64'
+      uses: docker/setup-qemu-action@v4
+      with:
+        platforms: s390x,arm
     - name: start alpine container
       run: >-
         docker run -d --name alpine
+        --platform ${{ matrix.platform }}
         --security-opt seccomp=unconfined
         -v "${{ github.workspace }}:/src"
         -w /src
@@ -30,7 +46,10 @@ jobs:
     - name: meson setup
       run: |
         docker exec alpine git config --global --add safe.directory /src
-        docker exec alpine meson setup build -Dunit_tests=enabled -Dwerror=true
+        docker exec alpine meson setup build \
+          -Dseccomp=${{ matrix.seccomp }} \
+          -Dunit_tests=enabled \
+          -Dwerror=true
     - name: build
       run: |
         docker exec alpine ninja -C build
