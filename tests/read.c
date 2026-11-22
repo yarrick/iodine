@@ -48,7 +48,7 @@ START_TEST(test_read_putshort)
 		ck_assert_int_eq(ntohs(k), i);
 
 		p = (char*)&k;
-		readshort(NULL, &p, &l);
+		readshort(&p, &l);
 		ck_assert_int_eq(l, i);
 	}
 }
@@ -69,7 +69,7 @@ START_TEST(test_read_putlong)
 		ck_assert_int_eq(ntohl(k), j);
 
 		p = (char*)&k;
-		readlong(NULL, &p, &l);
+		readlong(&p, &l);
 		ck_assert_int_eq(l, j);
 	}
 }

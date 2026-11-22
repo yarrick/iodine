@@ -496,8 +496,8 @@ decode_question(struct dns_msg *q, qr_t qr, char *packet, size_t packetlen, char
 	if (!namelen)
 		return -1;
 	CHECKLEN(4);
-	readshort(packet, &data, &q->type);
-	readshort(packet, &data, &class);
+	readshort(&data, &q->type);
+	readshort(&data, &class);
 
 	strlcpy(q->name, name, sizeof(q->name));
 	q->id = ntohs(header->id);
@@ -569,10 +569,10 @@ dns_decode_answer(char *buf, size_t buflen, struct dns_msg *q,
 		if (!readname(packet, packetlen, &data, name, sizeof(name)))
 			return 0;
 		CHECKLEN(10);
-		readshort(packet, &data, &rtype);
-		readshort(packet, &data, &class);
-		readlong(packet, &data, &ttl);
-		readshort(packet, &data, &rlen);
+		readshort(&data, &rtype);
+		readshort(&data, &class);
+		readlong(&data, &ttl);
+		readshort(&data, &rlen);
 		rdatastart = data;
 
 		/* The advertised rdata length must not exceed
@@ -596,7 +596,7 @@ dns_decode_answer(char *buf, size_t buflen, struct dns_msg *q,
 		case T_AAAA:
 			/* Assume that first answer is what we wanted */
 			rv = MIN(rlen, buflen);
-			return readdata(packet, &data, buf, rv);
+			return readdata(&data, buf, rv);
 		case T_CNAME:
 			/* Assume that first answer is what we wanted */
 			/* For tunnels, query type A has CNAME type answer */
@@ -606,7 +606,7 @@ dns_decode_answer(char *buf, size_t buflen, struct dns_msg *q,
 			return rv ? (rv - 1) : rv;
 		case T_TXT:
 			/* Assume that first answer is what we wanted */
-			rv = readtxtbin(packet, &data, rlen, rdata,
+			rv = readtxtbin(&data, rlen, rdata,
 					sizeof(rdata));
 			if (rv >= 1) {
 				rv = MIN(rv, buflen);
@@ -619,7 +619,7 @@ dns_decode_answer(char *buf, size_t buflen, struct dns_msg *q,
 		case T_SRV:
 			if (rlen < 3)
 				return 0;
-			readshort(packet, &data, &pref);
+			readshort(&data, &pref);
 			if (rtype == T_SRV) {
 				if (rlen < 7)
 					return 0;

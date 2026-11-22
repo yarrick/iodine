@@ -22,10 +22,10 @@
 #include <stdint.h>
 
 unsigned int readname(char *, int, char **, char *, size_t);
-unsigned int readshort(char *, char **, unsigned short *);
-unsigned int readlong(char *, char **, uint32_t *);
-unsigned int readdata(char *, char **, char *, size_t);
-unsigned int readtxtbin(char *, char **, size_t, char *, size_t);
+unsigned int readshort(char **, unsigned short *);
+unsigned int readlong(char **, uint32_t *);
+unsigned int readdata(char **, char *, size_t);
+unsigned int readtxtbin(char **, size_t, char *, size_t);
 
 int putname(char **, size_t, const char *);
 int putbyte(char **, unsigned char);

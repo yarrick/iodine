@@ -520,7 +520,7 @@ handle_version_request(sock_t dns_fd, char *in, int domain_len, struct dns_msg *
 	if (read > 4) {
 		/* Received V + 32bits version */
 		char *reader = unpacked;
-		readlong(unpacked, &reader, &version);
+		readlong(&reader, &version);
 	}
 
 	if (version != PROTOCOL_VERSION) {
