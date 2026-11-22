@@ -1,0 +1,46 @@
+# bash completion for iodine
+
+_iodine()
+{
+	local cur prev
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+	case "$prev" in
+	-u)
+		COMPREPLY=( $(compgen -u -- "$cur") )
+		return
+		;;
+	-t)
+		compopt -o filenames 2>/dev/null
+		COMPREPLY=( $(compgen -d -- "$cur") )
+		return
+		;;
+	-F)
+		compopt -o filenames 2>/dev/null
+		COMPREPLY=( $(compgen -f -- "$cur") )
+		return
+		;;
+	-T)
+		COMPREPLY=( $(compgen -W "NULL PRIVATE TXT SRV MX CNAME A" -- "$cur") )
+		return
+		;;
+	-O)
+		COMPREPLY=( $(compgen -W "Base32 Base64 Base64u Base128 Raw" -- "$cur") )
+		return
+		;;
+	-L)
+		COMPREPLY=( $(compgen -W "0 1" -- "$cur") )
+		return
+		;;
+	-d|-R|-P|-m|-M|-I|-z)
+		return
+		;;
+	esac
+
+	if [[ "$cur" == -* ]]; then
+		COMPREPLY=( $(compgen -W "-4 -6 -v -f -h -r -u -t -d -R -P -m -M -F -T -O -L -I -z" -- "$cur") )
+	fi
+}
+
+complete -F _iodine iodine

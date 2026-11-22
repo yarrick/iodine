@@ -1,0 +1,64 @@
+# bash completion for iodined
+
+_iodined_ips()
+{
+	if declare -F _comp_compgen_ip_addresses >/dev/null; then
+		_comp_compgen_ip_addresses "$@"
+	elif declare -F _ip_addresses >/dev/null; then
+		_ip_addresses "$@"
+	fi
+}
+
+_iodined()
+{
+	local cur prev words cword comp_args
+	if declare -F _comp_initialize >/dev/null; then
+		_comp_initialize -n : -- "$@" || return
+	elif declare -F _init_completion >/dev/null; then
+		_init_completion -n : || return
+	else
+		COMPREPLY=()
+		cur="${COMP_WORDS[COMP_CWORD]}"
+		prev="${COMP_WORDS[COMP_CWORD-1]}"
+	fi
+
+	case "$prev" in
+	-u)
+		COMPREPLY=( $(compgen -u -- "$cur") )
+		return
+		;;
+	-t)
+		compopt -o filenames 2>/dev/null
+		COMPREPLY=( $(compgen -d -- "$cur") )
+		return
+		;;
+	-F)
+		compopt -o filenames 2>/dev/null
+		COMPREPLY=( $(compgen -f -- "$cur") )
+		return
+		;;
+	-l)
+		_iodined_ips
+		COMPREPLY+=( $(compgen -W "external" -- "$cur") )
+		return
+		;;
+	-L)
+		_iodined_ips -6
+		return
+		;;
+	-n)
+		_iodined_ips
+		COMPREPLY+=( $(compgen -W "auto" -- "$cur") )
+		return
+		;;
+	-d|-m|-p|-b|-P|-z|-i)
+		return
+		;;
+	esac
+
+	if [[ "$cur" == -* ]]; then
+		COMPREPLY=( $(compgen -W "-4 -6 -v -c -s -f -h -D -u -t -d -m -l -L -p -n -b -P -z -F -i" -- "$cur") )
+	fi
+}
+
+complete -F _iodined iodined

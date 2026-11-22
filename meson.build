@@ -265,6 +265,11 @@ if not ['android', 'windows'].contains(host_machine.system())
       install_tag: 'man',
     )
   endforeach
+  install_data(
+    'misc/bash-completion/iodine',
+    'misc/bash-completion/iodined',
+    install_dir: get_option('datadir') / 'bash-completion' / 'completions',
+  )
 endif
 
 install_data('README.md',
