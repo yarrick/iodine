@@ -52,7 +52,10 @@ jobs:
     - name: install deps
       run: brew install meson
     - name: meson setup
-      run: meson setup build-android --cross-file .github/macos-android-aarch64.ini -Dwerror=true
+      run: >-
+        meson setup build-android
+        --cross-file .github/macos-android-aarch64.ini
+        --prefix=/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dwerror=true
     - name: build
       working-directory: build-android
       run: ninja
@@ -66,7 +69,10 @@ jobs:
     - name: install deps
       run: brew install check meson mingw-w64
     - name: meson setup
-      run: meson setup build-windows --cross-file .github/mingw-windows-x86_64.ini -Dwerror=true
+      run: >-
+        meson setup build-windows
+        --cross-file .github/mingw-windows-x86_64.ini
+        --prefix=/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dwerror=true
     - name: build
       working-directory: build-windows
       run: ninja

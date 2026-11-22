@@ -20,18 +20,21 @@ jobs:
             msystem: UCRT64
             pkg_prefix: mingw-w64-ucrt-x86_64
             bench: true
+            package: false
 
           - name: build CLANG64
             runner: windows-latest
             msystem: CLANG64
             pkg_prefix: mingw-w64-clang-x86_64
             bench: false
+            package: true
 
           - name: build CLANGARM64
             runner: windows-11-arm
             msystem: CLANGARM64
             pkg_prefix: mingw-w64-clang-aarch64
             bench: true
+            package: true
 
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
@@ -54,7 +57,9 @@ jobs:
           ${{ matrix.pkg_prefix }}-python-pip
           ${{ matrix.pkg_prefix }}-python-dnspython
     - name: meson setup
-      run: meson setup build -Dwerror=true
+      run: >-
+        meson setup build
+        --prefix=C:/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dwerror=true
     - name: build
       working-directory: build
       run: ninja
@@ -77,6 +82,16 @@ jobs:
     - name: run test_server
       working-directory: build
       run: ninja test_server
+    - name: package
+      if: matrix.package
+      working-directory: build
+      run: ninja package
+    - name: upload package
+      if: matrix.package
+      uses: actions/upload-artifact@v7
+      with:
+        path: build/iodine-*.zip
+        archive: false
 
   build-android:
 
@@ -94,7 +109,10 @@ jobs:
         refreshenv
     - name: meson setup
       shell: pwsh
-      run: meson setup build-android --cross-file .github\windows-android-aarch64.ini -Dwerror=true
+      run: >-
+        meson setup build-android
+        --cross-file .github\windows-android-aarch64.ini
+        --prefix=C:/ -Dbindir=bin -Dsbindir=bin -Ddocdir=doc -Dwerror=true
     - name: build
       shell: pwsh
       working-directory: build-android
