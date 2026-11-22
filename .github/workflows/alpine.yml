@@ -1,0 +1,42 @@
+name: alpine
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+    contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: start alpine container
+      run: >-
+        docker run -d --name alpine
+        --security-opt seccomp=unconfined
+        -v "${{ github.workspace }}:/src"
+        -w /src
+        alpine:latest sleep infinity
+    - name: install deps
+      run: >-
+        docker exec alpine apk add --no-cache
+        gcc musl-dev linux-headers meson samurai pkgconf git
+        zlib-dev check-dev libcap-ng-dev libseccomp-dev python3 py3-dnspython
+    - name: meson setup
+      run: |
+        docker exec alpine git config --global --add safe.directory /src
+        docker exec alpine meson setup build -Dunit_tests=enabled -Dwerror=true
+    - name: build
+      run: |
+        docker exec alpine ninja -C build
+        docker exec alpine ./build/iodine -v
+        docker exec alpine ./build/iodined -v
+    - name: test
+      run: docker exec alpine ninja -C build test
+    - name: test_server
+      run: docker exec alpine ninja -C build test_server
