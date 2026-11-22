@@ -125,6 +125,31 @@ START_TEST(test_confine_blocks_fs)
 }
 END_TEST
 
+#if HAVE_LANDLOCK
+START_TEST(test_confine_detach_staged)
+{
+	int fd;
+
+	if (get_landlock_abi() < 1)
+		return;
+
+	do_confine(PROC_NEED_DETACH);
+
+	/* Stage 1: /dev/null O_RDWR (used by do_detach) works, dirs are blocked */
+	fd = open("/dev/null", O_RDWR);
+	ck_assert_int_ge(fd, 0);
+	close(fd);
+	ck_assert_int_eq(open("/", O_RDONLY), -1);
+	ck_assert_int_eq(errno, EACCES);
+
+	/* Stage 2: /dev/null is now blocked too */
+	do_confine(PROC_NEED_NONE);
+	ck_assert_int_eq(open("/dev/null", O_RDWR), -1);
+	ck_assert_int_eq(errno, EACCES);
+}
+END_TEST
+#endif
+
 TCase *
 test_create(void)
 {
@@ -140,6 +165,9 @@ test_create(void)
 	tcase_add_test_raise_signal(tc, test_confine_blocks_fs, SIGABRT);
 #else
 	tcase_add_test(tc, test_confine_blocks_fs);
+#endif
+#if HAVE_LANDLOCK
+	tcase_add_test(tc, test_confine_detach_staged);
 #endif
 	return tc;
 }
