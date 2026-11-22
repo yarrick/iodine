@@ -80,7 +80,7 @@ START_TEST(test_encode_query)
 	enclen = sizeof(resolv);
 	memset(&buf, 0, sizeof(buf));
 	memset(&resolv, 0, sizeof(resolv));
-	memset(&q, 0, sizeof(struct dns_msg));
+	memset(&q, 0, sizeof(q));
 	q.type = T_NULL;
 	q.id = 1337;
 	q.edns0 = true;
@@ -117,7 +117,7 @@ START_TEST(test_decode_query)
 	const struct encoder *enc;
 	size_t len;
 
-	memset(&q, 0, sizeof(struct dns_msg));
+	memset(&q, 0, sizeof(q));
 	memset(&buf, 0, sizeof(buf));
 	q.id = 0;
 	len = sizeof(query_packet) - 1;
@@ -145,7 +145,7 @@ START_TEST(test_encode_response)
 
 	len = sizeof(buf);
 	memset(&buf, 0, sizeof(buf));
-	memset(&q, 0, sizeof(struct dns_msg));
+	memset(&q, 0, sizeof(q));
 	strlcpy(q.name, host, DNS_MSG_NAME_SIZE);
 	q.type = T_NULL;
 	q.id = 1337;

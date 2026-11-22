@@ -59,7 +59,7 @@ base128_reverse_init(void)
 	unsigned char c;
 
 	if (!reverse_init) {
-		memset(rev128, 0, 256);
+		memset(rev128, 0, sizeof(rev128));
 		for (i = 0; i < 128; i++) {
 			c = cb128[i];
 			rev128[(int) c] = i;

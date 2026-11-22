@@ -154,7 +154,7 @@ main(int argc, char **argv)
 	errormsg = NULL;
 	username = NULL;
 	run_as = NULL;
-	memset(password, 0, 33);
+	memset(password, 0, sizeof(password));
 	foreground = 0;
 	newroot = NULL;
 	context = NULL;

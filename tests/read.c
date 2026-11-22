@@ -314,7 +314,7 @@ START_TEST(test_putname)
 	char *b;
 	int ret;
 
-	memset(buf, 0, 256);
+	memset(buf, 0, sizeof(buf));
 	b = buf;
 	ret = putname(&b, 256, domain);
 
@@ -332,7 +332,7 @@ START_TEST(test_putname_nodot)
 	char *b;
 	int ret;
 
-	memset(buf, 0, 256);
+	memset(buf, 0, sizeof(buf));
 	b = buf;
 	ret = putname(&b, 256, nodot);
 
@@ -354,7 +354,7 @@ START_TEST(test_putname_toolong)
 	char *b;
 	int ret;
 
-	memset(buf, 0, 256);
+	memset(buf, 0, sizeof(buf));
 	b = buf;
 	ret = putname(&b, 256, toolong);
 

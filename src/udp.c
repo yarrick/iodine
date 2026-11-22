@@ -219,8 +219,8 @@ read_udp(sock_t fd, char *packet, size_t packetlen, struct udp_addr *addr)
 	}
 	addr->remote.addrlen = addrlen;
 
-	memset(&addr->local.addr, 0, sizeof(struct sockaddr_storage));
-	addr->local.addrlen = sizeof(struct sockaddr_storage);
+	memset(&addr->local.addr, 0, sizeof(addr->local.addr));
+	addr->local.addrlen = sizeof(addr->local.addr);
 	/* Read destination IP address */
 	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
 		cmsg = CMSG_NXTHDR(&msg, cmsg)) {

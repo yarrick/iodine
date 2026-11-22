@@ -40,7 +40,7 @@ base32_reverse_init(void)
 	unsigned char c;
 
 	if (!reverse_init) {
-		memset(rev32, 0, 256);
+		memset(rev32, 0, sizeof(rev32));
 		for (i = 0; i < 32; i++) {
 			c = cb32[i];
 			rev32[(int) c] = i;
