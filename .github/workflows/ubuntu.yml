@@ -164,14 +164,32 @@ jobs:
     - name: build
       working-directory: build
       run: ninja tests/fuzz_server
+    - name: meson setup cmplog
+      env:
+        CC: afl-cc
+      run: >-
+        meson setup build-cmplog
+        -Dwerror=true
+    - name: build cmplog
+      working-directory: build-cmplog
+      env:
+        AFL_LLVM_CMPLOG: "1"
+      run: ninja tests/fuzz_server
     - name: fuzz
       env:
         AFL_BENCH_UNTIL_CRASH: "1"
         AFL_NO_UI: "1"
         AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES: "1"
         AFL_SKIP_CPUFREQ: "1"
+      run: >-
+        afl-fuzz -V 180
+        -i tests/fuzz/server_input/
+        -o fuzzed
+        -c ./build-cmplog/tests/fuzz_server
+        -l 2AT
+        -- ./build/tests/fuzz_server
+    - name: check results
       run: |
-        afl-fuzz -V 180 -i tests/fuzz/server_input/ -o fuzzed -- ./build/tests/fuzz_server
         cat fuzzed/default/fuzzer_stats
         if ! grep -q '^saved_crashes *: 0$' fuzzed/default/fuzzer_stats; then
           for f in fuzzed/default/crashes/id:*; do
