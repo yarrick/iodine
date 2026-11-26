@@ -18,6 +18,8 @@ jobs:
     - uses: actions/checkout@v7
     - name: install deps
       run: brew install check meson
+    - name: install dnspython
+      run: /opt/homebrew/bin/python3 -m pip install dnspython --break-system-packages
     - name: meson setup
       run: meson setup build -Dwerror=true
     - name: build
@@ -39,8 +41,6 @@ jobs:
       run: |
         sudo -E ninja tun_bench
         sudo -E ninja tun_bench
-    - name: install dnspython
-      run: /opt/homebrew/bin/python3 -m pip install dnspython --break-system-packages
     - name: run test_server
       working-directory: build
       run: ninja test_server

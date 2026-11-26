@@ -1,3 +1,4 @@
+import argparse
 import base64
 import contextlib
 import hashlib
@@ -22,11 +23,13 @@ _B32_ENC_TRANS = str.maketrans(
 )
 _B32_DEC_TRANS = {v: k for k, v in _B32_ENC_TRANS.items()}
 
-if len(sys.argv) < 3:
-    sys.stderr.write(f"Usage: {sys.argv[0]} <thin_server> <os>\n")
-    sys.exit(1)
+parser = argparse.ArgumentParser()
+parser.add_argument("thin_server")
+parser.add_argument("os")
+parser.add_argument("--offline", action="store_true")
+args = parser.parse_args()
 
-binary, target_os = sys.argv[1], sys.argv[2].lower()
+binary, target_os, offline = args.thin_server, args.os.lower(), args.offline
 
 
 def b32_encode(data):
@@ -347,8 +350,9 @@ def build_suite(srv):
 
 
 try:
+    ns_ips = (None, "1.2.3.4") if offline else (None, "1.2.3.4", "auto")
     with contextlib.ExitStack() as stack:
-        srvs = [stack.enter_context(ThinServer(ns_ip)) for ns_ip in (None, "1.2.3.4", "auto")]
+        srvs = [stack.enter_context(ThinServer(ns_ip)) for ns_ip in ns_ips]
         print(f"[test] Testing addresses " + ", ".join([str(ip) for ip in srvs[0].ips]), flush=True)
         suite = unittest.TestSuite(build_suite(srv) for srv in srvs)
         if suite.countTestCases() == 0:

@@ -81,6 +81,19 @@ test_server_deps = [thin_server]
 if host_machine.system() == 'windows' and fs.exists(zlib_dll)
   test_server_deps += fs.copyfile(zlib_dll)
 endif
+py3_dns = import('python').find_installation(modules: ['dns'], required: false)
+if meson.can_run_host_binaries() and py3_dns.found()
+  test('server',
+    py3_dns,
+    args: [
+      files('test_server.py'),
+      thin_server.full_path(),
+      host_machine.system(),
+      '--offline',
+    ],
+    depends: test_server_deps,
+  )
+endif
 run_target('test_server',
   command: [
     py3,
